@@ -66,7 +66,7 @@ final class MaterialDraftTask implements GrowthAiTask
 
     public const MAIL_PROFILE = 'main_mail_v1';
 
-    public const MAIL_PROMPT_VERSION = 'material_main_mail_v3';
+    public const MAIL_PROMPT_VERSION = 'material_main_mail_v4';
 
     public const MAIL_SCHEMA_VERSION = 'material_main_mail_schema_v1';
 
@@ -431,6 +431,9 @@ final class MaterialDraftTask implements GrowthAiTask
             $this->addVoiceAndWork($input, $context);
         } else {
             $input['current_draft'] = $this->string($context['current_draft'] ?? '');
+            if ($this->materialKey === self::MAIL_MATERIAL_KEY) {
+                $input['current_draft'] = \App\Support\GrowthOS\MailHtmlFormatter::plainForAi($input['current_draft']);
+            }
         }
 
         if ($isGraphic) {
@@ -525,6 +528,9 @@ final class MaterialDraftTask implements GrowthAiTask
     {
         $mode = self::aiMode(data_get($context, 'work.mode'));
         $text = $this->string(data_get($context, 'work.text', ''));
+        if ($this->materialKey === self::MAIL_MATERIAL_KEY) {
+            $text = \App\Support\GrowthOS\MailHtmlFormatter::plainForAi($text);
+        }
         $input['mode'] = $mode;
 
         if ($mode === self::MODE_REFINE) {
@@ -734,9 +740,6 @@ final class MaterialDraftTask implements GrowthAiTask
         $subjects = array_map(static fn (mixed $subject): string => self::upperFirstLetter(trim((string) $subject)), $response->payload['subject_options']);
         $preheader = self::upperFirstLetter(trim((string) $response->payload['preheader']));
         $body = AiListFormatter::lineBreaks((string) $response->payload['body']);
-        if ($this->materialKey === self::MAIL_MATERIAL_KEY && (bool) data_get($input, 'style.html', false)) {
-            $body = \App\Support\GrowthOS\MailHtmlFormatter::format($body);
-        }
         $changeSummary = AiListFormatter::lineBreaks((string) $response->payload['change_summary']);
 
         if (in_array('', $subjects, true) || $preheader === '' || $body === '' || $changeSummary === '') {
@@ -891,7 +894,7 @@ Jeżeli style.length ma wartość "long", body ma około 300–450 słów: szers
 Termin podaj dokładnie tak jak w campaign.live_label. Nie zmieniaj ani nie poprawiaj terminu.
 Jeżeli campaign.host_name nie jest puste, przedstaw prowadzącego dokładnie tym imieniem i nazwiskiem, bez dopisywania tytułów, stanowisk, osiągnięć ani biografii. Jeżeli jest puste, nie wymyślaj prowadzącego.
 Nie podawaj żadnego adresu URL. W miejscu linku lub przycisku zapisu wstaw w osobnej linii dokładnie znacznik [LINK DO ZAPISU], który właściciel podmieni ręcznie.
-Jeżeli style.html ma wartość true, body zostaje zwykłym tekstem, bez znaczników HTML, tabel i stylów. Punkty programu pisz w osobnych liniach zaczynających się od „- ”. Aplikacja złoży z tego tekstu mail HTML. Jeżeli author_draft jest już kodem HTML, przepisz widoczną treść na zwykły tekst i popraw ją według instruction.
+Jeżeli style.html ma wartość true, body zostaje zwykłym tekstem, bez znaczników HTML, tabel i stylów. Punkty programu pisz w osobnych liniach zaczynających się od „- ”. Nie zwracaj szablonu, stylów ani przycisku. Aplikacja dokłada szablon i jeden przycisk zapisu. Jeżeli author_draft jest już kodem HTML, przepisz widoczną treść na zwykły tekst i popraw ją według instruction.
 Zakończ body podpisem: „Z pozdrowieniami,”, a w kolejnych liniach campaign.host_name (jeżeli nie jest puste) i „Zespół PNE”. Nie dodawaj stopki prawnej, adresu firmy ani linku do wypisania się z listy — doda je system mailingowy.
 Jeżeli source_materials.youtube_description nie jest puste, to zatwierdzony opis tego webinaru na YouTube. Traktuj go jako źródło faktów i spójnego przekazu, ale go nie kopiuj.
 Korzystaj wyłącznie z faktów zawartych w wejściu. Nie wymyślaj danych, statystyk, przepisów, funkcji produktów, ceny, certyfikatów, zaświadczeń, akredytacji ani dofinansowania.

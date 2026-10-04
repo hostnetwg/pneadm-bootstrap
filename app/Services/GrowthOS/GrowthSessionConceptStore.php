@@ -8,7 +8,9 @@ use App\Models\GrowthOS\GrowthArtifactVersion;
 use App\Models\GrowthOS\GrowthCampaign;
 use App\Models\GrowthOS\GrowthDecision;
 use App\Models\User;
+use App\Services\GrowthOS\AI\Tasks\MaterialDraftTask;
 use App\Support\GrowthOS\DemoTikWebinarProject;
+use App\Support\GrowthOS\MailTemplates;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
@@ -307,9 +309,19 @@ class GrowthSessionConceptStore
         $draft = (string) ($material['draft'] ?? '');
         $previousPayload = $artifact->exists && is_array($artifact->payload) ? $artifact->payload : null;
         $draftChanged = $previousPayload === null || (string) ($previousPayload['draft'] ?? '') !== $draft;
+        $isMainMail = $materialId === MaterialDraftTask::MAIL_MATERIAL_KEY;
+        $templateKey = $isMainMail
+            ? MailTemplates::key($material['template_key'] ?? ($previousPayload['template_key'] ?? null))
+            : null;
+        $hadTemplate = is_array($previousPayload) && array_key_exists('template_key', $previousPayload);
+        $templateChanged = $isMainMail && $previousPayload !== null && (
+            ($hadTemplate && MailTemplates::key($previousPayload['template_key']) !== $templateKey)
+            || (! $hadTemplate && $templateKey !== MailTemplates::DEFAULT)
+        );
+        $changed = $draftChanged || $templateChanged;
 
-        DB::transaction(function () use ($artifact, $material, $workspaceStatus, $draft, $previousPayload, $draftChanged, $actor, $source, $restoredFromVersion): void {
-            if ($draftChanged && $previousPayload !== null && ! $artifact->versions()->exists()) {
+        DB::transaction(function () use ($artifact, $material, $workspaceStatus, $draft, $previousPayload, $changed, $templateKey, $isMainMail, $actor, $source, $restoredFromVersion): void {
+            if ($changed && $previousPayload !== null && ! $artifact->versions()->exists()) {
                 $artifact->versions()->create([
                     'version' => (int) $artifact->version,
                     'source' => GrowthArtifactVersion::SOURCE_BASELINE,
@@ -324,16 +336,20 @@ class GrowthSessionConceptStore
             $artifact->summary = trim((string) ($material['summary'] ?? '')) ?: null;
             $artifact->schema_version = self::SCHEMA_VERSION;
             $artifact->version = $artifact->exists ? ((int) $artifact->version + 1) : 1;
-            $artifact->payload = [
+            $payload = [
                 'status' => $workspaceStatus,
                 'draft' => $draft,
             ];
+            if ($isMainMail) {
+                $payload['template_key'] = $templateKey;
+            }
+            $artifact->payload = $payload;
             if (! $artifact->exists) {
                 $artifact->created_by_user_id = $actor->id;
             }
             $artifact->save();
 
-            if (! $draftChanged) {
+            if (! $changed) {
                 return;
             }
 
@@ -605,6 +621,9 @@ class GrowthSessionConceptStore
             }
             if (is_string($artifact->payload['draft'] ?? null)) {
                 $materials[$index]['draft'] = $artifact->payload['draft'];
+            }
+            if (($material['id'] ?? null) === MaterialDraftTask::MAIL_MATERIAL_KEY && is_string($artifact->payload['template_key'] ?? null)) {
+                $materials[$index]['template_key'] = MailTemplates::key($artifact->payload['template_key']);
             }
         }
 

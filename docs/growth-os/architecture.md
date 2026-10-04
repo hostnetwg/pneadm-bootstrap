@@ -94,9 +94,9 @@ Nie tworzymy w v0.1 tabel `growth_topics`, `growth_experts`, `growth_campaign_to
 
 `growth_artifact_versions` (DEC-027, poza zakresem v0.1)
 
-- historia treści materiału: `growth_artifact_id`, `version`, `source` (`baseline`, `manual`, `ai_apply`, `restore`), `restored_from_version`, `payload` (`status`, `draft`), `created_by_user_id`, `created_at`,
+- historia treści materiału: `growth_artifact_id`, `version`, `source` (`baseline`, `manual`, `ai_apply`, `restore`), `restored_from_version`, `payload` (`status`, `draft`, a dla `main-mail` także `template_key`), `created_by_user_id`, `created_at`,
 - `unique(growth_artifact_id, version)`, kasowanie razem z artifactem,
-- wiersz powstaje tylko przy zmianie szkicu; zostaje ostatnie 20 na artifact,
+- wiersz powstaje przy zmianie szkicu, a dla mailingu głównego także przy zmianie `template_key`; zostaje ostatnie 20 na artifact,
 - przywrócenie dopisuje nowy wiersz, nigdy nie zmienia starych.
 
 ### Statusy Kanoniczne

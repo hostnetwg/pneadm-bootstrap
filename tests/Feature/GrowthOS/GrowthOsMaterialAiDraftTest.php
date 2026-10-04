@@ -1288,13 +1288,15 @@ class GrowthOsMaterialAiDraftTest extends TestCase
         $this->assertStringContainsString('style.html', $this->provider->instructions);
         $draft = $this->proposal(self::MAIL)['draft'];
         $fields = MaterialDraftTask::parseMainMail($draft);
-        $this->assertStringContainsString(MailHtmlFormatter::MARKER, $fields['body']);
-        $this->assertStringContainsString('href="'.MaterialDraftTask::LINK_PLACEHOLDER.'"', $fields['body']);
-        $this->assertStringContainsString('Zapisz się na webinar', $fields['body']);
-        $this->assertStringContainsString('<li style="margin:0 0 8px;">Pierwszy punkt</li>', $fields['body']);
-        $this->assertStringContainsString('Drugi &lt;b&gt;punkt&lt;/b&gt;', $fields['body']);
-        $this->assertStringNotContainsString('Zapisz się:', $fields['body']);
+        $this->assertStringNotContainsString(MailHtmlFormatter::MARKER, $fields['body']);
+        $this->assertStringNotContainsString('<table', $fields['body']);
+        $this->assertStringContainsString('Pierwszy punkt', $fields['body']);
+        $this->assertStringContainsString('Drugi <b>punkt</b>', $fields['body']);
         $this->assertSame('Praktyczny webinar dla nauczycieli.', $fields['preheader']);
+        $preview = MailHtmlFormatter::format($fields['body']);
+        $this->assertSame(1, substr_count($preview, 'href="'.MaterialDraftTask::LINK_PLACEHOLDER.'"'));
+        $this->assertStringContainsString('Drugi &lt;b&gt;punkt&lt;/b&gt;', $preview);
+        $this->assertStringNotContainsString('Zapisz się:', $preview);
 
         $this->actingAs($user)
             ->get(route('growth.projects.materials.show', [DemoTikWebinarProject::PROJECT_ID, self::MAIL]))

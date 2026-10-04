@@ -40,7 +40,7 @@ Reset dziennego limitu AI (DEC-046): przy komunikacie o limicie jest „Zresetuj
 
 HTML mailingu głównego (DEC-047): checkbox domyślnie włączony, aplikacja składa HTML do Sendy. Bez migracji.
 
-Edytor treści maila (DEC-048): Edycja / Kod HTML i podstawowe formatowanie, własny edytor. Bez migracji.
+Edytor treści maila (DEC-048): Edycja / Kod HTML i podstawowe formatowanie. Od DEC-049 mailing główny używa Tiptap i trzech szablonów. Mailing przypominający zostaje przy własnym oknie. Bez migracji.
 
 Asystent planowania kierunku (DEC-037): zadanie `direction_planning` z `web_search` na formularzu Zaplanuj webinar, wdrożone lokalnie, czeka na ręczną weryfikację Waldemara (NotebookLM). Bez migracji. Świadomie nie robimy: czatu, odkrywania tematu, głosu komunikacji w tym zadaniu ani automatycznego zatwierdzania kierunku.
 

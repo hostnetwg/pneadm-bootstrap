@@ -1160,13 +1160,25 @@ class DemoTikWebinarProject
         abort_if($row === null, 404);
 
         $draft = (string) ($row->payload['draft'] ?? '');
-        if ($draft === self::materialDraft($project, $materialId)) {
+        $versionTemplate = $materialId === MaterialDraftTask::MAIL_MATERIAL_KEY && array_key_exists('template_key', $row->payload)
+            ? MailTemplates::key($row->payload['template_key'])
+            : null;
+        $currentTemplate = null;
+        foreach ($project['materials'] as $material) {
+            if (is_array($material) && ($material['id'] ?? null) === $materialId) {
+                $currentTemplate = MailTemplates::key($material['template_key'] ?? null);
+            }
+        }
+        if ($draft === self::materialDraft($project, $materialId) && ($versionTemplate === null || $versionTemplate === $currentTemplate)) {
             return ['ok' => false, 'unchanged' => true];
         }
 
         foreach ($project['materials'] as $index => $material) {
             if (($material['id'] ?? null) === $materialId) {
                 $project['materials'][$index]['draft'] = $draft;
+                if ($versionTemplate !== null) {
+                    $project['materials'][$index]['template_key'] = $versionTemplate;
+                }
                 $project['materials'][$index]['status'] = 'DRAFT';
                 $project['materials'][$index]['updated_at'] = now()->toIso8601String();
             }
@@ -1743,7 +1755,7 @@ class DemoTikWebinarProject
     /**
      * @return array<string, mixed>
      */
-    public static function updateMaterialStatus(string $projectId, string $materialId, string $status, ?string $draft = null): array
+    public static function updateMaterialStatus(string $projectId, string $materialId, string $status, ?string $draft = null, ?string $templateKey = null): array
     {
         $project = self::requireProject($projectId);
         abort_unless(array_key_exists($status, self::materialStatusLabels()), 422);
@@ -1753,6 +1765,9 @@ class DemoTikWebinarProject
                 $project['materials'][$index]['status'] = $status;
                 if ($draft !== null && ! self::isMaterialSkipped($material)) {
                     $project['materials'][$index]['draft'] = $draft;
+                }
+                if ($templateKey !== null && $materialId === MaterialDraftTask::MAIL_MATERIAL_KEY && ! self::isMaterialSkipped($material)) {
+                    $project['materials'][$index]['template_key'] = MailTemplates::key($templateKey);
                 }
                 $project['materials'][$index]['updated_at'] = now()->toIso8601String();
                 self::saveProject($project);
@@ -2000,9 +2015,6 @@ class DemoTikWebinarProject
 
         if (MaterialDraftTask::usesWorkModes($materialId) && $mode !== MaterialDraftTask::MODE_GENERATE) {
             $revised = self::simulatedRevision($text);
-            if ($materialId === MaterialDraftTask::MAIL_MATERIAL_KEY && ($style['html'] ?? false)) {
-                $revised = MailHtmlFormatter::formatComposedDraft($revised);
-            }
             $project['material_ai_proposals'][$materialId] = [
                 'material_key' => $materialId,
                 'draft' => $revised,
@@ -2024,6 +2036,7 @@ class DemoTikWebinarProject
                 'created_at' => now()->toIso8601String(),
                 'note' => 'Symulowana propozycja AI. Obecny szkic pozostaje bez zmian do chwili wybrania „Zastosuj”.',
                 ...self::materialAiWorkMeta($project, $materialId, $mode, $text),
+                ...self::mailHtmlMeta($materialId, $style),
             ];
             self::saveProject($project);
 
@@ -2035,7 +2048,7 @@ class DemoTikWebinarProject
             'draft' => match ($materialId) {
                 MaterialDraftTask::FACEBOOK_MATERIAL_KEY => self::simulatedFacebookPost($project, $concept, $emojis, (bool) ($style['hashtags'] ?? true)),
                 MaterialDraftTask::GRAPHIC_MATERIAL_KEY => self::simulatedGraphicBrief($project, $concept, self::graphicElements($style)),
-                MaterialDraftTask::MAIL_MATERIAL_KEY => self::simulatedMainMail($project, $concept, $emojis, MaterialDraftTask::mailLength($style['length'] ?? null), (bool) ($style['html'] ?? false)),
+                MaterialDraftTask::MAIL_MATERIAL_KEY => self::simulatedMainMail($project, $concept, $emojis, MaterialDraftTask::mailLength($style['length'] ?? null)),
                 MaterialDraftTask::REMINDER_MATERIAL_KEY => self::simulatedReminderMail(
                     $project,
                     $concept,
@@ -2062,6 +2075,7 @@ class DemoTikWebinarProject
             'created_at' => now()->toIso8601String(),
             'note' => 'Symulowana propozycja AI. Obecny szkic pozostaje bez zmian do chwili wybrania „Zastosuj”.',
             ...self::materialAiWorkMeta($project, $materialId, $mode, $text),
+            ...self::mailHtmlMeta($materialId, $style),
         ];
 
         self::saveProject($project);
@@ -2147,6 +2161,7 @@ class DemoTikWebinarProject
         MaterialDraftResult $result,
         string $instruction = '',
         array $work = [],
+        array $style = [],
     ): array {
         $project = self::requireProject($projectId);
 
@@ -2169,11 +2184,25 @@ class DemoTikWebinarProject
                 MaterialDraftTask::aiMode($work['mode'] ?? null),
                 trim((string) ($work['text'] ?? '')),
             ),
+            ...self::mailHtmlMeta($materialId, $style),
         ];
 
         self::saveProject($project);
 
         return $project;
+    }
+
+    /**
+     * @param  array<string, mixed>  $style
+     * @return array{mail_html?: bool}
+     */
+    private static function mailHtmlMeta(string $materialId, array $style): array
+    {
+        if ($materialId !== MaterialDraftTask::MAIL_MATERIAL_KEY) {
+            return [];
+        }
+
+        return ['mail_html' => (bool) ($style['html'] ?? false)];
     }
 
     /**
@@ -2407,7 +2436,7 @@ class DemoTikWebinarProject
      * @param  array<string, mixed>  $project
      * @param  array<string, mixed>  $concept
      */
-    private static function simulatedMainMail(array $project, array $concept, bool $emojis, string $length, bool $html = false): string
+    private static function simulatedMainMail(array $project, array $concept, bool $emojis, string $length): string
     {
         $icon = static fn (string $emoji): string => $emojis ? $emoji.' ' : '';
         $title = trim((string) ($concept['title'] ?? $project['topic'] ?? ''));
@@ -2432,10 +2461,6 @@ class DemoTikWebinarProject
             "Zapisz się:\n".MaterialDraftTask::LINK_PLACEHOLDER,
             "Z pozdrowieniami,\n".($host !== '' ? $host."\n" : '').'Zespół PNE',
         ]));
-
-        if ($html) {
-            $body = MailHtmlFormatter::format($body);
-        }
 
         return MaterialDraftTask::composeMainMail(
             ['Zaproszenie: '.$title, $title.' — webinar dla nauczycieli', 'Praktyczny webinar: '.$title],

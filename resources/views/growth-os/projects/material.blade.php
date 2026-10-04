@@ -85,36 +85,40 @@
                                     <textarea id="mail_preheader_html" class="form-control form-control-sm font-monospace mt-2" rows="3" readonly data-mail-preheader-html></textarea>
                                 </details>
                             </div>
-                            <label id="mail_body_label" class="form-label">Treść</label>
-                            <div class="d-flex flex-wrap align-items-center gap-2 mb-2" data-mail-editor-toolbar>
-                                <div class="btn-group btn-group-sm" role="group" aria-label="Tryb treści">
-                                    <button type="button" class="btn btn-primary" data-mail-mode="visual" aria-pressed="true">Edycja</button>
-                                    <button type="button" class="btn btn-outline-primary" data-mail-mode="html" aria-pressed="false">Kod HTML</button>
+                            @if($aiDraftIsReminder)
+                                <label id="mail_body_label" class="form-label">Treść</label>
+                                <div class="d-flex flex-wrap align-items-center gap-2 mb-2" data-mail-editor-toolbar>
+                                    <div class="btn-group btn-group-sm" role="group" aria-label="Tryb treści">
+                                        <button type="button" class="btn btn-primary" data-mail-mode="visual" aria-pressed="true">Edycja</button>
+                                        <button type="button" class="btn btn-outline-primary" data-mail-mode="html" aria-pressed="false">Kod HTML</button>
+                                    </div>
+                                    <div class="btn-group btn-group-sm" role="group" aria-label="Formatowanie" data-mail-tools>
+                                        <button type="button" class="btn btn-outline-secondary" data-mail-command="bold" title="Pogrubienie" aria-label="Pogrubienie"><i class="bi bi-type-bold" aria-hidden="true"></i></button>
+                                        <button type="button" class="btn btn-outline-secondary" data-mail-command="italic" title="Kursywa" aria-label="Kursywa"><i class="bi bi-type-italic" aria-hidden="true"></i></button>
+                                        <button type="button" class="btn btn-outline-secondary" data-mail-command="underline" title="Podkreślenie" aria-label="Podkreślenie"><i class="bi bi-type-underline" aria-hidden="true"></i></button>
+                                        <button type="button" class="btn btn-outline-secondary" data-mail-command="insertUnorderedList" title="Lista" aria-label="Lista"><i class="bi bi-list-ul" aria-hidden="true"></i></button>
+                                        <button type="button" class="btn btn-outline-secondary" data-mail-command="insertOrderedList" title="Lista numerowana" aria-label="Lista numerowana"><i class="bi bi-list-ol" aria-hidden="true"></i></button>
+                                        <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#mail-editor-link" title="Link" aria-label="Link"><i class="bi bi-link-45deg" aria-hidden="true"></i></button>
+                                        <button type="button" class="btn btn-outline-secondary" data-mail-command="removeFormat" title="Wyczyść formatowanie" aria-label="Wyczyść formatowanie"><i class="bi bi-eraser" aria-hidden="true"></i></button>
+                                    </div>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm ms-auto" data-mail-copy-html>Kopiuj HTML maila</button>
+                                    <span class="small text-success d-none" role="status" data-mail-copy-html-status>Skopiowano. Wklej w Sendy w trybie HTML.</span>
                                 </div>
-                                <div class="btn-group btn-group-sm" role="group" aria-label="Formatowanie" data-mail-tools>
-                                    <button type="button" class="btn btn-outline-secondary" data-mail-command="bold" title="Pogrubienie" aria-label="Pogrubienie"><i class="bi bi-type-bold" aria-hidden="true"></i></button>
-                                    <button type="button" class="btn btn-outline-secondary" data-mail-command="italic" title="Kursywa" aria-label="Kursywa"><i class="bi bi-type-italic" aria-hidden="true"></i></button>
-                                    <button type="button" class="btn btn-outline-secondary" data-mail-command="underline" title="Podkreślenie" aria-label="Podkreślenie"><i class="bi bi-type-underline" aria-hidden="true"></i></button>
-                                    <button type="button" class="btn btn-outline-secondary" data-mail-command="insertUnorderedList" title="Lista" aria-label="Lista"><i class="bi bi-list-ul" aria-hidden="true"></i></button>
-                                    <button type="button" class="btn btn-outline-secondary" data-mail-command="insertOrderedList" title="Lista numerowana" aria-label="Lista numerowana"><i class="bi bi-list-ol" aria-hidden="true"></i></button>
-                                    <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#mail-editor-link" title="Link" aria-label="Link"><i class="bi bi-link-45deg" aria-hidden="true"></i></button>
-                                    <button type="button" class="btn btn-outline-secondary" data-mail-command="removeFormat" title="Wyczyść formatowanie" aria-label="Wyczyść formatowanie"><i class="bi bi-eraser" aria-hidden="true"></i></button>
-                                </div>
-                                <button type="button" class="btn btn-outline-secondary btn-sm ms-auto" data-mail-copy-html>Kopiuj HTML maila</button>
-                                <span class="small text-success d-none" role="status" data-mail-copy-html-status>Skopiowano. Wklej w Sendy w trybie HTML.</span>
-                            </div>
-                            <div
-                                id="mail_body_visual"
-                                class="border rounded mb-2"
-                                style="min-height:28rem;background:#f4f6f8;"
-                                data-mail-visual
-                                role="textbox"
-                                aria-multiline="true"
-                                aria-labelledby="mail_body_label"
-                                @if($materialSkipped) data-mail-locked="1" @endif
-                            ></div>
-                            <textarea id="mail_body" name="mail_body" class="form-control growth-draft-editor font-monospace d-none @error('mail_body') is-invalid @enderror" rows="16" aria-labelledby="mail_body_label" @readonly($materialSkipped)>{{ old('mail_body', $mailFields['body']) }}</textarea>
-                            <p class="form-text">Edycja pokazuje mail tak, jak zobaczy go odbiorca. Kod HTML to źródło do Sendy. Kopiowanie dokleja preheader na początku.</p>
+                                <div
+                                    id="mail_body_visual"
+                                    class="border rounded mb-2"
+                                    style="min-height:28rem;background:#f4f6f8;"
+                                    data-mail-visual
+                                    role="textbox"
+                                    aria-multiline="true"
+                                    aria-labelledby="mail_body_label"
+                                    @if($materialSkipped) data-mail-locked="1" @endif
+                                ></div>
+                                <textarea id="mail_body" name="mail_body" class="form-control growth-draft-editor font-monospace d-none @error('mail_body') is-invalid @enderror" rows="16" aria-labelledby="mail_body_label" @readonly($materialSkipped)>{{ old('mail_body', $mailFields['body']) }}</textarea>
+                                <p class="form-text">Edycja pokazuje treść. Kod HTML to źródło tego maila.</p>
+                            @else
+                                @include('growth-os.projects.partials.main-mail-editor')
+                            @endif
                             @error('mail_body')<div class="invalid-feedback">{{ $message }}</div>@enderror
                         @else
                             <label for="draft" class="visually-hidden">Szkic</label>
@@ -732,9 +736,15 @@
                             <div class="small fw-semibold mb-1">Propozycja AI</div>
                             @php
                                 $proposalMail = $aiDraftIsMail ? \App\Services\GrowthOS\AI\Tasks\MaterialDraftTask::parseMainMail((string) $aiDraftProposal['draft']) : null;
+                                $proposalHtml = null;
+                                if (is_array($proposalMail) && ! $aiDraftIsReminder && (($aiDraftProposal['mail_html'] ?? false) || str_contains($proposalMail['body'], \App\Support\GrowthOS\MailHtmlFormatter::MARKER))) {
+                                    $proposalHtml = str_contains($proposalMail['body'], \App\Support\GrowthOS\MailHtmlFormatter::MARKER)
+                                        ? $proposalMail['body']
+                                        : \App\Support\GrowthOS\MailHtmlFormatter::format($proposalMail['body'], \App\Support\GrowthOS\MailTemplates::key($material['template_key'] ?? null));
+                                }
                             @endphp
-                            @if(is_array($proposalMail) && str_contains($proposalMail['body'], \App\Support\GrowthOS\MailHtmlFormatter::MARKER))
-                                <iframe class="w-100 border rounded bg-light" style="height:28rem;" sandbox title="Podgląd propozycji HTML" srcdoc="{{ $proposalMail['body'] }}"></iframe>
+                            @if(is_string($proposalHtml))
+                                <iframe class="w-100 border rounded bg-light" style="height:28rem;" sandbox title="Podgląd propozycji HTML" srcdoc="{{ $proposalHtml }}"></iframe>
                             @else
                                 <div class="growth-compare growth-compare-proposal">{{ $aiDraftProposal['draft'] }}</div>
                             @endif
@@ -940,8 +950,9 @@
                         copyStatus.classList.remove('d-none');
                     });
 
-                    const body = document.getElementById('mail_body');
                     const visual = document.querySelector('[data-mail-visual]');
+                    if (visual) {
+                    const body = document.getElementById('mail_body');
                     const tools = document.querySelector('[data-mail-tools]');
                     const locked = visual?.dataset.mailLocked === '1';
                     let mode = 'visual';
@@ -1102,13 +1113,15 @@
                         });
                     }
 
+                    loadVisual();
+                    }
+
                     subject.addEventListener('input', refresh);
                     preheader.addEventListener('input', () => {
                         copyStatus.classList.add('d-none');
                         refresh();
                     });
                     refresh();
-                    loadVisual();
                 })();
             </script>
         @endif
@@ -1135,4 +1148,9 @@
         @endif
         @include('growth-os.partials.ai-daily-limit-reset-modal')
     </div>
+    @if($mailFields !== null && ! $aiDraftIsReminder)
+        @push('scripts')
+            @vite('resources/js/growth-mail-editor.js')
+        @endpush
+    @endif
 </x-app-layout>

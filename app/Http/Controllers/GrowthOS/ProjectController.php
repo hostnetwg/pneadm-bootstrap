@@ -1022,10 +1022,19 @@ class ProjectController extends Controller
             }
         }
 
-        $style['html'] = $material === MaterialDraftTask::MAIL_MATERIAL_KEY
-            && ($request->has('html')
-                ? $request->boolean('html')
-                : str_contains((string) ($work['text'] ?? ''), \App\Support\GrowthOS\MailHtmlFormatter::MARKER));
+        if ($material === MaterialDraftTask::MAIL_MATERIAL_KEY) {
+            if ($request->has('html')) {
+                $style['html'] = $request->boolean('html');
+            } elseif (($work['mode'] ?? '') === MaterialDraftTask::MODE_ITERATE) {
+                $previous = DemoTikWebinarProject::materialAiProposal($item, $material);
+                $style['html'] = (bool) ($previous['mail_html'] ?? false)
+                    || str_contains((string) ($previous['draft'] ?? ''), \App\Support\GrowthOS\MailHtmlFormatter::MARKER);
+            } else {
+                $style['html'] = false;
+            }
+        } else {
+            $style['html'] = false;
+        }
 
         if (config('growth_ai.enabled') !== true) {
             DemoTikWebinarProject::requestMaterialAiProposal($project, $material, $style, $instruction, $work);
@@ -1047,7 +1056,7 @@ class ProjectController extends Controller
             return $back->withInput()->with('error', $message);
         }
 
-        DemoTikWebinarProject::storeMaterialAiProposal($project, $material, $result, $instruction, $work);
+        DemoTikWebinarProject::storeMaterialAiProposal($project, $material, $result, $instruction, $work, $style);
 
         return $back->with('success', 'AI przygotowało szkic. Obecny szkic nie został nadpisany.');
     }
@@ -1097,14 +1106,18 @@ class ProjectController extends Controller
             'mail_subject' => ['nullable', 'string', 'max:200'],
             'mail_preheader' => ['nullable', 'string', 'max:200'],
             'mail_body' => ['nullable', 'string', 'max:20000'],
+            'template_key' => ['nullable', 'string', Rule::in(\App\Support\GrowthOS\MailTemplates::keys())],
         ]);
 
         if (MaterialDraftTask::isMail($material) && $request->has('mail_body')) {
             $subject = trim(preg_replace('/\s+/u', ' ', (string) ($data['mail_subject'] ?? '')));
+            $body = $material === MaterialDraftTask::MAIL_MATERIAL_KEY
+                ? \App\Support\GrowthOS\MailHtmlFormatter::editorContent((string) ($data['mail_body'] ?? ''))
+                : (string) ($data['mail_body'] ?? '');
             $data['draft'] = MaterialDraftTask::composeMainMail(
                 $subject !== '' ? [$subject] : [],
                 preg_replace('/\s+/u', ' ', (string) ($data['mail_preheader'] ?? '')),
-                (string) ($data['mail_body'] ?? ''),
+                $body,
             );
         }
 
@@ -1114,6 +1127,9 @@ class ProjectController extends Controller
             $material,
             $data['status'],
             array_key_exists('draft', $data) ? (string) $data['draft'] : null,
+            $material === MaterialDraftTask::MAIL_MATERIAL_KEY && $request->has('template_key')
+                ? \App\Support\GrowthOS\MailTemplates::key($data['template_key'] ?? null)
+                : null,
         );
 
         $message = match (true) {

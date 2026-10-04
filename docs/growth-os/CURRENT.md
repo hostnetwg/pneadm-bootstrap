@@ -114,14 +114,16 @@ Zaplanuj webinar
 ## 7. Otwarte pytania
 
 - Czy później dodać projekt w Canvie (Autofill) obok obrazu z OpenAI.
-- Mailing główny: mocniejszy edytor treści i wybór gotowego szablonu układu. Bez decyzji i bez kodu — najpierw konsultacja.
+
 ## 8. Następny krok
 
 Ręczna weryfikacja asystenta kierunku w otwartym projekcie (DEC-039): „Popraw propozycję”, „Popraw propozycję — szukaj w Internecie”, „Zastosuj” / „Odrzuć”, oraz blokada przy „Gotowe”. **Nie klikać prawdziwego AI bez potrzeby — to kosztuje.** Przy `GROWTH_AI_ENABLED=false` widać symulację bez źródeł. Na produkcji: backup, `git pull`, `optimize:clear` / cache — **bez migracji**. Dalej: ręczna weryfikacja Asystenta planowania na create (DEC-037), briefu grafiki i generatora obrazu, mailingów, scenariusza, DEC-035 i DEC-036.
 
 ## 9. Ostatnie zmiany
 
-- Treść maila (DEC-048): okno edycji z przełącznikiem Edycja / Kod HTML oraz pogrubieniem, kursywą, podkreśleniem, listami i linkiem. Własny edytor, bez zewnętrznej biblioteki. Bez migracji.
+- Mailing główny (DEC-049): treść jest w Tiptap (licencja MIT). Szablony Klasyczny PNE, Osobisty i Minimalny. AI pisze tekst, aplikacja składa HTML z jednym przyciskiem zapisu. Klucz szablonu jest w zapisie materiału i w historii wersji. Mailing przypominający zostaje przy dotychczasowym oknie. Bez migracji.
+
+- Treść maila (DEC-048): okno edycji z przełącznikiem Edycja / Kod HTML oraz pogrubieniem, kursywą, podkreśleniem, listami i linkiem. Własny edytor, bez zewnętrznej biblioteki. Od DEC-049 dotyczy mailingu przypominającego. Bez migracji.
 
 - Mailing główny (DEC-047): checkbox „Profesjonalny HTML maila” jest domyślnie włączony. AI pisze tekst, aplikacja składa HTML z akapitami, listą i przyciskiem zapisu. Mailing przypominający zostaje tekstem. Bez migracji.
 

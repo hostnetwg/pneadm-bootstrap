@@ -357,6 +357,14 @@ Smoke:
 
 Rollback: cofnąć kod. Zapisana koncepcja zostaje. Propozycja z sesji znika po wylogowaniu.
 
+## Szablony mailingu głównego (DEC-049, 2026-10-04)
+
+**Bez migracji.** Na mailingu głównym są trzy szablony i edytor Tiptap. Po `git pull`: `npm run build` (albo `npm ci && npm run build`), potem komendy cache. Mailing przypominający bez zmian.
+
+Smoke: widać „Klasyczny PNE”, „Osobisty” i „Minimalny” oraz „Cofnij”. Przełączenie szablonu nie zapisuje się samo. Nie klikać AI, jeśli flaga jest włączona.
+
+Rollback: cofnąć kod. Zapisany mail i klucz szablonu w JSON zostają. Starszy kod klucz ignoruje.
+
 ## Edytor treści maila (DEC-048, 2026-10-04)
 
 **Bez migracji.** Na mailingu treść ma przełącznik Edycja / Kod HTML i podstawowe formatowanie.

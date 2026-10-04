@@ -200,6 +200,12 @@ Szczegóły provision PNEDU: [FORM_ORDERS_PNEDU_PROVISION.md](./FORM_ORDERS_PNED
 2. `sail pint` na zmienionych plikach PHP,
 3. aktualizacja dokumentacji — patrz [AI_HUMAN_COMMUNICATION.md](./AI_HUMAN_COMMUNICATION.md) sekcja 14.
 
+## Weryfikacja PNE Growth OS — szablony mailingu głównego (DEC-049, 2026-10-04)
+
+- `sail artisan test --filter=GrowthOsMainMailTemplateTest`
+- `sail artisan test --filter=MailHtmlFormatterTest`
+- Ręcznie: na mailingu głównym widać Klasyczny PNE, Osobisty i Minimalny oraz cofnij i ponów. Kod HTML pokazuje gotowy mail. Nie klikać generowania przy włączonym AI bez potrzeby. Mailing przypominający nie ma wyboru szablonu.
+
 ## Weryfikacja PNE Growth OS — edytor treści maila (DEC-048, 2026-10-04)
 
 - `sail artisan test --filter=test_mail_page_offers_length_switch`

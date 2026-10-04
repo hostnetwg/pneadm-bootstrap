@@ -382,4 +382,12 @@ Date: 2026-10-04<br>
 Status: ACTIVE<br>
 Decision: Treść maila jest w oknie edycji z przełącznikiem Edycja / Kod HTML i podstawowym formatowaniem. To własny edytor, bez zewnętrznej biblioteki.<br>
 Rationale: Gotowe edytory (także TinyMCE używany przy lekcjach) przebudowują HTML i psują układ maila do Sendy. Własne okno zostawia tabelę, style w linii i znacznik linku.<br>
-Consequences: Przyciski: pogrubienie, kursywa, podkreślenie, listy, link i czyszczenie formatu. Link wstawia się w oknie Bootstrap. Zapis bez zmian nie przepisuje treści. Bez migracji.
+Consequences: Przyciski: pogrubienie, kursywa, podkreślenie, listy, link i czyszczenie formatu. Link wstawia się w oknie Bootstrap. Zapis bez zmian nie przepisuje treści. Bez migracji. Od DEC-049 mailing główny używa Tiptap; to okno zostaje przy mailingu przypominającym.
+
+## DEC-049
+
+Date: 2026-10-04<br>
+Status: ACTIVE<br>
+Decision: Mailing główny edytuje treść w Tiptap (pakiety MIT) i wybiera jeden z szablonów układu. AI nadal zwraca zwykły tekst w trybach generate, refine i iterate. Aplikacja składa końcowy HTML.<br>
+Rationale: Własne okno z DEC-048 nie dawało cofania ani pewnego formatowania. Pełny HTML maila w edytorze gubi tabelę Sendy, przycisk i znacznik zapisu. Szablon ma być wyborem wyglądu, nie odpowiedzią modelu.<br>
+Consequences: Tiptap dostaje tylko akapit, pogrubienie, kursywę, podkreślenie, listy, link, złamanie linii oraz cofnij i ponów. Nie edytuje tabeli, karty 600 px, przycisku „Zapisz się na webinar”, `[LINK DO ZAPISU]`, preheadera ani stopki. Szablony `classic`, `personal` i `minimal` (Klasyczny PNE, Osobisty, Minimalny) mają ten sam układ: nagłówek, treść, przycisk, stopka. Klucz `template_key` jest w JSON materiału i w historii wersji. Brak klucza oznacza szablon klasyczny. Zmiana szablonu nie zmienia tematu, preheadera ani treści. Apply i odrzucenie propozycji nie zmieniają szablonu. Do AI nie idzie otoczka HTML. Prompt `material_main_mail_v4`. Mailing przypominający bez tej zmiany. Bez migracji.

@@ -3,6 +3,10 @@
 Data utworzenia/aktualizacji: 2026-10-03
 Status: plan roboczy, do potwierdzenia przez właściciela
 
+## Ostatnio (2026-10-04) — Szablony i Tiptap na mailingu głównym (DEC-049)
+
+Mailing główny ma edytor Tiptap i trzy szablony układu. AI pisze tekst, aplikacja składa HTML. Mailing przypominający bez tej zmiany. Bez migracji. Kanon: [growth-os/CURRENT.md](./growth-os/CURRENT.md).
+
 ## Ostatnio (2026-10-04) — Edytor treści maila (DEC-048)
 
 Treść maila ma okno **Edycja** / **Kod HTML** i podstawowe formatowanie. Własny edytor, bez nowej biblioteki. Bez migracji. Kanon: [growth-os/CURRENT.md](./growth-os/CURRENT.md).
