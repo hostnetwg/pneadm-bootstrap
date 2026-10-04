@@ -9,9 +9,7 @@
         @if(session('success'))
             <div class="alert alert-success" role="status">{{ session('success') }}</div>
         @endif
-        @if(session('error'))
-            <div class="alert alert-danger" role="alert">{{ session('error') }}</div>
-        @endif
+        @include('growth-os.partials.ai-daily-limit-alert')
 
         <nav class="mb-3 small" aria-label="Okruszki">
             <a href="{{ route('growth.projects.index') }}">Projekty</a>
@@ -105,7 +103,7 @@
             </div>
             <div class="card-body">
                 <p class="mb-3"><span class="h6 text-secondary">Temat</span><br>{{ $project['topic'] }}</p>
-                <form method="POST" action="{{ route('growth.projects.direction.update', $project['id']) }}">
+                <form id="direction-edit-form" method="POST" action="{{ route('growth.projects.direction.update', $project['id']) }}">
                     @csrf
                     @method('PUT')
                     <div class="row g-3">
@@ -141,8 +139,155 @@
                     </div>
                     <button type="submit" class="btn btn-outline-primary mt-3">Zapisz kierunek</button>
                 </form>
+
+                @php
+                    $directionApproved = isset($project['completed_steps']['direction']);
+                    $directionProposal = is_array($project['direction_ai_proposal'] ?? null) ? $project['direction_ai_proposal'] : null;
+                @endphp
+
+                @if($directionApproved)
+                    <p class="small text-secondary mt-3 mb-0">Najpierw cofnij zatwierdzenie, żeby poprawiać kierunek z AI.</p>
+                @else
+                    <form method="POST" action="{{ route('growth.projects.direction.ai', $project['id']) }}" class="border rounded p-3 mt-4" data-direction-ai-form aria-labelledby="direction-assistant-heading">
+                        @csrf
+                        <input type="hidden" name="why_now" value="">
+                        <input type="hidden" name="audience" value="">
+                        <input type="hidden" name="problem" value="">
+                        <input type="hidden" name="takeaway" value="">
+                        <input type="hidden" name="sell_later" value="">
+                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                            <h3 class="h6 mb-0" id="direction-assistant-heading">Asystent kierunku</h3>
+                            <span class="badge bg-light text-secondary border">
+                                {{ $growthAiEnabled ? 'AI: OpenAI / '.$growthAiResearchModel : 'AI: symulacja lokalna' }}
+                            </span>
+                        </div>
+                        <p class="small text-secondary">AI proponuje zmiany obok obecnych pól. Kierunek zmienia się dopiero po „Zastosuj”.</p>
+                        <label for="planning_instruction" class="form-label small">Co chcesz zmienić?</label>
+                        <textarea id="planning_instruction" name="planning_instruction" rows="3" class="form-control form-control-sm" maxlength="{{ config('growth_ai.limits.max_instruction_chars') }}" placeholder="Np. bardziej skup się na nauczycielach niż dyrektorach.">{{ old('planning_instruction') }}</textarea>
+                        <div class="d-flex flex-wrap gap-2 mt-2">
+                            <button type="submit" class="btn btn-outline-primary btn-sm" name="planning_mode" value="iterate" data-growth-ai-submit>
+                                <span class="spinner-border spinner-border-sm me-1 d-none" role="status" aria-hidden="true" data-growth-ai-spinner></span>
+                                Popraw propozycję
+                            </button>
+                            <button type="submit" class="btn btn-outline-secondary btn-sm" name="planning_mode" value="refresh" data-growth-ai-submit>
+                                <span class="spinner-border spinner-border-sm me-1 d-none" role="status" aria-hidden="true" data-growth-ai-spinner></span>
+                                Popraw propozycję — szukaj w Internecie
+                            </button>
+                        </div>
+                    </form>
+                    <script>
+                        document.querySelectorAll('[data-direction-ai-form]').forEach((form) => {
+                            form.addEventListener('submit', (event) => {
+                                const source = document.getElementById('direction-edit-form');
+                                ['why_now', 'audience', 'problem', 'takeaway', 'sell_later'].forEach((name) => {
+                                    const from = source?.querySelector(`[name="${name}"]`);
+                                    const to = form.querySelector(`[name="${name}"]`);
+                                    if (from && to) {
+                                        to.value = from.value;
+                                    }
+                                });
+                                const submitter = event.submitter;
+                                setTimeout(() => {
+                                    form.querySelectorAll('[data-growth-ai-submit]').forEach((button) => { button.disabled = true; });
+                                }, 0);
+                                if (submitter) {
+                                    submitter.setAttribute('aria-busy', 'true');
+                                    submitter.querySelector('[data-growth-ai-spinner]')?.classList.remove('d-none');
+                                }
+                            });
+                        });
+                    </script>
+                @endif
+
+                @if($directionProposal)
+                    <section class="card border mt-3" aria-labelledby="direction-proposal-heading">
+                        <div class="card-body">
+                            <h3 class="h6" id="direction-proposal-heading">Kierunek proponowany przez AI</h3>
+                            <p class="small text-secondary">„Zmień na” wstawia tylko ten fragment do pola powyżej. Nic nie zapisuje. Następne pytanie do AI weźmie to, co jest w polach.</p>
+                            <p class="small text-success d-none mb-2" data-direction-apply-status role="status"></p>
+                            <script type="application/json" id="direction-proposal-fields">@json($directionProposal['direction'])</script>
+                            @foreach(['why_now' => 'Dlaczego teraz', 'audience' => 'Dla kogo', 'problem' => 'Problem', 'takeaway' => 'Co uczestnik wyniesie', 'sell_later' => 'Sprzedać później'] as $field => $label)
+                                <div class="mb-3">
+                                    <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+                                        <span class="small fw-semibold">{{ $label }}</span>
+                                        <button type="button" class="btn btn-outline-primary btn-sm py-0" data-direction-apply-field="{{ $field }}">Zmień na</button>
+                                    </div>
+                                    <p class="small mb-0 growth-ai-text">{{ \App\Support\GrowthOS\AiListFormatter::lineBreaks((string) ($directionProposal['direction'][$field] ?? '')) }}</p>
+                                </div>
+                            @endforeach
+                            @if(($directionProposal['title_suggestions'] ?? []) !== [])
+                                <p class="small fw-semibold mb-1">Alternatywne tytuły</p>
+                                <ul class="small">
+                                    @foreach($directionProposal['title_suggestions'] as $suggestion)
+                                        <li>{{ $suggestion }}</li>
+                                    @endforeach
+                                </ul>
+                            @endif
+                            <p class="small text-secondary growth-ai-text">{{ $directionProposal['change_summary'] ?? '' }}</p>
+                            <h4 class="h6 mt-3">Źródła wykorzystane przez AI</h4>
+                            @if(($directionProposal['source'] ?? '') === 'simulation')
+                                <p class="small text-warning-emphasis">Symulacja lokalna — bez sprawdzania Internetu.</p>
+                            @elseif(! ($directionProposal['web_search_used'] ?? false))
+                                <p class="small text-secondary">Ta poprawka nie sprawdzała Internetu.</p>
+                            @elseif(($directionProposal['sources'] ?? []) === [])
+                                <p class="small text-secondary">Brak listy źródeł z researchu.</p>
+                            @else
+                                <ul class="small list-unstyled">
+                                    @foreach($directionProposal['sources'] as $source)
+                                        <li class="mb-1">
+                                            <a href="{{ $source['url'] }}" target="_blank" rel="noopener noreferrer">{{ $source['title'] }}</a>
+                                            <span class="text-secondary">({{ $source['domain'] }})</span>
+                                        </li>
+                                    @endforeach
+                                </ul>
+                            @endif
+                            <div class="d-flex flex-wrap gap-2 mt-3">
+                                <form method="POST" action="{{ route('growth.projects.direction.ai.apply', $project['id']) }}">
+                                    @csrf
+                                    <button type="submit" class="btn btn-primary btn-sm">Zastosuj</button>
+                                </form>
+                                <form method="POST" action="{{ route('growth.projects.direction.ai.reject', $project['id']) }}">
+                                    @csrf
+                                    <button type="submit" class="btn btn-outline-secondary btn-sm">Odrzuć</button>
+                                </form>
+                            </div>
+                        </div>
+                    </section>
+                    <script>
+                        (() => {
+                            const payload = JSON.parse(document.getElementById('direction-proposal-fields')?.textContent || '{}');
+                            const form = document.getElementById('direction-edit-form');
+                            const status = document.querySelector('[data-direction-apply-status]');
+                            const labels = {
+                                why_now: 'Dlaczego teraz',
+                                audience: 'Dla kogo',
+                                problem: 'Problem',
+                                takeaway: 'Co uczestnik wyniesie',
+                                sell_later: 'Sprzedać później',
+                            };
+                            document.querySelectorAll('[data-direction-apply-field]').forEach((button) => {
+                                button.addEventListener('click', () => {
+                                    const name = button.getAttribute('data-direction-apply-field');
+                                    const field = form?.querySelector(`[name="${name}"]`);
+                                    if (!field || !Object.prototype.hasOwnProperty.call(payload, name)) {
+                                        return;
+                                    }
+                                    field.value = String(payload[name] ?? '');
+                                    field.dispatchEvent(new Event('input', { bubbles: true }));
+                                    field.focus({ preventScroll: true });
+                                    field.scrollIntoView({ block: 'center', behavior: 'smooth' });
+                                    if (status) {
+                                        status.textContent = 'Wstawiono „' + (labels[name] || 'pole') + '” do pola powyżej. Kierunek nie został zapisany.';
+                                        status.classList.remove('d-none');
+                                    }
+                                });
+                            });
+                        })();
+                    </script>
+                @endif
+
                 <div class="alert alert-info small mt-3 mb-3">
-                    Sugestia AI: temat jest aktualny, bo łączy AI z konkretną pracą nauczyciela. Komunikację prowadź przez oszczędność czasu, nie przez technologiczną modę. Ta podpowiedź zostaje tylko w tej przeglądarce.
+                    Kierunek to szkic: możesz go poprawić ręcznie, zapisać i dopiero potem zatwierdzić. Nic nie publikuje się automatycznie.
                 </div>
                 @unless(isset($project['completed_steps']['direction']))
                     <form method="POST" action="{{ route('growth.projects.steps.complete', [$project['id'], 'direction']) }}">
@@ -207,7 +352,7 @@
 
                             <div class="mb-3">
                                 <label for="concept_plan" class="form-label">Plan webinaru</label>
-                                <textarea id="concept_plan" name="plan" rows="2" class="form-control @error('plan') is-invalid @enderror" required>{{ old('plan', $concept['plan'] ?? '') }}</textarea>
+                                <textarea id="concept_plan" name="plan" rows="8" class="form-control @error('plan') is-invalid @enderror" required>{{ \App\Support\GrowthOS\AiListFormatter::lineBreaks((string) old('plan', $concept['plan'] ?? '')) }}</textarea>
                                 @error('plan')<div class="invalid-feedback">{{ $message }}</div>@enderror
                             </div>
 
@@ -219,7 +364,7 @@
 
                             <div class="mb-3">
                                 <label for="concept_lead_magnet" class="form-label">Materiał dodatkowy / lead magnet</label>
-                                <input id="concept_lead_magnet" name="lead_magnet" type="text" class="form-control @error('lead_magnet') is-invalid @enderror" value="{{ old('lead_magnet', $concept['lead_magnet'] ?? '') }}" required>
+                                <textarea id="concept_lead_magnet" name="lead_magnet" rows="6" class="form-control @error('lead_magnet') is-invalid @enderror" required>{{ \App\Support\GrowthOS\AiListFormatter::lineBreaks((string) old('lead_magnet', $concept['lead_magnet'] ?? '')) }}</textarea>
                                 @error('lead_magnet')<div class="invalid-feedback">{{ $message }}</div>@enderror
                             </div>
 
@@ -255,8 +400,8 @@
 
                     <div class="col-lg-5">
                         <section class="border rounded growth-panel p-3 mb-3" aria-labelledby="concept-ai-heading">
-                            <h3 class="h6" id="concept-ai-heading">Poproś AI o zmianę</h3>
-                            <p class="small text-secondary">AI przygotuje wariant. Obecna koncepcja nie zostanie nadpisana, dopóki nie klikniesz „Zastosuj”.</p>
+                            <h3 class="h6" id="concept-ai-heading">Wygeneruj lub zmień koncepcję</h3>
+                            <p class="small text-secondary">AI przygotuje wariant obok. Obecna koncepcja i pomysł z kierunkiem nie zmienią się, dopóki nie klikniesz „Zastosuj”. Nowy tytuł koncepcji nie podmienia tematu w „Pomysł i kierunek”.</p>
                             <p class="small mb-2">
                                 <span class="badge bg-light text-secondary border">
                                     @if($growthAiEnabled)
@@ -272,10 +417,10 @@
                                 action="{{ route('growth.projects.concept.ai', $project['id']) }}"
                             >
                                 @csrf
-                                <label for="concept_ai_intent" class="form-label">Co zmienić?</label>
+                                <label for="concept_ai_intent" class="form-label">Wygeneruj lub zmień</label>
                                 <select id="concept_ai_intent" name="intent" class="form-select mb-2 @error('intent') is-invalid @enderror" required>
                                     @foreach($conceptAiIntents as $intent)
-                                        <option value="{{ $intent['value'] }}" @selected(old('intent') === $intent['value'])>{{ $intent['label'] }}</option>
+                                        <option value="{{ $intent['value'] }}" @selected(old('intent', \App\Support\GrowthOS\DemoTikWebinarProject::conceptNeedsFirstDraft($concept) ? 'from_direction' : 'shorter') === $intent['value'])>{{ $intent['label'] }}</option>
                                     @endforeach
                                 </select>
                                 @error('intent')<div class="invalid-feedback mb-2">{{ $message }}</div>@enderror
@@ -292,7 +437,7 @@
                                 @error('instruction')<div class="invalid-feedback mb-2">{{ $message }}</div>@enderror
                                 @if($growthAiEnabled)
                                     <p class="small text-secondary mb-2">
-                                        Wysyłana jest tylko koncepcja i ta instrukcja. Nie wpisuj danych osobowych, danych klientów ani sekretów.
+                                        Każda opcja dostaje zapisaną koncepcję i zapisany pomysł z kierunkiem. Kierunek jest granicą sensu. „Wygeneruj na podstawie pomysłu i kierunku” układa pola, gdy koncepcja jest jeszcze pusta. Nie wpisuj danych osobowych, danych klientów ani sekretów.
                                     </p>
                                 @endif
 
@@ -307,7 +452,7 @@
                                     To trwa dłużej niż zwykle — propozycja zwykle wraca w 10–60 sekund.
                                 </p>
                             </form>
-                            <div id="growth-concept-ai-status" class="alert mt-3 mb-0 d-none" role="status"></div>
+                            <div id="growth-concept-ai-status" class="alert mt-3 mb-0 d-none" role="status" data-daily-limit-message="{{ \App\Services\GrowthOS\AI\GrowthAiService::DAILY_LIMIT_MESSAGE }}"></div>
                             <script>
                                 document.addEventListener('DOMContentLoaded', function () {
                                     const form = document.getElementById('growth-concept-ai-form');
@@ -337,8 +482,20 @@
                                     };
 
                                     const showStatus = function (message, type) {
-                                        status.className = 'alert mt-3 mb-0 alert-' + type;
-                                        status.textContent = message;
+                                        status.className = 'alert mt-3 mb-0 alert-' + type + ' d-flex flex-wrap align-items-center gap-2';
+                                        status.replaceChildren();
+                                        const text = document.createElement('span');
+                                        text.textContent = message;
+                                        status.append(text);
+                                        if (message === status.dataset.dailyLimitMessage) {
+                                            const reset = document.createElement('button');
+                                            reset.type = 'button';
+                                            reset.className = 'btn btn-light btn-sm';
+                                            reset.setAttribute('data-bs-toggle', 'modal');
+                                            reset.setAttribute('data-bs-target', '#growth-ai-limit-reset');
+                                            reset.textContent = 'Zresetuj limit';
+                                            status.append(reset);
+                                        }
                                     };
 
                                     const setLoading = function () {
@@ -577,6 +734,7 @@
                 @endforeach
             </div>
         </section>
+        @include('growth-os.partials.ai-daily-limit-reset-modal')
     </div>
 
 </x-app-layout>

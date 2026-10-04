@@ -153,10 +153,7 @@ class GrowthOsMaterialPersistenceTest extends TestCase
 
         $project = DemoTikWebinarProject::project();
         $this->assertIsArray($project);
-        $this->assertSame(
-            'Nauczyciele szkół podstawowych i ponadpodstawowych, dyrektorzy zainteresowani TIK.',
-            $project['direction']['audience'],
-        );
+        $this->assertSame('', $project['direction']['audience']);
     }
 
     /**

@@ -23,6 +23,9 @@ class OpenAiProviderTest extends TestCase
         config()->set('growth_ai.timeout_seconds', 2);
         config()->set('growth_ai.limits.max_output_tokens', 500);
         config()->set('growth_ai.reasoning_effort', 'low');
+        config()->set('growth_ai.research.model', 'research-model');
+        config()->set('growth_ai.research.timeout_seconds', 30);
+        config()->set('growth_ai.research.reasoning_effort', 'medium');
 
         Http::preventStrayRequests();
         $this->task = app(ConceptRevisionTask::class);
@@ -154,6 +157,161 @@ class OpenAiProviderTest extends TestCase
         Http::assertSentCount(1);
     }
 
+    public function test_concept_revision_request_has_no_web_search_tools(): void
+    {
+        Http::fake([
+            'openai.invalid/*' => Http::response($this->openAiResponse($this->validPayload()), 200),
+        ]);
+
+        $this->provider()->generateStructured(
+            taskType: ConceptRevisionTask::TYPE,
+            instructions: $this->task->instructions(),
+            input: $this->input(),
+            schema: $this->task->schema(),
+        );
+
+        Http::assertSent(function (Request $request): bool {
+            return $request['store'] === false
+                && $request['model'] === 'test-model'
+                && ($request['reasoning']['effort'] ?? null) === 'low'
+                && $request['text']['format']['type'] === 'json_schema'
+                && $request['text']['format']['strict'] === true
+                && ! array_key_exists('tools', $request->data())
+                && ! array_key_exists('tool_choice', $request->data())
+                && ! array_key_exists('include', $request->data());
+        });
+    }
+
+    public function test_research_request_uses_web_search_tool_research_model_and_store_false(): void
+    {
+        Http::fake([
+            'openai.invalid/*' => Http::response(
+                $this->openAiResearchResponse($this->directionPayload()),
+                200,
+                ['x-request-id' => 'research-req'],
+            ),
+        ]);
+
+        $response = $this->provider()->generateStructured(
+            taskType: 'direction_planning',
+            instructions: 'research',
+            input: ['topic' => 'NotebookLM'],
+            schema: ['type' => 'object'],
+            options: [
+                'web_search' => true,
+                'require_web_search' => true,
+                'use_research_model' => true,
+            ],
+        );
+
+        $this->assertTrue($response->webSearchUsed);
+        $this->assertSame('research-model', $response->model);
+        $this->assertSame('https://blog.google/notebooklm/', $response->researchSources[0]['url']);
+        $this->assertSame('notebooklm.google', $response->researchSources[1]['domain']);
+        Http::assertSent(function (Request $request): bool {
+            return $request['store'] === false
+                && $request['model'] === 'research-model'
+                && ($request['reasoning']['effort'] ?? null) === 'medium'
+                && $request['text']['format']['type'] === 'json_schema'
+                && $request['text']['format']['name'] === 'direction_planning'
+                && $request['text']['format']['strict'] === true
+                && $request['tools'] === [['type' => 'web_search']]
+                && $request['tool_choice'] === ['type' => 'web_search']
+                && $request['include'] === ['web_search_call.action.sources']
+                && ! str_contains($request->body(), 'test-key-never-sent-to-openai');
+        });
+    }
+
+    public function test_research_extracts_sources_skips_malformed_and_deduplicates(): void
+    {
+        $payload = $this->openAiResearchResponse($this->directionPayload(), [
+            [
+                'type' => 'web_search_call',
+                'action' => [
+                    'sources' => [
+                        ['url' => 'https://www.gov.pl/web/edukacja', 'title' => 'MEN'],
+                        ['url' => 'not-a-url', 'title' => 'bad'],
+                        ['url' => 'ftp://example.com/file', 'title' => 'ftp'],
+                        ['title' => 'missing url'],
+                        'plain-string',
+                        ['url' => 'https://www.gov.pl/web/edukacja', 'title' => 'duplicate'],
+                    ],
+                ],
+            ],
+            [
+                'type' => 'message',
+                'content' => [[
+                    'type' => 'output_text',
+                    'text' => json_encode($this->directionPayload(), JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
+                    'annotations' => [
+                        ['type' => 'url_citation', 'url' => 'https://isap.sejm.gov.pl/', 'title' => 'ISAP'],
+                        ['type' => 'file_citation', 'url' => 'https://ignored.example/'],
+                    ],
+                ]],
+            ],
+        ]);
+
+        Http::fake([
+            'openai.invalid/*' => Http::response($payload, 200),
+        ]);
+
+        $response = $this->provider()->generateStructured(
+            taskType: 'direction_planning',
+            instructions: 'research',
+            input: ['topic' => 'NotebookLM'],
+            schema: ['type' => 'object'],
+            options: ['web_search' => true, 'require_web_search' => true],
+        );
+
+        $this->assertSame([
+            'https://www.gov.pl/web/edukacja',
+            'https://isap.sejm.gov.pl/',
+        ], array_column($response->researchSources, 'url'));
+        $this->assertSame('www.gov.pl', $response->researchSources[0]['domain']);
+    }
+
+    public function test_missing_web_search_call_fails_closed_when_required(): void
+    {
+        Http::fake([
+            'openai.invalid/*' => Http::response($this->openAiResponse($this->directionPayload()), 200),
+        ]);
+
+        try {
+            $this->provider()->generateStructured(
+                taskType: 'direction_planning',
+                instructions: 'research',
+                input: ['topic' => 'NotebookLM'],
+                schema: ['type' => 'object'],
+                options: [
+                    'web_search' => true,
+                    'require_web_search' => true,
+                ],
+            );
+            $this->fail('Expected GrowthAiException was not thrown.');
+        } catch (GrowthAiException $exception) {
+            $this->assertSame('web_search_missing', $exception->errorType);
+            $this->assertSame(GrowthAiException::RESEARCH_FAILED_MESSAGE, $exception->userMessage);
+        }
+    }
+
+    public function test_research_rate_limit_is_retried_once(): void
+    {
+        Http::fakeSequence()
+            ->push(['error' => ['message' => 'rate limited']], 429)
+            ->push($this->openAiResearchResponse($this->directionPayload()), 200);
+
+        $response = $this->provider()->generateStructured(
+            taskType: 'direction_planning',
+            instructions: 'research',
+            input: ['topic' => 'NotebookLM'],
+            schema: ['type' => 'object'],
+            options: ['web_search' => true, 'require_web_search' => true],
+        );
+
+        $this->assertTrue($response->webSearchUsed);
+        Http::assertSentCount(2);
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -194,6 +352,23 @@ class OpenAiProviderTest extends TestCase
     }
 
     /**
+     * @return array<string, mixed>
+     */
+    private function directionPayload(): array
+    {
+        return [
+            'working_topic' => 'NotebookLM w pracy nauczyciela',
+            'why_now' => 'Narzędzie jest aktualne.',
+            'audience' => 'Nauczyciele przedmiotowi',
+            'problem' => 'Przygotowanie lekcji z dokumentami zajmuje dużo czasu.',
+            'takeaway' => 'Uczestnik ułoży prosty proces pracy z NotebookLM.',
+            'sell_later' => 'być może',
+            'title_suggestions' => [],
+            'change_summary' => 'Zaproponowano kierunek na podstawie researchu.',
+        ];
+    }
+
+    /**
      * @param  array<string, mixed>|string  $payload
      * @return array<string, mixed>
      */
@@ -212,6 +387,44 @@ class OpenAiProviderTest extends TestCase
                         : $payload,
                 ]],
             ]],
+            'usage' => [
+                'input_tokens' => 111,
+                'output_tokens' => 222,
+            ],
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @param  list<array<string, mixed>>|null  $output
+     * @return array<string, mixed>
+     */
+    private function openAiResearchResponse(array $payload, ?array $output = null): array
+    {
+        return [
+            'id' => 'resp-research',
+            'model' => 'research-model',
+            'status' => 'completed',
+            'output' => $output ?? [
+                [
+                    'type' => 'web_search_call',
+                    'action' => [
+                        'sources' => [
+                            ['url' => 'https://blog.google/notebooklm/', 'title' => 'NotebookLM blog'],
+                        ],
+                    ],
+                ],
+                [
+                    'type' => 'message',
+                    'content' => [[
+                        'type' => 'output_text',
+                        'text' => json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
+                        'annotations' => [
+                            ['type' => 'url_citation', 'url' => 'https://notebooklm.google/', 'title' => 'NotebookLM'],
+                        ],
+                    ]],
+                ],
+            ],
             'usage' => [
                 'input_tokens' => 111,
                 'output_tokens' => 222,

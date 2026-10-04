@@ -135,9 +135,27 @@ class GrowthSessionConceptStore
 
     public function latestOwnedCampaign(User $owner): ?GrowthCampaign
     {
-        $campaign = GrowthCampaign::query()
+        $campaign = $this->ownedCampaigns($owner)->first();
+
+        return $campaign instanceof GrowthCampaign ? $campaign : null;
+    }
+
+    /**
+     * @return Collection<int, GrowthCampaign>
+     */
+    public function ownedCampaigns(User $owner): Collection
+    {
+        return GrowthCampaign::query()
             ->where('owner_user_id', $owner->id)
             ->latest('id')
+            ->get();
+    }
+
+    public function ownedCampaign(User $owner, int $campaignId): ?GrowthCampaign
+    {
+        $campaign = GrowthCampaign::query()
+            ->where('owner_user_id', $owner->id)
+            ->whereKey($campaignId)
             ->first();
 
         return $campaign instanceof GrowthCampaign ? $campaign : null;

@@ -24,7 +24,7 @@
                 <div class="card-body">
                     <h3 class="h5 mb-2">Inbox jest pusty, bo nie ma projektu webinaru</h3>
                     <p class="text-secondary mb-3">Najpierw zaplanuj webinar TIK. Inbox nie jest głównym flow, tylko listą decyzji wynikających z projektu.</p>
-                    <a href="{{ route('growth.projects.create') }}" class="btn btn-primary">Zaplanuj webinar TIK</a>
+                    <a href="{{ route('growth.projects.create') }}" class="btn btn-primary">Zaplanuj webinar</a>
                 </div>
             </div>
         @elseif(count($items) === 0)

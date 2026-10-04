@@ -9,8 +9,11 @@ use App\Models\GrowthOS\GrowthCampaign;
 use App\Models\GrowthOS\GrowthDecision;
 use App\Models\User;
 use App\Services\GrowthOS\AI\Data\ConceptRevisionResult;
+use App\Services\GrowthOS\AI\Data\DirectionPlanningResult;
 use App\Services\GrowthOS\AI\Data\MaterialDraftResult;
+use App\Services\GrowthOS\AI\GrowthImageService;
 use App\Services\GrowthOS\AI\Support\PneVoice;
+use App\Services\GrowthOS\AI\Tasks\DirectionPlanningTask;
 use App\Services\GrowthOS\AI\Tasks\GraphicImageTask;
 use App\Services\GrowthOS\AI\Tasks\MaterialDraftTask;
 use App\Services\GrowthOS\GrowthOperationalTasks;
@@ -30,6 +33,8 @@ class DemoTikWebinarProject
     public const MATERIAL_SKIPPED = 'SKIPPED';
 
     public const SESSION_PROJECT = 'growth_os.demo_tik_project';
+
+    public const SESSION_DIRECTION_PLAN = 'growth_os.direction_planning_proposal';
 
     /**
      * @return list<array{value: string, label: string}>
@@ -86,12 +91,16 @@ class DemoTikWebinarProject
      * @param  array{type: string, live_date: string, live_time: string, host: string, goal: string, topic?: string|null, host_instructor_id?: int|null, voice_instructor_id?: int|null}  $data
      * @return array<string, mixed>
      */
-    public static function createProject(array $data): array
+    public static function createProject(array $data, bool $useDirectionProposal = false): array
     {
         $topic = trim((string) ($data['topic'] ?? ''));
-        if ($topic === '') {
-            $topic = self::ideas()[0]['title'];
-        }
+        $proposal = $useDirectionProposal ? self::directionPlanningProposal() : null;
+        $applyProposal = $proposal !== null
+            && ($proposal['fingerprint'] ?? null) === self::directionPlanningFingerprint(
+                (string) $data['type'],
+                (string) $data['goal'],
+                $topic,
+            );
 
         $project = self::freshWorkspace([
             'type' => $data['type'],
@@ -103,21 +112,329 @@ class DemoTikWebinarProject
             'goal' => $data['goal'],
             'topic' => $topic,
             'status' => 'PLANNING',
+            'direction' => $applyProposal ? ($proposal['direction'] ?? null) : null,
         ]);
 
         $user = auth()->user();
         if ($user instanceof User) {
             $project = app(GrowthSessionConceptStore::class)->createCampaign($project, $user);
+            if ($applyProposal) {
+                app(GrowthSessionConceptStore::class)->persistDirection($project, $user);
+            }
         }
 
         self::saveProject($project);
+        if ($useDirectionProposal) {
+            session()->forget(self::SESSION_DIRECTION_PLAN);
+        }
 
         return $project;
     }
 
     /**
+     * @return array<string, mixed>|null
+     */
+    public static function directionPlanningProposal(): ?array
+    {
+        $proposal = session(self::SESSION_DIRECTION_PLAN);
+
+        return is_array($proposal) ? $proposal : null;
+    }
+
+    /**
+     * @param  array{type: string, goal: string, topic: string, live_date?: string}  $fields
      * @return array<string, mixed>
      */
+    public static function storeDirectionPlanningProposal(
+        array $fields,
+        DirectionPlanningResult $result,
+        string $mode,
+        bool $simulation,
+    ): array {
+        $previous = self::directionPlanningProposal();
+        $proposal = [
+            'working_topic' => $result->workingTopic,
+            'direction' => $result->direction,
+            'title_suggestions' => $result->titleSuggestions,
+            'change_summary' => $result->changeSummary,
+            'sources' => $simulation ? [] : $result->researchSources,
+            'web_search_used' => $simulation ? false : $result->webSearchUsed,
+            'source' => $simulation ? 'simulation' : 'real_ai',
+            'provider' => $simulation ? null : $result->provider,
+            'model' => $simulation ? null : $result->model,
+            'prompt_version' => $simulation ? null : $result->promptVersion,
+            'schema_version' => $simulation ? null : $result->schemaVersion,
+            'mode' => DirectionPlanningTask::mode($mode),
+            'iteration_count' => $mode === DirectionPlanningTask::MODE_GENERATE
+                ? 0
+                : (int) ($previous['iteration_count'] ?? 0) + 1,
+            'fingerprint' => self::directionPlanningFingerprint($fields['type'], $fields['goal'], $fields['topic']),
+            'created_at' => now()->toIso8601String(),
+        ];
+
+        session([self::SESSION_DIRECTION_PLAN => $proposal]);
+
+        return $proposal;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public static function storeSimulatedDirectionPlanningProposal(array $fields, string $mode, string $instruction = ''): array
+    {
+        $topic = trim((string) $fields['topic']);
+        $goal = (string) (collect(self::goals())->firstWhere('value', $fields['goal'])['label'] ?? $fields['goal']);
+        $previous = self::directionPlanningProposal();
+        $direction = is_array($previous['direction'] ?? null) ? $previous['direction'] : self::emptyDirection();
+        if ($mode === DirectionPlanningTask::MODE_GENERATE || $direction['why_now'] === '') {
+            $direction = [
+                'why_now' => 'Temat „'.$topic.'” może być aktualny dla celu: '.$goal.'. To szkic startowy, nie research.',
+                'audience' => 'Nauczyciele i dyrektorzy, którzy pracują z tym tematem w szkole.',
+                'problem' => 'Przygotowanie i sprawdzenie materiałów zajmuje dużo czasu, a trudno oddzielić to, co naprawdę pomaga na lekcji.',
+                'takeaway' => 'Uczestnik zobaczy praktyczny sposób pracy z tematem i będzie mógł odnieść go do własnej lekcji.',
+                'sell_later' => 'być może',
+            ];
+        }
+        if ($instruction !== '' && $mode === DirectionPlanningTask::MODE_ITERATE) {
+            $direction['problem'] = trim($direction['problem'].' '.$instruction);
+        }
+
+        $result = new DirectionPlanningResult(
+            workingTopic: $topic,
+            direction: $direction,
+            titleSuggestions: [],
+            changeSummary: 'Symulacja lokalna na podstawie tematu i celu.',
+            provider: 'simulation',
+            model: '',
+            promptVersion: DirectionPlanningTask::PROMPT_VERSION,
+            schemaVersion: DirectionPlanningTask::SCHEMA_VERSION,
+            requestId: '',
+            researchSources: [],
+            webSearchUsed: false,
+        );
+
+        return self::storeDirectionPlanningProposal($fields, $result, $mode, true);
+    }
+
+    public static function directionPlanningFingerprint(string $type, string $goal, string $topic): array
+    {
+        return [
+            'type' => hash('sha256', trim($type)),
+            'goal' => hash('sha256', trim($goal)),
+            'topic' => hash('sha256', trim($topic)),
+        ];
+    }
+
+    /**
+     * @return array{why_now: string, audience: string, problem: string, takeaway: string, sell_later: string}
+     */
+    public static function emptyDirection(): array
+    {
+        return [
+            'why_now' => '',
+            'audience' => '',
+            'problem' => '',
+            'takeaway' => '',
+            'sell_later' => '',
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $context
+     * @return array<string, mixed>
+     */
+    public static function directionPlanningContext(array $fields, string $mode, string $instruction = ''): array
+    {
+        $context = [
+            'today' => now()->toDateString(),
+            'type' => (string) $fields['type'],
+            'topic' => trim((string) $fields['topic']),
+            'goal' => (string) (collect(self::goals())->firstWhere('value', $fields['goal'])['label'] ?? $fields['goal']),
+            'live_date' => (string) ($fields['live_date'] ?? ''),
+            'instruction' => trim($instruction),
+        ];
+
+        if ($mode !== DirectionPlanningTask::MODE_GENERATE) {
+            $previous = self::directionPlanningProposal();
+            $context['previous_proposal'] = is_array($previous) ? $previous : [];
+        }
+
+        return $context;
+    }
+
+    public static function directionIsApproved(array $project): bool
+    {
+        return isset($project['completed_steps']['direction']);
+    }
+
+    public static function directionFieldsFingerprint(array $direction): string
+    {
+        $normalized = [
+            'why_now' => trim((string) ($direction['why_now'] ?? '')),
+            'audience' => trim((string) ($direction['audience'] ?? '')),
+            'problem' => trim((string) ($direction['problem'] ?? '')),
+            'takeaway' => trim((string) ($direction['takeaway'] ?? '')),
+            'sell_later' => trim((string) ($direction['sell_later'] ?? '')),
+        ];
+
+        return hash('sha256', json_encode($normalized, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR));
+    }
+
+    /**
+     * @param  array<string, mixed>  $project
+     * @param  array<string, mixed>  $direction
+     * @return array<string, mixed>
+     */
+    public static function directionWorkspaceContext(array $project, array $direction, string $instruction = ''): array
+    {
+        $proposal = is_array($project['direction_ai_proposal'] ?? null) ? $project['direction_ai_proposal'] : [];
+        $goalValue = (string) ($project['goal'] ?? '');
+
+        return [
+            'today' => now()->toDateString(),
+            'type' => (string) ($project['type'] ?? ''),
+            'topic' => trim((string) ($project['topic'] ?? '')),
+            'goal' => (string) (collect(self::goals())->firstWhere('value', $goalValue)['label'] ?? $goalValue),
+            'live_date' => (string) ($project['live_date'] ?? ''),
+            'instruction' => trim($instruction),
+            'previous_proposal' => [
+                'working_topic' => trim((string) ($project['topic'] ?? '')),
+                'direction' => [
+                    'why_now' => trim((string) ($direction['why_now'] ?? '')),
+                    'audience' => trim((string) ($direction['audience'] ?? '')),
+                    'problem' => trim((string) ($direction['problem'] ?? '')),
+                    'takeaway' => trim((string) ($direction['takeaway'] ?? '')),
+                    'sell_later' => trim((string) ($direction['sell_later'] ?? '')),
+                ],
+                'title_suggestions' => is_array($proposal['title_suggestions'] ?? null) ? $proposal['title_suggestions'] : [],
+                'sources' => is_array($proposal['sources'] ?? null) ? $proposal['sources'] : [],
+            ],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public static function storeDirectionWorkspaceProposal(
+        string $projectId,
+        DirectionPlanningResult $result,
+        string $mode,
+        bool $simulation,
+        string $savedFingerprint,
+    ): array {
+        $project = self::requireProject($projectId);
+        $previous = is_array($project['direction_ai_proposal'] ?? null) ? $project['direction_ai_proposal'] : [];
+        $proposal = [
+            'working_topic' => $result->workingTopic,
+            'direction' => $result->direction,
+            'title_suggestions' => $result->titleSuggestions,
+            'change_summary' => $result->changeSummary,
+            'sources' => $simulation ? [] : $result->researchSources,
+            'web_search_used' => $simulation ? false : $result->webSearchUsed,
+            'source' => $simulation ? 'simulation' : 'real_ai',
+            'provider' => $simulation ? null : $result->provider,
+            'model' => $simulation ? null : $result->model,
+            'prompt_version' => $simulation ? null : $result->promptVersion,
+            'schema_version' => $simulation ? null : $result->schemaVersion,
+            'mode' => DirectionPlanningTask::mode($mode),
+            'iteration_count' => (int) ($previous['iteration_count'] ?? 0) + 1,
+            'saved_fingerprint' => $savedFingerprint,
+            'created_at' => now()->toIso8601String(),
+        ];
+        $project['direction_ai_proposal'] = $proposal;
+        self::saveProject($project);
+
+        return $proposal;
+    }
+
+    /**
+     * @param  array<string, mixed>  $direction
+     * @return array<string, mixed>
+     */
+    public static function storeSimulatedDirectionWorkspaceProposal(
+        string $projectId,
+        array $direction,
+        string $mode,
+        string $instruction,
+        string $savedFingerprint,
+    ): array {
+        $project = self::requireProject($projectId);
+        $topic = trim((string) ($project['topic'] ?? ''));
+        $next = [
+            'why_now' => trim((string) ($direction['why_now'] ?? '')),
+            'audience' => trim((string) ($direction['audience'] ?? '')),
+            'problem' => trim((string) ($direction['problem'] ?? '')),
+            'takeaway' => trim((string) ($direction['takeaway'] ?? '')),
+            'sell_later' => trim((string) ($direction['sell_later'] ?? '')),
+        ];
+        if ($next['why_now'] === '') {
+            $next['why_now'] = 'Temat „'.$topic.'” może być aktualny. To szkic startowy, nie research.';
+            $next['audience'] = $next['audience'] !== '' ? $next['audience'] : 'Nauczyciele, którzy pracują z tym tematem w szkole.';
+            $next['problem'] = $next['problem'] !== '' ? $next['problem'] : 'Przygotowanie i sprawdzenie materiałów zajmuje dużo czasu.';
+            $next['takeaway'] = $next['takeaway'] !== '' ? $next['takeaway'] : 'Uczestnik odniesie temat do własnej lekcji.';
+            $next['sell_later'] = in_array($next['sell_later'], DirectionPlanningTask::SELL_LATER, true) ? $next['sell_later'] : 'być może';
+        }
+        if ($instruction !== '' && $mode === DirectionPlanningTask::MODE_ITERATE) {
+            $next['problem'] = trim($next['problem'].' '.$instruction);
+        }
+
+        $result = new DirectionPlanningResult(
+            workingTopic: $topic,
+            direction: $next,
+            titleSuggestions: [],
+            changeSummary: 'Symulacja lokalna na podstawie obecnego kierunku.',
+            provider: 'simulation',
+            model: '',
+            promptVersion: DirectionPlanningTask::PROMPT_VERSION,
+            schemaVersion: DirectionPlanningTask::SCHEMA_VERSION,
+            requestId: '',
+            researchSources: [],
+            webSearchUsed: false,
+        );
+
+        return self::storeDirectionWorkspaceProposal($projectId, $result, $mode, true, $savedFingerprint);
+    }
+
+    public static function applyDirectionWorkspaceProposal(string $projectId): string
+    {
+        $project = self::requireProject($projectId);
+        $proposal = $project['direction_ai_proposal'] ?? null;
+        if (! is_array($proposal) || ! is_array($proposal['direction'] ?? null)) {
+            return 'missing';
+        }
+        if (self::directionIsApproved($project)) {
+            return 'approved';
+        }
+
+        $saved = is_array($project['direction'] ?? null) ? $project['direction'] : self::emptyDirection();
+        if (($proposal['saved_fingerprint'] ?? '') !== self::directionFieldsFingerprint($saved)) {
+            $project['direction_ai_proposal'] = null;
+            self::saveProject($project);
+
+            return 'stale';
+        }
+
+        $project['direction'] = [
+            'why_now' => trim((string) ($proposal['direction']['why_now'] ?? '')),
+            'audience' => trim((string) ($proposal['direction']['audience'] ?? '')),
+            'problem' => trim((string) ($proposal['direction']['problem'] ?? '')),
+            'takeaway' => trim((string) ($proposal['direction']['takeaway'] ?? '')),
+            'sell_later' => trim((string) ($proposal['direction']['sell_later'] ?? '')),
+        ];
+        $project['direction_ai_proposal'] = null;
+        self::persistDirection($project);
+        self::saveProject($project);
+
+        return 'applied';
+    }
+
+    public static function rejectDirectionWorkspaceProposal(string $projectId): void
+    {
+        $project = self::requireProject($projectId);
+        $project['direction_ai_proposal'] = null;
+        self::saveProject($project);
+    }
+
     /**
      * @param  array{host: string, host_instructor_id: int|null, voice_instructor_id: int|null}  $people
      * @return array<string, mixed>
@@ -183,6 +500,9 @@ class DemoTikWebinarProject
         $completed[$step] = now()->toIso8601String();
         $project['completed_steps'] = $completed;
         $project['status'] = $step === 'direction' ? 'PLANNING' : 'PREPARING';
+        if ($step === 'direction') {
+            $project['direction_ai_proposal'] = null;
+        }
 
         self::saveProject($project);
         if ($step === 'direction') {
@@ -265,11 +585,61 @@ class DemoTikWebinarProject
     public static function conceptAiIntents(): array
     {
         return [
+            ['value' => 'from_direction', 'label' => 'Wygeneruj na podstawie pomysłu i kierunku'],
             ['value' => 'shorter', 'label' => 'Skróć i uprość'],
             ['value' => 'practical', 'label' => 'Bardziej praktycznie'],
             ['value' => 'directors', 'label' => 'Bardziej dla dyrektora'],
             ['value' => 'less_sales', 'label' => 'Mniej sprzedażowo'],
             ['value' => 'expand', 'label' => 'Rozbuduj program'],
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $project
+     */
+    public static function directionIsBlank(array $project): bool
+    {
+        $direction = is_array($project['direction'] ?? null) ? $project['direction'] : [];
+        $text = trim((string) ($project['topic'] ?? ''))
+            .trim((string) ($direction['why_now'] ?? ''))
+            .trim((string) ($direction['audience'] ?? ''))
+            .trim((string) ($direction['problem'] ?? ''))
+            .trim((string) ($direction['takeaway'] ?? ''));
+
+        return $text === '';
+    }
+
+    /**
+     * @param  array<string, mixed>  $concept
+     */
+    public static function conceptNeedsFirstDraft(array $concept): bool
+    {
+        foreach (['subtitle', 'promise', 'plan', 'cta', 'lead_magnet'] as $key) {
+            if (trim((string) ($concept[$key] ?? '')) !== '') {
+                return false;
+            }
+        }
+
+        $points = $concept['points'] ?? [];
+
+        return ! is_array($points) || array_filter($points, static fn ($point): bool => trim((string) $point) !== '') === [];
+    }
+
+    /**
+     * @param  array<string, mixed>  $project
+     * @return array<string, string>
+     */
+    public static function directionDraftContext(array $project): array
+    {
+        $direction = is_array($project['direction'] ?? null) ? $project['direction'] : [];
+
+        return [
+            'topic' => trim((string) ($project['topic'] ?? '')),
+            'why_now' => trim((string) ($direction['why_now'] ?? '')),
+            'audience' => trim((string) ($direction['audience'] ?? '')),
+            'problem' => trim((string) ($direction['problem'] ?? '')),
+            'takeaway' => trim((string) ($direction['takeaway'] ?? '')),
+            'sell_later' => trim((string) ($direction['sell_later'] ?? '')),
         ];
     }
 
@@ -316,13 +686,16 @@ class DemoTikWebinarProject
 
         $current = $project['concept'] ?? [];
         $intentLabel = collect(self::conceptAiIntents())->firstWhere('value', $intent)['label'] ?? $intent;
+        $concept = $intent === 'from_direction'
+            ? self::simulatedConceptFromDirection($project)
+            : self::simulatedConceptProposal(is_array($current) ? $current : [], $intent);
 
         $project['concept_ai_proposal'] = [
             'intent' => $intent,
             'intent_label' => $intentLabel,
             'created_at' => now()->toIso8601String(),
             'note' => 'Symulowana propozycja AI. Nic nie zostało nadpisane — możesz przyjąć albo odrzucić.',
-            'concept' => self::simulatedConceptProposal(is_array($current) ? $current : [], $intent),
+            'concept' => $concept,
         ];
 
         if (isset($project['completed_steps']['concept'])) {
@@ -349,6 +722,10 @@ class DemoTikWebinarProject
     ): array {
         $project = self::requireProject($projectId);
         $current = is_array($project['concept'] ?? null) ? $project['concept'] : [];
+        $sellLater = trim((string) data_get($project, 'direction.sell_later', ''));
+        $nextProduct = $intent === 'from_direction' && in_array($sellLater, ['nie', 'być może', 'tak'], true)
+            ? $sellLater
+            : (string) ($current['next_product'] ?? '');
 
         $project['concept_ai_proposal'] = [
             'intent' => $intent,
@@ -365,7 +742,7 @@ class DemoTikWebinarProject
             'change_summary' => $result->changeSummary,
             'concept' => [
                 ...$result->concept,
-                'next_product' => (string) ($current['next_product'] ?? ''),
+                'next_product' => $nextProduct,
             ],
         ];
 
@@ -393,15 +770,6 @@ class DemoTikWebinarProject
             $project,
             'Zastosowano propozycję AI: '.($proposal['intent_label'] ?? 'zmiana')
         );
-
-        if (isset($proposal['concept']['audience'])) {
-            $project['direction']['audience'] = trim((string) $proposal['concept']['audience']);
-            if (isset($project['completed_steps']['direction'])) {
-                unset($project['completed_steps']['direction']);
-                self::supersedeDirectionApproval($project);
-            }
-            self::persistDirection($project);
-        }
 
         $project['concept'] = self::normalizeConcept($proposal['concept']);
         $project['concept_ai_proposal'] = null;
@@ -463,7 +831,76 @@ class DemoTikWebinarProject
             return null;
         }
 
-        $campaign = app(GrowthSessionConceptStore::class)->latestOwnedCampaign($user);
+        return self::hydrateOwnedCampaign(
+            app(GrowthSessionConceptStore::class)->latestOwnedCampaign($user),
+        );
+    }
+
+    /**
+     * @return list<array{id: int, topic: string, host: string, live_date: string, live_time: string, status: string, is_open: bool}>
+     */
+    public static function ownedCampaignSummaries(): array
+    {
+        $user = auth()->user();
+        if (! $user instanceof User) {
+            return [];
+        }
+
+        $openId = (int) data_get(session(self::SESSION_PROJECT), 'growth_campaign_id', 0);
+
+        return app(GrowthSessionConceptStore::class)->ownedCampaigns($user)->map(function (GrowthCampaign $campaign) use ($openId): array {
+            $topic = trim((string) ($campaign->working_topic ?: $campaign->name));
+
+            return [
+                'id' => (int) $campaign->id,
+                'topic' => $topic !== '' ? $topic : 'Webinar TIK',
+                'host' => trim((string) ($campaign->host_name ?: '—')),
+                'live_date' => $campaign->live_at?->toDateString() ?? '',
+                'live_time' => $campaign->live_at?->format('H:i') ?? '',
+                'status' => $campaign->status === GrowthCampaign::STATUS_PREPARING ? 'PREPARING' : 'PLANNING',
+                'is_open' => $openId === (int) $campaign->id,
+            ];
+        })->all();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public static function openOwnedCampaign(int $campaignId): array
+    {
+        $user = auth()->user();
+        abort_unless($user instanceof User, 404);
+
+        $project = self::hydrateOwnedCampaign(
+            app(GrowthSessionConceptStore::class)->ownedCampaign($user, $campaignId),
+        );
+        abort_if($project === null, 404);
+
+        return $project;
+    }
+
+    public static function deleteOwnedCampaign(int $campaignId): void
+    {
+        $user = auth()->user();
+        abort_unless($user instanceof User, 404);
+
+        $campaign = app(GrowthSessionConceptStore::class)->ownedCampaign($user, $campaignId);
+        abort_if($campaign === null, 404);
+
+        app(GrowthImageService::class)->deleteForCampaign($campaign);
+        $campaign->delete();
+
+        $session = session(self::SESSION_PROJECT);
+        if (is_array($session) && (int) ($session['growth_campaign_id'] ?? 0) === $campaignId) {
+            session()->forget([self::SESSION_PROJECT, self::SESSION_DIRECTION_PLAN]);
+        }
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private static function hydrateOwnedCampaign(?GrowthCampaign $campaign): ?array
+    {
         if (! $campaign instanceof GrowthCampaign) {
             return null;
         }
@@ -475,7 +912,7 @@ class DemoTikWebinarProject
             'live_time' => $campaign->live_at?->format('H:i') ?? '20:00',
             'host' => '—',
             'goal' => $campaign->goal ?: 'unknown',
-            'topic' => $topic !== '' ? $topic : self::ideas()[0]['title'],
+            'topic' => $topic !== '' ? $topic : '',
             'status' => 'PLANNING',
             'growth_campaign_id' => $campaign->id,
         ]);
@@ -507,30 +944,28 @@ class DemoTikWebinarProject
             'growth_campaign_id' => $fields['growth_campaign_id'] ?? null,
             'created_at' => now()->toIso8601String(),
             'completed_steps' => [],
-            'direction' => [
-                'why_now' => 'AI w narzędziach edukacyjnych szybko się zmienia, a nauczyciele potrzebują praktycznych przykładów bez technologicznego żargonu.',
-                'audience' => 'Nauczyciele szkół podstawowych i ponadpodstawowych, dyrektorzy zainteresowani TIK.',
-                'problem' => 'Jak przygotować lepsze materiały szybciej i bez poczucia, że trzeba być informatykiem.',
-                'takeaway' => 'Uczestnik wychodzi z listą funkcji Canva AI i kilkoma gotowymi promptami do własnych lekcji.',
-                'sell_later' => 'być może',
-            ],
+            'direction' => is_array($fields['direction'] ?? null)
+                ? [
+                    'why_now' => trim((string) ($fields['direction']['why_now'] ?? '')),
+                    'audience' => trim((string) ($fields['direction']['audience'] ?? '')),
+                    'problem' => trim((string) ($fields['direction']['problem'] ?? '')),
+                    'takeaway' => trim((string) ($fields['direction']['takeaway'] ?? '')),
+                    'sell_later' => trim((string) ($fields['direction']['sell_later'] ?? '')),
+                ]
+                : self::emptyDirection(),
             'concept' => [
                 'title' => $topic,
-                'subtitle' => 'Praktyczny webinar TIK dla nauczycieli',
-                'promise' => 'Pokażemy, jak wykorzystać Canva AI do szybszego tworzenia materiałów dydaktycznych.',
-                'points' => [
-                    '5 funkcji Canva AI, które realnie skracają przygotowanie materiałów.',
-                    'Przykłady: karta pracy, prezentacja, dyplom, grafika do lekcji.',
-                    'Typowe błędy w promptach i jak ich uniknąć.',
-                    'Bezpieczne użycie AI w szkole.',
-                ],
-                'plan' => 'Wprowadzenie -> pokaz 5 funkcji -> mini case z lekcji -> pytania -> podsumowanie i CTA.',
-                'cta' => 'Pobierz checklistę promptów i dołącz do kolejnego szkolenia pogłębiającego.',
-                'lead_magnet' => 'PDF: 7 promptów Canva AI dla nauczyciela.',
-                'next_product' => 'być może',
+                'subtitle' => '',
+                'promise' => '',
+                'points' => [],
+                'plan' => '',
+                'cta' => '',
+                'lead_magnet' => '',
+                'next_product' => '',
             ],
             'concept_versions' => [],
             'concept_ai_proposal' => null,
+            'direction_ai_proposal' => null,
             'material_ai_proposals' => [],
             'materials' => self::defaultMaterials(),
         ];
@@ -610,6 +1045,7 @@ class DemoTikWebinarProject
         $direction['takeaway'] = trim((string) ($data['takeaway'] ?? ''));
         $direction['sell_later'] = trim((string) ($data['sell_later'] ?? ''));
         $project['direction'] = $direction;
+        $project['direction_ai_proposal'] = null;
 
         if (isset($project['completed_steps']['direction'])) {
             unset($project['completed_steps']['direction']);
@@ -809,13 +1245,308 @@ class DemoTikWebinarProject
     {
         $draft = self::materialDraft($project, MaterialDraftTask::GRAPHIC_MATERIAL_KEY);
 
-        foreach (['Opis obrazu dla AI (bez tekstu na obrazie):', 'Kierunek wizualny:'] as $label) {
+        foreach ([self::IMAGE_DESCRIPTION_LABEL, 'Kierunek wizualny:'] as $label) {
             if (preg_match('/^'.preg_quote($label, '/').'\R(.+?)(?:\R\R|\z)/msu', $draft, $match) === 1 && trim($match[1]) !== '') {
                 return mb_substr(trim($match[1]), 0, GraphicImageTask::MAX_PROMPT_CHARS);
             }
         }
 
         return '';
+    }
+
+    /**
+     * Visual direction paragraph of the saved graphic brief.
+     *
+     * @param  array<string, mixed>  $project
+     */
+    public static function graphicVisualDirection(array $project): string
+    {
+        $draft = self::materialDraft($project, MaterialDraftTask::GRAPHIC_MATERIAL_KEY);
+        if (preg_match('/^Kierunek wizualny:\R(.+?)(?:\R\R|\z)/msu', $draft, $match) === 1) {
+            return trim($match[1]);
+        }
+
+        return '';
+    }
+
+    public const IMAGE_DESCRIPTION_LABEL = 'Opis obrazu dla AI (bez tekstu na obrazie):';
+
+    /**
+     * Replace only the image-description section of a graphic brief.
+     */
+    public static function replaceGraphicImageDescription(string $draft, string $description): string
+    {
+        $block = self::IMAGE_DESCRIPTION_LABEL."\n".trim($description);
+        $pattern = '/^'.preg_quote(self::IMAGE_DESCRIPTION_LABEL, '/').'\R.+?(?=\R\R|\z)/msu';
+
+        if (preg_match($pattern, $draft) === 1) {
+            return (string) preg_replace($pattern, $block, $draft, 1);
+        }
+
+        $draft = rtrim($draft);
+
+        return $draft === '' ? $block : $draft."\n\n".$block;
+    }
+
+    /**
+     * @param  array<string, mixed>  $project
+     * @param  array{mode?: string, text?: string}  $work
+     * @return array<string, mixed>
+     */
+    public static function imageDescriptionAiContext(array $project, array $work = [], string $instruction = ''): array
+    {
+        $direction = is_array($project['direction'] ?? null) ? $project['direction'] : [];
+        $concept = is_array($project['concept'] ?? null) ? $project['concept'] : [];
+
+        return [
+            'campaign' => [
+                'working_topic' => (string) ($project['topic'] ?? ''),
+                'live_label' => self::liveLabel($project),
+            ],
+            'direction' => self::fingerprintDirection($direction),
+            'concept' => [
+                'title' => trim((string) ($concept['title'] ?? '')),
+                'promise' => trim((string) ($concept['promise'] ?? '')),
+                'plan' => trim((string) ($concept['plan'] ?? '')),
+            ],
+            'visual_direction' => self::graphicVisualDirection($project),
+            'mode' => MaterialDraftTask::aiMode($work['mode'] ?? null),
+            'text' => trim((string) ($work['text'] ?? '')),
+            'instruction' => trim($instruction),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $project
+     * @return array<string, string>
+     */
+    public static function imageDescriptionAiFingerprint(array $project): array
+    {
+        $direction = is_array($project['direction'] ?? null) ? $project['direction'] : [];
+        $concept = is_array($project['concept'] ?? null) ? $project['concept'] : [];
+
+        return [
+            'topic' => self::hash(['topic' => (string) ($project['topic'] ?? '')]),
+            'direction' => self::hash(self::fingerprintDirection($direction)),
+            'concept' => self::hash(self::fingerprintConcept($concept)),
+            'description' => self::hash(['description' => self::graphicImageDescription($project)]),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $project
+     * @return array<string, mixed>|null
+     */
+    public static function imageDescriptionAiProposal(array $project): ?array
+    {
+        $proposal = $project['image_description_ai_proposal'] ?? null;
+
+        return is_array($proposal) ? $proposal : null;
+    }
+
+    /**
+     * @param  array{mode?: string, text?: string}  $work
+     * @return array<string, mixed>
+     */
+    public static function requestImageDescriptionAiProposal(string $projectId, array $work = [], string $instruction = ''): array
+    {
+        $project = self::requireProject($projectId);
+        $mode = MaterialDraftTask::aiMode($work['mode'] ?? null);
+        $text = trim((string) ($work['text'] ?? ''));
+        $topic = trim((string) ($project['topic'] ?? ''));
+        $description = $mode === MaterialDraftTask::MODE_GENERATE
+            ? 'Ilustracja do webinaru „'.$topic.'”: spokojna scena z pracy odbiorców, miękkie światło dzienne, bez tekstu i logotypów.'
+            : self::simulatedRevision($text);
+
+        $project['image_description_ai_proposal'] = self::imageDescriptionProposalRecord(
+            $project,
+            $description,
+            $mode === MaterialDraftTask::MODE_GENERATE
+                ? 'Symulacja lokalna: opis złożony z tematu webinaru. Prawdziwe AI uwzględni kierunek i koncepcję.'
+                : 'Symulacja lokalna: opis z uporządkowanymi odstępami. Prawdziwe AI uwzględni Twoją uwagę.',
+            $instruction,
+            'simulation',
+            null,
+            null,
+            null,
+            null,
+            $mode,
+            $text,
+        );
+        self::saveProject($project);
+
+        return $project;
+    }
+
+    /**
+     * @param  array{mode?: string, text?: string}  $work
+     * @return array<string, mixed>
+     */
+    public static function storeImageDescriptionAiProposal(
+        string $projectId,
+        MaterialDraftResult $result,
+        array $work = [],
+        string $instruction = '',
+    ): array {
+        $project = self::requireProject($projectId);
+        $project['image_description_ai_proposal'] = self::imageDescriptionProposalRecord(
+            $project,
+            $result->draft,
+            $result->changeSummary,
+            $instruction,
+            'real_ai',
+            $result->provider,
+            $result->model,
+            $result->promptVersion,
+            $result->schemaVersion,
+            MaterialDraftTask::aiMode($work['mode'] ?? null),
+            trim((string) ($work['text'] ?? '')),
+        );
+        self::saveProject($project);
+
+        return $project;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public static function iterableImageDescriptionAiProposal(string $projectId): ?array
+    {
+        $project = self::requireProject($projectId);
+        $proposal = self::imageDescriptionAiProposal($project);
+        if ($proposal === null) {
+            return null;
+        }
+
+        if (($proposal['fingerprint'] ?? null) !== self::imageDescriptionAiFingerprint($project)) {
+            unset($project['image_description_ai_proposal']);
+            self::saveProject($project);
+
+            return null;
+        }
+
+        return $proposal;
+    }
+
+    /**
+     * @return array{ok: bool}
+     */
+    public static function applyImageDescriptionAiProposal(string $projectId): array
+    {
+        $project = self::requireProject($projectId);
+        $proposal = self::imageDescriptionAiProposal($project);
+        abort_if($proposal === null, 404);
+        $materialId = MaterialDraftTask::GRAPHIC_MATERIAL_KEY;
+
+        if (! self::canDraftMaterialWithAi($project)
+            || ($proposal['fingerprint'] ?? null) !== self::imageDescriptionAiFingerprint($project)) {
+            unset($project['image_description_ai_proposal']);
+            self::saveProject($project);
+
+            return ['ok' => false];
+        }
+
+        foreach ($project['materials'] as $index => $material) {
+            if (($material['id'] ?? null) === $materialId) {
+                $project['materials'][$index]['draft'] = self::replaceGraphicImageDescription(
+                    (string) ($material['draft'] ?? ''),
+                    (string) $proposal['description'],
+                );
+                $project['materials'][$index]['status'] = 'DRAFT';
+                $project['materials'][$index]['updated_at'] = now()->toIso8601String();
+            }
+        }
+
+        unset($project['image_description_ai_proposal']);
+        self::saveProject($project);
+        self::persistMaterial($project, $materialId, GrowthArtifactVersion::SOURCE_AI_APPLY);
+        self::recordConceptDecision(
+            $project,
+            GrowthSessionConceptStore::DECISION_MATERIAL_AI_APPLY,
+            GrowthDecision::STATUS_APPROVED,
+            'Czy zastosować opis obrazu z AI?',
+            'Zastosowano opis obrazu AI w briefie grafiki głównej',
+            [
+                'material_key' => $materialId,
+                'scope' => 'image_description',
+                'prompt_version' => (string) ($proposal['prompt_version'] ?? ''),
+                'source' => (string) ($proposal['source'] ?? ''),
+                'ai_mode' => (string) ($proposal['mode'] ?? ''),
+            ],
+            $materialId,
+        );
+
+        return ['ok' => true];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public static function rejectImageDescriptionAiProposal(string $projectId): array
+    {
+        $project = self::requireProject($projectId);
+        $proposal = self::imageDescriptionAiProposal($project);
+        abort_if($proposal === null, 404);
+
+        unset($project['image_description_ai_proposal']);
+        self::saveProject($project);
+        self::recordConceptDecision(
+            $project,
+            GrowthSessionConceptStore::DECISION_MATERIAL_AI_REJECT,
+            GrowthDecision::STATUS_REJECTED,
+            'Czy odrzucić opis obrazu z AI?',
+            'Odrzucono opis obrazu AI',
+            [
+                'material_key' => MaterialDraftTask::GRAPHIC_MATERIAL_KEY,
+                'scope' => 'image_description',
+                'source' => (string) ($proposal['source'] ?? ''),
+            ],
+            MaterialDraftTask::GRAPHIC_MATERIAL_KEY,
+        );
+
+        return $project;
+    }
+
+    /**
+     * @param  array<string, mixed>  $project
+     * @return array<string, mixed>
+     */
+    private static function imageDescriptionProposalRecord(
+        array $project,
+        string $description,
+        string $changeSummary,
+        string $instruction,
+        string $source,
+        ?string $provider,
+        ?string $model,
+        ?string $promptVersion,
+        ?string $schemaVersion,
+        string $mode,
+        string $text,
+    ): array {
+        $previous = self::imageDescriptionAiProposal($project);
+        $iterate = $mode === MaterialDraftTask::MODE_ITERATE && $previous !== null;
+
+        return [
+            'description' => $description,
+            'change_summary' => $changeSummary,
+            'instruction' => trim($instruction),
+            'source' => $source,
+            'provider' => $provider,
+            'model' => $model,
+            'prompt_version' => $promptVersion,
+            'schema_version' => $schemaVersion,
+            'fingerprint' => self::imageDescriptionAiFingerprint($project),
+            'created_at' => now()->toIso8601String(),
+            'note' => $source === 'real_ai'
+                ? 'Propozycja prawdziwego AI. Opis w generatorze i brief zmieniają się dopiero po „Zastosuj”.'
+                : 'Symulowana propozycja AI. Opis w generatorze i brief zmieniają się dopiero po „Zastosuj”.',
+            'mode' => $mode,
+            'iteration_count' => $iterate ? (int) ($previous['iteration_count'] ?? 0) + 1 : 0,
+            'compare_description' => $mode === MaterialDraftTask::MODE_GENERATE
+                ? self::graphicImageDescription($project)
+                : $text,
+        ];
     }
 
     /**
@@ -878,6 +1609,34 @@ class DemoTikWebinarProject
             'cta' => trim((string) ($data['cta'] ?? '')),
             'lead_magnet' => trim((string) ($data['lead_magnet'] ?? '')),
             'next_product' => trim((string) ($data['next_product'] ?? '')),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $project
+     * @return array<string, mixed>
+     */
+    private static function simulatedConceptFromDirection(array $project): array
+    {
+        $direction = self::directionDraftContext($project);
+        $topic = $direction['topic'] !== '' ? $direction['topic'] : 'Webinar';
+        $sellLater = in_array($direction['sell_later'], ['nie', 'być może', 'tak'], true)
+            ? $direction['sell_later']
+            : 'być może';
+
+        return [
+            'title' => $topic,
+            'subtitle' => 'Szkic koncepcji na podstawie kierunku',
+            'promise' => $direction['takeaway'] !== '' ? $direction['takeaway'] : 'Uczestnik odniesie temat do własnej pracy.',
+            'points' => array_values(array_filter([
+                $direction['problem'] !== '' ? $direction['problem'] : null,
+                $direction['takeaway'] !== '' ? $direction['takeaway'] : null,
+                'Jeden przykład do własnej lekcji.',
+            ])),
+            'plan' => 'Wprowadzenie, przykład, krótka praca własna i pytania.',
+            'cta' => 'Zabierz jeden własny przykład do wypróbowania.',
+            'lead_magnet' => 'Krótka checklista po webinarze.',
+            'next_product' => $sellLater,
         ];
     }
 
@@ -1057,6 +1816,7 @@ class DemoTikWebinarProject
                 'length' => MaterialDraftTask::mailLength($style['length'] ?? null),
                 'timing' => MaterialDraftTask::reminderTiming($style['timing'] ?? null),
                 'duration_minutes' => MaterialDraftTask::hostScriptDuration($style['duration_minutes'] ?? null),
+                'html' => (bool) ($style['html'] ?? false),
             ],
             'instruction' => trim($instruction),
         ];
@@ -1064,6 +1824,9 @@ class DemoTikWebinarProject
         if (MaterialDraftTask::usesVoice($materialId)) {
             $voice = GrowthPeople::voice($project);
             $context['voice'] = ['name' => $voice['name'], 'profile' => $voice['profile']];
+        }
+
+        if (MaterialDraftTask::usesWorkModes($materialId)) {
             $context['work'] = [
                 'mode' => MaterialDraftTask::aiMode($work['mode'] ?? null),
                 'text' => trim((string) ($work['text'] ?? '')),
@@ -1235,13 +1998,22 @@ class DemoTikWebinarProject
         $mode = MaterialDraftTask::aiMode($work['mode'] ?? null);
         $text = trim((string) ($work['text'] ?? ''));
 
-        if (MaterialDraftTask::usesVoice($materialId) && $mode !== MaterialDraftTask::MODE_GENERATE) {
+        if (MaterialDraftTask::usesWorkModes($materialId) && $mode !== MaterialDraftTask::MODE_GENERATE) {
+            $revised = self::simulatedRevision($text);
+            if ($materialId === MaterialDraftTask::MAIL_MATERIAL_KEY && ($style['html'] ?? false)) {
+                $revised = MailHtmlFormatter::formatComposedDraft($revised);
+            }
             $project['material_ai_proposals'][$materialId] = [
                 'material_key' => $materialId,
-                'draft' => self::simulatedRevision($text),
-                'change_summary' => $mode === MaterialDraftTask::MODE_REFINE
-                    ? 'Symulacja lokalna: Twój szkic z uporządkowanymi odstępami. Prawdziwe AI zredaguje go Twoim głosem.'
-                    : 'Symulacja lokalna: poprzednia propozycja z uporządkowanymi odstępami. Prawdziwe AI uwzględni Twoją uwagę.',
+                'draft' => $revised,
+                'change_summary' => match (true) {
+                    MaterialDraftTask::usesVoice($materialId) && $mode === MaterialDraftTask::MODE_REFINE => 'Symulacja lokalna: Twój szkic z uporządkowanymi odstępami. Prawdziwe AI zredaguje go Twoim głosem.',
+                    MaterialDraftTask::usesVoice($materialId) => 'Symulacja lokalna: poprzednia propozycja z uporządkowanymi odstępami. Prawdziwe AI uwzględni Twoją uwagę.',
+                    $materialId === MaterialDraftTask::GRAPHIC_MATERIAL_KEY && $mode === MaterialDraftTask::MODE_REFINE => 'Symulacja lokalna: Twój brief z uporządkowanymi odstępami. Prawdziwe AI poprawi go według instrukcji.',
+                    $materialId === MaterialDraftTask::GRAPHIC_MATERIAL_KEY => 'Symulacja lokalna: poprzednia propozycja briefu z uporządkowanymi odstępami. Prawdziwe AI uwzględni Twoją uwagę.',
+                    $mode === MaterialDraftTask::MODE_REFINE => 'Symulacja lokalna: Twój szkic z uporządkowanymi odstępami. Prawdziwe AI poprawi go według instrukcji.',
+                    default => 'Symulacja lokalna: poprzednia propozycja z uporządkowanymi odstępami. Prawdziwe AI uwzględni Twoją uwagę.',
+                },
                 'instruction' => $instruction,
                 'source' => 'simulation',
                 'provider' => null,
@@ -1263,7 +2035,7 @@ class DemoTikWebinarProject
             'draft' => match ($materialId) {
                 MaterialDraftTask::FACEBOOK_MATERIAL_KEY => self::simulatedFacebookPost($project, $concept, $emojis, (bool) ($style['hashtags'] ?? true)),
                 MaterialDraftTask::GRAPHIC_MATERIAL_KEY => self::simulatedGraphicBrief($project, $concept, self::graphicElements($style)),
-                MaterialDraftTask::MAIL_MATERIAL_KEY => self::simulatedMainMail($project, $concept, $emojis, MaterialDraftTask::mailLength($style['length'] ?? null)),
+                MaterialDraftTask::MAIL_MATERIAL_KEY => self::simulatedMainMail($project, $concept, $emojis, MaterialDraftTask::mailLength($style['length'] ?? null), (bool) ($style['html'] ?? false)),
                 MaterialDraftTask::REMINDER_MATERIAL_KEY => self::simulatedReminderMail(
                     $project,
                     $concept,
@@ -1306,14 +2078,13 @@ class DemoTikWebinarProject
      */
     private static function materialAiWorkMeta(array $project, string $materialId, string $mode, string $text): array
     {
-        if (! MaterialDraftTask::usesVoice($materialId)) {
+        if (! MaterialDraftTask::usesWorkModes($materialId)) {
             return [];
         }
 
         $previous = self::materialAiProposal($project, $materialId);
         $iterate = $mode === MaterialDraftTask::MODE_ITERATE && $previous !== null;
-
-        return [
+        $meta = [
             'mode' => $mode,
             'iteration_count' => $iterate ? (int) ($previous['iteration_count'] ?? 0) + 1 : 0,
             'compare_draft' => $mode === MaterialDraftTask::MODE_GENERATE ? self::materialDraft($project, $materialId) : $text,
@@ -1323,8 +2094,13 @@ class DemoTikWebinarProject
                 default => '',
             },
             'text_hash' => $text !== '' ? hash('sha256', $text) : null,
-            'voice_instructor_id' => GrowthPeople::voice($project)['instructor_id'],
         ];
+
+        if (MaterialDraftTask::usesVoice($materialId)) {
+            $meta['voice_instructor_id'] = GrowthPeople::voice($project)['instructor_id'];
+        }
+
+        return $meta;
     }
 
     /**
@@ -1609,7 +2385,8 @@ class DemoTikWebinarProject
      */
     private static function simulatedGraphicBrief(array $project, array $concept, array $elements): string
     {
-        $title = trim((string) ($concept['title'] ?? $project['topic'] ?? ''));
+        $topic = trim((string) ($project['topic'] ?? ''));
+        $title = $topic !== '' ? $topic : trim((string) ($concept['title'] ?? ''));
 
         return MaterialDraftTask::composeGraphicBrief(
             [
@@ -1630,7 +2407,7 @@ class DemoTikWebinarProject
      * @param  array<string, mixed>  $project
      * @param  array<string, mixed>  $concept
      */
-    private static function simulatedMainMail(array $project, array $concept, bool $emojis, string $length): string
+    private static function simulatedMainMail(array $project, array $concept, bool $emojis, string $length, bool $html = false): string
     {
         $icon = static fn (string $emoji): string => $emojis ? $emoji.' ' : '';
         $title = trim((string) ($concept['title'] ?? $project['topic'] ?? ''));
@@ -1655,6 +2432,10 @@ class DemoTikWebinarProject
             "Zapisz się:\n".MaterialDraftTask::LINK_PLACEHOLDER,
             "Z pozdrowieniami,\n".($host !== '' ? $host."\n" : '').'Zespół PNE',
         ]));
+
+        if ($html) {
+            $body = MailHtmlFormatter::format($body);
+        }
 
         return MaterialDraftTask::composeMainMail(
             ['Zaproszenie: '.$title, $title.' — webinar dla nauczycieli', 'Praktyczny webinar: '.$title],
@@ -1865,7 +2646,7 @@ class DemoTikWebinarProject
     {
         if ($project === null) {
             return [
-                'label' => 'Zaplanuj webinar TIK',
+                'label' => 'Zaplanuj webinar',
                 'href' => route('growth.projects.create'),
                 'meta' => 'Zacznij od daty, prowadzącego, celu i tematu.',
             ];
@@ -2123,16 +2904,16 @@ class DemoTikWebinarProject
     private static function defaultMaterials(): array
     {
         return [
-            self::materialTemplate('youtube-description', 'Opis YouTube', 'Opis live', 'REVIEW', 'Krótki opis korzyści i programu spotkania.', 'Canva AI w pracy nauczyciela - praktyczny webinar TIK dla nauczycieli.'),
-            self::materialTemplate('main-graphic', 'Grafika główna', 'Grafika', 'DRAFT', 'Nagłówek i kierunek grafiki do promocji.', 'Środa 20:00 - Canva AI dla nauczycieli - praktycznie i spokojnie.'),
-            self::materialTemplate('facebook-post', 'Post Facebook', 'Social', 'DRAFT', 'Post zapowiadający webinar.', '5 funkcji Canva AI, które oszczędzają czas przy kartach pracy i prezentacjach.'),
-            self::materialTemplate('main-mail', 'Mailing główny', 'Mailing', 'NOT_STARTED', 'Główny mailing zapraszający.', 'Wersja edukacyjna bez agresywnej sprzedaży, z jasnym CTA do zapisu.'),
-            self::materialTemplate('reminder-mail', 'Mailing przypominający', 'Mailing', 'NOT_STARTED', 'Przypomnienie dzień przed live.', 'Krótki mail: start jutro, co uczestnik wyniesie, link do pokoju.'),
-            self::materialTemplate('landing', 'Formularz zapisu / landing', 'Landing', 'NOT_STARTED', 'Strona lub formularz zapisu.', 'Nagłówek, obietnica, 3 punkty programu, prowadzący, data i CTA.'),
-            self::materialTemplate('host-script', 'Scenariusz prowadzącego', 'Scenariusz', 'DRAFT', 'Plan prowadzenia webinaru.', 'Intro, przejścia między sekcjami, pytania do publiczności, końcowe CTA.'),
-            self::materialTemplate('participant-material', 'Materiał dla uczestnika', 'Materiał', 'NOT_STARTED', 'PDF lub checklista po webinarze.', '7 promptów Canva AI dla nauczyciela i miejsce na własne notatki.'),
-            self::materialTemplate('obs-intro', 'Intro OBS', 'Techniczne', 'NOT_STARTED', 'Plansza lub intro do live.', 'Krótka plansza startowa z tytułem, datą i marką PNE.'),
-            self::materialTemplate('follow-up', 'Follow-up', 'Mailing', 'NOT_STARTED', 'Mail po webinarze.', 'Nagranie, materiał dodatkowy, najważniejsze wnioski i delikatne CTA.'),
+            self::materialTemplate('youtube-description', 'Opis YouTube', 'Opis live', 'REVIEW', 'Krótki opis korzyści i programu spotkania.', ''),
+            self::materialTemplate('main-graphic', 'Grafika główna', 'Grafika', 'DRAFT', 'Nagłówek i kierunek grafiki do promocji.', ''),
+            self::materialTemplate('facebook-post', 'Post Facebook', 'Social', 'DRAFT', 'Post zapowiadający webinar.', ''),
+            self::materialTemplate('main-mail', 'Mailing główny', 'Mailing', 'NOT_STARTED', 'Główny mailing zapraszający.', ''),
+            self::materialTemplate('reminder-mail', 'Mailing przypominający', 'Mailing', 'NOT_STARTED', 'Przypomnienie dzień przed live.', ''),
+            self::materialTemplate('landing', 'Formularz zapisu / landing', 'Landing', 'NOT_STARTED', 'Strona lub formularz zapisu.', ''),
+            self::materialTemplate('host-script', 'Scenariusz prowadzącego', 'Scenariusz', 'DRAFT', 'Plan prowadzenia webinaru.', ''),
+            self::materialTemplate('participant-material', 'Materiał dla uczestnika', 'Materiał', 'NOT_STARTED', 'PDF lub checklista po webinarze.', ''),
+            self::materialTemplate('obs-intro', 'Intro OBS', 'Techniczne', 'NOT_STARTED', 'Plansza lub intro do live.', ''),
+            self::materialTemplate('follow-up', 'Follow-up', 'Mailing', 'NOT_STARTED', 'Mail po webinarze.', ''),
         ];
     }
 }

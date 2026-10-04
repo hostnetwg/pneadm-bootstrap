@@ -13,6 +13,7 @@ use App\Services\GrowthOS\AI\GrowthImageService;
 use App\Services\GrowthOS\AI\Tasks\GraphicImageTask;
 use App\Support\GrowthOS\DemoTikWebinarProject;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Testing\TestResponse;
@@ -474,6 +475,80 @@ class GrowthOsMaterialImageTest extends TestCase
 
         $this->generate($user);
         $this->actingAs($user)->get($this->materialUrl(self::GRAPHIC))->assertSee('Utwórz wersję kwadratową');
+    }
+
+    public function test_logos_are_placed_on_the_finished_image_and_square_edit_gets_the_clean_file(): void
+    {
+        $user = $this->readyProject();
+        $this->actingAs($user)
+            ->get($this->materialUrl(self::GRAPHIC))
+            ->assertSee('Logo na grafice')
+            ->assertSee('Nałóż logo Platformy');
+
+        $this->actingAs($user)
+            ->post(route('growth.projects.materials.sponsor-logo.store', [DemoTikWebinarProject::PROJECT_ID, self::GRAPHIC]), [
+                'sponsor_logo' => UploadedFile::fake()->image('sponsor.png', 120, 60),
+            ])
+            ->assertRedirect($this->materialUrl(self::GRAPHIC))
+            ->assertSessionHas('success');
+
+        $this->generate($user, [
+            'include_pne_logo' => '1',
+            'include_sponsor_logo' => '1',
+        ])->assertSessionHas('success');
+
+        $landscape = GrowthArtifactImage::query()->sole();
+        $this->assertTrue($landscape->include_pne_logo);
+        $this->assertTrue($landscape->include_sponsor_logo);
+        $this->assertNotNull($landscape->base_path);
+        $clean = Storage::disk('local')->get($landscape->base_path);
+        $this->assertNotSame($clean, Storage::disk('local')->get($landscape->path));
+
+        $this->adapt($user, $landscape)->assertSessionHas('success');
+        $this->assertSame($clean, $this->provider->sourceBytes);
+
+        $square = GrowthArtifactImage::query()->where('format', 'square')->sole();
+        $this->assertTrue($square->include_pne_logo);
+        $this->assertTrue($square->include_sponsor_logo);
+        $this->assertNotSame(
+            Storage::disk('local')->get($square->base_path),
+            Storage::disk('local')->get($square->path),
+        );
+        $this->actingAs($user)->get($this->materialUrl(self::GRAPHIC))->assertSee('Z logo');
+    }
+
+    public function test_revise_edits_the_clean_image_and_keeps_the_original(): void
+    {
+        $user = $this->readyProject();
+        $this->generate($user, ['include_pne_logo' => '1'])->assertSessionHas('success');
+        $original = GrowthArtifactImage::query()->sole();
+        $clean = Storage::disk('local')->get($original->base_path);
+
+        $this->actingAs($user)
+            ->get($this->materialUrl(self::GRAPHIC))
+            ->assertSee('Popraw ten obraz')
+            ->assertSee('Popraw opis obrazu')
+            ->assertSee($original->id, false);
+
+        $this->actingAs($user)
+            ->post(route('growth.projects.materials.images.revise', [DemoTikWebinarProject::PROJECT_ID, self::GRAPHIC, $original->id]), [
+                'instruction' => 'Nauczyciel siedzi przodem do uczniów, za nim tablica.',
+            ])
+            ->assertSessionHas('success');
+
+        $this->assertSame('edit', $this->provider->operation);
+        $this->assertSame($clean, $this->provider->sourceBytes);
+        $this->assertStringContainsString('Nauczyciel siedzi przodem do uczniów, za nim tablica.', $this->provider->prompt);
+        $this->assertStringContainsString('Zostaw resztę bez zmian', $this->provider->prompt);
+
+        $revised = GrowthArtifactImage::query()->where('id', '!=', $original->id)->sole();
+        $this->assertSame($original->id, $revised->source_image_id);
+        $this->assertSame('landscape', $revised->format);
+        $this->assertSame(GraphicImageTask::REVISE_PROMPT_VERSION, $revised->prompt_version);
+        $this->assertTrue($revised->include_pne_logo);
+        $this->assertSame(self::DESCRIPTION, $revised->prompt);
+        Storage::disk('local')->assertExists($original->path);
+        $this->actingAs($user)->get($this->materialUrl(self::GRAPHIC))->assertSee('Poprawka obrazu #'.$original->id);
     }
 
     private function adapt(User $user, GrowthArtifactImage $image): TestResponse

@@ -64,7 +64,7 @@ Testy integracyjne z prawdziwym API Sendy — wyjątki mockowane przez `Http::fa
 
 | Moduł | Filtr / plik |
 |-------|----------------|
-| PNE Growth OS — Etap 0.1–0.3.2 | `sail artisan test tests/Feature/GrowthOS` oraz `sail artisan test tests/Unit/GrowthOS` — flaga, role, menu; sesyjny flow webinaru; bezpieczny pilotaż OpenAI bez prawdziwych requestów; kanon: [growth-os/CURRENT.md](./growth-os/CURRENT.md) |
+| PNE Growth OS — Etap 0.1–0.3.2 | `sail artisan test tests/Feature/GrowthOS` oraz `sail artisan test tests/Unit/GrowthOS` — flaga, role, menu; sesyjny flow webinaru; Asystent planowania (`direction_planning`, fake provider, `Http::preventStrayRequests`); bezpieczny pilotaż OpenAI bez prawdziwych requestów; kanon: [growth-os/CURRENT.md](./growth-os/CURRENT.md) |
 | ClickMeeting / provision PNEDU | `--filter=ClickMeetingServiceTest`, `PneduProvisionEmailContextBuilderTest`, `ParticipantLiveAccessServiceTest`, `SystemMailConfigurationTest` |
 | Edycja użytkownika pnedu.pl w ADM | `--filter=PneduUserUpdateTest`, `--filter=PneduUserSetPasswordTest`; kanon: [PNEDU_USERS_ADMIN.md](./PNEDU_USERS_ADMIN.md) |
 | Dopisanie do nagrania po szkoleniu | `--filter=RecordingEnrollmentApiTest`; **pnedu:** `--filter=RecordingEnrollmentTest` (założenie konta pomijane, gdy `testing.users` nie ma `deleted_at` / `first_name` / `email_verified_at`; nie równolegle z suite pneadm); kanon: [RECORDING_ENROLLMENT.md](./RECORDING_ENROLLMENT.md) |
@@ -199,6 +199,67 @@ Szczegóły provision PNEDU: [FORM_ORDERS_PNEDU_PROVISION.md](./FORM_ORDERS_PNED
 1. `sail test` (lub `--filter=` dla dotkniętego modułu),
 2. `sail pint` na zmienionych plikach PHP,
 3. aktualizacja dokumentacji — patrz [AI_HUMAN_COMMUNICATION.md](./AI_HUMAN_COMMUNICATION.md) sekcja 14.
+
+## Weryfikacja PNE Growth OS — edytor treści maila (DEC-048, 2026-10-04)
+
+- `sail artisan test --filter=test_mail_page_offers_length_switch`
+- Ręcznie: na mailingu są przyciski Edycja i Kod HTML oraz pogrubienie. Przełączenie trybu nie zapisuje szkicu.
+
+## Weryfikacja PNE Growth OS — HTML mailingu głównego (DEC-047, 2026-10-04)
+
+- `sail artisan test --filter=test_main_mail_html_option_formats_the_plain_body`
+- Ręcznie: na mailingu głównym checkbox „Profesjonalny HTML maila” jest zaznaczony. Nie klikać generowania przy włączonym AI bez potrzeby.
+
+## Weryfikacja PNE Growth OS — reset dziennego limitu AI (DEC-046, 2026-10-03)
+
+- `sail artisan test --filter=test_daily_limit_message_offers_a_reset`
+- Ręcznie: po komunikacie o limicie widać „Zresetuj limit”. Potwierdzenie jest w oknie, nie w przeglądarce.
+
+## Weryfikacja PNE Growth OS — poprawka mailingu głównego (DEC-045, 2026-10-03)
+
+- `sail artisan test --filter=test_main_mail_refine_sends_the_unsaved_fields`
+- Ręcznie: na mailingu głównym widać „Poproś AI o nowy szkic” i „Popraw mój szkic”. Nie klikać przy włączonym AI bez potrzeby.
+
+## Weryfikacja PNE Growth OS — poprawka posta Facebook (DEC-044, 2026-10-03)
+
+- `sail artisan test --filter=test_facebook_refine_sends_the_unsaved_post`
+- Ręcznie: na poście Facebook widać „Poproś AI o nowy szkic” i „Popraw mój szkic”. Nie klikać przy włączonym AI bez potrzeby.
+
+## Weryfikacja PNE Growth OS — poprawka grafiki (DEC-043, 2026-10-03)
+
+- `sail artisan test --filter='test_graphic_refine_sends_the_unsaved_brief|test_image_description_refine_apply|test_revise_edits_the_clean_image'`
+- Ręcznie: na grafice głównej widać „Popraw mój brief”, „Popraw ten opis” i przy obrazie „Popraw ten obraz”. Nie klikać przy włączonym AI bez potrzeby.
+
+## Weryfikacja PNE Growth OS — logo na grafice (DEC-042, 2026-10-03)
+
+- `sail artisan test --filter=test_logos_are_placed_on_the_finished_image`
+- Ręcznie: na grafice głównej widać logo Platformy i miejsce na logo sponsora. Nie klikać „Generuj obraz” bez potrzeby.
+
+## Weryfikacja PNE Growth OS — kierunek jako granica koncepcji (DEC-041, 2026-10-03)
+
+- `sail artisan test --filter='test_revision_sends_saved_direction|test_valid_response_creates_proposal'`
+- Ręcznie: przy wypełnionej koncepcji opis pod listą mówi, że każda opcja dostaje pomysł z kierunkiem. Nie klikać przy włączonym AI bez potrzeby.
+
+## Weryfikacja PNE Growth OS — koncepcja z kierunku (2026-10-03)
+
+- `sail artisan test --filter=test_from_direction`
+- Ręcznie: pusta koncepcja, lista „Wygeneruj lub zmień” ma na górze „Wygeneruj na podstawie pomysłu i kierunku”. Nie klikać przy włączonym AI bez potrzeby.
+
+## Weryfikacja PNE Growth OS — asystent kierunku w projekcie (DEC-039, 2026-10-03)
+
+- `sail artisan test --filter=GrowthOsDirectionWorkspaceAiTest`
+- Ręcznie: otwarty projekt, karta „Pomysł i kierunek” — „Popraw propozycję” i „Popraw propozycję — szukaj w Internecie” bez klikania prawdziwego AI, jeśli flaga jest włączona. Przy „Gotowe” widać prośbę o cofnięcie zatwierdzenia. „Zastosuj” nie zatwierdza kierunku.
+
+## Weryfikacja PNE Growth OS — usuwanie projektów (DEC-038, 2026-10-03)
+
+- `sail artisan test --filter=GrowthOsProjectDeleteTest`
+- Ręcznie: `/growth/projects` pokazuje wszystkie kampanie; **Usuń** otwiera modal (nie `confirm()`); po potwierdzeniu projekt znika, lista się odświeża.
+
+## Weryfikacja PNE Growth OS — Asystent planowania (DEC-037, 2026-10-02)
+
+- `sail artisan test tests/Feature/GrowthOS tests/Unit/GrowthOS` — bez prawdziwego OpenAI (`Http::preventStrayRequests`).
+- Zakres: `GrowthOsDirectionPlanningTest` (sesja, szkic DRAFT, puste defaulty, CTA, fail closed, wspólny limit) oraz `OpenAiProviderTest` (`web_search` tylko przy researchu, źródła z API, brak narzędzi przy `concept_revision`).
+- Ręcznie: **nie klikać** „Przeanalizuj temat” przy `GROWTH_AI_ENABLED=true` bez decyzji — to kosztuje. Przy wyłączonej fladze: temat NotebookLM → symulacja bez listy źródeł → Utwórz projekt → puste materiały, kierunek z symulacji dopiero po „Użyj tego kierunku”.
 
 ## Weryfikacja minimalnego legalnego checkoutu — 2026-09-08
 

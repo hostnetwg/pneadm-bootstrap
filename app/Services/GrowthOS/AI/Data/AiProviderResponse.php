@@ -6,6 +6,7 @@ final readonly class AiProviderResponse
 {
     /**
      * @param  array<string, mixed>  $payload
+     * @param  list<array{title: string, url: string, domain: string}>  $researchSources
      */
     public function __construct(
         public array $payload,
@@ -15,5 +16,7 @@ final readonly class AiProviderResponse
         public int $inputTokens,
         public int $outputTokens,
         public int $latencyMs,
+        public bool $webSearchUsed = false,
+        public array $researchSources = [],
     ) {}
 }

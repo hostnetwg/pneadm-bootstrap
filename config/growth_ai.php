@@ -24,6 +24,19 @@ return [
 
     'timeout_seconds' => max(5, (int) env('GROWTH_AI_TIMEOUT_SECONDS', 60)),
     'reasoning_effort' => env('GROWTH_AI_REASONING_EFFORT', 'low'),
+
+    /*
+    | Asystent planowania kierunku (DEC-037). Osobny model tylko dla direction_planning.
+    | Oficjalna ścieżka OpenAI dla web_search to Responses + gpt-5.5. Najmocniejszy
+    | gpt-6-astra można ustawić tutaj, ale bywa, że zamiast wypełnić schemat, dopytuje.
+    */
+    'research' => [
+        'model' => env('GROWTH_AI_RESEARCH_MODEL', 'gpt-5.5'),
+        'timeout_seconds' => max(30, (int) env('GROWTH_AI_RESEARCH_TIMEOUT_SECONDS', 120)),
+        'reasoning_effort' => env('GROWTH_AI_RESEARCH_REASONING_EFFORT', 'medium'),
+        'input_per_million' => max(0, (float) env('GROWTH_AI_RESEARCH_INPUT_COST_PER_MILLION', 2.50)),
+        'output_per_million' => max(0, (float) env('GROWTH_AI_RESEARCH_OUTPUT_COST_PER_MILLION', 15.00)),
+    ],
     'limits' => [
         'max_output_tokens' => max(256, (int) env('GROWTH_AI_MAX_OUTPUT_TOKENS', 4000)),
         'max_input_chars' => max(1000, (int) env('GROWTH_AI_MAX_INPUT_CHARS', 12000)),

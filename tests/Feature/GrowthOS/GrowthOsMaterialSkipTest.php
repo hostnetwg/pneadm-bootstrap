@@ -137,7 +137,10 @@ class GrowthOsMaterialSkipTest extends TestCase
     public function test_skipped_youtube_description_is_not_an_ai_source(): void
     {
         $user = $this->readyProject();
-        $this->setStatus($user, 'youtube-description', 'APPROVED');
+        $this->actingAs($user)->post(route('growth.projects.materials.status', [DemoTikWebinarProject::PROJECT_ID, 'youtube-description']), [
+            'status' => 'APPROVED',
+            'draft' => 'Opis YouTube zatwierdzony do testu źródła.',
+        ]);
         $project = DemoTikWebinarProject::requireProject(DemoTikWebinarProject::PROJECT_ID);
         $this->assertNotSame('', DemoTikWebinarProject::approvedYoutubeDescription($project));
 

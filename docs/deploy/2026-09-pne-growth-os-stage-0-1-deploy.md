@@ -286,3 +286,140 @@ Smoke:
 7. Pozostałe materiały AI (post, grafika, mailingi, scenariusz) działają jak wcześniej.
 
 Rollback: cofnąć kod; kolumny mogą zostać (są `NULL` i nic ich nie wymaga). Pełne cofnięcie: `/opt/alt/php82/usr/bin/php artisan migrate:rollback --step=2 --force` po backupie (usuwa wybrane głosy i wpisane profile).
+
+## Asystent planowania kierunku (DEC-037, 2026-10-02)
+
+**Bez migracji.** Opcjonalne zmienne (mają domyślne wartości w `config/growth_ai.php`):
+
+- `GROWTH_AI_RESEARCH_MODEL` (domyślnie `gpt-5.5`) — tylko Asystent planowania,
+- `GROWTH_AI_RESEARCH_TIMEOUT_SECONDS` (120),
+- `GROWTH_AI_RESEARCH_REASONING_EFFORT` (medium).
+
+Nie zmienia `GROWTH_AI_MODEL` (koncepcja i materiały zostają na `gpt-5-mini`). Konto OpenAI musi mieć dostęp do `web_search` na Responses API.
+
+Kolejność na produkcji:
+
+```bash
+cd /home/srv66127/domains/adm.pnedu.pl/pneadm
+git pull
+/bin/bash /home/srv66127/domains/adm.pnedu.pl/pneadm/docs/deploy/scripts/prod-mysql-nightly-backup.sh
+/opt/alt/php82/usr/bin/php artisan optimize:clear
+/opt/alt/php82/usr/bin/php artisan config:cache
+/opt/alt/php82/usr/bin/php artisan route:cache
+/opt/alt/php82/usr/bin/php artisan view:cache
+```
+
+Smoke:
+
+1. `/growth/projects/create`: CTA „Zaplanuj webinar”, Asystent planowania, brak kart Canva z Pomysłów.
+2. Przy `GROWTH_AI_ENABLED=false`: temat NotebookLM → „Przeanalizuj temat” → komunikat o symulacji, brak listy źródeł.
+3. „Użyj tego kierunku” + „Utwórz projekt webinaru” wypełnia szkic kierunku; status to nie „Gotowe”.
+4. Nowy projekt: puste szkice materiałów, koncepcja tylko z wpisanym tematem.
+5. Istniejące AI (opis YouTube, post, mailingi, scenariusz, grafika) działa jak wcześniej.
+
+Rollback: cofnąć kod. Brak zmian schematu bazy.
+
+## Usuwanie projektów (DEC-038, 2026-10-03)
+
+**Bez migracji.** `/growth/projects` listuje wszystkie kampanie właściciela. Usunięcie jest trwałe.
+
+Smoke:
+
+1. Lista pokazuje więcej niż jedną kampanię, jeśli są w bazie.
+2. „Otwórz” na starszej kampanii pokazuje jej temat w workspace.
+3. „Usuń” otwiera modal Bootstrap (nie `confirm()`). Po potwierdzeniu projekt znika z listy i z bazy.
+4. Cudzej kampanii nie widać.
+
+Rollback: cofnąć kod. Usunięte kampanie nie wracają.
+
+## Asystent kierunku w projekcie (DEC-039, 2026-10-03)
+
+**Bez migracji.** Na karcie „Pomysł i kierunek” otwartego projektu: „Popraw propozycję” (bez wyszukiwania) i „Popraw propozycję — szukaj w Internecie”. „Zastosuj” zapisuje szkic. Zatwierdzonego kierunku AI nie zmienia.
+
+Smoke:
+
+1. Nowy projekt: pod polami kierunku widać asystenta i model researchu (albo „symulacja lokalna”).
+2. Przy `GROWTH_AI_ENABLED=false`: „Popraw propozycję” pokazuje kartę obok, bez listy źródeł. Pola kierunku bez zmian do „Zastosuj”.
+3. „Zastosuj” wypełnia szkic. Status to nie „Gotowe”. Temat projektu bez zmian.
+4. Po „Zatwierdź kierunek” asystent znika i widać „Najpierw cofnij zatwierdzenie”.
+
+Rollback: cofnąć kod. Zapisany kierunek zostaje. Propozycje z sesji znikają po wylogowaniu.
+
+## Koncepcja z pomysłu i kierunku (DEC-040, 2026-10-03)
+
+**Bez migracji.** Na karcie „Koncepcja webinaru” nagłówek to „Wygeneruj lub zmień koncepcję”. Przy pustych polach lista zaczyna się od „Wygeneruj na podstawie pomysłu i kierunku”.
+
+Smoke:
+
+1. Projekt z uzupełnionym kierunkiem i pustą koncepcją: ta opcja jest wybrana.
+2. Przy `GROWTH_AI_ENABLED=false` przycisk „Wygeneruj propozycję” pokazuje kartę obok. Temat w „Pomysł i kierunek” bez zmian do i po „Zastosuj”.
+3. Bez kierunku i bez tematu komunikat prosi o uzupełnienie pomysłu. Nie ma wywołania AI.
+
+Rollback: cofnąć kod. Zapisana koncepcja zostaje. Propozycja z sesji znika po wylogowaniu.
+
+## Edytor treści maila (DEC-048, 2026-10-04)
+
+**Bez migracji.** Na mailingu treść ma przełącznik Edycja / Kod HTML i podstawowe formatowanie.
+
+Smoke: widać „Edycja” i „Kod HTML”. Przełączenie nie zapisuje szkicu.
+
+Rollback: cofnąć kod. Zapisany mail zostaje.
+
+## HTML mailingu głównego (DEC-047, 2026-10-04)
+
+**Bez migracji.** Na materiale „Mailing główny” checkbox „Profesjonalny HTML maila” jest zaznaczony. Mailing przypominający go nie ma.
+
+Smoke: checkbox jest włączony. Nie klikać generowania, jeśli flaga AI jest włączona.
+
+Rollback: cofnąć kod. Zapisany mail zostaje.
+
+## Reset dziennego limitu AI (DEC-046, 2026-10-03)
+
+**Bez migracji.** Przy komunikacie „Dzienny limit AI został wykorzystany” jest „Zresetuj limit”. Limit obrazów ma własny przycisk.
+
+Smoke: przycisk otwiera okno z „Anuluj” i „Zresetuj limit”. Po zatwierdzeniu komunikat znika.
+
+Rollback: cofnąć kod. Licznik w cache zostaje do końca doby.
+
+## Poprawka mailingu głównego (DEC-045, 2026-10-03)
+
+**Bez migracji.** Na materiale „Mailing główny” są „Poproś AI o nowy szkic” i „Popraw mój szkic”.
+
+Smoke: te przyciski są widoczne. Nie klikać ich, jeśli flaga AI jest włączona.
+
+Rollback: cofnąć kod. Zapisany mail zostaje.
+
+## Poprawka posta Facebook (DEC-044, 2026-10-03)
+
+**Bez migracji.** Na materiale „Post Facebook” są „Poproś AI o nowy szkic” i „Popraw mój szkic”.
+
+Smoke: te przyciski są widoczne. Nie klikać ich, jeśli flaga AI jest włączona.
+
+Rollback: cofnąć kod. Zapisany post zostaje.
+
+## Poprawka briefu, opisu i obrazu (DEC-043, 2026-10-03)
+
+**Bez migracji.** Brief grafiki: „Poproś AI o nowy brief” i „Popraw mój brief”. Opis obrazu ma osobną propozycję. „Popraw ten obraz” edytuje gotowe zdjęcie.
+
+Smoke: na materiale „Grafika główna” widać te przyciski. Nie klikać ich, jeśli flaga AI jest włączona.
+
+Rollback: cofnąć kod. Zapisany brief i obrazy zostają.
+
+## Logo na grafice głównej (DEC-042, 2026-10-03)
+
+Migracja `2026_10_03_120000_add_logo_overlay_to_growth_artifact_images` dodaje `base_path`, `include_pne_logo` i `include_sponsor_logo`.
+
+Smoke: na materiale „Grafika główna” widać logo Platformy i formularz logo sponsora. „Generuj obraz” zostawić bez klikania, jeśli flaga AI jest włączona.
+
+Rollback: cofnąć kod i migrację. Pliki sponsorów w `storage/app/private/growth-os/logos/` zostają.
+
+## Kierunek przy każdej poprawce koncepcji (DEC-041, 2026-10-03)
+
+**Bez migracji.** Każda opcja „Wygeneruj lub zmień” wysyła zapisany temat i pięć pól kierunku. „Zastosuj” nie zmienia kierunku i nie cofa zatwierdzenia.
+
+Smoke:
+
+1. Projekt z zatwierdzonym kierunkiem i zapisaną koncepcją: opis pod listą mówi, że każda opcja dostaje pomysł z kierunkiem.
+2. Po „Zastosuj” propozycji „Skróć i uprość” status kierunku zostaje „Gotowe”, a pola kierunku bez zmian.
+
+Rollback: cofnąć kod. Zapisany kierunek i koncepcja zostają.

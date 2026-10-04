@@ -4,12 +4,14 @@ namespace App\Services\GrowthOS\AI;
 
 use App\Models\GrowthOS\GrowthArtifact;
 use App\Models\GrowthOS\GrowthArtifactImage;
+use App\Models\GrowthOS\GrowthCampaign;
 use App\Models\User;
 use App\Services\GrowthOS\AI\Contracts\GrowthAiImageProvider;
 use App\Services\GrowthOS\AI\Data\AiImageResponse;
 use App\Services\GrowthOS\AI\Exceptions\GrowthAiException;
 use App\Services\GrowthOS\AI\Support\GraphicImageProcessor;
 use App\Services\GrowthOS\AI\Tasks\GraphicImageTask;
+use App\Support\GrowthOS\GraphicLogoStore;
 use Closure;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -40,10 +42,13 @@ final class GrowthImageService
         bool $includeHeadline,
         string $headline,
         string $liveLabel,
+        bool $includePneLogo = false,
+        bool $includeSponsorLogo = false,
     ): GrowthArtifactImage {
         $size = GraphicImageTask::providerSize($format, $this->provider->model());
         $prompt = $this->task->prompt($description, $format, $includeHeadline, $headline, $liveLabel, $size);
         $withHeadline = $includeHeadline && trim($headline) !== '';
+        $logos = $this->logos($artifact, $includePneLogo, $includeSponsorLogo);
 
         return $this->run($user, $artifact, [
             'format' => $format,
@@ -51,8 +56,10 @@ final class GrowthImageService
             'include_headline' => $withHeadline,
             'overlay_headline' => $withHeadline ? mb_substr(trim($headline), 0, 180) : null,
             'overlay_date' => $withHeadline && trim($liveLabel) !== '' ? mb_substr(trim($liveLabel), 0, 80) : null,
+            'include_pne_logo' => $this->hasCorner($logos, 'left'),
+            'include_sponsor_logo' => $this->hasCorner($logos, 'right'),
             'prompt_version' => GraphicImageTask::PROMPT_VERSION,
-        ], $format, $size, fn (string $quality): AiImageResponse => $this->provider->generateImage($prompt, $size, $quality));
+        ], $format, $size, fn (string $quality): AiImageResponse => $this->provider->generateImage($prompt, $size, $quality), $logos);
     }
 
     /**
@@ -84,6 +91,8 @@ final class GrowthImageService
             (string) $source->overlay_headline,
             (string) $source->overlay_date,
         );
+        $logos = $this->logos($artifact, $source->include_pne_logo, $source->include_sponsor_logo);
+        $cleanPath = $source->base_path ?: $source->path;
 
         return $this->run($user, $artifact, [
             'source_image_id' => $source->id,
@@ -92,14 +101,60 @@ final class GrowthImageService
             'include_headline' => $source->include_headline,
             'overlay_headline' => $source->overlay_headline,
             'overlay_date' => $source->overlay_date,
+            'include_pne_logo' => $this->hasCorner($logos, 'left'),
+            'include_sponsor_logo' => $this->hasCorner($logos, 'right'),
             'prompt_version' => GraphicImageTask::ADAPT_PROMPT_VERSION,
         ], 'square_from_landscape', $size, fn (string $quality): AiImageResponse => $this->provider->editImage(
             $prompt,
-            (string) $disk->get($source->path),
+            (string) $disk->get($cleanPath),
             $source->mime,
             $size,
             $quality,
-        ));
+        ), $logos);
+    }
+
+    /**
+     * One correction of an existing image. Logos are put back afterwards, from the clean file.
+     */
+    public function revise(User $user, GrowthArtifactImage $source, string $instruction): GrowthArtifactImage
+    {
+        $disk = Storage::disk($source->disk);
+        $cleanPath = $source->base_path ?: $source->path;
+        if (! $disk->exists($cleanPath)) {
+            throw new GrowthAiException(
+                errorType: 'missing_source_image',
+                userMessage: 'Nie znaleziono pliku obrazu do poprawki.',
+            );
+        }
+
+        $artifact = $source->artifact;
+        $size = GraphicImageTask::providerSize($source->format, $this->provider->model());
+        $prompt = $this->task->revisePrompt(
+            $instruction,
+            (string) $source->prompt,
+            $source->include_headline,
+            (string) $source->overlay_headline,
+            (string) $source->overlay_date,
+        );
+        $logos = $this->logos($artifact, $source->include_pne_logo, $source->include_sponsor_logo);
+
+        return $this->run($user, $artifact, [
+            'source_image_id' => $source->id,
+            'format' => $source->format,
+            'prompt' => $source->prompt,
+            'include_headline' => $source->include_headline,
+            'overlay_headline' => $source->overlay_headline,
+            'overlay_date' => $source->overlay_date,
+            'include_pne_logo' => $this->hasCorner($logos, 'left'),
+            'include_sponsor_logo' => $this->hasCorner($logos, 'right'),
+            'prompt_version' => GraphicImageTask::REVISE_PROMPT_VERSION,
+        ], 'revise_'.$source->format, $size, fn (string $quality): AiImageResponse => $this->provider->editImage(
+            $prompt,
+            (string) $disk->get($cleanPath),
+            $source->mime,
+            $size,
+            $quality,
+        ), $logos);
     }
 
     /**
@@ -107,8 +162,9 @@ final class GrowthImageService
      *
      * @param  array<string, mixed>  $attributes
      * @param  Closure(string): AiImageResponse  $call
+     * @param  list<array{bytes: string, corner: string}>  $logos
      */
-    private function run(User $user, GrowthArtifact $artifact, array $attributes, string $kind, string $size, Closure $call): GrowthArtifactImage
+    private function run(User $user, GrowthArtifact $artifact, array $attributes, string $kind, string $size, Closure $call, array $logos = []): GrowthArtifactImage
     {
         $target = GraphicImageTask::format((string) $attributes['format']);
 
@@ -118,7 +174,7 @@ final class GrowthImageService
                 'provider' => null,
                 'model' => null,
                 'quality' => null,
-            ], $this->processor->placeholder($target['width'], $target['height']));
+            ], $this->processor->placeholder($target['width'], $target['height']), $logos);
         }
 
         if (! $user->isSuperAdmin()) {
@@ -141,7 +197,7 @@ final class GrowthImageService
                 'provider' => $response->provider,
                 'model' => $response->model,
                 'quality' => $quality,
-            ], $this->processor->fit($response->bytes, $target['width'], $target['height']));
+            ], $this->processor->fit($response->bytes, $target['width'], $target['height']), $logos);
             $this->resetCircuit();
             $this->logInvocation($kind, $size, $quality, 'success', $response);
 
@@ -173,20 +229,41 @@ final class GrowthImageService
 
     public function delete(GrowthArtifactImage $image): void
     {
+        $disk = Storage::disk($image->disk);
+        $paths = array_values(array_filter([$image->path, $image->base_path]));
         $image->delete();
-        Storage::disk($image->disk)->delete($image->path);
+        $disk->delete($paths);
+    }
+
+    public function deleteForCampaign(GrowthCampaign $campaign): void
+    {
+        $images = GrowthArtifactImage::query()
+            ->whereIn('growth_artifact_id', $campaign->artifacts()->select('id'))
+            ->orderByDesc('id')
+            ->get();
+
+        foreach ($images as $image) {
+            $this->delete($image);
+        }
     }
 
     /**
      * @param  array<string, mixed>  $attributes
+     * @param  list<array{bytes: string, corner: string}>  $logos
      */
-    private function store(User $user, GrowthArtifact $artifact, array $attributes, string $bytes): GrowthArtifactImage
+    private function store(User $user, GrowthArtifact $artifact, array $attributes, string $bytes, array $logos = []): GrowthArtifactImage
     {
         $target = GraphicImageTask::format((string) $attributes['format']);
         $disk = (string) config('growth_ai.images.disk');
-        $path = sprintf('growth-os/images/%d/%s.jpg', $artifact->id, Str::uuid());
+        $name = (string) Str::uuid();
+        $path = sprintf('growth-os/images/%d/%s.jpg', $artifact->id, $name);
+        $basePath = $logos === [] ? null : sprintf('growth-os/images/%d/%s.base.jpg', $artifact->id, $name);
+        $final = $logos === [] ? $bytes : $this->processor->overlay($bytes, $logos);
+        $storage = Storage::disk($disk);
 
-        if (! Storage::disk($disk)->put($path, $bytes)) {
+        if (($basePath !== null && ! $storage->put($basePath, $bytes)) || ! $storage->put($path, $final)) {
+            $storage->delete(array_filter([$path, $basePath]));
+
             throw GrowthAiException::unavailable('storage_error', retryable: false);
         }
 
@@ -196,12 +273,13 @@ final class GrowthImageService
                 'height' => $target['height'],
                 'disk' => $disk,
                 'path' => $path,
+                'base_path' => $basePath,
                 'mime' => GraphicImageProcessor::MIME,
-                'size_bytes' => strlen($bytes),
+                'size_bytes' => strlen($final),
                 'created_by_user_id' => $user->id,
             ]);
         } catch (Throwable $exception) {
-            Storage::disk($disk)->delete($path);
+            $storage->delete(array_filter([$path, $basePath]));
 
             throw $exception;
         }
@@ -237,6 +315,28 @@ final class GrowthImageService
             'user_id' => $user->getAuthIdentifier(),
             'used_before_reset' => $used,
         ]);
+    }
+
+    /**
+     * @param  list<array{bytes: string, corner: string}>  $logos
+     */
+    private function hasCorner(array $logos, string $corner): bool
+    {
+        foreach ($logos as $logo) {
+            if (($logo['corner'] ?? '') === $corner) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @return list<array{bytes: string, corner: string}>
+     */
+    private function logos(GrowthArtifact $artifact, bool $pne, bool $sponsor): array
+    {
+        return GraphicLogoStore::forOverlay((int) $artifact->growth_campaign_id, $pne, $sponsor);
     }
 
     private function dailyLimitKey(User $user): string

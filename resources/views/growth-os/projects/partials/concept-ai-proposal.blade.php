@@ -23,7 +23,7 @@
             </p>
         @endif
         @if(filled($proposal['change_summary'] ?? null))
-            <p class="small mb-2"><strong>Podsumowanie zmian:</strong> {{ $proposal['change_summary'] }}</p>
+            <p class="small mb-2 growth-ai-text"><strong>Podsumowanie zmian:</strong> {{ $proposal['change_summary'] }}</p>
         @endif
         @if(!empty($proposal['changed_fields']))
             <p class="small mb-2">
@@ -33,18 +33,18 @@
         @endif
         <p class="fw-semibold mb-1">{{ $proposal['concept']['title'] ?? '' }}</p>
         <p class="small text-secondary mb-2">{{ $proposal['concept']['subtitle'] ?? '' }}</p>
-        <p class="small mb-2">{{ $proposal['concept']['promise'] ?? '' }}</p>
+        <p class="small mb-2 growth-ai-text">{{ \App\Support\GrowthOS\AiListFormatter::lineBreaks((string) ($proposal['concept']['promise'] ?? '')) }}</p>
         @if(filled($proposal['concept']['audience'] ?? null))
-            <p class="small mb-2"><strong>Odbiorcy:</strong> {{ $proposal['concept']['audience'] }}</p>
+            <p class="small mb-2 growth-ai-text"><strong>Odbiorcy:</strong> {{ \App\Support\GrowthOS\AiListFormatter::lineBreaks((string) $proposal['concept']['audience']) }}</p>
         @endif
         <ul class="small">
             @foreach(($proposal['concept']['points'] ?? []) as $point)
                 <li>{{ $point }}</li>
             @endforeach
         </ul>
-        <p class="small mb-2"><strong>Agenda:</strong> {{ $proposal['concept']['plan'] ?? '' }}</p>
-        <p class="small mb-3"><strong>CTA:</strong> {{ $proposal['concept']['cta'] ?? '' }}</p>
-        <p class="small mb-3"><strong>Materiał dodatkowy:</strong> {{ $proposal['concept']['lead_magnet'] ?? '' }}</p>
+        <p class="small mb-2 growth-ai-text"><strong>Agenda:</strong><br>{{ \App\Support\GrowthOS\AiListFormatter::lineBreaks((string) ($proposal['concept']['plan'] ?? '')) }}</p>
+        <p class="small mb-3 growth-ai-text"><strong>CTA:</strong> {{ \App\Support\GrowthOS\AiListFormatter::lineBreaks((string) ($proposal['concept']['cta'] ?? '')) }}</p>
+        <p class="small mb-3 growth-ai-text"><strong>Materiał dodatkowy:</strong><br>{{ \App\Support\GrowthOS\AiListFormatter::lineBreaks((string) ($proposal['concept']['lead_magnet'] ?? '')) }}</p>
         <div class="d-flex flex-wrap gap-2">
             <form method="POST" action="{{ route('growth.projects.concept.ai.apply', $projectId) }}">
                 @csrf

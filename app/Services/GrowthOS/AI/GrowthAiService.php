@@ -4,12 +4,16 @@ namespace App\Services\GrowthOS\AI;
 
 use App\Models\User;
 use App\Services\GrowthOS\AI\Contracts\GrowthAiProvider;
+use App\Services\GrowthOS\AI\Contracts\GrowthAiResearchTask;
 use App\Services\GrowthOS\AI\Contracts\GrowthAiTask;
 use App\Services\GrowthOS\AI\Data\AiProviderResponse;
 use App\Services\GrowthOS\AI\Data\ConceptRevisionResult;
+use App\Services\GrowthOS\AI\Data\DirectionPlanningResult;
 use App\Services\GrowthOS\AI\Data\MaterialDraftResult;
 use App\Services\GrowthOS\AI\Exceptions\GrowthAiException;
 use App\Services\GrowthOS\AI\Tasks\ConceptRevisionTask;
+use App\Services\GrowthOS\AI\Tasks\DirectionPlanningTask;
+use App\Services\GrowthOS\AI\Tasks\GraphicImageDescriptionTask;
 use App\Services\GrowthOS\AI\Tasks\MaterialDraftTask;
 use Closure;
 use Illuminate\Support\Facades\Cache;
@@ -19,21 +23,28 @@ use Throwable;
 
 final class GrowthAiService
 {
+    public const DAILY_LIMIT_MESSAGE = 'Dzienny limit AI został wykorzystany. Możesz kontynuować ręcznie.';
+
     public function __construct(
         private readonly GrowthAiProvider $provider,
         private readonly ConceptRevisionTask $conceptRevisionTask,
         private readonly MaterialDraftTask $materialDraftTask,
+        private readonly DirectionPlanningTask $directionPlanningTask,
+        private readonly GraphicImageDescriptionTask $imageDescriptionTask,
     ) {}
 
     /**
      * @param  array<string, mixed>  $concept
+     * @param  array<string, mixed>|null  $direction
      */
-    public function reviseConcept(User $user, array $concept, string $audience, string $instruction): ConceptRevisionResult
+    public function reviseConcept(User $user, array $concept, string $audience, string $instruction, ?array $direction = null, bool $fromDirection = false): ConceptRevisionResult
     {
         $this->ensureAllowed($user);
 
-        $task = $this->conceptRevisionTask;
-        $input = $task->input($concept, $audience, $instruction);
+        $task = $fromDirection
+            ? $this->conceptRevisionTask->draftingFromDirection()
+            : $this->conceptRevisionTask;
+        $input = $task->input($concept, $audience, $instruction, $direction);
 
         return $this->run(
             $user,
@@ -46,11 +57,44 @@ final class GrowthAiService
     /**
      * @param  array<string, mixed>  $context
      */
+    public function planDirection(User $user, array $context, string $mode = DirectionPlanningTask::MODE_GENERATE): DirectionPlanningResult
+    {
+        $this->ensureAllowed($user);
+
+        $task = $this->directionPlanningTask->forMode($mode);
+        $input = $task->input($context);
+
+        return $this->run(
+            $user,
+            $task,
+            $input,
+            fn (AiProviderResponse $response): DirectionPlanningResult => $task->validateAndNormalize($response, $input),
+        );
+    }
+
     public function draftMaterial(User $user, string $materialKey, array $context): MaterialDraftResult
     {
         $this->ensureAllowed($user);
 
         $task = $this->materialDraftTask->forMaterial($materialKey);
+        $input = $task->input($context);
+
+        return $this->run(
+            $user,
+            $task,
+            $input,
+            fn (AiProviderResponse $response): MaterialDraftResult => $task->validateAndNormalize($response, $input),
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $context
+     */
+    public function reviseImageDescription(User $user, array $context): MaterialDraftResult
+    {
+        $this->ensureAllowed($user);
+
+        $task = $this->imageDescriptionTask;
         $input = $task->input($context);
 
         return $this->run(
@@ -93,11 +137,21 @@ final class GrowthAiService
         $response = null;
 
         try {
+            $options = [];
+            if ($task instanceof GrowthAiResearchTask) {
+                $options['use_research_model'] = true;
+                if ($task->requiresWebSearch()) {
+                    $options['web_search'] = true;
+                    $options['require_web_search'] = true;
+                }
+            }
+
             $response = $this->provider->generateStructured(
                 taskType: $task->type(),
                 instructions: $task->instructions(),
                 input: $input,
                 schema: $task->schema(),
+                options: $options,
             );
 
             $result = $validate($response);
@@ -134,15 +188,37 @@ final class GrowthAiService
         ], true);
     }
 
+    public function dailyUsage(User $user): int
+    {
+        return RateLimiter::attempts($this->dailyLimitKey($user));
+    }
+
+    public function resetDailyLimit(User $user): void
+    {
+        $used = $this->dailyUsage($user);
+        RateLimiter::clear($this->dailyLimitKey($user));
+
+        Log::channel((string) config('growth_ai.log_channel'))->info('Growth AI daily limit reset', [
+            'task_type' => 'daily_limit',
+            'user_id' => $user->getAuthIdentifier(),
+            'used_before_reset' => $used,
+        ]);
+    }
+
+    private function dailyLimitKey(User $user): string
+    {
+        return sprintf('growth-ai:daily:user:%s', $user->getAuthIdentifier());
+    }
+
     private function ensureDailyLimit(User $user): void
     {
-        $key = sprintf('growth-ai:daily:user:%s', $user->getAuthIdentifier());
+        $key = $this->dailyLimitKey($user);
         $limit = (int) config('growth_ai.limits.daily_per_user');
 
         if (RateLimiter::tooManyAttempts($key, $limit)) {
             throw new GrowthAiException(
                 errorType: 'daily_limit_reached',
-                userMessage: 'Dzienny limit AI został wykorzystany. Możesz kontynuować ręcznie.',
+                userMessage: self::DAILY_LIMIT_MESSAGE,
             );
         }
 
@@ -204,10 +280,14 @@ final class GrowthAiService
         try {
             $inputTokens = $response?->inputTokens ?? 0;
             $outputTokens = $response?->outputTokens ?? 0;
-            $estimatedCost = (
-                $inputTokens * (float) config('growth_ai.cost.input_per_million')
-                + $outputTokens * (float) config('growth_ai.cost.output_per_million')
-            ) / 1_000_000;
+            $researchPricing = $task instanceof GrowthAiResearchTask;
+            $inputRate = $researchPricing
+                ? (float) config('growth_ai.research.input_per_million', config('growth_ai.cost.input_per_million'))
+                : (float) config('growth_ai.cost.input_per_million');
+            $outputRate = $researchPricing
+                ? (float) config('growth_ai.research.output_per_million', config('growth_ai.cost.output_per_million'))
+                : (float) config('growth_ai.cost.output_per_million');
+            $estimatedCost = ($inputTokens * $inputRate + $outputTokens * $outputRate) / 1_000_000;
 
             Log::channel((string) config('growth_ai.log_channel'))->info('Growth AI invocation', [
                 'task_type' => $task->type(),
@@ -223,6 +303,8 @@ final class GrowthAiService
                 'validation_result' => $validationResult,
                 'provider_request_id' => $response?->requestId,
                 'error_type' => $errorType,
+                'web_search_used' => $response?->webSearchUsed ?? false,
+                'source_count' => count($response?->researchSources ?? []),
             ]);
         } catch (Throwable) {
             // A technical log failure must never overwrite a valid proposal or block manual work.

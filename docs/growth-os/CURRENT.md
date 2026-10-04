@@ -1,9 +1,9 @@
 # PNE Growth OS — Current State
 
-Last updated: 2026-10-02 CEST<br>
+Last updated: 2026-10-04 CEST<br>
 Branch: main<br>
 Commit: 95d6376<br>
-Stage: v0.2 — szkice AI opisu YouTube, posta Facebook i briefu grafiki, generator obrazu grafiki głównej, historia wersji materiałów<br>
+Stage: v0.2 — Asystent planowania kierunku, szkice AI materiałów, generator obrazu, historia wersji<br>
 Current blocker: none (produkcja: migracje v0.1 `Ran`, `/growth` działa — [runbook](../deploy/2026-09-pne-growth-os-stage-0-1-deploy.md))
 
 ## 1. Cel projektu
@@ -12,11 +12,14 @@ PNE Growth OS / PNE Rozwój to moduł w `adm.pnedu.pl`, który ma prowadzić wł
 
 ## Current UX snapshot
 
-- Entry point: **PNE Rozwój → Zaplanuj webinar TIK**.
+- Entry point: **PNE Rozwój → Zaplanuj webinar**.
 - Main workspace: **Projekt webinaru**.
 - Primary UX principle: zawsze widoczny **Następny krok**.
 - Supporting views: **Dzisiaj / Projekty / Pomysły / Inbox**.
-- Concept stage: edycja ręczna, cofnięcie zatwierdzenia, opcjonalna propozycja OpenAI jako wariant do przyjęcia/odrzucenia.
+- **Projekty** (DEC-038): lista wszystkich zapisanych webinariów właściciela. „Otwórz” wczytuje wybraną kampanię do workspace. „Usuń” (modal) kasuje kampanię, materiały, historię i obrazy na stałe.
+- Formularz **Zaplanuj webinar** (DEC-037): opcjonalny **Asystent planowania** sprawdza aktualne informacje i proponuje kierunek; projekt powstaje dopiero po „Utwórz projekt webinaru”. „Użyj tego kierunku” wstępnie wypełnia szkic, ale nie zatwierdza go. Nowy projekt ma puste pola kierunku i puste szkice materiałów (koncepcja tylko z tytułem = temat).
+- Karta **Pomysł i kierunek** (DEC-039): po powstaniu projektu ten sam asystent zostaje w workspace. „Popraw propozycję” i „Popraw propozycję — szukaj w Internecie” pokazują nową wersję obok pól. „Zmień na” wstawia jeden fragment do pola, bez zapisu. Kierunek zapisuje się po „Zastosuj” i zostaje szkicem. Przy „Gotowe” najpierw trzeba cofnąć zatwierdzenie.
+- Concept stage: edycja ręczna, cofnięcie zatwierdzenia, opcjonalna propozycja OpenAI jako wariant do przyjęcia/odrzucenia. Przy pustej koncepcji pierwsza opcja to „Wygeneruj na podstawie pomysłu i kierunku”. Każda opcja dostaje zapisany kierunek jako granicę sensu (DEC-041). Nowy tytuł nie zmienia tematu kierunku, a „Zastosuj” nie zmienia pól kierunku.
 - Formularz webinaru i karta projektu (DEC-035): „Prowadzący” to „Instruktor z bazy” albo „Inna osoba (spoza bazy)”, a osobna lista „Głos komunikacji” (domyślnie „PNE — neutralnie”) wskazuje, czyim stylem AI pisze opis YouTube. W formularzu instruktora `super_admin` widzi pole „Profil komunikacji dla AI”.
 - Materiał „Opis YouTube” (DEC-036): po zatwierdzeniu kierunku i koncepcji „Poproś AI o nowy szkic” (od zera) albo „Popraw mój szkic” (redakcja tekstu z pola, także niezapisanego). Na karcie propozycji „Co jeszcze poprawić?” i „Popraw ponownie”. Zastosuj / Odrzuć jak wcześniej; po odrzuceniu niezapisany tekst wraca do pola.
 - Materiał „Post Facebook”: ten sam wzorzec, plus checkbox hashtagów; AI korzysta z opisu YouTube tylko zatwierdzonego i wstawia `[LINK DO ZAPISU]` zamiast linku.
@@ -27,13 +30,16 @@ PNE Growth OS / PNE Rozwój to moduł w `adm.pnedu.pl`, który ma prowadzić wł
 
 ## 2. Aktualny etap
 
-Etap v0.2. Pierwszy wycinek, szkic AI dla materiału `youtube-description` (DEC-024), Waldemar zweryfikował 2026-10-01, z prawdziwym AI i w symulacji. Drugi wycinek, szkic AI dla materiału `facebook-post` (DEC-026), Waldemar zweryfikował 2026-10-01. Historia wersji materiałów (DEC-027) działa na produkcji od 2026-10-01: migracja wykonana, Waldemar sprawdził ją ręcznie. Trzeci wycinek, brief grafiki głównej (DEC-028), oraz generator obrazu z briefem korzystającym z opisu YouTube (DEC-029), z modelem `gpt-image-2` i wersją kwadratową z obrazu poziomego (DEC-030), są w repozytorium od 2026-10-02. Waldemar testował generator lokalnie z prawdziwym OpenAI. Na produkcji czekają na migrację `growth_artifact_images`. Model danych v0.1 działa na produkcji. Propozycje AI zostają w przeglądarce, w której powstały.
+Etap v0.2. Pierwszy wycinek, szkic AI dla materiału `youtube-description` (DEC-024), Waldemar zweryfikował 2026-10-01, z prawdziwym AI i w symulacji. Drugi wycinek, szkic AI dla materiału `facebook-post` (DEC-026), Waldemar zweryfikował 2026-10-01. Historia wersji materiałów (DEC-027) działa na produkcji od 2026-10-01: migracja wykonana, Waldemar sprawdził ją ręcznie. Trzeci wycinek, brief grafiki głównej (DEC-028), oraz generator obrazu z briefem korzystającym z opisu YouTube (DEC-029), z modelem `gpt-image-2` i wersją kwadratową z obrazu poziomego (DEC-030), są w repozytorium od 2026-10-02. Waldemar testował generator lokalnie z prawdziwym OpenAI. Na produkcji czekają na migrację `growth_artifact_images`. Asystent planowania kierunku (DEC-037) jest w repozytorium od 2026-10-02, a ten sam asystent na karcie kierunku otwartego projektu (DEC-039) od 2026-10-03. Oba bez migracji, czekają na ręczną weryfikację. Model danych v0.1 działa na produkcji. Propozycje AI zostają w przeglądarce, w której powstały.
 
 ## 3. Co już działa
 
 - Feature flag `PNE_GROWTH_OS_ENABLED` i dostęp tymczasowo tylko dla `super_admin`.
 - Menu **PNE Rozwój**: Dzisiaj, Projekty, Pomysły, Inbox.
-- Formularz **Zaplanuj webinar TIK**.
+- Lista **Projekty** (DEC-038): wszystkie kampanie właściciela, otwieranie wybranej i trwałe usuwanie z modalem. Cudzej kampanii nie widać i nie da się usunąć.
+- Formularz **Zaplanuj webinar**.
+- **Asystent planowania** (DEC-037): zadanie `direction_planning`, prompt `direction_planning_v1`. Przy włączonej fladze OpenAI `gpt-5.5` z `web_search` (generate i refresh); iterate bez wyszukiwania. Propozycja tylko w sesji. „Użyj tego kierunku” zapisuje szkic `DRAFT` przy tworzeniu projektu, bez zatwierdzenia. Przy wyłączonej fladze — symulacja lokalna bez udawania źródeł. Statyczne karty pomysłów są na Pomysłach (etykieta „Przykład tematu”), nie na create.
+- **Asystent kierunku w projekcie** (DEC-039): na karcie „Pomysł i kierunek” te same tryby iterate i refresh. Propozycja w sesji projektu. „Zastosuj” zapisuje szkic, „Odrzuć” zostawia kierunek. Zatwierdzonego kierunku AI nie rusza.
 - Sesyjny projekt webinaru (`DemoTikWebinarProject`).
 - Modele Eloquent v0.1 i relacje: właściciel, instruktor, materiał, zadanie, decyzja. Workspace używa kampanii, kierunku, koncepcji, decyzji przy kierunku i koncepcji, 9 zadań operacyjnych i 10 materiałów roboczych.
 - Testy integralności: unikalny klucz materiału w kampanii, puste relacje, usuwanie kampanii razem z dziećmi, czyszczenie opcjonalnych powiązań.
@@ -53,13 +59,13 @@ Etap v0.2. Pierwszy wycinek, szkic AI dla materiału `youtube-description` (DEC-
 - **Poproś AI o szkic** dla „Grafika główna” (DEC-028, DEC-029): prompt `material_graphic_brief_v2`. AI zwraca osobne pola briefu, aplikacja składa z nich szkic z etykietami i sama wstawia termin z dniem tygodnia oraz prowadzącego. Checkboxy: podtytuł, prowadzący, wezwanie do działania, opis obrazu dla AI, tekst alternatywny (domyślnie włączone). AI dostaje zatwierdzony opis YouTube, jeśli istnieje.
 - **Poproś AI o szkic** dla „Mailing główny” (DEC-032): prompt `material_main_mail_v1`. AI zwraca 3 tematy, preheader i treść, a aplikacja składa szkic z etykietami („Temat:”, „Inne propozycje tematu:”, „Preheader:”). Zwrot „Dzień dobry,” i „Państwo”, podpis prowadzącego i „Zespół PNE”, `[LINK DO ZAPISU]` zamiast linku, bez stopki prawnej. Przełącznik „Długość maila” (krótki 150–250 słów albo dłuższy 300–450 słów), emotikony domyślnie wyłączone, dodatkowa instrukcja. AI dostaje zatwierdzony opis YouTube, jeśli istnieje. Szkic jest edytowany w osobnych polach Temat, Preheader i Treść (zapisywany jako jeden tekst z etykietami), z listą „Propozycje tematu od AI” (wszystkie 3 tematy, także pierwotny, z przyciskiem „Użyj” i oznaczeniem „w polu”), licznikami znaków i przyciskiem „Kopiuj kod HTML preheadera” do Sendy. Bez wysyłki i Sendy.
 - **Poproś AI o szkic** dla „Mailing przypominający” (DEC-033): prompt `material_reminder_mail_v1`, ten sam format i te same pola co mailing główny. Przełącznik „Kiedy wysyłasz przypomnienie” (dzień przed, „jutro”, albo w dniu webinaru, „dziś”) i przełącznik długości (80–150 albo 180–280 słów). Dwa znaczniki: `[LINK DO POKOJU]` dla zapisanych i `[LINK DO ZAPISU]` dla pozostałych. AI dostaje zatwierdzony opis YouTube i zatwierdzony mailing główny, jeśli istnieją.
-- **Generator obrazu** dla „Grafika główna” (DEC-029, DEC-030): OpenAI `gpt-image-2`, jakość `medium`, jeden obraz w formacie poziomym (natywnie 16:9, 1920×1080 bez przycinania) albo kwadratowym (1080×1080). Przy obrazie poziomym jest „Utwórz wersję kwadratową”: te same elementy przekomponowane do kwadratu przez edycję obrazu w OpenAI, z tymi samymi napisami co oryginał. Generator pokazuje dzisiejsze zużycie limitu i ma przycisk „Zresetuj limit” (modal, wpis w logu). Aplikacja dokleja do opisu zasady bez tekstu, logotypów i rozpoznawalnych osób. Z checkboxem dokleja nagłówek z briefu i termin. Pliki JPEG są prywatne (`storage/app/private/growth-os/images`), tabela `growth_artifact_images`, galeria 10 ostatnich (wybrana grafika zostaje zawsze), limit 10 obrazów dziennie, osobny obwód awaryjny, log bez opisu obrazu. Przy wyłączonej fladze powstaje obraz zastępczy bez OpenAI.
+- **Generator obrazu** dla „Grafika główna” (DEC-029, DEC-030, DEC-042): OpenAI `gpt-image-2`, jakość `medium`, jeden obraz w formacie poziomym (natywnie 16:9, 1920×1080 bez przycinania) albo kwadratowym (1080×1080). Przy obrazie poziomym jest „Utwórz wersję kwadratową”: te same elementy przekomponowane do kwadratu przez edycję obrazu w OpenAI, z tymi samymi napisami co oryginał. Logo Platformy i opcjonalne logo sponsora aplikacja dokłada na gotowy obraz (także po wersji kwadratowej); model ich nie rysuje. Generator pokazuje dzisiejsze zużycie limitu i ma przycisk „Zresetuj limit” (modal, wpis w logu). Aplikacja dokleja do opisu zasady bez tekstu i bez logotypów rysowanych przez model. Z checkboxem dokleja nagłówek z briefu i termin. Nagłówek briefu bierze się z tematu webinaru (DEC-043). Brief ma „Nowy brief” / „Popraw mój brief”, a opis obrazu poprawia się osobno. „Popraw ten obraz” edytuje gotowe zdjęcie jedną uwagą; logo dokłada się potem. Pliki JPEG są prywatne (`storage/app/private/growth-os/images`), tabela `growth_artifact_images`, galeria 10 ostatnich (wybrana grafika zostaje zawsze), limit 10 obrazów dziennie, osobny obwód awaryjny, log bez opisu obrazu. Przy wyłączonej fladze powstaje obraz zastępczy bez OpenAI.
 - Osobna, domyślnie wyłączona flaga `GROWTH_AI_ENABLED`; prawdziwe AI jest dostępne tylko dla `super_admin`.
 - Provider i model są konfigurowane centralnie i widoczne w UI; logika Growth OS korzysta z abstrakcji providera.
-- Walidacja structured output, allowlisty danych (koncepcja; opis YouTube z `host_name` — DEC-025; post Facebook dodatkowo z zatwierdzonym opisem YouTube — DEC-026; poza tym bez innych materiałów), blokada e-maili/telefonów/sekretów i linków spoza wejścia, timeout, jeden retry, limity wywołań i prosty circuit breaker. Limit dzienny i circuit breaker są wspólne dla obu zadań.
-- Osobny log techniczny zawiera tylko metadane wywołania (w tym `task_type`: `concept_revision`, `material_draft` albo `material_image`) — bez promptu, odpowiedzi, treści, PII i sekretów.
+- Walidacja structured output, allowlisty danych (kierunek: temat/cel/typ; koncepcja; opis YouTube z `host_name` — DEC-025; post Facebook dodatkowo z zatwierdzonym opisem YouTube — DEC-026; poza tym bez innych materiałów), blokada e-maili/telefonów/sekretów i linków spoza wejścia, timeout, jeden retry, limity wywołań i prosty circuit breaker. Limit dzienny i circuit breaker są wspólne dla zadań tekstowych (`direction_planning`, `concept_revision`, `material_draft`). `direction_planning` ma osobny model i timeout researchu.
+- Osobny log techniczny zawiera tylko metadane wywołania (w tym `task_type`: `direction_planning`, `concept_revision`, `material_draft` albo `material_image`) — bez promptu, odpowiedzi, treści, PII i sekretów. `direction_planning` loguje też `web_search_used` i `source_count`.
 - Prosta historia wersji koncepcji w sesji (do 5 pozycji).
-- Pozostałe pomysły i sugestie AI są nadal symulowane.
+- Lista Pomysłów to przykłady tematów, nie propozycje AI.
 - Inbox prowadzi do miejsca w projekcie, nie jest głównym flow.
 
 Do tej sekcji wpisujemy wyłącznie rzeczy faktycznie istniejące w aktualnym kodzie/prototypie. Wizja, planowane API, przyszłe modele i pomysły konsultacyjne należą do `vision.md` albo `roadmap.md`.
@@ -67,7 +73,7 @@ Do tej sekcji wpisujemy wyłącznie rzeczy faktycznie istniejące w aktualnym ko
 ## 4. Aktualny flow UX
 
 ```text
-Zaplanuj TIK
+Zaplanuj webinar
 → Pomysł i kierunek
 → Koncepcja (edycja / AI / zatwierdź / cofnij)
 → Materiały
@@ -78,7 +84,7 @@ Zaplanuj TIK
 
 ## 5. Najważniejsze decyzje
 
-- Start UX to **Zaplanuj webinar TIK**, nie abstrakcyjny Topic.
+- Start UX to **Zaplanuj webinar**, nie abstrakcyjny Topic.
 - Projekt webinaru jest głównym workspace.
 - Inbox jest pomocniczy.
 - AI draftuje i sugeruje; człowiek zatwierdza.
@@ -98,20 +104,44 @@ Zaplanuj TIK
 - Brak Meta / Canva API.
 - Brak publikacji, wysyłek, jobów i biznesowych side effectów.
 - Propozycje AI działają w sesji HTTP. Poza sesją zostaje kampania, prowadzący, zapisany kierunek, zapisana koncepcja, decyzje przy kierunku, koncepcji i szkicach AI materiałów, 9 zadań operacyjnych, 10 materiałów (po jawnym zapisie) z historią do 20 wersji i techniczny log metadanych AI.
-- Brak AI poza etapem Koncepcja oraz materiałami „Opis YouTube”, „Post Facebook”, „Grafika główna” (brief i obraz) , „Mailing główny”, „Mailing przypominający” i „Scenariusz prowadzącego”. Innymi materiałami w kontekście AI są tylko zatwierdzony opis YouTube (dla posta, briefu grafiki, obu mailingów i scenariusza) oraz zatwierdzony mailing główny (dla przypomnienia).
+- Brak AI poza Asystentem planowania na create, asystentem kierunku w otwartym projekcie (DEC-039), etapem Koncepcja oraz materiałami „Opis YouTube”, „Post Facebook”, „Grafika główna” (brief i obraz) , „Mailing główny”, „Mailing przypominający” i „Scenariusz prowadzącego”. Innymi materiałami w kontekście AI są tylko zatwierdzony opis YouTube (dla posta, briefu grafiki, obu mailingów i scenariusza) oraz zatwierdzony mailing główny (dla przypomnienia).
+- Brak czatu, odkrywania tematu i głosu komunikacji w Asystencie planowania.
 - Brak wysyłki maili i integracji z Sendy: mailing główny to tekst do skopiowania.
-- Brak integracji z Canvą i innych dostawców obrazów niż OpenAI. Edycja obrazu służy tylko do wersji kwadratowej z obrazu poziomego (DEC-030). Brak dowolnej edycji, wariantów w jednym kliknięciu i obu formatów naraz (Waldemar ma Canva Pro i Education).
+- Brak integracji z Canvą i innych dostawców obrazów niż OpenAI. Edycja obrazu służy do wersji kwadratowej (DEC-030) i do jednej poprawki gotowego zdjęcia (DEC-043). Brak wariantów w jednym kliknięciu i obu formatów naraz.
 - Brak ostrzeżenia na zapisanym materiale, że kierunek lub koncepcja zmieniły się po jego przygotowaniu (opcjonalne w DEC-024, nie zrobione).
 - `Topic` i `Expert` nie należą do v0.1. Ekspert wskazuje opcjonalnie istniejący `Instructor` przez `primary_instructor_id`.
 
 ## 7. Otwarte pytania
 
 - Czy później dodać projekt w Canvie (Autofill) obok obrazu z OpenAI.
+- Mailing główny: mocniejszy edytor treści i wybór gotowego szablonu układu. Bez decyzji i bez kodu — najpierw konsultacja.
 ## 8. Następny krok
 
-Ręczna weryfikacja briefu grafiki i generatora obrazu przez Waldemara: brief z zatwierdzonym opisem YouTube i bez niego, obraz poziomy i kwadratowy, z napisem i bez, wersja kwadratowa z obrazu poziomego, wybór i usuwanie w galerii. Na produkcji: backup, migracja `growth_artifact_images`, smoke z runbooka (kroki 1–7) i sprawdzenie, czy konto OpenAI ma dostęp do `gpt-image-2`. Ręczna weryfikacja szkicu AI mailingu głównego (DEC-032): krótki i dłuższy, z opisem YouTube i bez. Ręczna weryfikacja szkicu AI mailingu przypominającego (DEC-033): „jutro” i „dziś”, z zatwierdzonym mailingiem głównym i bez. Ręczna weryfikacja scenariusza prowadzącego (DEC-034): 45 i 90 minut oraz własny czas. Ręczna weryfikacja DEC-035 i DEC-036: wpisanie profilu Waldemara w formularzu instruktora, webinar z gościem i głosem Waldemara, „Popraw mój szkic” na własnym tekście, dwie poprawki „Popraw ponownie” (np. „popraw tylko CTA”), Odrzuć z powrotem tekstu. Na produkcji: backup i dwie migracje. Potem kolejne materiały (landing, follow-up) albo zapis propozycji AI w bazie. Propozycje AI zostają w sesji. Zadania operacyjne nie sterują głównym CTA.
+Ręczna weryfikacja asystenta kierunku w otwartym projekcie (DEC-039): „Popraw propozycję”, „Popraw propozycję — szukaj w Internecie”, „Zastosuj” / „Odrzuć”, oraz blokada przy „Gotowe”. **Nie klikać prawdziwego AI bez potrzeby — to kosztuje.** Przy `GROWTH_AI_ENABLED=false` widać symulację bez źródeł. Na produkcji: backup, `git pull`, `optimize:clear` / cache — **bez migracji**. Dalej: ręczna weryfikacja Asystenta planowania na create (DEC-037), briefu grafiki i generatora obrazu, mailingów, scenariusza, DEC-035 i DEC-036.
 
 ## 9. Ostatnie zmiany
+
+- Treść maila (DEC-048): okno edycji z przełącznikiem Edycja / Kod HTML oraz pogrubieniem, kursywą, podkreśleniem, listami i linkiem. Własny edytor, bez zewnętrznej biblioteki. Bez migracji.
+
+- Mailing główny (DEC-047): checkbox „Profesjonalny HTML maila” jest domyślnie włączony. AI pisze tekst, aplikacja składa HTML z akapitami, listą i przyciskiem zapisu. Mailing przypominający zostaje tekstem. Bez migracji.
+
+- Dzienny limit AI (DEC-046): przy komunikacie „Dzienny limit AI został wykorzystany” jest „Zresetuj limit” (okno potwierdzenia) na Zaplanuj webinar, w projekcie i na materiałach. Limit obrazów zostaje osobny. Bez migracji.
+
+- Mailing główny (DEC-045): nowy szkic, poprawa tematu, preheadera i treści oraz kolejna poprawka propozycji. Mailing przypominający bez tej zmiany. Bez migracji.
+
+- Post Facebook (DEC-044): nowy szkic, poprawa własnego tekstu i kolejna poprawka propozycji, tak jak opis YouTube. Bez głosu komunikacji. Bez migracji.
+
+- Grafika główna (DEC-043): brief ma nowy szkic, poprawę szkicu i kolejną poprawkę. Nagłówek bierze się z tematu webinaru. Opis obrazu poprawia się osobno. „Popraw ten obraz” edytuje gotowe zdjęcie. Bez migracji.
+
+- Listy w odpowiedzi AI: numeracja i wypunktowanie w polach tekstowych koncepcji, kierunku i szkicu materiału dostają złamanie linii przed kolejnym punktem. Karta propozycji je pokazuje. „Zastosuj” wstawia ten sam układ do pola. Bez migracji.
+
+- Koncepcja i kierunek (DEC-041): każda opcja „Wygeneruj lub zmień” dostaje zapisany temat i pięć pól kierunku. Poprawka nie układa koncepcji od nowa. „Zastosuj” nie zmienia kierunku i nie cofa jego zatwierdzenia. Bez migracji.
+
+- Asystent kierunku w otwartym projekcie (DEC-039): na karcie „Pomysł i kierunek” „Popraw propozycję” (bez wyszukiwania) i „Popraw propozycję — szukaj w Internecie”. Propozycja obok pól; „Zastosuj” zapisuje szkic `DRAFT`. Przy „Gotowe” AI jest zablokowane. Bez migracji.
+
+- Lista i usuwanie projektów (DEC-038): `/growth/projects` pokazuje wszystkie kampanie właściciela, „Otwórz” i trwałe „Usuń” z modalem. Bez migracji.
+
+- Asystent planowania kierunku (DEC-037): zadanie `direction_planning` z `web_search` przy generate/refresh, propozycja tylko w sesji, „Użyj tego kierunku” jako szkic `DRAFT`. Domyślny model researchu `gpt-5.5` (`GROWTH_AI_RESEARCH_MODEL`). Nowy projekt bez przykładowych treści Canva. CTA „Zaplanuj webinar”. Bez migracji.
 
 - Operator ≠ Prowadzący ≠ Głos komunikacji (DEC-035): migracje `2026_10_02_130000` (`growth_campaigns.communication_voice_instructor_id`) i `2026_10_02_130100` (`instructors.ai_voice_profile`), `GrowthPeople`, `PneVoice`, wybór prowadzącego z bazy lub spoza bazy oraz głosu w formularzu i na karcie projektu. Opis YouTube z trybami generate / refine / iterate (DEC-036), prompt `material_youtube_description_v3`, emotikony domyślnie wyłączone.
 

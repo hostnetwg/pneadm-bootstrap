@@ -1,7 +1,57 @@
 # Następne Kroki
 
-Data utworzenia/aktualizacji: 2026-09-29
+Data utworzenia/aktualizacji: 2026-10-03
 Status: plan roboczy, do potwierdzenia przez właściciela
+
+## Ostatnio (2026-10-04) — Edytor treści maila (DEC-048)
+
+Treść maila ma okno **Edycja** / **Kod HTML** i podstawowe formatowanie. Własny edytor, bez nowej biblioteki. Bez migracji. Kanon: [growth-os/CURRENT.md](./growth-os/CURRENT.md).
+
+## Ostatnio (2026-10-04) — HTML mailingu głównego (DEC-047)
+
+Na mailingu głównym **Profesjonalny HTML maila** jest domyślnie włączony. Treść do Sendy składa aplikacja. Mailing przypominający zostaje tekstem. Bez migracji. Kanon: [growth-os/CURRENT.md](./growth-os/CURRENT.md).
+
+## Ostatnio (2026-10-03) — Reset dziennego limitu AI (DEC-046)
+
+Przy komunikacie o wykorzystanym limicie jest **Zresetuj limit**. Działa na Zaplanuj webinar, w projekcie i na materiałach. Limit obrazów zostaje osobny. Bez migracji. Kanon: [growth-os/CURRENT.md](./growth-os/CURRENT.md).
+
+## Ostatnio (2026-10-03) — Poprawka mailingu głównego (DEC-045)
+
+Mailing główny ma te same trzy kroki co opis YouTube. Poprawka bierze temat, preheader i treść z pól. Mailing przypominający zostaje przy jednym przycisku. Bez migracji. Kanon: [growth-os/CURRENT.md](./growth-os/CURRENT.md).
+
+## Ostatnio (2026-10-03) — Poprawka posta na Facebooku (DEC-044)
+
+Post Facebook ma te same trzy kroki co opis YouTube. Głos komunikacji zostaje przy opisie YouTube. Bez migracji. Kanon: [growth-os/CURRENT.md](./growth-os/CURRENT.md).
+
+## Ostatnio (2026-10-03) — Poprawka briefu, opisu i gotowego obrazu (DEC-043)
+
+Na grafice głównej brief ma **Nowy brief** i **Popraw mój brief**. Opis obrazu poprawia się osobno. Nagłówek bierze się z tematu webinaru. **Popraw ten obraz** edytuje gotowe zdjęcie jedną uwagą. Bez migracji. Kanon: [growth-os/CURRENT.md](./growth-os/CURRENT.md).
+
+## Ostatnio (2026-10-03) — Logo na grafice głównej (DEC-042)
+
+Na grafice głównej logo Platformy i opcjonalne logo sponsora są dokładane na gotowy obraz. Wersja kwadratowa dostaje je po przekomponowaniu. Migracja `2026_10_03_120000`. Kanon: [growth-os/CURRENT.md](./growth-os/CURRENT.md).
+
+## Ostatnio (2026-10-03) — Kierunek przy każdej poprawce koncepcji (DEC-041)
+
+Każda opcja **Wygeneruj lub zmień** dostaje zapisany **Pomysł i kierunek**. Poprawka nie układa koncepcji od nowa. **Zastosuj** nie zmienia kierunku. Bez migracji. Kanon: [growth-os/CURRENT.md](./growth-os/CURRENT.md).
+
+## Ostatnio (2026-10-03) — Koncepcja z pomysłu i kierunku (DEC-040)
+
+Na karcie **Koncepcja webinaru** lista nazywa się **Wygeneruj lub zmień**. Przy pustych polach pierwsza opcja to **Wygeneruj na podstawie pomysłu i kierunku**. Nowy tytuł koncepcji nie zmienia tematu w **Pomysł i kierunek**. Bez migracji. Kanon: [growth-os/CURRENT.md](./growth-os/CURRENT.md).
+
+## Ostatnio (2026-10-03) — Asystent kierunku w otwartym projekcie (DEC-039)
+
+Na karcie **Pomysł i kierunek** można poprawić kierunek z AI albo ręcznie. Propozycja nie nadpisuje pól, dopóki nie klikniesz **Zastosuj**. Przy statusie **Gotowe** najpierw **Cofnij zatwierdzenie**. Bez migracji. Kanon: [growth-os/CURRENT.md](./growth-os/CURRENT.md).
+
+## Ostatnio (2026-10-03) — Usuwanie projektów webinaru (DEC-038)
+
+Lista **Projekty** pokazuje wszystkie kampanie właściciela. **Usuń** kasuje projekt na stałe (modal Bootstrap). **Otwórz** wczytuje wybraną kampanię. Bez migracji. Kanon: [growth-os/CURRENT.md](./growth-os/CURRENT.md).
+
+## Ostatnio (2026-10-02) — Asystent planowania kierunku (DEC-037)
+
+Na formularzu **Zaplanuj webinar** AI może sprawdzić aktualne informacje i zaproponować kierunek. Propozycja zostaje w sesji; projekt i zatwierdzenie są osobnymi krokami. Nowy projekt nie dostaje przykładowych treści Canva. Bez migracji. Kanon: [growth-os/CURRENT.md](./growth-os/CURRENT.md), [06-AI.md](./pne-growth-os/06-AI.md).
+
+Następny krok: ręczna weryfikacja Waldemara na temacie NotebookLM (nie klikać prawdziwego AI bez potrzeby).
 
 ## Ostatnio (2026-09-30) — Ograniczenie requestów przy oczekiwaniu na KSeF
 

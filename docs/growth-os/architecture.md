@@ -1,6 +1,6 @@
 # PNE Growth OS — Architecture
 
-Status: kampania, prowadzący, kierunek, koncepcja, decyzje, 9 zadań operacyjnych i 10 materiałów zapisują się z prototypu. Propozycje AI (koncepcja oraz szkice opisu YouTube i posta Facebook) zostają w sesji HTTP.
+Status: kampania, prowadzący, kierunek, koncepcja, decyzje, 9 zadań operacyjnych i 10 materiałów zapisują się z prototypu. `/growth/projects` listuje wszystkie kampanie właściciela; usunięcie kasuje kampanię z dziećmi i plikami obrazów (DEC-038). Propozycje AI (planowanie kierunku przed projektem i na karcie kierunku, koncepcja oraz szkice materiałów) zostają w sesji HTTP.
 
 ## Zasada Główna
 
@@ -238,21 +238,20 @@ Tabele domenowe v0.1 są w migracji `database/migrations/2026_09_29_191500_creat
 
 Po zalogowaniu bez sesji wraca ostatnia kampania właściciela, prowadzący (`host_name`), kierunek, artifact `concept`, decyzje przy kierunku i koncepcji, 9 zadań operacyjnych oraz zapisane materiały (status i szkic). Zadania mają stabilny `key`, termin liczony od `live_at` oraz w UX tylko `todo` i `done`. Nie tworzą decyzji i nie zmieniają następnego kroku. Ręczny zapis materiału też nie tworzy decyzji. Etykieta „Opublikowane / zaplanowane” jest tylko w `payload.status`; kolumna artifactu dostaje `approved`. Propozycje AI zostają w sesji i nie wracają po nowym zalogowaniu.
 
-Jedyną rzeczywistą integracją zewnętrzną jest opcjonalne OpenAI w dwóch zadaniach: rewizja koncepcji (`concept_revision`) i szkic materiału (`material_draft`, tylko materiały `youtube-description`, `facebook-post` i `main-graphic`):
+Jedyną rzeczywistą integracją zewnętrzną jest opcjonalne OpenAI w trzech zadaniach tekstowych: planowanie kierunku (`direction_planning`, DEC-037), rewizja koncepcji (`concept_revision`) i szkic materiału (`material_draft`, materiały z AI) oraz osobno generator obrazu (`material_image`):
 
 ```text
-Etap Koncepcja / ekran materiału „Opis YouTube”, „Post Facebook” albo „Grafika główna”
+Formularz Zaplanuj webinar (Asystent planowania)
 → GrowthAiService (flaga, super_admin, circuit breaker, wspólny limit dzienny, log)
-→ ConceptRevisionTask albo MaterialDraftTask (allowlista danych, prompt, schema, walidacja)
-→ GrowthAiProvider
-→ OpenAiProvider
-→ OpenAI Responses API
-→ parsowanie i walidacja
-→ propozycja w sesji
-→ jawne Zastosuj / Odrzuć
+→ DirectionPlanningTask (GrowthAiResearchTask; generate/refresh = web_search)
+→ GrowthAiProvider / OpenAiProvider
+→ OpenAI Responses API (json_schema + tools web_search, store: false)
+→ źródła z API, walidacja, propozycja w sesji
+→ „Użyj tego kierunku” + Utwórz projekt (szkic DRAFT) albo ręczny kierunek
+→ w otwartym projekcie ten sam task: iterate bez web_search, refresh z web_search, Zastosuj = DRAFT (DEC-039)
 ```
 
-Oba zadania implementują mały kontrakt `GrowthAiTask` (`type`, `promptVersion`, `schemaVersion`, `instructions`, `schema`). Serwis loguje typ i wersje z zadania, więc nie ma w nim stałych pod koncepcję. Nie ma rejestru zadań ani routera modeli.
+Trzy zadania tekstowe implementują `GrowthAiTask`. `direction_planning` dodatkowo `GrowthAiResearchTask`. Serwis loguje typ i wersje z zadania. Nie ma rejestru zadań ani automatycznego routera modeli; model researchu jest osobną konfiguracją (`GROWTH_AI_RESEARCH_MODEL`, domyślnie `gpt-5.5`) i nie zmienia `concept_revision` ani `material_draft`.
 
 `MaterialDraftTask` (DEC-024): prompt `material_youtube_description_v2`, schema `material_youtube_description_schema_v1`, profil `youtube_description_v1`. Wejście to allowlista: `material` (klucz, nazwa, typ), `campaign` (`working_topic`, etykieta celu, `live_date`, `live_time`, strefa aplikacji, `host_name`), pięć pól kierunku, pola koncepcji (`title`, `subtitle`, `promise`, `points`, `plan`, `cta`, `additional_material`), bieżący szkic tego materiału, `style.emojis` i opcjonalna `instruction` właściciela. Bez innych materiałów. `host_name` trafia do AI od DEC-025; pusty lub „—” jest wysyłany jako pusty, a prompt każe przepisać imię i nazwisko bez dopisywania biografii. Wyjście: `draft` i `change_summary`; dodatkowe pola, dane osobowe i linki spoza wejścia odrzucają odpowiedź. Data i godzina idą osobno, a przy kontroli telefonów wzorce dat są pomijane, żeby termin nie wyglądał jak numer telefonu.
 
@@ -266,7 +265,9 @@ Generator obrazu (DEC-029) jest osobną ścieżką, bo zwraca plik, a nie JSON: 
 
 Propozycje są w sesji osobno dla każdego materiału (`material_ai_proposals[klucz]`). Propozycja szkicu ma odcisk sha256 czterech źródeł: pól kierunku, pól koncepcji, bieżącego szkicu materiału i prowadzącego. Przy poście, briefie grafiki, obu mailingach i scenariuszu prowadzącego dochodzi piąte źródło, `source_materials`: zatwierdzony opis YouTube, a przy mailingu przypominającym także zatwierdzony mailing główny (`MaterialDraftTask::sourceMaterialKeys`). „Zastosuj” liczy odcisk ponownie i sprawdza oba zatwierdzenia. Różnica czyści propozycję i niczego nie zapisuje. Zgodność zapisuje szkic, ustawia status `DRAFT`, zapisuje artifact `material` i decyzję `material_ai_apply`. „Odrzuć” zapisuje tylko decyzję `material_ai_reject`.
 
-Logika Growth OS nie zależy bezpośrednio od endpointu ani SDK OpenAI. Provider i model są konfiguracją centralną. Istnieje tylko implementacja OpenAI; nie ma automatycznego routingu ani fallbacku do innego dostawcy.
+Logika Growth OS nie zależy bezpośrednio od endpointu ani SDK OpenAI. Provider i model są konfiguracją centralną. Istnieje tylko implementacja OpenAI; nie ma automatycznego routingu ani fallbacku do innego dostawcy. `web_search` jest włączane wyłącznie dla zadań `GrowthAiResearchTask` (dziś `direction_planning` w trybach generate i refresh).
+
+Od DEC-037 `DirectionPlanningTask` dostaje allowlistę: `mode`, `today`, `campaign` (`type`, `topic`, `goal`, `live_date`), `user_instruction` oraz przy iterate/refresh `previous_proposal`. Bez prowadzącego, głosu komunikacji i materiałów. Wyjście: `working_topic`, pięć pól kierunku, `title_suggestions` (0–3), `change_summary`. Źródła researchu nie pochodzą z JSON modelu. Propozycja na create ma odcisk sha256 typu, celu i tematu. „Użyj tego kierunku” przy zgodnym odcisku zapisuje artifact `direction` jako `DRAFT` przy tworzeniu projektu. Od DEC-039 ten sam task działa na karcie kierunku: poprzednia propozycja to pola z formularza (także niezapisane), a odcisk dotyczy zapisanego kierunku. „Zastosuj” zapisuje `DRAFT` i nie zmienia tematu. Zatwierdzenie nadal jest osobnym krokiem.
 
 Pełna propozycja AI pozostaje w sesji HTTP. Log plikowy przechowuje wyłącznie minimalne metadane techniczne wywołania (`task_type`, wersje, tokeny, koszt, status), bez promptu, odpowiedzi i treści.
 

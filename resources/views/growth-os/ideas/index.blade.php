@@ -9,10 +9,10 @@
                 <div>
                     <h2 class="h4 mb-2">Pomysły</h2>
                     <p class="text-secondary mb-0">
-                        Minimalny ekran inspiracji. Nie zaczynamy od abstrakcyjnego Topic — główne CTA to nadal zaplanowanie webinaru TIK.
+                        Minimalny ekran inspiracji. To przykłady, nie propozycje AI. Główne CTA to zaplanowanie webinaru.
                     </p>
                 </div>
-                <a href="{{ route('growth.projects.create') }}" class="btn btn-primary align-self-start">Zaplanuj webinar TIK</a>
+                <a href="{{ route('growth.projects.create') }}" class="btn btn-primary align-self-start">Zaplanuj webinar</a>
             </div>
         </section>
 
@@ -21,7 +21,7 @@
                 <div class="col-md-6 col-xl-4">
                     <div class="card border h-100">
                         <div class="card-body">
-                            <span class="badge bg-light text-secondary border mb-2">Sugestia AI (symulacja)</span>
+                            <span class="badge bg-light text-secondary border mb-2">Przykład tematu</span>
                             <h3 class="h5">{{ $idea['title'] }}</h3>
                             <p class="text-secondary mb-0">{{ $idea['why'] }}</p>
                         </div>

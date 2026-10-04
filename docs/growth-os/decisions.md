@@ -174,7 +174,7 @@ Date: 2026-09-29<br>
 Status: ACTIVE<br>
 Decision: Kierunek webinaru zapisuje się jako artifact `direction` z pięcioma polami. „Zatwierdź kierunek” i cofnięcie są decyzją `direction_approval`. Propozycja AI przy kierunku i prowadzący zostają w sesji.<br>
 Rationale: Po zalogowaniu ma wracać treść kierunku i fakt zatwierdzenia, tak jak przy koncepcji. Stała podpowiedź AI nie jest decyzją ani treścią właściciela.<br>
-Consequences: Klucz `direction`, `type=direction`, `schema_version=1`. `payload`: `why_now`, `audience`, `problem`, `takeaway`, `sell_later`. Zapis jest jawny. Zatwierdzenie tworzy decyzję `approved` i utrwala bieżące pola. Cofnięcie oznacza poprzednią decyzję jako `superseded` i dodaje `changes_requested`. Edycja zatwierdzonego kierunku też oznacza decyzję jako `superseded`, bez nowej decyzji. „Zastosuj” przy koncepcji, jeśli zmienia odbiorców, zapisuje kierunek i cofa jego zatwierdzenie. Prowadzący i propozycja AI nadal nie są trwałe. Trwałość prowadzącego opisuje późniejszy DEC-023.
+Consequences: Klucz `direction`, `type=direction`, `schema_version=1`. `payload`: `why_now`, `audience`, `problem`, `takeaway`, `sell_later`. Zapis jest jawny. Zatwierdzenie tworzy decyzję `approved` i utrwala bieżące pola. Cofnięcie oznacza poprzednią decyzję jako `superseded` i dodaje `changes_requested`. Edycja zatwierdzonego kierunku też oznacza decyzję jako `superseded`, bez nowej decyzji. Od DEC-041 „Zastosuj” przy koncepcji nie zapisuje odbiorców z powrotem do kierunku i nie cofa jego zatwierdzenia. Prowadzący i propozycja AI nadal nie są trwałe. Trwałość prowadzącego opisuje późniejszy DEC-023.
 
 ## DEC-023
 
@@ -287,3 +287,99 @@ Status: ACTIVE<br>
 Decision: Materiał „Opis YouTube” ma trzy tryby AI: „Poproś AI o nowy szkic” (generate), „Popraw mój szkic” (refine) i „Popraw ponownie” (iterate). Prompt `material_youtube_description_v3`, schema bez zmian (`material_youtube_description_schema_v1`).<br>
 Rationale: Waldemar zauważył, że AI zastępowało jego tekst własnym stylem. Brief konsultanta przy HEAD 41ffb55 wprowadza redakcję tekstu autora i poprawki krok po kroku, zaczynając od jednego materiału.<br>
 Consequences: Generate pisze od zera i nie dostaje obecnego szkicu. Refine wysyła tekst z pola szkicu, także niezapisany (`author_draft`), z zasadą „Redaguj tekst autora. Nie zastępuj jego głosu swoim.”; puste pole daje komunikat „Najpierw wpisz własny szkic.” bez wywołania AI. Iterate działa na karcie propozycji: „Co jeszcze poprawić?” i „Popraw ponownie” wysyłają poprzednią propozycję (`previous_proposal`) z nową uwagą i tworzą nową propozycję w sesji, bez zapisu materiału, decyzji i wersji. Pusta uwaga daje „Napisz, co jeszcze poprawić.”. Prompt traktuje lokalne polecenia dosłownie (tylko CTA, pierwszy akapit bez zmian, tylko literówki). Wejście oddziela fakty o prowadzącym (`presenter.name`, nadal `host_name` jak w DEC-025) od głosu (`voice.pne_rules`, `voice.personal`); prompt zabrania pierwszej osoby sugerującej, że autor prowadzi webinar, i wymyślonych relacji („zaprosiłem”). Emotikony domyślnie wyłączone (1A). Odcisk propozycji dostaje część `voice`: id instruktora, status, imię i nazwisko, skrót profilu i wersję `PneVoice`. Zmiana głosu, profilu, kierunku, koncepcji, zapisanego szkicu lub prowadzącego unieważnia propozycję. Tryb, numer poprawki i skrót wysłanego tekstu są zapisane przy propozycji, nie w odcisku. Iterate na nieaktualnej propozycji usuwa ją i pokazuje komunikat. Nowy komunikat dla wszystkich materiałów: „Kierunek, koncepcja lub szkic zmieniły się od czasu przygotowania propozycji. Wygeneruj ją ponownie.” „Zastosuj” i „Odrzuć” działają jak wcześniej; decyzja dostaje w meta `ai_mode`, `iteration_count` i `communication_voice_instructor_id`, bez treści. Po „Odrzuć” niezapisany tekst wysłany w refine wraca do pola szkicu. Symulacja lokalna obsługuje wszystkie trzy tryby. Pozostałe materiały AI bez zmian.
+
+## DEC-037
+
+Date: 2026-10-02<br>
+Status: ACTIVE<br>
+Decision: Formularz **Zaplanuj webinar** (`/growth/projects/create`) ma **Asystenta planowania**. Nowe zadanie `direction_planning` (prompt `direction_planning_v1`, schema `direction_planning_schema_v1`) pomaga zaplanować webinar: aktualność, odbiorców, problem, rezultat i ostrożną decyzję `sell_later` (`nie` / `być może` / `tak`). Pierwsza analiza i odświeżenie wymagają hosted `web_search` w OpenAI Responses API; brak `web_search_call` zamyka wywołanie bez propozycji. Propozycja żyje tylko w sesji. „Użyj tego kierunku” oznacza szkic, ale projekt powstaje dopiero po „Utwórz projekt webinaru”. Zastosowany kierunek jest `DRAFT`, bez automatycznego zatwierdzenia.<br>
+Rationale: Brief konsultanta przy HEAD 54c29b9 i odpowiedzi Waldemara: 1A (statyczne pomysły znikają z create, zostają na Pomysłach bez etykiety AI), 2A (puste szkice materiałów i koncepcji), 3B (mocniejszy model researchu: domyślnie `gpt-5.5`, bo to oficjalna ścieżka `web_search`; `GROWTH_AI_RESEARCH_MODEL` pozwala później przełączyć na `gpt-6-astra`), 4A („Użyj tego kierunku” nie tworzy projektu samo), 5B (CTA „Zaplanuj webinar”). Przypadek testowy: „NotebookLM w pracy nauczyciela — od przygotowania lekcji do pracy z dokumentami”.<br>
+Consequences: `DirectionPlanningTask` implementuje `GrowthAiResearchTask`. Generate i refresh ustawiają `tools: [{type: web_search}]`, `tool_choice: {type: web_search}` i `include: [web_search_call.action.sources]` w jednym żądaniu ze `json_schema` i `store: false`. Iterate nie wyszukuje; dostaje `previous_proposal` i wymaganą instrukcję. Źródła bierze API (`action.sources` i `url_citation`), nigdy pola URL wymyślone przez model. Symulacja (`GROWTH_AI_ENABLED=false`) nie udaje researchu ani źródeł. Allowlista wejścia: typ, temat, cel, data, instrukcja, poprzednia propozycja; bez głosu komunikacji, prowadzącego i innych materiałów. Prompt każe ignorować instrukcje ze stron. Odcisk to skróty typu, celu i tematu; zmiana unieważnia iterate/refresh i „Użyj tego kierunku” (projekt i tak powstaje, szkic AI nie wchodzi). Nowy projekt nie dostaje już przykładowych treści Canva: puste pola kierunku, koncepcja tylko z tytułem = temat, puste szkice materiałów. Lista Pomysłów zostaje jako „Przykład tematu”. Wspólny limit dzienny i circuit breaker z innymi zadaniami tekstowymi. Log metadanych ma `task_type=direction_planning`, `web_search_used` i `source_count`, bez promptu, odpowiedzi, treści, PII i URL-i. Bez czatu, bez odkrywania tematu, bez migracji. Istniejące AI materiałów i koncepcji bez zmian (nadal `gpt-5-mini`, bez `web_search`).
+
+## DEC-038
+
+Date: 2026-10-03<br>
+Status: ACTIVE<br>
+Decision: `/growth/projects` pokazuje **wszystkie** kampanie właściciela. Przy każdej jest „Otwórz projekt webinaru” i „Usuń”. Usunięcie jest trwałe: kampania, kierunek, koncepcja, materiały, historia wersji, decyzje, zadania i pliki obrazów. Potwierdzenie tylko w modalu Bootstrap 5.<br>
+Rationale: Waldemar potrzebuje usuwać projekty testowe. Lista pokazywała wyłącznie ostatnią kampanię, więc starsze zostawały w bazie. Wybrany wariant A.<br>
+Consequences: Workspace nadal używa jednego projektu w sesji (`tik-webinar-session`). „Otwórz” wczytuje wybraną kampanię do sesji. „Usuń” kasuje tylko kampanię zalogowanego właściciela (404 dla cudzej). Jeśli usuwany projekt był otwarty, sesja jest czyszczona. Brak kosza i `SoftDeletes`. Nie rusza zamówień, kursów ani instruktorów. Bez migracji.
+
+## DEC-039
+
+Date: 2026-10-03<br>
+Status: ACTIVE<br>
+Decision: Po utworzeniu projektu asystent kierunku zostaje na karcie **Pomysł i kierunek**. „Popraw propozycję” (bez wyszukiwania) i „Popraw propozycję — szukaj w Internecie” (z `web_search`) biorą bieżące pola, także niezapisane. Nowa propozycja stoi obok. „Zmień na” wstawia jeden fragment do pola, bez zapisu. „Zastosuj” zapisuje pięć pól jako `DRAFT`. „Odrzuć” nic nie zapisuje. Przy statusie Gotowe asystent jest zablokowany do „Cofnij zatwierdzenie”.<br>
+Rationale: Po „Użyj tego kierunku” i „Utwórz projekt webinaru” propozycja znika z formularza tworzenia. Waldemar chce dalej poprawiać kierunek z AI albo ręcznie w otwartym projekcie.<br>
+Consequences: To samo zadanie `direction_planning`. Propozycja workspace jest w sesji projektu (`direction_ai_proposal`), osobno od propozycji sprzed utworzenia projektu. Odcisk dotyczy zapisanego kierunku z chwili prośby: niezapisane pola nie blokują „Zastosuj”, a „Zapisz kierunek” albo zatwierdzenie kasuje propozycję. „Zastosuj” nie zmienia tematu projektu i nie zatwierdza kierunku. Tytuły z AI są tylko podpowiedzią. Bez migracji i bez czatu.
+
+## DEC-040
+
+Date: 2026-10-03<br>
+Status: ACTIVE<br>
+Decision: Pusta **Koncepcja webinaru** dostaje opcję „Wygeneruj na podstawie pomysłu i kierunku” na początku listy „Wygeneruj lub zmień”. AI układa pola koncepcji z tematu i pięciu pól kierunku. Tytuł koncepcji nie zmienia tematu w „Pomysł i kierunek”. „Zastosuj” tej opcji nie nadpisuje kierunku.<br>
+Rationale: Dotychczasowe opcje tylko poprawiają istniejącą koncepcję. Przy pustych polach nie mają z czego wyjść. Waldemar chce iść dalej tą samą ścieżką AI, bez rozjechania się tytułu z już ustalonym kierunkiem.<br>
+Consequences: To nadal `concept_revision`, model `gpt-5-mini`, bez `web_search`. Wejście dostaje blok `direction` przy tej opcji. Symulacja nie wstawia przykładowych treści Canva. Od DEC-041 ten sam blok kierunku dostają też pozostałe opcje listy. Bez migracji.
+
+## DEC-041
+
+Date: 2026-10-03<br>
+Status: ACTIVE<br>
+Decision: Każda opcja listy „Wygeneruj lub zmień” dostaje zapisany temat i pięć pól kierunku. Przy poprawce istniejącej koncepcji kierunek jest granicą sensu: AI zmienia to, o co prosi opcja, i koryguje zdanie, które kierunkowi zaprzecza. Nie układa koncepcji od nowa. „Zastosuj” nie zmienia pól kierunku i nie cofa jego zatwierdzenia.<br>
+Rationale: Kolejne poprawki koncepcji widziały tylko poprzednią koncepcję i mogły odjechać od tematu, problemu i efektu. Kopiowanie odbiorców z propozycji z powrotem do „Dla kogo” rozjeżdżało kierunek w drugą stronę.<br>
+Consequences: To nadal `concept_revision`, `gpt-5-mini`, bez `web_search`. Blok `direction` jest przy każdej opcji. Tryb `from_direction` nadal wypełnia pustą koncepcję. Pozostałe opcje redagują zapisaną koncepcję. Puste pola kierunku nie są powodem, żeby coś dopisywać. „Zastosuj” zapisuje tylko koncepcję. Bez migracji.
+
+## DEC-042
+
+Date: 2026-10-03<br>
+Status: ACTIVE<br>
+Decision: Na grafice głównej logo Platformy i opcjonalne logo sponsora są dokładane jako pliki na gotowy obraz. Model ich nie rysuje. Wersja kwadratowa dostaje te same pliki dopiero po przekomponowaniu.<br>
+Rationale: Prośba do modelu o narysowanie logo psuje litery i proporcje. Przekazanie logo w pikselach obrazu poziomego zniekształciłoby je przy wersji kwadratowej.<br>
+Consequences: Logo Platformy to plik `public/images/Logo nazwa PNE - white.png`. Logo sponsora jest jedno na kampanię, PNG na dysku prywatnym. Obraz z logo ma czysty plik w `base_path`; do edycji kwadratu idzie ten plik. Migracja `2026_10_03_120000_add_logo_overlay_to_growth_artifact_images`.
+
+## DEC-043
+
+Date: 2026-10-03<br>
+Status: ACTIVE<br>
+Decision: Brief grafiki ma te same tryby co opis YouTube: nowy brief, poprawa szkicu i kolejna poprawka propozycji. Nagłówek bierze się z ustalonego tematu webinaru. Opis obrazu poprawia się osobno i „Zastosuj” zmienia tylko tę sekcję briefu. Przy gotowym obrazie „Popraw ten obraz” wysyła ten obraz i jedną uwagę do edycji; logo dokłada się potem, a poprzedni obraz zostaje.<br>
+Rationale: Szkice materiałów już dostają temat, kierunek i koncepcję, ale nagłówek grafiki był skrótem obok tematu. Generator zdjęcia nie widział kierunku. Poprawka całego briefu mieszałaby opis obrazu z nagłówkiem, a generowanie od zera gubiłoby zdjęcie, które już pasuje.<br>
+Consequences: Prompt briefu `material_graphic_brief_v3`. Opis obrazu to zadanie `graphic_image_description`, model `gpt-5-mini`, bez `web_search`. Edycja obrazu używa `POST /images/edits` i czystego pliku z `base_path`. Bez migracji.
+
+## DEC-044
+
+Date: 2026-10-03<br>
+Status: ACTIVE<br>
+Decision: Post Facebook ma te same trzy kroki co opis YouTube: nowy szkic, poprawa tekstu z pola (także niezapisana) i kolejna poprawka propozycji. Głos komunikacji zostaje tylko przy opisie YouTube.<br>
+Rationale: Przy poście był jeden przycisk, który nie brał niezapisanej poprawki i nie pozwalał poprawiać samej propozycji.<br>
+Consequences: Prompt `material_facebook_post_v2`. Te same dane co dotychczas: temat, kierunek, koncepcja i zatwierdzony opis YouTube. Bez migracji.
+
+## DEC-045
+
+Date: 2026-10-03<br>
+Status: ACTIVE<br>
+Decision: Mailing główny ma te same trzy kroki co opis YouTube: nowy szkic, poprawa tematu, preheadera i treści z pól (także niezapisanych) oraz kolejna poprawka propozycji.<br>
+Rationale: Przy mailu był jeden przycisk. Poprawka nie brała tekstu, którego właściciel jeszcze nie zapisał, i nie dało się poprawiać samej propozycji.<br>
+Consequences: Prompt `material_main_mail_v2`. Mailing przypominający zostaje przy jednym przycisku. Bez migracji.
+
+## DEC-046
+
+Date: 2026-10-03<br>
+Status: ACTIVE<br>
+Decision: Gdy pojawi się komunikat o wykorzystanym dziennym limicie AI, obok jest „Zresetuj limit”. To samo na Zaplanuj webinar, w projekcie i na materiałach oraz przy błędzie koncepcji bez przeładowania strony.<br>
+Rationale: Po wyczerpaniu limitu praca z AI stawała do końca doby. Właściciel ma móc wyzerować licznik świadomie, tak jak przy obrazach.<br>
+Consequences: Reset czyści licznik tekstowego AI (`growth-ai:daily`). Limit obrazów zostaje osobny. Potwierdzenie jest w oknie Bootstrap. W logu jest tylko liczba zużytych wywołań, bez treści. Bez migracji.
+
+## DEC-047
+
+Date: 2026-10-04<br>
+Status: ACTIVE<br>
+Decision: Na mailingu głównym checkbox „Profesjonalny HTML maila” jest domyślnie włączony. AI pisze zwykły tekst, a aplikacja składa z niego mail HTML do wklejenia w Sendy.<br>
+Rationale: Właściciel wkleja treść w Sendy w trybie HTML. Swobodny HTML z modelu jest niestabilny, a stały układ daje ten sam wygląd przy każdym webinarze.<br>
+Consequences: Prompt `material_main_mail_v3`. Mailing przypominający zostaje zwykłym tekstem. W szkicu jest podgląd i „Kopiuj HTML maila” (preheader na początku). Bez migracji.
+
+## DEC-048
+
+Date: 2026-10-04<br>
+Status: ACTIVE<br>
+Decision: Treść maila jest w oknie edycji z przełącznikiem Edycja / Kod HTML i podstawowym formatowaniem. To własny edytor, bez zewnętrznej biblioteki.<br>
+Rationale: Gotowe edytory (także TinyMCE używany przy lekcjach) przebudowują HTML i psują układ maila do Sendy. Własne okno zostawia tabelę, style w linii i znacznik linku.<br>
+Consequences: Przyciski: pogrubienie, kursywa, podkreślenie, listy, link i czyszczenie formatu. Link wstawia się w oknie Bootstrap. Zapis bez zmian nie przepisuje treści. Bez migracji.

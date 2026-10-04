@@ -8,6 +8,7 @@ use App\Services\GrowthOS\AI\Data\MaterialDraftResult;
 use App\Services\GrowthOS\AI\Exceptions\GrowthAiException;
 use App\Services\GrowthOS\AI\Support\PneVoice;
 use App\Services\GrowthOS\AI\Support\ProhibitedData;
+use App\Support\GrowthOS\AiListFormatter;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Validator;
 use InvalidArgumentException;
@@ -43,7 +44,7 @@ final class MaterialDraftTask implements GrowthAiTask
 
     public const FACEBOOK_PROFILE = 'facebook_post_v1';
 
-    public const FACEBOOK_PROMPT_VERSION = 'material_facebook_post_v1';
+    public const FACEBOOK_PROMPT_VERSION = 'material_facebook_post_v2';
 
     public const FACEBOOK_SCHEMA_VERSION = 'material_facebook_post_schema_v1';
 
@@ -55,7 +56,7 @@ final class MaterialDraftTask implements GrowthAiTask
 
     public const GRAPHIC_PROFILE = 'graphic_brief_v1';
 
-    public const GRAPHIC_PROMPT_VERSION = 'material_graphic_brief_v2';
+    public const GRAPHIC_PROMPT_VERSION = 'material_graphic_brief_v3';
 
     public const GRAPHIC_SCHEMA_VERSION = 'material_graphic_brief_schema_v1';
 
@@ -65,7 +66,7 @@ final class MaterialDraftTask implements GrowthAiTask
 
     public const MAIL_PROFILE = 'main_mail_v1';
 
-    public const MAIL_PROMPT_VERSION = 'material_main_mail_v1';
+    public const MAIL_PROMPT_VERSION = 'material_main_mail_v3';
 
     public const MAIL_SCHEMA_VERSION = 'material_main_mail_schema_v1';
 
@@ -170,7 +171,7 @@ final class MaterialDraftTask implements GrowthAiTask
      * @var array<string, int>
      */
     private const GRAPHIC_FIELD_LIMITS = [
-        'headline' => 80,
+        'headline' => 160,
         'subtitle' => 160,
         'cta' => 40,
         'visual_direction' => 800,
@@ -258,6 +259,17 @@ final class MaterialDraftTask implements GrowthAiTask
     public static function usesVoice(string $materialKey): bool
     {
         return in_array($materialKey, self::VOICE_MATERIALS, true);
+    }
+
+    /**
+     * Materials with generate / refine / iterate. Voice stays on the YouTube description only.
+     */
+    public static function usesWorkModes(string $materialKey): bool
+    {
+        return self::usesVoice($materialKey)
+            || $materialKey === self::GRAPHIC_MATERIAL_KEY
+            || $materialKey === self::FACEBOOK_MATERIAL_KEY
+            || $materialKey === self::MAIL_MATERIAL_KEY;
     }
 
     public static function aiMode(mixed $value): string
@@ -437,6 +449,9 @@ final class MaterialDraftTask implements GrowthAiTask
                 'emojis' => (bool) data_get($context, 'style.emojis', false),
                 'length' => self::mailLength(data_get($context, 'style.length')),
             ];
+            if ($this->materialKey === self::MAIL_MATERIAL_KEY) {
+                $input['style']['html'] = (bool) data_get($context, 'style.html', false);
+            }
             if ($this->materialKey === self::REMINDER_MATERIAL_KEY) {
                 $input['style']['timing'] = self::reminderTiming(data_get($context, 'style.timing'));
             }
@@ -449,6 +464,10 @@ final class MaterialDraftTask implements GrowthAiTask
         }
 
         $input['instruction'] = $this->string($context['instruction'] ?? '');
+
+        if ($isGraphic || $isFacebook || $this->materialKey === self::MAIL_MATERIAL_KEY) {
+            $this->addGraphicWork($input, $context);
+        }
 
         $encoded = json_encode($input, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
         if (mb_strlen($encoded) > (int) config('growth_ai.limits.max_input_chars')) {
@@ -492,6 +511,28 @@ final class MaterialDraftTask implements GrowthAiTask
             $input['author_draft'] = $text;
         } elseif ($mode === self::MODE_ITERATE) {
             $input['previous_proposal'] = $text;
+        }
+    }
+
+    /**
+     * Brief and Facebook modes match the YouTube description (DEC-036) without the communication voice.
+     * Refine and iterate replace the saved draft with the text the owner is actually correcting.
+     *
+     * @param  array<string, mixed>  $input
+     * @param  array<string, mixed>  $context
+     */
+    private function addGraphicWork(array &$input, array $context): void
+    {
+        $mode = self::aiMode(data_get($context, 'work.mode'));
+        $text = $this->string(data_get($context, 'work.text', ''));
+        $input['mode'] = $mode;
+
+        if ($mode === self::MODE_REFINE) {
+            $input['author_draft'] = $text;
+            $input['current_draft'] = '';
+        } elseif ($mode === self::MODE_ITERATE) {
+            $input['previous_proposal'] = $text;
+            $input['current_draft'] = '';
         }
     }
 
@@ -562,8 +603,8 @@ final class MaterialDraftTask implements GrowthAiTask
             throw GrowthAiException::invalidResponse('unexpected_fields');
         }
 
-        $draft = trim((string) $response->payload['draft']);
-        $changeSummary = trim((string) $response->payload['change_summary']);
+        $draft = AiListFormatter::lineBreaks((string) $response->payload['draft']);
+        $changeSummary = AiListFormatter::lineBreaks((string) $response->payload['change_summary']);
 
         if ($draft === '' || $changeSummary === '') {
             throw GrowthAiException::invalidResponse('empty_required_field');
@@ -692,8 +733,11 @@ final class MaterialDraftTask implements GrowthAiTask
 
         $subjects = array_map(static fn (mixed $subject): string => self::upperFirstLetter(trim((string) $subject)), $response->payload['subject_options']);
         $preheader = self::upperFirstLetter(trim((string) $response->payload['preheader']));
-        $body = trim((string) $response->payload['body']);
-        $changeSummary = trim((string) $response->payload['change_summary']);
+        $body = AiListFormatter::lineBreaks((string) $response->payload['body']);
+        if ($this->materialKey === self::MAIL_MATERIAL_KEY && (bool) data_get($input, 'style.html', false)) {
+            $body = \App\Support\GrowthOS\MailHtmlFormatter::format($body);
+        }
+        $changeSummary = AiListFormatter::lineBreaks((string) $response->payload['change_summary']);
 
         if (in_array('', $subjects, true) || $preheader === '' || $body === '' || $changeSummary === '') {
             throw GrowthAiException::invalidResponse('empty_required_field');
@@ -741,6 +785,11 @@ final class MaterialDraftTask implements GrowthAiTask
         }
 
         $fields = array_map(static fn (mixed $value): string => trim((string) $value), $response->payload);
+        foreach (['subtitle', 'visual_direction', 'image_prompt', 'alt_text', 'change_summary'] as $key) {
+            if (array_key_exists($key, $fields)) {
+                $fields[$key] = AiListFormatter::lineBreaks($fields[$key]);
+            }
+        }
         if ($fields['headline'] === '' || $fields['visual_direction'] === '' || $fields['change_summary'] === '') {
             throw GrowthAiException::invalidResponse('empty_required_field');
         }
@@ -801,7 +850,13 @@ final class MaterialDraftTask implements GrowthAiTask
         return <<<'PROMPT'
 Jesteś projektantem materiałów promocyjnych webinarów edukacyjnych PNE. Przygotuj tekstowy brief grafiki głównej webinaru. Grafika powstanie później ręcznie w Canvie albo z pomocą modelu graficznego, w dwóch formatach: style.formats.
 Pisz wyłącznie po polsku, naturalną i poprawną polszczyzną. Odbiorców określ na podstawie pola direction.audience.
-headline: krótki nagłówek na grafikę, najlepiej do 40 znaków, oparty na concept.title. Bez daty i godziny.
+
+TRYB PRACY (pole mode):
+- "generate": nowy brief od zera na podstawie campaign.working_topic, kierunku i koncepcji. current_draft nie jest tekstem do przepisania.
+- "refine": author_draft to brief autora, także niezapisany. Popraw tylko to, o co prosi instruction, oraz zdanie, które zaprzecza tematowi, kierunkowi albo koncepcji. Resztę briefu zostaw.
+- "iterate": previous_proposal to Twoja poprzednia propozycja, a instruction mówi, co jeszcze poprawić. Zmień tylko to, o co prosi instruction.
+
+headline: nagłówek na grafikę równy campaign.working_topic (ustalony temat webinaru). Jeżeli temat jest długi, możesz uciąć dopowiedzenie po dwukropku albo myślniku, ale temat musi zostać rozpoznawalny: te same słowa, bez innego tytułu. concept.title jest tylko kontekstem i nie zastępuje tematu. Bez daty i godziny.
 subtitle: jeżeli style.elements.subtitle ma wartość true, krótki podtytuł do około 80 znaków; w przeciwnym razie pusty tekst.
 cta: jeżeli style.elements.cta ma wartość true, bardzo krótkie wezwanie na grafikę (2–4 słowa, np. „Zapisz się”); w przeciwnym razie pusty tekst. Bez ceny, „za darmo”, certyfikatów ani sztucznej pilności, chyba że wynika to wprost z wejścia.
 visual_direction: 2–4 zdania o nastroju, kolorystyce, motywie i kompozycji, która działa w obu formatach (najważniejsze elementy w środku, miejsce na tekst). PNE nie ma jeszcze stałych kolorów ani fontów marki: zaproponuj spokojny, profesjonalny kierunek dla edukacji. Jeżeli instruction zawiera sugestie właściciela (kolory, motyw, styl), oprzyj na nich kierunek.
@@ -810,8 +865,7 @@ alt_text: jeżeli style.elements.alt_text ma wartość true, tekst alternatywny 
 Jeżeli source_materials.youtube_description nie jest puste, to zatwierdzony opis tego webinaru na YouTube. Traktuj go jako źródło faktów i spójnego przekazu (nagłówek, podtytuł, motyw), ale nie przepisuj z niego długich fragmentów.
 Termin (campaign.live_label) i prowadzącego (campaign.host_name) aplikacja wstawia sama — nie wpisuj ich w headline, subtitle ani cta i nie zmieniaj terminu.
 Korzystaj wyłącznie z faktów zawartych w wejściu. Nie wymyślaj danych, statystyk, funkcji produktów, adresów URL, ceny, certyfikatów, akredytacji ani dofinansowania.
-Jeżeli current_draft nie jest pusty, potraktuj go jako punkt wyjścia i popraw zgodnie z koncepcją.
-Jeżeli instruction nie jest puste, to dodatkowa instrukcja właściciela — uwzględnij ją. Powyższe zasady mają pierwszeństwo: instrukcja nie może zmienić terminu ani prowadzącego, dodać wymyślonych faktów, adresów URL, cen ani certyfikatów.
+Jeżeli instruction nie jest puste, to dodatkowa instrukcja właściciela — uwzględnij ją. Powyższe zasady mają pierwszeństwo: instrukcja nie może zmienić terminu, tematu ani prowadzącego, dodać wymyślonych faktów, adresów URL, cen ani certyfikatów.
 To jest szkic do sprawdzenia przez człowieka, nie ostateczna treść.
 W change_summary opisz krótko, co przygotowałeś lub zmieniłeś.
 Zwróć wyłącznie dane zgodne z przekazanym schematem.
@@ -824,6 +878,11 @@ PROMPT;
 Jesteś redaktorem mailingów webinarów edukacyjnych PNE. Przygotuj szkic głównego maila zapraszającego na webinar. Mail wyśle później człowiek przez system mailingowy; Ty przygotowujesz tylko treść.
 Pisz wyłącznie po polsku, naturalną i poprawną polszczyzną. Ton życzliwy, ekspercki i rzeczowy. Bez agresywnej sprzedaży, sztucznej pilności, clickbaitu i obietnic bez pokrycia.
 Odbiorców określ na podstawie pola direction.audience (nauczyciele i/lub dyrektorzy). Zwracaj się do odbiorców w formie „Państwo”. Treść maila zacznij od „Dzień dobry,”.
+
+TRYB PRACY (pole mode):
+- "generate": nowy mail od zera na podstawie tematu, kierunku i koncepcji. current_draft nie jest tekstem do przepisania.
+- "refine": author_draft to mail autora, także niezapisany. Może mieć etykiety „Temat:” i „Preheader:”, a potem treść. Popraw tylko to, o co prosi instruction, oraz zdanie sprzeczne z tematem, kierunkiem albo koncepcją. Pierwsza propozycja tematu zostaje tematem autora, chyba że instruction każe go zmienić. Dwie pozostałe mogą być wariantami. Preheader i body redaguj, nie pisz maila od zera.
+- "iterate": previous_proposal to Twoja poprzednia propozycja, a instruction mówi, co jeszcze poprawić. Zmień tylko to, o co prosi instruction. Etykiet „Temat:” i „Preheader:” nie przenoś do body.
 subject_options: dokładnie 3 różne propozycje tematu maila, każda najwyżej około 60 znaków. Zwykła polska pisownia: pierwsza litera tematu wielka, nazwy własne i produkty wielką literą (np. „Canva AI”), żadnych słów pisanych w całości wielkimi literami, bez emotikon i bez wykrzyknika. Pierwsza propozycja jest główna.
 preheader: jedno zdanie od wielkiej litery, najwyżej 100 znaków, które uzupełnia temat i go nie powtarza.
 body: treść maila, bez tematu i preheadera.
@@ -832,11 +891,11 @@ Jeżeli style.length ma wartość "long", body ma około 300–450 słów: szers
 Termin podaj dokładnie tak jak w campaign.live_label. Nie zmieniaj ani nie poprawiaj terminu.
 Jeżeli campaign.host_name nie jest puste, przedstaw prowadzącego dokładnie tym imieniem i nazwiskiem, bez dopisywania tytułów, stanowisk, osiągnięć ani biografii. Jeżeli jest puste, nie wymyślaj prowadzącego.
 Nie podawaj żadnego adresu URL. W miejscu linku lub przycisku zapisu wstaw w osobnej linii dokładnie znacznik [LINK DO ZAPISU], który właściciel podmieni ręcznie.
+Jeżeli style.html ma wartość true, body zostaje zwykłym tekstem, bez znaczników HTML, tabel i stylów. Punkty programu pisz w osobnych liniach zaczynających się od „- ”. Aplikacja złoży z tego tekstu mail HTML. Jeżeli author_draft jest już kodem HTML, przepisz widoczną treść na zwykły tekst i popraw ją według instruction.
 Zakończ body podpisem: „Z pozdrowieniami,”, a w kolejnych liniach campaign.host_name (jeżeli nie jest puste) i „Zespół PNE”. Nie dodawaj stopki prawnej, adresu firmy ani linku do wypisania się z listy — doda je system mailingowy.
 Jeżeli source_materials.youtube_description nie jest puste, to zatwierdzony opis tego webinaru na YouTube. Traktuj go jako źródło faktów i spójnego przekazu, ale go nie kopiuj.
 Korzystaj wyłącznie z faktów zawartych w wejściu. Nie wymyślaj danych, statystyk, przepisów, funkcji produktów, ceny, certyfikatów, zaświadczeń, akredytacji ani dofinansowania.
-Jeżeli style.emojis ma wartość true, dodaj w body 2–4 adekwatne emotikony (np. przy terminie i punktach programu), nigdy w temacie i preheaderze. Jeżeli style.emojis ma wartość false, nie używaj emotikon.
-Jeżeli current_draft nie jest pusty, potraktuj go jako punkt wyjścia i popraw zgodnie z koncepcją. Może zawierać etykiety „Temat:”, „Inne propozycje tematu:” i „Preheader:” — nie przenoś ich do body.
+Jeżeli style.emojis ma wartość true, dodaj w body 2–4 adekwatne emotikony (np. przy terminie i punktach programu), nigdy w temacie i preheaderze. Jeżeli style.emojis ma wartość false, nie używaj emotikon; w trybach "refine" i "iterate" zachowaj emotikony, które już są w treści, chyba że instruction mówi inaczej.
 Jeżeli instruction nie jest puste, to dodatkowa instrukcja właściciela — uwzględnij ją w szkicu. Powyższe zasady mają pierwszeństwo: instrukcja nie może zmienić terminu ani prowadzącego, dodać wymyślonych faktów, adresów URL, cen, certyfikatów ani agresywnej sprzedaży.
 To jest szkic do sprawdzenia przez człowieka, nie ostateczna treść.
 W change_summary opisz krótko, co przygotowałeś lub zmieniłeś.
@@ -936,6 +995,11 @@ PROMPT;
 Jesteś redaktorem materiałów promocyjnych webinarów edukacyjnych PNE. Przygotuj szkic posta na Facebooku zapowiadającego webinar.
 Pisz wyłącznie po polsku, naturalną i poprawną polszczyzną. Ton życzliwy, ekspercki i bezpośredni, bez infantylizmu.
 Odbiorców określ na podstawie pola direction.audience (nauczyciele i/lub dyrektorzy).
+
+TRYB PRACY (pole mode):
+- "generate": napisz nowy post od zera na podstawie tematu, kierunku i koncepcji. current_draft nie jest tekstem do przepisania.
+- "refine": author_draft to tekst autora, także niezapisany. Redaguj ten tekst. Zachowaj jego strukturę, kolejność i sformułowania, chyba że instruction mówi inaczej. Popraw tylko to, co wymaga poprawy, oraz zdanie sprzeczne z tematem, kierunkiem albo koncepcją.
+- "iterate": previous_proposal to Twoja poprzednia propozycja, a instruction mówi, co jeszcze poprawić. Zmień tylko to, o co prosi instruction.
 Post ma być krótki: najwyżej około 800 znaków razem z hashtagami. Zacznij od jednego zdania, które trafia w problem lub korzyść odbiorcy, bez clickbaitu. Potem podaj 2–4 krótkie konkrety z koncepcji, termin i zaproszenie do zapisu.
 Bez agresywnej sprzedaży, sztucznej pilności i obietnic bez pokrycia.
 Korzystaj wyłącznie z faktów zawartych w wejściu. Nie wymyślaj danych, statystyk, przepisów, funkcji produktów, ceny, certyfikatów, akredytacji ani dofinansowania.
@@ -943,8 +1007,7 @@ Datę i godzinę webinaru przepisz dokładnie z campaign.live_date i campaign.li
 Jeżeli campaign.host_name nie jest puste, możesz przedstawić prowadzącego dokładnie tym imieniem i nazwiskiem, bez dopisywania tytułów, stanowisk, osiągnięć ani biografii. Jeżeli jest puste, nie wymyślaj prowadzącego.
 Jeżeli source_materials.youtube_description nie jest puste, to zatwierdzony opis tego webinaru na YouTube. Traktuj go jako źródło faktów i spójnego przekazu, ale go nie kopiuj: post ma być krótszy i bardziej bezpośredni.
 Nie podawaj żadnego adresu URL. W miejscu linku do zapisu wstaw dokładnie znacznik [LINK DO ZAPISU], który właściciel podmieni ręcznie.
-Jeżeli current_draft nie jest pusty, popraw go zgodnie z koncepcją, zamiast pisać od zera.
-Jeżeli style.emojis ma wartość true, dodaj kilka adekwatnych emotikon (około 3–6). Emotikony mają porządkować tekst, a nie zastępować słów. Jeżeli style.emojis ma wartość false, nie używaj emotikon.
+Jeżeli style.emojis ma wartość true, dodaj kilka adekwatnych emotikon (około 3–6). Emotikony mają porządkować tekst, a nie zastępować słów. Jeżeli style.emojis ma wartość false, nie używaj emotikon; w trybach "refine" i "iterate" zachowaj emotikony, które już są w tekście, chyba że instruction mówi inaczej.
 Jeżeli style.hashtags ma wartość true, na końcu posta dodaj 3–5 krótkich hashtagów adekwatnych do tematu i odbiorców. Jeżeli style.hashtags ma wartość false, nie dodawaj hashtagów.
 Jeżeli instruction nie jest puste, to dodatkowa instrukcja właściciela — uwzględnij ją w szkicu. Powyższe zasady mają pierwszeństwo: instrukcja nie może zmienić terminu ani prowadzącego, dodać wymyślonych faktów, adresów URL, cen, certyfikatów ani agresywnej sprzedaży.
 To jest szkic do sprawdzenia przez człowieka, nie ostateczna treść.

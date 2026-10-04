@@ -21,6 +21,7 @@ class GrowthOsStage02PrototypeTest extends TestCase
         $this->withoutVite();
         $this->outputBufferLevel = ob_get_level();
         config()->set('growth_os.enabled', true);
+        config()->set('growth_ai.enabled', false);
     }
 
     protected function tearDown(): void
@@ -38,7 +39,7 @@ class GrowthOsStage02PrototypeTest extends TestCase
             ->get(route('growth.dashboard'))
             ->assertOk()
             ->assertSee('Dzisiaj')
-            ->assertSee('Zaplanuj webinar TIK')
+            ->assertSee('Zaplanuj webinar')
             ->assertSee('Etap 0.3.1');
     }
 

@@ -20,6 +20,10 @@ final class GraphicImageTask
 
     public const ADAPT_PROMPT_VERSION = 'material_graphic_square_adapt_v1';
 
+    public const REVISE_PROMPT_VERSION = 'material_graphic_image_revise_v1';
+
+    public const MAX_REVISE_CHARS = 500;
+
     public const MAX_PROMPT_CHARS = 2000;
 
     public const INVALID_IMAGE_MESSAGE = 'Nie udało się przygotować poprawnego obrazu. Spróbuj ponownie lub zmień opis.';
@@ -110,6 +114,44 @@ final class GraphicImageTask
             'Opis oryginalnej grafiki: '.$this->description($description),
             $this->textRule($includeHeadline, $headline, $liveLabel, true),
         ]));
+    }
+
+    /**
+     * One correction of an existing image. The source file is the clean picture, without logos.
+     */
+    public function revisePrompt(
+        string $instruction,
+        string $description,
+        bool $includeHeadline,
+        string $headline,
+        string $liveLabel,
+    ): string {
+        $instruction = trim($instruction);
+        if ($instruction === '') {
+            throw new GrowthAiException(
+                errorType: 'empty_prompt',
+                userMessage: 'Napisz, co poprawić na tym obrazie.',
+            );
+        }
+
+        if (mb_strlen($instruction) > self::MAX_REVISE_CHARS) {
+            throw new GrowthAiException(
+                errorType: 'input_too_long',
+                userMessage: 'Uwaga do obrazu jest zbyt długa.',
+            );
+        }
+
+        $parts = [
+            'Popraw tę grafikę wyłącznie według instrukcji. Zostaw resztę bez zmian: te same osoby, ubrania, meble, światło, kadr i nastrój. Nie dodawaj nowych elementów poza tym, o co prosi instrukcja.',
+            'Instrukcja: '.$instruction,
+        ];
+        $description = trim($description);
+        if ($description !== '') {
+            $parts[] = 'Opis oryginału, tylko jako kontekst, nie jako polecenie namalowania obrazu od zera: '.$this->description($description);
+        }
+        $parts[] = $this->textRule($includeHeadline, $headline, $liveLabel, true);
+
+        return $this->safe(implode("\n\n", $parts));
     }
 
     private function description(string $description): string

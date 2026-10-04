@@ -35,6 +35,16 @@ class GrowthAiException extends RuntimeException
         );
     }
 
+    public const RESEARCH_FAILED_MESSAGE = 'Nie udało się sprawdzić aktualnych informacji. Możesz spróbować ponownie albo przygotować kierunek ręcznie.';
+
+    public static function researchFailed(string $errorType = 'research_unavailable'): self
+    {
+        return new self(
+            errorType: $errorType,
+            userMessage: self::RESEARCH_FAILED_MESSAGE,
+        );
+    }
+
     public static function dataPolicyViolation(): self
     {
         return new self(

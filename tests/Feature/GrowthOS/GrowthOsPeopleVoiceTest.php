@@ -617,7 +617,7 @@ final class FakeVoiceDraftProvider implements GrowthAiProvider
         return 'test-model';
     }
 
-    public function generateStructured(string $taskType, string $instructions, array $input, array $schema): AiProviderResponse
+    public function generateStructured(string $taskType, string $instructions, array $input, array $schema, array $options = []): AiProviderResponse
     {
         $this->calls++;
         $this->instructions = $instructions;

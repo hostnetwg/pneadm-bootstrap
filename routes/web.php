@@ -70,15 +70,31 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
     Route::redirect('/dashboard/zamowienia', '/');
 
     Route::middleware('growth_os.access')->prefix('growth')->name('growth.')->group(function () {
+        Route::post('/ai/limit/reset', [GrowthOsProjectController::class, 'resetAiDailyLimit'])
+            ->name('ai.limit.reset');
         Route::get('/', GrowthOsDashboardController::class)->name('dashboard');
         Route::get('/projects', [GrowthOsProjectController::class, 'index'])->name('projects.index');
         Route::get('/projects/create', [GrowthOsProjectController::class, 'create'])->name('projects.create');
         Route::post('/projects', [GrowthOsProjectController::class, 'store'])->name('projects.store');
+        Route::post('/projects/direction-planning', [GrowthOsProjectController::class, 'planDirection'])
+            ->middleware('throttle:growth-ai')
+            ->name('projects.direction-planning');
+        Route::post('/projects/{campaign}/open', [GrowthOsProjectController::class, 'open'])
+            ->whereNumber('campaign')
+            ->name('projects.open');
+        Route::delete('/projects/{campaign}', [GrowthOsProjectController::class, 'destroy'])
+            ->whereNumber('campaign')
+            ->name('projects.destroy');
         Route::get('/projects/{project}', [GrowthOsProjectController::class, 'show'])->name('projects.show');
         Route::put('/projects/{project}/host', [GrowthOsProjectController::class, 'updateHost'])->name('projects.host.update');
         Route::post('/projects/{project}/steps/{step}', [GrowthOsProjectController::class, 'completeStep'])->name('projects.steps.complete');
         Route::post('/projects/{project}/steps/{step}/reopen', [GrowthOsProjectController::class, 'reopenStep'])->name('projects.steps.reopen');
         Route::put('/projects/{project}/direction', [GrowthOsProjectController::class, 'updateDirection'])->name('projects.direction.update');
+        Route::post('/projects/{project}/direction/ai', [GrowthOsProjectController::class, 'reviseDirection'])
+            ->middleware('throttle:growth-ai')
+            ->name('projects.direction.ai');
+        Route::post('/projects/{project}/direction/ai/apply', [GrowthOsProjectController::class, 'applyDirectionAi'])->name('projects.direction.ai.apply');
+        Route::post('/projects/{project}/direction/ai/reject', [GrowthOsProjectController::class, 'rejectDirectionAi'])->name('projects.direction.ai.reject');
         Route::put('/projects/{project}/concept', [GrowthOsProjectController::class, 'updateConcept'])->name('projects.concept.update');
         Route::post('/projects/{project}/concept/ai', [GrowthOsProjectController::class, 'requestConceptAi'])
             ->middleware('throttle:growth-ai')
@@ -96,14 +112,31 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
         Route::post('/projects/{project}/materials/{material}/versions/{version}/restore', [GrowthOsProjectController::class, 'restoreMaterialVersion'])
             ->whereNumber('version')
             ->name('projects.materials.versions.restore');
+        Route::post('/projects/{project}/materials/{material}/sponsor-logo', [GrowthOsProjectController::class, 'storeSponsorLogo'])
+            ->name('projects.materials.sponsor-logo.store');
+        Route::delete('/projects/{project}/materials/{material}/sponsor-logo', [GrowthOsProjectController::class, 'deleteSponsorLogo'])
+            ->name('projects.materials.sponsor-logo.delete');
+        Route::get('/projects/{project}/materials/{material}/sponsor-logo', [GrowthOsProjectController::class, 'showSponsorLogo'])
+            ->name('projects.materials.sponsor-logo.show');
         Route::post('/projects/{project}/materials/{material}/images', [GrowthOsProjectController::class, 'generateMaterialImage'])
             ->middleware('throttle:growth-ai')
             ->name('projects.materials.images.generate');
+        Route::post('/projects/{project}/materials/{material}/images/description/ai', [GrowthOsProjectController::class, 'requestImageDescriptionAi'])
+            ->middleware('throttle:growth-ai')
+            ->name('projects.materials.images.description.ai');
+        Route::post('/projects/{project}/materials/{material}/images/description/ai/apply', [GrowthOsProjectController::class, 'applyImageDescriptionAi'])
+            ->name('projects.materials.images.description.ai.apply');
+        Route::post('/projects/{project}/materials/{material}/images/description/ai/reject', [GrowthOsProjectController::class, 'rejectImageDescriptionAi'])
+            ->name('projects.materials.images.description.ai.reject');
         Route::get('/projects/{project}/materials/{material}/images/{image}', [GrowthOsProjectController::class, 'showMaterialImage'])
             ->whereNumber('image')
             ->name('projects.materials.images.show');
         Route::post('/projects/{project}/materials/{material}/images/limit/reset', [GrowthOsProjectController::class, 'resetMaterialImageLimit'])
             ->name('projects.materials.images.limit.reset');
+        Route::post('/projects/{project}/materials/{material}/images/{image}/revise', [GrowthOsProjectController::class, 'reviseMaterialImage'])
+            ->whereNumber('image')
+            ->middleware('throttle:growth-ai')
+            ->name('projects.materials.images.revise');
         Route::post('/projects/{project}/materials/{material}/images/{image}/square', [GrowthOsProjectController::class, 'adaptMaterialImageToSquare'])
             ->whereNumber('image')
             ->middleware('throttle:growth-ai')

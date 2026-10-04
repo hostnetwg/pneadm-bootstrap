@@ -22,9 +22,33 @@ Mailing główny (DEC-032): szkic AI z 3 tematami, preheaderem, treścią i prze
 
 Operator ≠ Prowadzący ≠ Głos komunikacji (DEC-035) i tryby opisu YouTube generate / refine / iterate (DEC-036): wdrożone lokalnie, czekają na weryfikację Waldemara i dwie migracje na produkcji. Później, jeśli się sprawdzi: głos i tryby dla kolejnych materiałów (każdy osobną decyzją), zapis głosu przy wersji materiału (dziś głos jest tylko przy kampanii). Świadomie nie robimy: kont i logowania instruktorów, biblioteki stylu, wyszukiwania w starych mailach, RAG, embeddingów, fine-tuningu ani automatycznego uczenia profilu.
 
+Asystent kierunku w otwartym projekcie (DEC-039): na karcie „Pomysł i kierunek” te same tryby iterate i refresh. Propozycja obok pól, „Zastosuj” zapisuje szkic. Bez migracji.
+
+Koncepcja z kierunku (DEC-040): przy pustej koncepcji pierwsza opcja to „Wygeneruj na podstawie pomysłu i kierunku”. Ten sam task `concept_revision`, bez wyszukiwania. Tytuł koncepcji nie zmienia tematu kierunku. Bez migracji.
+
+Kierunek przy każdej poprawce koncepcji (DEC-041): pozostałe opcje listy też dostają zapisany kierunek jako granicę sensu. „Zastosuj” nie zmienia kierunku. Bez migracji.
+
+Logo na grafice (DEC-042): pliki logo Platformy i sponsora są nakładane po wygenerowaniu obrazu. Migracja `2026_10_03_120000`.
+
+Poprawka grafiki (DEC-043): brief i opis obrazu poprawia się osobno, nagłówek bierze się z tematu, a gotowe zdjęcie można poprawić jedną uwagą. Bez migracji.
+
+Post Facebook (DEC-044): te same trzy kroki poprawki co opis YouTube. Bez migracji.
+
+Mailing główny (DEC-045): te same trzy kroki. Poprawka bierze temat, preheader i treść. Bez migracji.
+
+Reset dziennego limitu AI (DEC-046): przy komunikacie o limicie jest „Zresetuj limit”. Limit obrazów zostaje osobny. Bez migracji.
+
+HTML mailingu głównego (DEC-047): checkbox domyślnie włączony, aplikacja składa HTML do Sendy. Bez migracji.
+
+Edytor treści maila (DEC-048): Edycja / Kod HTML i podstawowe formatowanie, własny edytor. Bez migracji.
+
+Asystent planowania kierunku (DEC-037): zadanie `direction_planning` z `web_search` na formularzu Zaplanuj webinar, wdrożone lokalnie, czeka na ręczną weryfikację Waldemara (NotebookLM). Bez migracji. Świadomie nie robimy: czatu, odkrywania tematu, głosu komunikacji w tym zadaniu ani automatycznego zatwierdzania kierunku.
+
+Lista i usuwanie projektów (DEC-038): `/growth/projects` pokazuje wszystkie kampanie właściciela, otwieranie i trwałe usuwanie z modalem. Bez kosza.
+
 ## LATER
 
-AI dla kolejnych materiałów, research, integracje wykonawcze, post-produkcja, analityka i grafy relacji. Model danych v0.1 jest już wdrożony.
+AI dla kolejnych materiałów, odkrywanie tematu, integracje wykonawcze, post-produkcja, analityka i grafy relacji. Model danych v0.1 jest już wdrożony. Research na starcie webinaru (DEC-037) nie jest już „later”.
 
 ## Etap 0.3 — Prototyp UX Webinaru TIK
 

@@ -7,12 +7,20 @@ use App\Services\GrowthOS\AI\Data\AiProviderResponse;
 use App\Services\GrowthOS\AI\Data\ConceptRevisionResult;
 use App\Services\GrowthOS\AI\Exceptions\GrowthAiException;
 use App\Services\GrowthOS\AI\Support\ProhibitedData;
+use App\Support\GrowthOS\AiListFormatter;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 
 final class ConceptRevisionTask implements GrowthAiTask
 {
     public const TYPE = 'concept_revision';
+
+    public function __construct(private readonly bool $fromDirection = false) {}
+
+    public function draftingFromDirection(): self
+    {
+        return new self(true);
+    }
 
     /** @var list<string> */
     private const FIELDS = [
@@ -43,12 +51,23 @@ final class ConceptRevisionTask implements GrowthAiTask
 
     public function instructions(): string
     {
-        return <<<'PROMPT'
-Jesteś redaktorem koncepcji webinarów edukacyjnych PNE. Zmień koncepcję zgodnie z instrukcją użytkownika.
+        $mode = $this->fromDirection
+            ? <<<'TEXT'
+TRYB: ułóż pierwszą koncepcję na podstawie direction. current_concept może mieć tylko tytuł równy tematowi, a pozostałe pola puste. Uzupełnij wszystkie pola koncepcji. Tytuł może być jaśniejszą wersją tematu, ale nie zmieniaj sensu kierunku i nie wymyślaj innego webinaru. Nie zostawiaj pustych pól. Nie dopisuj faktów, których nie ma w direction.
+TEXT
+            : <<<'TEXT'
+TRYB: zmień istniejącą koncepcję zgodnie z instrukcją. Blok direction jest granicą sensu: nie zaprzeczaj polom topic, audience, problem, takeaway ani sell_later, jeśli są wypełnione. Jeżeli zdanie w current_concept im przeczy, popraw to zdanie. Nie układaj koncepcji od nowa i nie wymyślaj innego webinaru. Puste pola direction nie są powodem, żeby coś dopisywać. Jeżeli pole nie wymaga zmiany ani takiej korekty, przepisz jego bieżącą wartość bez zmian.
+TEXT;
+
+        return <<<PROMPT
+Jesteś redaktorem koncepcji webinarów edukacyjnych PNE.
 Pisz wyłącznie po polsku, profesjonalnie, jasno i praktycznie dla polskiej oświaty.
 Zachowaj sens i fakty zawarte w wejściu. Nie wymyślaj wyników badań, statystyk, funkcji produktów ani faktów wymagających researchu.
+Tytuł koncepcji nie jest poleceniem zmiany tematu w dziale pomysłu i kierunku.
 Zwróć wyłącznie dane zgodne z przekazanym schematem. W changed_fields wskaż pola, których treść faktycznie zmieniasz.
-Jeżeli pole nie wymaga zmiany, przepisz jego bieżącą wartość bez zmian.
+Jeżeli podajesz listę numerowaną albo wypunktowaną, każdy punkt zacznij od nowej linii. Dotyczy to także zapisu „1) 2) 3)”. Nie zapisuj punktów w jednym akapicie.
+
+{$mode}
 PROMPT;
     }
 
@@ -58,7 +77,10 @@ PROMPT;
      * @param  array<string, mixed>  $concept
      * @return array<string, mixed>
      */
-    public function input(array $concept, string $audience, string $userInstruction): array
+    /**
+     * @param  array<string, mixed>|null  $direction
+     */
+    public function input(array $concept, string $audience, string $userInstruction, ?array $direction = null): array
     {
         $userInstruction = trim($userInstruction);
         if ($userInstruction === '') {
@@ -81,6 +103,18 @@ PROMPT;
             ],
             'user_instruction' => $userInstruction,
         ];
+
+        if (is_array($direction)) {
+            $source = $direction;
+            $input['direction'] = [
+                'topic' => $this->string($source['topic'] ?? ''),
+                'why_now' => $this->string($source['why_now'] ?? ''),
+                'audience' => $this->string($source['audience'] ?? ''),
+                'problem' => $this->string($source['problem'] ?? ''),
+                'takeaway' => $this->string($source['takeaway'] ?? ''),
+                'sell_later' => $this->string($source['sell_later'] ?? ''),
+            ];
+        }
 
         $encoded = json_encode($input, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
         if (mb_strlen($encoded) > (int) config('growth_ai.limits.max_input_chars')) {
@@ -164,15 +198,15 @@ PROMPT;
         $validated = $validator->validated();
         $normalized = [
             'title' => trim((string) $validated['title']),
-            'subtitle' => trim((string) $validated['subtitle']),
-            'promise' => trim((string) $validated['promise']),
-            'audience' => trim((string) $validated['audience']),
+            'subtitle' => AiListFormatter::lineBreaks((string) $validated['subtitle']),
+            'promise' => AiListFormatter::lineBreaks((string) $validated['promise']),
+            'audience' => AiListFormatter::lineBreaks((string) $validated['audience']),
             'main_points' => $this->stringList($validated['main_points']),
-            'agenda' => trim((string) $validated['agenda']),
-            'cta' => trim((string) $validated['cta']),
-            'additional_material' => trim((string) $validated['additional_material']),
+            'agenda' => AiListFormatter::lineBreaks((string) $validated['agenda']),
+            'cta' => AiListFormatter::lineBreaks((string) $validated['cta']),
+            'additional_material' => AiListFormatter::lineBreaks((string) $validated['additional_material']),
         ];
-        $changeSummary = trim((string) $validated['change_summary']);
+        $changeSummary = AiListFormatter::lineBreaks((string) $validated['change_summary']);
 
         $requiredTextFields = array_diff(self::FIELDS, ['main_points']);
         foreach ($requiredTextFields as $field) {

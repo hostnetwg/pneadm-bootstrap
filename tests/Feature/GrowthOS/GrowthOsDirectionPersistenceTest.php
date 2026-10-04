@@ -45,7 +45,7 @@ class GrowthOsDirectionPersistenceTest extends TestCase
             ->get(route('growth.projects.show', DemoTikWebinarProject::PROJECT_ID))
             ->assertOk()
             ->assertSee('Zapisz kierunek')
-            ->assertSee('Ta podpowiedź zostaje tylko w tej przeglądarce.');
+            ->assertSee('Kierunek to szkic');
 
         $this->assertSame(0, GrowthArtifact::query()->where('key', GrowthSessionConceptStore::DIRECTION_KEY)->count());
         $this->assertSame(0, GrowthDecision::query()->count());

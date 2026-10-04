@@ -10,10 +10,12 @@ use App\Models\User;
 use App\Services\GrowthOS\AI\Contracts\GrowthAiProvider;
 use App\Services\GrowthOS\AI\Data\AiProviderResponse;
 use App\Services\GrowthOS\AI\Exceptions\GrowthAiException;
+use App\Services\GrowthOS\AI\GrowthAiService;
 use App\Services\GrowthOS\AI\Tasks\ConceptRevisionTask;
 use App\Services\GrowthOS\AI\Tasks\MaterialDraftTask;
 use App\Services\GrowthOS\GrowthSessionConceptStore;
 use App\Support\GrowthOS\DemoTikWebinarProject;
+use App\Support\GrowthOS\MailHtmlFormatter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
@@ -83,7 +85,7 @@ class GrowthOsMaterialAiDraftTest extends TestCase
     {
         $user = $this->readyProject();
 
-        foreach ([self::MATERIAL => 'Poproś AI o nowy szkic', self::FACEBOOK => 'Poproś AI o szkic'] as $key => $button) {
+        foreach ([self::MATERIAL => 'Poproś AI o nowy szkic', self::FACEBOOK => 'Popraw mój szkic'] as $key => $button) {
             $this->actingAs($user)
                 ->get(route('growth.projects.materials.show', [DemoTikWebinarProject::PROJECT_ID, $key]))
                 ->assertOk()
@@ -196,7 +198,7 @@ class GrowthOsMaterialAiDraftTest extends TestCase
         );
         $this->assertSame(self::MATERIAL, $input['material']['key']);
         $this->assertSame('Canva AI w pracy nauczyciela', $input['campaign']['working_topic']);
-        $this->assertSame('PDF: 7 promptów Canva AI dla nauczyciela.', $input['concept']['additional_material']);
+        $this->assertSame('', $input['concept']['additional_material']);
         $this->assertArrayNotHasKey('next_product', $input['concept']);
     }
 
@@ -655,10 +657,47 @@ class GrowthOsMaterialAiDraftTest extends TestCase
         $this->approve($user, 'concept');
 
         $this->requestDraft($user)
-            ->assertSessionHas('error', 'Dzienny limit AI został wykorzystany. Możesz kontynuować ręcznie.');
+            ->assertSessionHas('error', GrowthAiService::DAILY_LIMIT_MESSAGE);
 
         $this->assertSame(1, $this->provider->calls);
         $this->assertNull($this->proposal());
+    }
+
+    public function test_daily_limit_message_offers_a_reset_that_clears_the_counter(): void
+    {
+        config()->set('growth_ai.limits.daily_per_user', 1);
+        $this->logPath = storage_path('logs/growth-ai-material-test-'.uniqid().'.log');
+        config()->set('logging.channels.growth_ai_material_test', [
+            'driver' => 'single',
+            'path' => $this->logPath,
+            'level' => 'debug',
+        ]);
+        config()->set('growth_ai.log_channel', 'growth_ai_material_test');
+        $user = $this->readyProject();
+        $materialUrl = route('growth.projects.materials.show', [DemoTikWebinarProject::PROJECT_ID, self::MATERIAL]);
+
+        $this->requestDraft($user)->assertSessionHas('success');
+        $this->actingAs($user)->get($materialUrl)
+            ->assertSee(GrowthAiService::DAILY_LIMIT_MESSAGE)
+            ->assertSee('data-bs-target="#growth-ai-limit-reset"', false);
+        $this->actingAs($user)->get(route('growth.projects.show', DemoTikWebinarProject::PROJECT_ID))
+            ->assertSee('data-bs-target="#growth-ai-limit-reset"', false)
+            ->assertSee('data-daily-limit-message="'.GrowthAiService::DAILY_LIMIT_MESSAGE.'"', false);
+        $this->actingAs($user)->get(route('growth.projects.create'))
+            ->assertSee('data-bs-target="#growth-ai-limit-reset"', false);
+
+        $this->actingAs($user)
+            ->post(route('growth.ai.limit.reset'))
+            ->assertRedirect()
+            ->assertSessionHas('success', 'Zresetowano dzienny limit AI. Możesz znów prosić o propozycje.');
+
+        $this->actingAs($user)->get($materialUrl)->assertDontSee(GrowthAiService::DAILY_LIMIT_MESSAGE);
+        $this->requestDraft($user)->assertSessionHas('success');
+        $this->assertSame(2, $this->provider->calls);
+        $this->assertStringContainsString('"used_before_reset":1', (string) file_get_contents($this->logPath));
+
+        $other = User::factory()->create(['is_active' => true]);
+        $this->actingAs($other)->post(route('growth.ai.limit.reset'))->assertForbidden();
     }
 
     public function test_url_not_present_in_input_is_rejected(): void
@@ -706,6 +745,8 @@ class GrowthOsMaterialAiDraftTest extends TestCase
         $this->actingAs($user)
             ->get(route('growth.projects.materials.show', [DemoTikWebinarProject::PROJECT_ID, self::FACEBOOK]))
             ->assertOk()
+            ->assertSee('Poproś AI o nowy szkic')
+            ->assertSee('Popraw mój szkic')
             ->assertSee('Dodaj emotikony do posta')
             ->assertSee('id="material_ai_hashtags" checked', false)
             ->assertSee(MaterialDraftTask::LINK_PLACEHOLDER)
@@ -724,7 +765,7 @@ class GrowthOsMaterialAiDraftTest extends TestCase
 
         $input = $this->provider->input;
         $this->assertSame(
-            ['material', 'campaign', 'direction', 'concept', 'source_materials', 'current_draft', 'style', 'instruction'],
+            ['material', 'campaign', 'direction', 'concept', 'source_materials', 'current_draft', 'style', 'instruction', 'mode'],
             array_keys($input),
         );
         $this->assertSame(['youtube_description'], array_keys($input['source_materials']));
@@ -735,6 +776,34 @@ class GrowthOsMaterialAiDraftTest extends TestCase
         $this->assertStringContainsString('posta na Facebooku', $this->provider->instructions);
         $this->assertStringContainsString(MaterialDraftTask::LINK_PLACEHOLDER, $this->provider->instructions);
         $this->assertStringContainsString('style.hashtags', $this->provider->instructions);
+        $this->assertSame('generate', $input['mode']);
+        $this->assertSame('Canva AI w pracy nauczyciela', $input['campaign']['working_topic']);
+    }
+
+    public function test_facebook_refine_sends_the_unsaved_post_and_iterate_uses_the_proposal(): void
+    {
+        $user = $this->readyProject();
+
+        $this->requestFor($user, self::FACEBOOK, [
+            'mode' => 'refine',
+            'author_draft' => 'Mój niezapisany post o NotebookLM.',
+            'instruction' => 'Zostaw pierwsze zdanie',
+        ]);
+
+        $this->assertSame('refine', $this->provider->input['mode']);
+        $this->assertSame('Mój niezapisany post o NotebookLM.', $this->provider->input['author_draft']);
+        $this->assertSame('', $this->provider->input['current_draft']);
+        $this->assertSame('Canva AI w pracy nauczyciela', $this->provider->input['campaign']['working_topic']);
+        $this->assertArrayNotHasKey('voice', $this->provider->input);
+
+        $this->requestFor($user, self::FACEBOOK, [
+            'mode' => 'iterate',
+            'instruction' => 'Skróć tylko zakończenie',
+        ]);
+
+        $this->assertSame('iterate', $this->provider->input['mode']);
+        $this->assertArrayHasKey('previous_proposal', $this->provider->input);
+        $this->assertSame(2, $this->provider->calls);
     }
 
     public function test_facebook_gets_youtube_description_only_when_approved(): void
@@ -910,7 +979,9 @@ class GrowthOsMaterialAiDraftTest extends TestCase
         $this->actingAs($user)
             ->get(route('growth.projects.materials.show', [DemoTikWebinarProject::PROJECT_ID, self::GRAPHIC]))
             ->assertOk()
-            ->assertSee('Poproś AI o szkic')
+            ->assertSee('Poproś AI o nowy brief')
+            ->assertSee('Popraw mój brief')
+            ->assertSee('Popraw opis obrazu')
             ->assertSee('Dodatkowe elementy briefu')
             ->assertSee('id="material_ai_element_subtitle" checked', false)
             ->assertSee('id="material_ai_element_alt_text" checked', false)
@@ -926,7 +997,8 @@ class GrowthOsMaterialAiDraftTest extends TestCase
         $this->requestFor($user, self::GRAPHIC)->assertSessionHas('success');
 
         $input = $this->provider->input;
-        $this->assertSame(['material', 'campaign', 'direction', 'concept', 'source_materials', 'current_draft', 'style', 'instruction'], array_keys($input));
+        $this->assertSame(['material', 'campaign', 'direction', 'concept', 'source_materials', 'current_draft', 'style', 'instruction', 'mode'], array_keys($input));
+        $this->assertSame('generate', $input['mode']);
         $this->assertSame(['youtube_description' => ''], $input['source_materials']);
         $this->assertSame(['working_topic', 'goal', 'live_date', 'live_time', 'timezone', 'host_name', 'live_label'], array_keys($input['campaign']));
         $this->assertSame($this->liveLabel(), $input['campaign']['live_label']);
@@ -938,6 +1010,7 @@ class GrowthOsMaterialAiDraftTest extends TestCase
             $this->provider->schema['required'],
         );
         $this->assertStringContainsString('bez żadnego tekstu', $this->provider->instructions);
+        $this->assertStringContainsString('campaign.working_topic', $this->provider->instructions);
         $this->assertStringContainsString('source_materials.youtube_description', $this->provider->instructions);
     }
 
@@ -1067,6 +1140,69 @@ class GrowthOsMaterialAiDraftTest extends TestCase
         $this->assertSame(0, $this->provider->calls);
     }
 
+    public function test_graphic_refine_sends_the_unsaved_brief_and_iterate_uses_the_proposal(): void
+    {
+        $user = $this->readyProject();
+        $this->provider->payload = $this->graphicPayload();
+
+        $this->requestFor($user, self::GRAPHIC, [
+            'mode' => 'refine',
+            'author_draft' => "Nagłówek: Mój brief\n\nKierunek wizualny:\nGranat.",
+            'instruction' => 'Zostaw nagłówek',
+        ]);
+
+        $this->assertSame('refine', $this->provider->input['mode']);
+        $this->assertSame("Nagłówek: Mój brief\n\nKierunek wizualny:\nGranat.", $this->provider->input['author_draft']);
+        $this->assertSame('', $this->provider->input['current_draft']);
+        $this->assertSame('Canva AI w pracy nauczyciela', $this->provider->input['campaign']['working_topic']);
+
+        $this->requestFor($user, self::GRAPHIC, [
+            'mode' => 'iterate',
+            'instruction' => 'Skróć tylko kierunek wizualny',
+        ]);
+
+        $this->assertSame('iterate', $this->provider->input['mode']);
+        $this->assertArrayHasKey('previous_proposal', $this->provider->input);
+        $this->assertSame(2, $this->provider->calls);
+    }
+
+    public function test_image_description_refine_apply_changes_only_the_description(): void
+    {
+        $user = $this->readyProject();
+        $brief = "Nagłówek: Canva AI w szkole\nTermin: wtorek\n\nKierunek wizualny:\nGranat i biel.\n\nOpis obrazu dla AI (bez tekstu na obrazie):\nStary opis biurka.";
+        $this->saveMaterial($user, self::GRAPHIC, 'REVIEW', $brief);
+        $this->provider->payload = [
+            'description' => 'Nauczyciel siedzi przodem do uczniów, za nim tablica.',
+            'change_summary' => 'Poprawiono układ klasy.',
+        ];
+
+        $this->actingAs($user)
+            ->post(route('growth.projects.materials.images.description.ai', [DemoTikWebinarProject::PROJECT_ID, self::GRAPHIC]), [
+                'mode' => 'refine',
+                'author_draft' => 'Stary opis biurka, uczniowie za nauczycielem.',
+                'description_instruction' => 'Nauczyciel przodem do uczniów',
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $this->assertSame('graphic_image_description', $this->provider->taskType);
+        $this->assertSame('refine', $this->provider->input['mode']);
+        $this->assertSame('Stary opis biurka, uczniowie za nauczycielem.', $this->provider->input['author_draft']);
+        $this->assertSame('Canva AI w pracy nauczyciela', $this->provider->input['campaign']['working_topic']);
+        $this->assertSame('Granat i biel.', $this->provider->input['visual_direction']);
+
+        $this->actingAs($user)
+            ->post(route('growth.projects.materials.images.description.ai.apply', [DemoTikWebinarProject::PROJECT_ID, self::GRAPHIC]))
+            ->assertSessionHas('success');
+
+        $graphic = DemoTikWebinarProject::material(DemoTikWebinarProject::PROJECT_ID, self::GRAPHIC);
+        $draft = (string) $graphic['draft'];
+        $this->assertStringContainsString('Nagłówek: Canva AI w szkole', $draft);
+        $this->assertStringContainsString("Opis obrazu dla AI (bez tekstu na obrazie):\nNauczyciel siedzi przodem do uczniów, za nim tablica.", $draft);
+        $this->assertStringNotContainsString('Stary opis biurka.', $draft);
+        $this->assertSame('DRAFT', $graphic['status']);
+    }
+
     public function test_mail_page_offers_length_switch_and_emojis(): void
     {
         $user = $this->readyProject();
@@ -1074,7 +1210,14 @@ class GrowthOsMaterialAiDraftTest extends TestCase
         $this->actingAs($user)
             ->get(route('growth.projects.materials.show', [DemoTikWebinarProject::PROJECT_ID, self::MAIL]))
             ->assertOk()
-            ->assertSee('Poproś AI o szkic')
+            ->assertSee('Poproś AI o nowy szkic')
+            ->assertSee('Popraw mój szkic')
+            ->assertSee('data-growth-ai-author-source="mail"', false)
+            ->assertSee('Profesjonalny HTML maila')
+            ->assertSee('Kod HTML')
+            ->assertSee('aria-label="Pogrubienie"', false)
+            ->assertSee('aria-label="Link"', false)
+            ->assertSee('id="material_ai_html" checked', false)
             ->assertSee('Długość maila')
             ->assertSee('Krótki (ok. 150–250 słów)')
             ->assertSee('Dłuższy (ok. 300–450 słów)')
@@ -1091,16 +1234,72 @@ class GrowthOsMaterialAiDraftTest extends TestCase
         $this->requestFor($user, self::MAIL)->assertSessionHas('success');
 
         $input = $this->provider->input;
-        $this->assertSame(['material', 'campaign', 'direction', 'concept', 'source_materials', 'current_draft', 'style', 'instruction'], array_keys($input));
+        $this->assertSame(['material', 'campaign', 'direction', 'concept', 'source_materials', 'current_draft', 'style', 'instruction', 'mode'], array_keys($input));
+        $this->assertSame('generate', $input['mode']);
         $this->assertSame(['key' => self::MAIL, 'name' => 'Mailing główny', 'type' => 'main_mail'], $input['material']);
         $this->assertSame($this->liveLabel(), $input['campaign']['live_label']);
         $this->assertSame(['youtube_description' => ''], $input['source_materials']);
-        $this->assertSame(['emojis' => false, 'length' => 'short'], $input['style']);
+        $this->assertSame(['emojis' => false, 'length' => 'short', 'html' => false], $input['style']);
         $this->assertSame(['subject_options', 'preheader', 'body', 'change_summary'], $this->provider->schema['required']);
         $this->assertSame(MaterialDraftTask::MAIL_PROMPT_VERSION, $this->proposal(self::MAIL)['prompt_version']);
         foreach (['Dzień dobry,', 'Państwo', 'Zespół PNE', MaterialDraftTask::LINK_PLACEHOLDER, 'style.length', 'campaign.live_label'] as $rule) {
             $this->assertStringContainsString($rule, $this->provider->instructions);
         }
+    }
+
+    public function test_main_mail_refine_sends_the_unsaved_fields_and_iterate_uses_the_proposal(): void
+    {
+        $user = $this->readyProject();
+        $this->provider->payload = $this->mailPayload();
+        $author = "Temat: Mój temat\nPreheader: Krótki preheader.\n\nDzień dobry,\n\nMój niezapisany mail.";
+
+        $this->requestFor($user, self::MAIL, [
+            'mode' => 'refine',
+            'author_draft' => $author,
+            'instruction' => 'Zostaw temat',
+        ]);
+
+        $this->assertSame('refine', $this->provider->input['mode']);
+        $this->assertSame($author, $this->provider->input['author_draft']);
+        $this->assertSame('', $this->provider->input['current_draft']);
+        $this->assertSame('Canva AI w pracy nauczyciela', $this->provider->input['campaign']['working_topic']);
+        $this->assertArrayNotHasKey('voice', $this->provider->input);
+
+        $this->requestFor($user, self::MAIL, [
+            'mode' => 'iterate',
+            'instruction' => 'Skróć tylko zakończenie',
+        ]);
+
+        $this->assertSame('iterate', $this->provider->input['mode']);
+        $this->assertArrayHasKey('previous_proposal', $this->provider->input);
+        $this->assertSame(2, $this->provider->calls);
+    }
+
+    public function test_main_mail_html_option_formats_the_plain_body(): void
+    {
+        $user = $this->readyProject();
+        $payload = $this->mailPayload();
+        $payload['body'] = "Dzień dobry,\n\n- Pierwszy punkt\n- Drugi <b>punkt</b>\n\nZapisz się:\n[LINK DO ZAPISU]\n\nZ pozdrowieniami,\nZespół PNE";
+        $this->provider->payload = $payload;
+
+        $this->requestFor($user, self::MAIL, ['html' => '1'])->assertSessionHas('success');
+
+        $this->assertTrue($this->provider->input['style']['html']);
+        $this->assertStringContainsString('style.html', $this->provider->instructions);
+        $draft = $this->proposal(self::MAIL)['draft'];
+        $fields = MaterialDraftTask::parseMainMail($draft);
+        $this->assertStringContainsString(MailHtmlFormatter::MARKER, $fields['body']);
+        $this->assertStringContainsString('href="'.MaterialDraftTask::LINK_PLACEHOLDER.'"', $fields['body']);
+        $this->assertStringContainsString('Zapisz się na webinar', $fields['body']);
+        $this->assertStringContainsString('<li style="margin:0 0 8px;">Pierwszy punkt</li>', $fields['body']);
+        $this->assertStringContainsString('Drugi &lt;b&gt;punkt&lt;/b&gt;', $fields['body']);
+        $this->assertStringNotContainsString('Zapisz się:', $fields['body']);
+        $this->assertSame('Praktyczny webinar dla nauczycieli.', $fields['preheader']);
+
+        $this->actingAs($user)
+            ->get(route('growth.projects.materials.show', [DemoTikWebinarProject::PROJECT_ID, self::MAIL]))
+            ->assertSee('Podgląd propozycji HTML', false)
+            ->assertSee('data-pne-mail=', false);
     }
 
     public function test_mail_length_and_emojis_reach_the_model(): void
@@ -1110,7 +1309,7 @@ class GrowthOsMaterialAiDraftTest extends TestCase
 
         $this->requestFor($user, self::MAIL, ['length' => 'long', 'emojis' => '1']);
 
-        $this->assertSame(['emojis' => true, 'length' => 'long'], $this->provider->input['style']);
+        $this->assertSame(['emojis' => true, 'length' => 'long', 'html' => false], $this->provider->input['style']);
 
         $this->actingAs($user)
             ->from(route('growth.projects.materials.show', [DemoTikWebinarProject::PROJECT_ID, self::MAIL]))
@@ -1187,6 +1386,17 @@ class GrowthOsMaterialAiDraftTest extends TestCase
     {
         config()->set('growth_ai.enabled', false);
         $user = $this->readyProject();
+        $this->actingAs($user)->put(route('growth.projects.concept.update', DemoTikWebinarProject::PROJECT_ID), [
+            'title' => 'Canva AI w pracy nauczyciela',
+            'subtitle' => 'Podtytuł',
+            'promise' => 'Obietnica',
+            'points' => "Punkt 1\nPunkt 2",
+            'plan' => 'Intro, pokaz, pytania',
+            'cta' => 'CTA',
+            'lead_magnet' => 'Checklista',
+            'next_product' => 'nie',
+        ]);
+        $this->approve($user, 'concept');
 
         $this->requestFor($user, self::MAIL, ['length' => 'short', 'emojis' => '0']);
         $short = $this->proposal(self::MAIL)['draft'];
@@ -1307,6 +1517,7 @@ class GrowthOsMaterialAiDraftTest extends TestCase
             ->get(route('growth.projects.materials.show', [DemoTikWebinarProject::PROJECT_ID, self::REMINDER]))
             ->assertOk()
             ->assertSee('Poproś AI o szkic')
+            ->assertDontSee('Profesjonalny HTML maila')
             ->assertSee('Kiedy wysyłasz przypomnienie')
             ->assertSee('Dzień przed webinarem („jutro”)', false)
             ->assertSee('W dniu webinaru („dziś”)', false)
@@ -1747,6 +1958,7 @@ final class FakeMaterialDraftProvider implements GrowthAiProvider
         string $instructions,
         array $input,
         array $schema,
+        array $options = [],
     ): AiProviderResponse {
         $this->calls++;
         $this->taskType = $taskType;

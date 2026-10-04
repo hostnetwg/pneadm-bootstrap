@@ -163,4 +163,8 @@
         background: #f4f8ff;
         border-color: #b9cdf3;
     }
+
+    .growth-ai-text {
+        white-space: pre-line;
+    }
 </style>

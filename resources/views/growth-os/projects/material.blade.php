@@ -9,9 +9,7 @@
         @if(session('success'))
             <div class="alert alert-success" role="status">{{ session('success') }}</div>
         @endif
-        @if(session('error'))
-            <div class="alert alert-danger" role="alert">{{ session('error') }}</div>
-        @endif
+        @include('growth-os.partials.ai-daily-limit-alert')
 
         <nav class="mb-3 small" aria-label="Okruszki">
             <a href="{{ route('growth.projects.show', $project['id']) }}">Projekt webinaru</a>
@@ -87,8 +85,36 @@
                                     <textarea id="mail_preheader_html" class="form-control form-control-sm font-monospace mt-2" rows="3" readonly data-mail-preheader-html></textarea>
                                 </details>
                             </div>
-                            <label for="mail_body" class="form-label">Treść</label>
-                            <textarea id="mail_body" name="mail_body" class="form-control growth-draft-editor @error('mail_body') is-invalid @enderror" rows="16" @readonly($materialSkipped)>{{ old('mail_body', $mailFields['body']) }}</textarea>
+                            <label id="mail_body_label" class="form-label">Treść</label>
+                            <div class="d-flex flex-wrap align-items-center gap-2 mb-2" data-mail-editor-toolbar>
+                                <div class="btn-group btn-group-sm" role="group" aria-label="Tryb treści">
+                                    <button type="button" class="btn btn-primary" data-mail-mode="visual" aria-pressed="true">Edycja</button>
+                                    <button type="button" class="btn btn-outline-primary" data-mail-mode="html" aria-pressed="false">Kod HTML</button>
+                                </div>
+                                <div class="btn-group btn-group-sm" role="group" aria-label="Formatowanie" data-mail-tools>
+                                    <button type="button" class="btn btn-outline-secondary" data-mail-command="bold" title="Pogrubienie" aria-label="Pogrubienie"><i class="bi bi-type-bold" aria-hidden="true"></i></button>
+                                    <button type="button" class="btn btn-outline-secondary" data-mail-command="italic" title="Kursywa" aria-label="Kursywa"><i class="bi bi-type-italic" aria-hidden="true"></i></button>
+                                    <button type="button" class="btn btn-outline-secondary" data-mail-command="underline" title="Podkreślenie" aria-label="Podkreślenie"><i class="bi bi-type-underline" aria-hidden="true"></i></button>
+                                    <button type="button" class="btn btn-outline-secondary" data-mail-command="insertUnorderedList" title="Lista" aria-label="Lista"><i class="bi bi-list-ul" aria-hidden="true"></i></button>
+                                    <button type="button" class="btn btn-outline-secondary" data-mail-command="insertOrderedList" title="Lista numerowana" aria-label="Lista numerowana"><i class="bi bi-list-ol" aria-hidden="true"></i></button>
+                                    <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#mail-editor-link" title="Link" aria-label="Link"><i class="bi bi-link-45deg" aria-hidden="true"></i></button>
+                                    <button type="button" class="btn btn-outline-secondary" data-mail-command="removeFormat" title="Wyczyść formatowanie" aria-label="Wyczyść formatowanie"><i class="bi bi-eraser" aria-hidden="true"></i></button>
+                                </div>
+                                <button type="button" class="btn btn-outline-secondary btn-sm ms-auto" data-mail-copy-html>Kopiuj HTML maila</button>
+                                <span class="small text-success d-none" role="status" data-mail-copy-html-status>Skopiowano. Wklej w Sendy w trybie HTML.</span>
+                            </div>
+                            <div
+                                id="mail_body_visual"
+                                class="border rounded mb-2"
+                                style="min-height:28rem;background:#f4f6f8;"
+                                data-mail-visual
+                                role="textbox"
+                                aria-multiline="true"
+                                aria-labelledby="mail_body_label"
+                                @if($materialSkipped) data-mail-locked="1" @endif
+                            ></div>
+                            <textarea id="mail_body" name="mail_body" class="form-control growth-draft-editor font-monospace d-none @error('mail_body') is-invalid @enderror" rows="16" aria-labelledby="mail_body_label" @readonly($materialSkipped)>{{ old('mail_body', $mailFields['body']) }}</textarea>
+                            <p class="form-text">Edycja pokazuje mail tak, jak zobaczy go odbiorca. Kod HTML to źródło do Sendy. Kopiowanie dokleja preheader na początku.</p>
                             @error('mail_body')<div class="invalid-feedback">{{ $message }}</div>@enderror
                         @else
                             <label for="draft" class="visually-hidden">Szkic</label>
@@ -122,8 +148,8 @@
                         </div>
                         <div class="card-body">
                             <p class="small text-secondary">
-                                Obraz powstaje z opisu poniżej. Aplikacja dopisuje stałe zasady: bez napisów (chyba że zaznaczysz nagłówek), bez logotypów i bez rozpoznawalnych osób.
-                                Z gotowego obrazu poziomego możesz potem utworzyć wersję kwadratową z tymi samymi elementami.
+                                Obraz powstaje z opisu poniżej. Model nie rysuje napisów (chyba że zaznaczysz nagłówek) ani logotypów.
+                                Logo Platformy i logo sponsora aplikacja dokłada potem z plików, także na wersji kwadratowej.
                                 Nic nie jest publikowane.
                             </p>
                             <div class="d-flex flex-wrap align-items-center gap-2 small mb-3">
@@ -160,6 +186,63 @@
                                 <div class="alert alert-warning small mb-3" role="status">{{ \App\Http\Controllers\GrowthOS\ProjectController::IMAGE_NOT_PERSISTED_MESSAGE }}</div>
                             @endif
 
+                            <div class="border rounded p-3 mb-3">
+                                <h4 class="h6">Logo na grafice</h4>
+                                <p class="small text-secondary">Prawdziwe pliki są kładzione w dolnych rogach gotowego obrazu. Model ich nie przerysowuje.</p>
+                                <div class="row g-3 align-items-center">
+                                    <div class="col-md-6">
+                                        <div class="small fw-semibold mb-1">Logo Platformy</div>
+                                        @if($pneLogoAvailable)
+                                            <img src="{{ asset(\App\Support\GrowthOS\GraphicLogoStore::PNE_PUBLIC) }}" alt="Logo Platformy Nowoczesnej Edukacji" class="border rounded mb-2" style="background:#1e293b;max-width:180px;height:auto;padding:.5rem" width="180">
+                                        @else
+                                            <p class="small text-secondary mb-0">Brak pliku logo Platformy.</p>
+                                        @endif
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="small fw-semibold mb-1">Logo sponsora tego webinaru</div>
+                                        @if($sponsorLogoReady)
+                                            <img src="{{ route('growth.projects.materials.sponsor-logo.show', [$project['id'], $material['id']]) }}" alt="Logo sponsora" class="border rounded mb-2" style="background:#f8f9fa;max-width:180px;height:auto;padding:.5rem" width="180">
+                                            <div>
+                                                <button type="button" class="btn btn-outline-danger btn-sm" data-bs-toggle="modal" data-bs-target="#sponsor-logo-delete">Usuń logo sponsora</button>
+                                            </div>
+                                        @elseif($imageGeneratorReady)
+                                            <form method="POST" action="{{ route('growth.projects.materials.sponsor-logo.store', [$project['id'], $material['id']]) }}" enctype="multipart/form-data">
+                                                @csrf
+                                                <label for="sponsor_logo" class="form-label small">PNG, JPG albo WebP, do 2 MB</label>
+                                                <input id="sponsor_logo" name="sponsor_logo" type="file" accept="image/png,image/jpeg,image/webp" class="form-control form-control-sm @error('sponsor_logo') is-invalid @enderror" required>
+                                                @error('sponsor_logo')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                                <button type="submit" class="btn btn-outline-primary btn-sm mt-2">Wgraj logo sponsora</button>
+                                            </form>
+                                        @else
+                                            <p class="small text-secondary mb-0">Logo sponsora można wgrać, gdy projekt jest zapisany.</p>
+                                        @endif
+                                    </div>
+                                </div>
+                            </div>
+                            @if($sponsorLogoReady)
+                                <div class="modal fade" id="sponsor-logo-delete" tabindex="-1" aria-labelledby="sponsor-logo-delete-title" aria-hidden="true">
+                                    <div class="modal-dialog modal-dialog-centered">
+                                        <div class="modal-content">
+                                            <div class="modal-header">
+                                                <h4 class="modal-title h6" id="sponsor-logo-delete-title">Usunąć logo sponsora?</h4>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+                                            </div>
+                                            <div class="modal-body small">
+                                                Kolejne obrazy nie dostaną tego logo. Obrazy już wygenerowane zostają bez zmian.
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Anuluj</button>
+                                                <form method="POST" action="{{ route('growth.projects.materials.sponsor-logo.delete', [$project['id'], $material['id']]) }}">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button type="submit" class="btn btn-danger btn-sm">Usuń logo</button>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            @endif
+
                             <form method="POST" action="{{ route('growth.projects.materials.images.generate', [$project['id'], $material['id']]) }}" data-growth-ai-form>
                                 @csrf
                                 <fieldset class="mb-3">
@@ -194,7 +277,20 @@
                                     <label class="form-check-label" for="material_image_include_headline">Dodaj nagłówek i termin na obrazie</label>
                                 </div>
                                 <div class="form-text mb-3">
-                                    Nagłówek „{{ $imageHeadline }}”, termin: {{ $aiDraftLiveLabel }}. AI może pomylić polskie znaki lub cyfry — sprawdź napis przed użyciem.
+                                    Temat webinaru: <span class="fw-semibold">{{ $project['topic'] }}</span>.
+                                    Nagłówek z briefu: „{{ $imageHeadline }}”, termin: {{ $aiDraftLiveLabel }}.
+                                    AI może pomylić polskie znaki lub cyfry — sprawdź napis przed użyciem.
+                                </div>
+
+                                <input type="hidden" name="include_pne_logo" value="0">
+                                <div class="form-check mb-1">
+                                    <input class="form-check-input" type="checkbox" name="include_pne_logo" value="1" id="material_image_include_pne_logo" @checked(old('include_pne_logo', $pneLogoAvailable ? '1' : '0') === '1') @disabled(! $imageCanGenerate || ! $pneLogoAvailable)>
+                                    <label class="form-check-label" for="material_image_include_pne_logo">Nałóż logo Platformy</label>
+                                </div>
+                                <input type="hidden" name="include_sponsor_logo" value="0">
+                                <div class="form-check mb-3">
+                                    <input class="form-check-input" type="checkbox" name="include_sponsor_logo" value="1" id="material_image_include_sponsor_logo" @checked(old('include_sponsor_logo', $sponsorLogoReady ? '1' : '0') === '1') @disabled(! $imageCanGenerate || ! $sponsorLogoReady)>
+                                    <label class="form-check-label" for="material_image_include_sponsor_logo">Nałóż logo sponsora</label>
                                 </div>
 
                                 <button type="submit" class="btn btn-outline-primary" @disabled(! $imageCanGenerate) data-growth-ai-submit>
@@ -203,6 +299,91 @@
                                 </button>
                                 <span class="small text-secondary ms-2">Zwykle trwa to do 1–2 minut.</span>
                             </form>
+
+                            <div class="border rounded p-3 mt-4" id="image-description-ai">
+                                <h4 class="h6">Popraw opis obrazu</h4>
+                                <p class="small text-secondary">
+                                    Osobno od briefu. AI widzi temat, kierunek i koncepcję.
+                                    „Nowy opis” pisze od zera. „Popraw ten opis” redaguje tekst z pola powyżej, także niezapisany.
+                                    Opis w polu i w briefie zmienia się dopiero po „Zastosuj”. Nagłówek briefu zostaje.
+                                </p>
+                                <form method="POST" action="{{ route('growth.projects.materials.images.description.ai', [$project['id'], $material['id']]) }}" data-growth-ai-form>
+                                    @csrf
+                                    <input type="hidden" name="mode" value="generate" data-growth-ai-mode-input>
+                                    <input type="hidden" name="author_draft" value="" data-growth-ai-author-draft data-growth-ai-author-source="material_image_prompt">
+                                    <label for="image_description_instruction" class="form-label small">Dodatkowa instrukcja (opcjonalnie)</label>
+                                    <textarea id="image_description_instruction" name="description_instruction" rows="2" maxlength="{{ config('growth_ai.limits.max_instruction_chars') }}" class="form-control form-control-sm mb-2" placeholder="Np. nauczyciel siedzi przodem do uczniów, za nim tablica, uczniowie nie siedzą za jego plecami" @disabled(! $imageCanGenerate)>{{ old('description_instruction') }}</textarea>
+                                    <div class="d-flex flex-wrap gap-2">
+                                        <button type="submit" class="btn btn-outline-primary btn-sm" @disabled(! $imageCanGenerate) data-growth-ai-submit data-growth-ai-mode="generate">
+                                            <span class="spinner-border spinner-border-sm me-1 d-none" aria-hidden="true" data-growth-ai-spinner></span>
+                                            Nowy opis
+                                        </button>
+                                        <button type="submit" class="btn btn-outline-primary btn-sm" @disabled(! $imageCanGenerate) data-growth-ai-submit data-growth-ai-mode="refine">
+                                            <span class="spinner-border spinner-border-sm me-1 d-none" aria-hidden="true" data-growth-ai-spinner></span>
+                                            Popraw ten opis
+                                        </button>
+                                    </div>
+                                </form>
+                                @if($imageDescriptionProposal)
+                                    @php
+                                        $descriptionMode = $imageDescriptionProposal['mode'] ?? null;
+                                        $descriptionCompare = match ($descriptionMode) {
+                                            'refine' => 'Twój opis (wysłany do AI)',
+                                            'iterate' => 'Poprzednia propozycja',
+                                            default => 'Opis z briefu',
+                                        };
+                                    @endphp
+                                    <div class="border rounded p-3 mt-3 bg-light">
+                                        <div class="d-flex flex-wrap justify-content-between gap-2 mb-2">
+                                            <div class="small fw-semibold">Propozycja opisu</div>
+                                            <span class="badge bg-white text-secondary border">
+                                                {{ ($imageDescriptionProposal['source'] ?? '') === 'real_ai' ? 'AI: OpenAI / '.($imageDescriptionProposal['model'] ?? '') : 'AI: symulacja lokalna' }}
+                                            </span>
+                                        </div>
+                                        <p class="small text-secondary mb-2">
+                                            {{ $imageDescriptionProposal['note'] ?? '' }}
+                                            @if(($imageDescriptionProposal['iteration_count'] ?? 0) > 0)
+                                                <span class="badge bg-white text-secondary border">Poprawka nr {{ $imageDescriptionProposal['iteration_count'] }}</span>
+                                            @endif
+                                        </p>
+                                        <div class="row g-2">
+                                            <div class="col-md-6">
+                                                <div class="small fw-semibold mb-1">{{ $descriptionCompare }}</div>
+                                                <div class="growth-compare">{{ $imageDescriptionProposal['compare_description'] ?? '' }}</div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <div class="small fw-semibold mb-1">Propozycja AI</div>
+                                                <div class="growth-compare growth-compare-proposal">{{ $imageDescriptionProposal['description'] ?? '' }}</div>
+                                            </div>
+                                        </div>
+                                        <p class="small mt-2 mb-0 growth-ai-text"><span class="fw-semibold">Co zmieniono:</span> {{ $imageDescriptionProposal['change_summary'] ?? '' }}</p>
+                                        @unless($materialSkipped)
+                                            <form method="POST" action="{{ route('growth.projects.materials.images.description.ai', [$project['id'], $material['id']]) }}" class="mt-3" data-growth-ai-form>
+                                                @csrf
+                                                <input type="hidden" name="mode" value="iterate">
+                                                <label for="image_description_iterate" class="form-label small fw-semibold">Co jeszcze poprawić w opisie?</label>
+                                                <textarea id="image_description_iterate" name="description_instruction" rows="2" maxlength="{{ config('growth_ai.limits.max_instruction_chars') }}" class="form-control form-control-sm" placeholder="Np. zostaw biurko, zmień tylko układ klasy" @disabled(! $imageCanGenerate)></textarea>
+                                                <button type="submit" class="btn btn-outline-primary btn-sm mt-2" @disabled(! $imageCanGenerate) data-growth-ai-submit>
+                                                    <span class="spinner-border spinner-border-sm me-1 d-none" aria-hidden="true" data-growth-ai-spinner></span>
+                                                    Popraw ponownie
+                                                </button>
+                                            </form>
+                                        @endunless
+                                        <div class="d-flex flex-wrap gap-2 mt-3">
+                                            @unless($materialSkipped)
+                                                <form method="POST" action="{{ route('growth.projects.materials.images.description.ai.apply', [$project['id'], $material['id']]) }}">
+                                                    @csrf
+                                                    <button type="submit" class="btn btn-primary btn-sm">Zastosuj opis</button>
+                                                </form>
+                                            @endunless
+                                            <form method="POST" action="{{ route('growth.projects.materials.images.description.ai.reject', [$project['id'], $material['id']]) }}">
+                                                @csrf
+                                                <button type="submit" class="btn btn-outline-secondary btn-sm">Odrzuć</button>
+                                            </form>
+                                        </div>
+                                    </div>
+                                @endif
+                            </div>
                         </div>
 
                         @if($materialImages->isNotEmpty())
@@ -230,7 +411,12 @@
                                                         @if($image->include_headline)
                                                             <span class="badge bg-light text-secondary border">Z nagłówkiem</span>
                                                         @endif
-                                                        @if($image->source_image_id)
+                                                        @if($image->include_pne_logo || $image->include_sponsor_logo)
+                                                            <span class="badge bg-light text-secondary border">Z logo</span>
+                                                        @endif
+                                                        @if($image->prompt_version === \App\Services\GrowthOS\AI\Tasks\GraphicImageTask::REVISE_PROMPT_VERSION)
+                                                            <span class="badge bg-light text-secondary border">Poprawka obrazu #{{ $image->source_image_id }}</span>
+                                                        @elseif($image->source_image_id)
                                                             <span class="badge bg-light text-secondary border">Kwadrat z poziomego #{{ $image->source_image_id }}</span>
                                                         @endif
                                                     </div>
@@ -245,9 +431,19 @@
                                                                 <span class="spinner-border spinner-border-sm me-1 d-none" aria-hidden="true" data-growth-ai-spinner></span>
                                                                 Utwórz wersję kwadratową
                                                             </button>
-                                                            <span class="d-block form-text">Te same elementy rozmieszczone na nowo w kwadracie, bez przycinania.</span>
+                                                            <span class="d-block form-text">Te same elementy rozmieszczone na nowo w kwadracie. Logo jest dokładane dopiero potem, z plików.</span>
                                                         </form>
                                                     @endif
+                                                    <form method="POST" action="{{ route('growth.projects.materials.images.revise', [$project['id'], $material['id'], $image->id]) }}" class="w-100" data-growth-ai-form>
+                                                        @csrf
+                                                        <label for="image_revise_{{ $image->id }}" class="form-label small fw-semibold mb-1">Co poprawić na tym obrazie?</label>
+                                                        <textarea id="image_revise_{{ $image->id }}" name="instruction" rows="2" maxlength="{{ \App\Services\GrowthOS\AI\Tasks\GraphicImageTask::MAX_REVISE_CHARS }}" class="form-control form-control-sm" placeholder="Np. nauczyciel siedzi przodem do uczniów, za nim tablica, uczniowie nie siedzą za jego plecami" @disabled(! $imageCanGenerate)></textarea>
+                                                        <button type="submit" class="btn btn-outline-primary btn-sm mt-2" @disabled(! $imageCanGenerate) data-growth-ai-submit>
+                                                            <span class="spinner-border spinner-border-sm me-1 d-none" aria-hidden="true" data-growth-ai-spinner></span>
+                                                            Popraw ten obraz
+                                                        </button>
+                                                        <span class="d-block form-text">Jedna zmiana. Reszta zdjęcia zostaje. Logo jest dokładane dopiero potem. Poprzedni obraz zostaje w galerii.</span>
+                                                    </form>
                                                     <a href="{{ $imageUrl }}?download=1" class="btn btn-outline-secondary btn-sm">Pobierz</a>
                                                     @unless($image->is_selected)
                                                         <form method="POST" action="{{ route('growth.projects.materials.images.select', [$project['id'], $material['id'], $image->id]) }}">
@@ -329,6 +525,9 @@
                                 <p class="small text-secondary mb-3">
                                     AI zwraca 3 propozycje tematu (pierwsza jest główna), preheader i treść. Zwrot „Dzień dobry,” i forma „Państwo”, podpis prowadzącego i „Zespół PNE”.
                                     Termin: <span class="fw-semibold">{{ $aiDraftLiveLabel }}</span>. Stopkę i link do wypisania dodaje system mailingowy.
+                                    @unless($aiDraftIsReminder)
+                                        „Poproś AI o nowy szkic” pisze od zera. „Popraw mój szkic” redaguje temat, preheader i treść z pól powyżej, także niezapisane.
+                                    @endunless
                                 </p>
                             @endif
 
@@ -336,6 +535,9 @@
                                 <p class="small text-secondary mb-3">AI nie poda linków. Wstawi {{ \App\Services\GrowthOS\AI\Tasks\MaterialDraftTask::ROOM_LINK_PLACEHOLDER }} dla zapisanych i {{ \App\Services\GrowthOS\AI\Tasks\MaterialDraftTask::LINK_PLACEHOLDER }} dla osób, które jeszcze się nie zapisały, do ręcznej podmiany.</p>
                             @elseif($aiDraftIsFacebookPost || $aiDraftIsMail)
                                 <p class="small text-secondary mb-3">AI nie poda linku. W jego miejscu wstawi {{ \App\Services\GrowthOS\AI\Tasks\MaterialDraftTask::LINK_PLACEHOLDER }} do ręcznej podmiany.</p>
+                            @endif
+                            @if($aiDraftIsFacebookPost)
+                                <p class="small text-secondary mb-3">„Poproś AI o nowy szkic” pisze od zera. „Popraw mój szkic” redaguje tekst z pola powyżej, także niezapisany.</p>
                             @endif
 
                             @if($aiDraftUsesVoice && $aiDraftVoice !== null)
@@ -366,6 +568,7 @@
                                     <p class="small mb-2">
                                         Brief zawsze ma nagłówek, termin i kierunek wizualny. Formaty: {{ \App\Services\GrowthOS\AI\Tasks\MaterialDraftTask::GRAPHIC_FORMATS }}.
                                         Termin wstawia aplikacja: <span class="fw-semibold">{{ $aiDraftLiveLabel }}</span>.
+                                        Nagłówek bierze się z tematu webinaru. „Nowy brief” pisze od zera. „Popraw mój brief” redaguje tekst szkicu, także niezapisany.
                                     </p>
                                     <fieldset class="mb-3">
                                         <legend class="form-label fs-6">Dodatkowe elementy briefu</legend>
@@ -413,6 +616,14 @@
                                             @endforeach
                                         </fieldset>
                                     @endif
+                                    @if($aiDraftIsMail && ! $aiDraftIsReminder)
+                                        <input type="hidden" name="html" value="0">
+                                        <div class="form-check mb-3">
+                                            <input class="form-check-input" type="checkbox" name="html" value="1" id="material_ai_html" @checked(old('html', '1') === '1') @disabled(! $aiDraftAllowed)>
+                                            <label class="form-check-label" for="material_ai_html">Profesjonalny HTML maila</label>
+                                            <div class="form-text">Treść powstanie jako HTML do wklejenia w Sendy: akapity, lista i przycisk zapisu. Temat i preheader zostają zwykłym tekstem.</div>
+                                        </div>
+                                    @endif
                                     @if($aiDraftIsMail)
                                         <fieldset class="mb-3">
                                             <legend class="form-label fs-6">Długość maila</legend>
@@ -449,17 +660,17 @@
                                 >{{ old('instruction', $aiDraftProposal['instruction'] ?? '') }}</textarea>
                                 @error('instruction')<div class="invalid-feedback">{{ $message }}</div>@enderror
                                 <div class="form-text mb-3">Nie wpisuj danych osobowych, danych klientów ani sekretów. Instrukcja nie zmieni terminu ani prowadzącego.</div>
-                                @if($aiDraftUsesVoice)
+                                @if($aiDraftUsesWorkModes)
                                     <input type="hidden" name="mode" value="generate" data-growth-ai-mode-input>
-                                    <input type="hidden" name="author_draft" value="" data-growth-ai-author-draft>
+                                    <input type="hidden" name="author_draft" value="" data-growth-ai-author-draft @if($aiDraftIsMail && ! $aiDraftIsReminder) data-growth-ai-author-source="mail" @endif>
                                     <div class="d-flex flex-wrap gap-2">
                                         <button type="submit" class="btn btn-outline-primary" @disabled(! $aiDraftAllowed) data-growth-ai-submit data-growth-ai-mode="generate">
                                             <span class="spinner-border spinner-border-sm me-1 d-none" aria-hidden="true" data-growth-ai-spinner></span>
-                                            Poproś AI o nowy szkic
+                                            {{ $aiDraftIsGraphic ? 'Poproś AI o nowy brief' : 'Poproś AI o nowy szkic' }}
                                         </button>
                                         <button type="submit" class="btn btn-outline-primary" @disabled(! $aiDraftAllowed) data-growth-ai-submit data-growth-ai-mode="refine">
                                             <span class="spinner-border spinner-border-sm me-1 d-none" aria-hidden="true" data-growth-ai-spinner></span>
-                                            Popraw mój szkic
+                                            {{ $aiDraftIsGraphic ? 'Popraw mój brief' : 'Popraw mój szkic' }}
                                         </button>
                                     </div>
                                 @else
@@ -519,16 +730,23 @@
                         </div>
                         <div class="col-lg-6">
                             <div class="small fw-semibold mb-1">Propozycja AI</div>
-                            <div class="growth-compare growth-compare-proposal">{{ $aiDraftProposal['draft'] }}</div>
+                            @php
+                                $proposalMail = $aiDraftIsMail ? \App\Services\GrowthOS\AI\Tasks\MaterialDraftTask::parseMainMail((string) $aiDraftProposal['draft']) : null;
+                            @endphp
+                            @if(is_array($proposalMail) && str_contains($proposalMail['body'], \App\Support\GrowthOS\MailHtmlFormatter::MARKER))
+                                <iframe class="w-100 border rounded bg-light" style="height:28rem;" sandbox title="Podgląd propozycji HTML" srcdoc="{{ $proposalMail['body'] }}"></iframe>
+                            @else
+                                <div class="growth-compare growth-compare-proposal">{{ $aiDraftProposal['draft'] }}</div>
+                            @endif
                         </div>
                     </div>
-                    <p class="small mt-3 mb-0"><span class="fw-semibold">Co zmieniono:</span> {{ $aiDraftProposal['change_summary'] }}</p>
-                    @if($aiDraftUsesVoice && ! $materialSkipped)
+                    <p class="small mt-3 mb-0 growth-ai-text"><span class="fw-semibold">Co zmieniono:</span> {{ $aiDraftProposal['change_summary'] }}</p>
+                    @if($aiDraftUsesWorkModes && ! $materialSkipped)
                         <form method="POST" action="{{ route('growth.projects.materials.ai', [$project['id'], $material['id']]) }}" class="mt-3" data-growth-ai-form>
                             @csrf
                             <input type="hidden" name="mode" value="iterate">
                             <label for="material_ai_iterate_instruction" class="form-label small fw-semibold">Co jeszcze poprawić?</label>
-                            <textarea id="material_ai_iterate_instruction" name="instruction" rows="2" maxlength="{{ config('growth_ai.limits.max_instruction_chars') }}" class="form-control form-control-sm" placeholder="Np. popraw tylko CTA; zostaw pierwszy akapit bez zmian; popraw tylko literówki" @disabled(! $aiDraftAllowed)></textarea>
+                            <textarea id="material_ai_iterate_instruction" name="instruction" rows="2" maxlength="{{ config('growth_ai.limits.max_instruction_chars') }}" class="form-control form-control-sm" placeholder="{{ $aiDraftIsGraphic ? 'Np. zmień tylko nagłówek na pełny temat; zostaw opis obrazu' : 'Np. popraw tylko CTA; zostaw pierwszy akapit bez zmian; popraw tylko literówki' }}" @disabled(! $aiDraftAllowed)></textarea>
                             <button type="submit" class="btn btn-outline-primary btn-sm mt-2" @disabled(! $aiDraftAllowed) data-growth-ai-submit>
                                 <span class="spinner-border spinner-border-sm me-1 d-none" aria-hidden="true" data-growth-ai-spinner></span>
                                 Popraw ponownie
@@ -633,6 +851,21 @@
 
         @if($aiDraftSupported)
             <script>
+                const mailAuthorDraft = () => {
+                    window.growthSyncMailBody?.();
+                    const subject = document.getElementById('mail_subject')?.value.trim() || '';
+                    const preheader = document.getElementById('mail_preheader')?.value.trim() || '';
+                    const body = document.getElementById('mail_body')?.value.trim() || '';
+                    const header = [
+                        subject ? 'Temat: ' + subject : '',
+                        preheader ? 'Preheader: ' + preheader : '',
+                    ].filter(Boolean).join('\n');
+                    if (header === '') {
+                        return body;
+                    }
+
+                    return body === '' ? header : header + '\n\n' + body;
+                };
                 document.querySelectorAll('[data-duration-custom]').forEach((input) => {
                     input.addEventListener('input', () => {
                         document.getElementById('material_ai_duration_custom').checked = true;
@@ -643,8 +876,10 @@
                         const modeInput = form.querySelector('[data-growth-ai-mode-input]');
                         if (modeInput) {
                             modeInput.value = event.submitter?.dataset.growthAiMode || 'generate';
-                            form.querySelector('[data-growth-ai-author-draft]').value = modeInput.value === 'refine'
-                                ? (document.getElementById('draft')?.value || '')
+                            const authorDraft = form.querySelector('[data-growth-ai-author-draft]');
+                            const sourceId = authorDraft?.dataset.growthAiAuthorSource || 'draft';
+                            authorDraft.value = modeInput.value === 'refine'
+                                ? (sourceId === 'mail' ? mailAuthorDraft() : (document.getElementById(sourceId)?.value || ''))
                                 : '';
                         }
                         form.querySelectorAll('[data-growth-ai-submit]').forEach((button) => {
@@ -705,14 +940,199 @@
                         copyStatus.classList.remove('d-none');
                     });
 
+                    const body = document.getElementById('mail_body');
+                    const visual = document.querySelector('[data-mail-visual]');
+                    const tools = document.querySelector('[data-mail-tools]');
+                    const locked = visual?.dataset.mailLocked === '1';
+                    let mode = 'visual';
+                    let savedRange = null;
+
+                    const looksLikeHtml = (value) => /<[a-z][\s\S]*>/i.test(value);
+
+                    const sanitize = (html) => {
+                        const template = document.createElement('template');
+                        template.innerHTML = html;
+                        template.content.querySelectorAll('script,iframe,object,embed,link,meta,style').forEach((node) => node.remove());
+                        template.content.querySelectorAll('*').forEach((node) => {
+                            [...node.attributes].forEach((attr) => {
+                                const name = attr.name.toLowerCase();
+                                if (name.startsWith('on') || name === 'srcdoc') {
+                                    node.removeAttribute(attr.name);
+                                }
+                                if ((name === 'href' || name === 'src') && /^\s*javascript:/i.test(attr.value)) {
+                                    node.removeAttribute(attr.name);
+                                }
+                            });
+                        });
+
+                        return template.innerHTML;
+                    };
+
+                    const plainToHtml = (text) => text.split(/\n{2,}/).map((block) => {
+                        const lines = block.split('\n').map((line) => escapeHtml(line)).join('<br>');
+
+                        return '<p style="margin:0 0 16px;">' + lines + '</p>';
+                    }).join('');
+
+                    const editableSurface = () => visual.querySelector('[data-pne-mail-body]') || visual;
+
+                    const loadVisual = () => {
+                        const value = body.value || '';
+                        if (looksLikeHtml(value)) {
+                            visual.innerHTML = sanitize(value);
+                            visual.dataset.mailRich = 'html';
+                        } else {
+                            visual.innerHTML = value.trim() === '' ? '<p style="margin:0 0 16px;"><br></p>' : plainToHtml(value);
+                            visual.dataset.mailRich = 'plain';
+                        }
+                        visual.querySelectorAll('[contenteditable]').forEach((node) => node.removeAttribute('contenteditable'));
+                        editableSurface().setAttribute('contenteditable', locked ? 'false' : 'true');
+                    };
+
+                    const syncBody = () => {
+                        if (!visual || mode !== 'visual' || visual.dataset.mailDirty !== '1') {
+                            return;
+                        }
+                        const formatted = visual.querySelector('table,b,strong,i,em,u,ul,ol,a,h1,h2,h3');
+                        if (visual.dataset.mailRich === 'html' || formatted) {
+                            body.value = visual.innerHTML;
+                            return;
+                        }
+                        body.value = visual.innerText.replace(/\n{3,}/g, '\n\n').trim();
+                    };
+
+                    window.growthSyncMailBody = syncBody;
+
+                    const setMode = (next) => {
+                        if (next === 'html') {
+                            syncBody();
+                        }
+                        mode = next;
+                        const visualOn = next === 'visual';
+                        visual.classList.toggle('d-none', ! visualOn);
+                        body.classList.toggle('d-none', visualOn);
+                        tools?.classList.toggle('d-none', ! visualOn);
+                        document.querySelectorAll('[data-mail-mode]').forEach((button) => {
+                            const active = button.dataset.mailMode === next;
+                            button.classList.toggle('btn-primary', active);
+                            button.classList.toggle('btn-outline-primary', ! active);
+                            button.setAttribute('aria-pressed', active ? 'true' : 'false');
+                        });
+                        if (visualOn) {
+                            loadVisual();
+                        }
+                    };
+
+                    document.querySelector('[data-mail-copy-html]')?.addEventListener('click', async () => {
+                        refresh();
+                        syncBody();
+                        const full = preheaderHtml() + '\n' + (body.value || '');
+                        const status = document.querySelector('[data-mail-copy-html-status]');
+                        try {
+                            await navigator.clipboard.writeText(full);
+                        } catch {
+                            setMode('html');
+                            body.select();
+                            document.execCommand('copy');
+                        }
+                        status?.classList.remove('d-none');
+                    });
+
+                    document.querySelectorAll('[data-mail-mode]').forEach((button) => {
+                        button.addEventListener('click', () => setMode(button.dataset.mailMode));
+                    });
+
+                    document.querySelectorAll('[data-mail-command]').forEach((button) => {
+                        button.addEventListener('mousedown', (event) => event.preventDefault());
+                        button.addEventListener('click', () => {
+                            if (locked || mode !== 'visual') {
+                                return;
+                            }
+                            editableSurface().focus();
+                            document.execCommand(button.dataset.mailCommand, false, null);
+                            visual.dataset.mailDirty = '1';
+                            if (button.dataset.mailCommand !== 'removeFormat') {
+                                visual.dataset.mailRich = 'html';
+                            }
+                            syncBody();
+                        });
+                    });
+
+                    document.getElementById('mail-editor-link')?.addEventListener('show.bs.modal', () => {
+                        const selection = window.getSelection();
+                        savedRange = selection && selection.rangeCount && visual.contains(selection.anchorNode)
+                            ? selection.getRangeAt(0)
+                            : null;
+                        document.getElementById('mail-editor-link-error')?.classList.add('d-none');
+                    });
+
+                    document.getElementById('mail-editor-link-save')?.addEventListener('click', () => {
+                        const url = document.getElementById('mail-editor-link-url').value.trim();
+                        const error = document.getElementById('mail-editor-link-error');
+                        if (!/^(https?:\/\/|mailto:|\[LINK DO ZAPISU\])/i.test(url)) {
+                            error?.classList.remove('d-none');
+                            return;
+                        }
+                        editableSurface().focus();
+                        const selection = window.getSelection();
+                        if (savedRange) {
+                            selection.removeAllRanges();
+                            selection.addRange(savedRange);
+                        }
+                        document.execCommand('createLink', false, url);
+                        visual.querySelectorAll('a[href]').forEach((link) => {
+                            if (!link.getAttribute('style')) {
+                                link.setAttribute('style', 'color:#1e4d8c;');
+                            }
+                        });
+                        visual.dataset.mailDirty = '1';
+                        visual.dataset.mailRich = 'html';
+                        syncBody();
+                        document.querySelector('#mail-editor-link [data-bs-dismiss="modal"]')?.click();
+                    });
+
+                    visual.addEventListener('input', () => {
+                        visual.dataset.mailDirty = '1';
+                    });
+                    document.getElementById('material-save')?.addEventListener('submit', syncBody);
+
+                    if (locked) {
+                        document.querySelectorAll('[data-mail-command], [data-bs-target="#mail-editor-link"]').forEach((button) => {
+                            button.disabled = true;
+                        });
+                    }
+
                     subject.addEventListener('input', refresh);
                     preheader.addEventListener('input', () => {
                         copyStatus.classList.add('d-none');
                         refresh();
                     });
                     refresh();
+                    loadVisual();
                 })();
             </script>
         @endif
+        @if($mailFields !== null)
+            <div class="modal fade" id="mail-editor-link" tabindex="-1" aria-labelledby="mail-editor-link-title" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h4 class="modal-title h6" id="mail-editor-link-title">Wstaw link</h4>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+                        </div>
+                        <div class="modal-body">
+                            <label for="mail-editor-link-url" class="form-label">Adres</label>
+                            <input type="text" class="form-control" id="mail-editor-link-url" placeholder="https:// lub [LINK DO ZAPISU]">
+                            <div id="mail-editor-link-error" class="invalid-feedback d-block d-none">Wpisz adres http, https, mailto albo znacznik [LINK DO ZAPISU].</div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Anuluj</button>
+                            <button type="button" class="btn btn-primary btn-sm" id="mail-editor-link-save">Wstaw link</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        @endif
+        @include('growth-os.partials.ai-daily-limit-reset-modal')
     </div>
 </x-app-layout>

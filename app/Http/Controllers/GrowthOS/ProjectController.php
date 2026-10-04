@@ -8,10 +8,13 @@ use App\Models\GrowthOS\GrowthTask;
 use App\Services\GrowthOS\AI\Exceptions\GrowthAiException;
 use App\Services\GrowthOS\AI\GrowthAiService;
 use App\Services\GrowthOS\AI\GrowthImageService;
+use App\Services\GrowthOS\AI\Support\GraphicImageProcessor;
+use App\Services\GrowthOS\AI\Tasks\DirectionPlanningTask;
 use App\Services\GrowthOS\AI\Tasks\GraphicImageTask;
 use App\Services\GrowthOS\AI\Tasks\MaterialDraftTask;
 use App\Services\GrowthOS\GrowthOperationalTasks;
 use App\Support\GrowthOS\DemoTikWebinarProject;
+use App\Support\GrowthOS\GraphicLogoStore;
 use App\Support\GrowthOS\GrowthPeople;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
@@ -34,12 +37,30 @@ class ProjectController extends Controller
 
     public const MATERIAL_AI_ITERATE_EMPTY_MESSAGE = 'Napisz, co jeszcze poprawić.';
 
-    public const IMAGE_NOT_PERSISTED_MESSAGE = 'Projekt nie jest jeszcze zapisany w bazie, więc obrazu nie da się przechować.';
+    public const IMAGE_DESCRIPTION_REFINE_EMPTY_MESSAGE = 'Najpierw wpisz opis obrazu.';
+
+    public const IMAGE_DESCRIPTION_ITERATE_EMPTY_MESSAGE = 'Napisz, co poprawić w opisie obrazu.';
+
+    public const IMAGE_REVISE_EMPTY_MESSAGE = 'Napisz, co poprawić na tym obrazie.';
+
+    public const DIRECTION_PLAN_EMPTY_TOPIC_MESSAGE = 'Najpierw wpisz temat webinaru.';
+
+    public const DIRECTION_PLAN_ITERATE_EMPTY_MESSAGE = 'Napisz, co chcesz zmienić.';
+
+    public const DIRECTION_PLAN_STALE_MESSAGE = 'Temat, cel lub typ zmieniły się od czasu przygotowania propozycji. Wygeneruj ją ponownie.';
+
+    public const DIRECTION_WORKSPACE_APPROVED_MESSAGE = 'Najpierw cofnij zatwierdzenie kierunku.';
+
+    public const DIRECTION_WORKSPACE_STALE_MESSAGE = 'Kierunek zmienił się od czasu przygotowania propozycji. Wygeneruj ją ponownie.';
+
+    public const DIRECTION_PLAN_RESEARCH_MESSAGE = GrowthAiException::RESEARCH_FAILED_MESSAGE;
+
+    public const PROJECT_DELETED_MESSAGE = 'Usunięto projekt webinaru. Tej operacji nie da się cofnąć.';
 
     public function index(): View
     {
         return view('growth-os.projects.index', [
-            'project' => DemoTikWebinarProject::project(),
+            'campaigns' => DemoTikWebinarProject::ownedCampaignSummaries(),
             'nextAction' => DemoTikWebinarProject::nextAction(DemoTikWebinarProject::project()),
             'projectStatusLabels' => DemoTikWebinarProject::projectStatusLabels(),
         ]);
@@ -49,9 +70,82 @@ class ProjectController extends Controller
     {
         return view('growth-os.projects.create', [
             'goals' => DemoTikWebinarProject::goals(),
-            'ideas' => DemoTikWebinarProject::ideas(),
             'instructorOptions' => GrowthPeople::instructorOptions(),
+            'directionProposal' => DemoTikWebinarProject::directionPlanningProposal(),
+            'growthAiEnabled' => config('growth_ai.enabled') === true,
+            'growthAiModel' => (string) config('growth_ai.research.model', config('growth_ai.model')),
         ]);
+    }
+
+    public function planDirection(Request $request): RedirectResponse
+    {
+        $goalValues = collect(DemoTikWebinarProject::goals())->pluck('value')->all();
+        $data = $request->validate([
+            'type' => ['required', 'string', 'max:40'],
+            'goal' => ['required', Rule::in($goalValues)],
+            'topic' => ['nullable', 'string', 'max:180'],
+            'live_date' => ['nullable', 'date'],
+            'planning_mode' => ['nullable', Rule::in([
+                DirectionPlanningTask::MODE_GENERATE,
+                DirectionPlanningTask::MODE_ITERATE,
+                DirectionPlanningTask::MODE_REFRESH,
+            ])],
+            'planning_instruction' => ['nullable', 'string', 'max:'.config('growth_ai.limits.max_instruction_chars')],
+        ]);
+
+        $topic = trim((string) ($data['topic'] ?? ''));
+        $mode = DirectionPlanningTask::mode($data['planning_mode'] ?? null);
+        $instruction = trim((string) ($data['planning_instruction'] ?? ''));
+        $back = redirect()->route('growth.projects.create')->withInput();
+
+        if ($topic === '') {
+            return $back->with('error', self::DIRECTION_PLAN_EMPTY_TOPIC_MESSAGE);
+        }
+
+        if ($mode === DirectionPlanningTask::MODE_ITERATE && $instruction === '') {
+            return $back->with('error', self::DIRECTION_PLAN_ITERATE_EMPTY_MESSAGE);
+        }
+
+        $proposal = DemoTikWebinarProject::directionPlanningProposal();
+        if ($mode !== DirectionPlanningTask::MODE_GENERATE) {
+            $fingerprint = DemoTikWebinarProject::directionPlanningFingerprint($data['type'], $data['goal'], $topic);
+            if ($proposal === null || ($proposal['fingerprint'] ?? null) !== $fingerprint) {
+                return $back->with('error', self::DIRECTION_PLAN_STALE_MESSAGE);
+            }
+        }
+
+        $fields = [
+            'type' => $data['type'],
+            'goal' => $data['goal'],
+            'topic' => $topic,
+            'live_date' => (string) ($data['live_date'] ?? ''),
+        ];
+
+        if (config('growth_ai.enabled') !== true) {
+            DemoTikWebinarProject::storeSimulatedDirectionPlanningProposal($fields, $mode, $instruction);
+
+            return $back->with('success', 'Przygotowano szkic kierunku (symulacja lokalna — informacje nie zostały sprawdzone w Internecie).');
+        }
+
+        try {
+            $result = app(GrowthAiService::class)->planDirection(
+                $request->user(),
+                DemoTikWebinarProject::directionPlanningContext($fields, $mode, $instruction),
+                $mode,
+            );
+        } catch (GrowthAiException $exception) {
+            $message = $exception->errorType === 'web_search_missing' || $exception->userMessage === GrowthAiException::RESEARCH_FAILED_MESSAGE
+                ? GrowthAiException::RESEARCH_FAILED_MESSAGE
+                : ($exception->userMessage === GrowthAiException::INVALID_RESPONSE_MESSAGE
+                    ? 'Nie udało się przygotować poprawnej propozycji AI. Możesz przygotować kierunek ręcznie.'
+                    : $exception->userMessage);
+
+            return $back->with('error', $message);
+        }
+
+        DemoTikWebinarProject::storeDirectionPlanningProposal($fields, $result, $mode, false);
+
+        return $back->with('success', 'AI przygotowało propozycję kierunku. Projekt jeszcze nie powstał — nic nie zatwierdzono.');
     }
 
     public function store(Request $request): RedirectResponse
@@ -67,11 +161,44 @@ class ProjectController extends Controller
             ...GrowthPeople::rules(),
         ], GrowthPeople::messages());
 
-        $project = DemoTikWebinarProject::createProject([...$data, ...GrowthPeople::fromInput($data)]);
+        $useProposal = $request->boolean('use_direction_ai_proposal');
+        $proposal = DemoTikWebinarProject::directionPlanningProposal();
+        $applied = $useProposal && $proposal !== null
+            && ($proposal['fingerprint'] ?? null) === DemoTikWebinarProject::directionPlanningFingerprint(
+                $data['type'],
+                $data['goal'],
+                trim((string) ($data['topic'] ?? '')),
+            );
+
+        $project = DemoTikWebinarProject::createProject([...$data, ...GrowthPeople::fromInput($data)], $useProposal);
+
+        $redirect = redirect()
+            ->route('growth.projects.show', $project['id']);
+
+        if ($useProposal && ! $applied) {
+            return $redirect->with('error', self::DIRECTION_PLAN_STALE_MESSAGE)
+                ->with('success', 'Utworzono projekt webinaru. Propozycja AI nie została użyta, bo temat, cel lub typ się zmieniły.');
+        }
+
+        return $redirect->with('success', $applied
+            ? 'Utworzono projekt webinaru. Kierunek z AI jest szkicem — zatwierdź go świadomie w workspace.'
+            : 'Utworzono projekt webinaru. Kampania i prowadzący są zapisane.');
+    }
+
+    public function open(int $campaign): RedirectResponse
+    {
+        DemoTikWebinarProject::openOwnedCampaign($campaign);
+
+        return redirect()->route('growth.projects.show', DemoTikWebinarProject::PROJECT_ID);
+    }
+
+    public function destroy(int $campaign): RedirectResponse
+    {
+        DemoTikWebinarProject::deleteOwnedCampaign($campaign);
 
         return redirect()
-            ->route('growth.projects.show', $project['id'])
-            ->with('success', 'Utworzono projekt webinaru. Kampania i prowadzący są zapisane.');
+            ->route('growth.projects.index')
+            ->with('success', self::PROJECT_DELETED_MESSAGE);
     }
 
     public function updateHost(Request $request, string $project): RedirectResponse
@@ -102,6 +229,7 @@ class ProjectController extends Controller
             'growthAiEnabled' => config('growth_ai.enabled') === true,
             'growthAiProvider' => (string) config('growth_ai.provider'),
             'growthAiModel' => (string) config('growth_ai.model'),
+            'growthAiResearchModel' => (string) config('growth_ai.research.model', config('growth_ai.model')),
             'conceptDecisions' => DemoTikWebinarProject::conceptDecisions($item),
             'operationalTasks' => DemoTikWebinarProject::operationalTasks($item),
             'instructorOptions' => GrowthPeople::instructorOptions([
@@ -141,10 +269,10 @@ class ProjectController extends Controller
     public function updateDirection(Request $request, string $project): RedirectResponse
     {
         $data = $request->validate([
-            'why_now' => ['required', 'string', 'max:1000'],
-            'audience' => ['required', 'string', 'max:500'],
-            'problem' => ['required', 'string', 'max:1000'],
-            'takeaway' => ['required', 'string', 'max:1000'],
+            'why_now' => ['required', 'string', 'max:1500'],
+            'audience' => ['required', 'string', 'max:1000'],
+            'problem' => ['required', 'string', 'max:1500'],
+            'takeaway' => ['required', 'string', 'max:1500'],
             'sell_later' => ['required', Rule::in(['nie', 'być może', 'tak'])],
         ]);
 
@@ -153,6 +281,96 @@ class ProjectController extends Controller
         return redirect()
             ->route('growth.projects.show', $project)
             ->with('success', 'Zapisano kierunek.')
+            ->withFragment('direction');
+    }
+
+    public function reviseDirection(Request $request, string $project): RedirectResponse
+    {
+        $data = $request->validate([
+            'why_now' => ['nullable', 'string', 'max:1500'],
+            'audience' => ['nullable', 'string', 'max:1000'],
+            'problem' => ['nullable', 'string', 'max:1500'],
+            'takeaway' => ['nullable', 'string', 'max:1500'],
+            'sell_later' => ['nullable', Rule::in(DirectionPlanningTask::SELL_LATER)],
+            'planning_mode' => ['nullable', Rule::in([
+                DirectionPlanningTask::MODE_ITERATE,
+                DirectionPlanningTask::MODE_REFRESH,
+            ])],
+            'planning_instruction' => ['nullable', 'string', 'max:'.config('growth_ai.limits.max_instruction_chars')],
+        ]);
+
+        $item = DemoTikWebinarProject::requireProject($project);
+        $back = redirect()->route('growth.projects.show', $project)->withFragment('direction')->withInput();
+        $mode = DirectionPlanningTask::mode($data['planning_mode'] ?? null) === DirectionPlanningTask::MODE_REFRESH
+            ? DirectionPlanningTask::MODE_REFRESH
+            : DirectionPlanningTask::MODE_ITERATE;
+        $instruction = trim((string) ($data['planning_instruction'] ?? ''));
+
+        if (DemoTikWebinarProject::directionIsApproved($item)) {
+            return $back->with('error', self::DIRECTION_WORKSPACE_APPROVED_MESSAGE);
+        }
+
+        if ($mode === DirectionPlanningTask::MODE_ITERATE && $instruction === '') {
+            return $back->with('error', self::DIRECTION_PLAN_ITERATE_EMPTY_MESSAGE);
+        }
+
+        $direction = [
+            'why_now' => trim((string) ($data['why_now'] ?? '')),
+            'audience' => trim((string) ($data['audience'] ?? '')),
+            'problem' => trim((string) ($data['problem'] ?? '')),
+            'takeaway' => trim((string) ($data['takeaway'] ?? '')),
+            'sell_later' => trim((string) ($data['sell_later'] ?? '')),
+        ];
+        $saved = is_array($item['direction'] ?? null) ? $item['direction'] : DemoTikWebinarProject::emptyDirection();
+        $savedFingerprint = DemoTikWebinarProject::directionFieldsFingerprint($saved);
+
+        if (config('growth_ai.enabled') !== true) {
+            DemoTikWebinarProject::storeSimulatedDirectionWorkspaceProposal($project, $direction, $mode, $instruction, $savedFingerprint);
+
+            return $back->with('success', 'Przygotowano propozycję kierunku (symulacja lokalna — obecny kierunek nie został zmieniony).');
+        }
+
+        try {
+            $result = app(GrowthAiService::class)->planDirection(
+                $request->user(),
+                DemoTikWebinarProject::directionWorkspaceContext($item, $direction, $instruction),
+                $mode,
+            );
+        } catch (GrowthAiException $exception) {
+            $message = $exception->errorType === 'web_search_missing' || $exception->userMessage === GrowthAiException::RESEARCH_FAILED_MESSAGE
+                ? GrowthAiException::RESEARCH_FAILED_MESSAGE
+                : ($exception->userMessage === GrowthAiException::INVALID_RESPONSE_MESSAGE
+                    ? 'Nie udało się przygotować poprawnej propozycji AI. Możesz przygotować kierunek ręcznie.'
+                    : $exception->userMessage);
+
+            return $back->with('error', $message);
+        }
+
+        DemoTikWebinarProject::storeDirectionWorkspaceProposal($project, $result, $mode, false, $savedFingerprint);
+
+        return $back->with('success', 'AI przygotowało propozycję kierunku. Obecny kierunek nie został zmieniony.');
+    }
+
+    public function applyDirectionAi(string $project): RedirectResponse
+    {
+        $back = redirect()->route('growth.projects.show', $project)->withFragment('direction');
+        $outcome = DemoTikWebinarProject::applyDirectionWorkspaceProposal($project);
+
+        return match ($outcome) {
+            'applied' => $back->with('success', 'Zastosowano propozycję AI. Kierunek jest szkicem — zatwierdź go świadomie.'),
+            'approved' => $back->with('error', self::DIRECTION_WORKSPACE_APPROVED_MESSAGE),
+            'stale' => $back->with('error', self::DIRECTION_WORKSPACE_STALE_MESSAGE),
+            default => $back->with('error', 'Nie ma propozycji AI do zastosowania.'),
+        };
+    }
+
+    public function rejectDirectionAi(string $project): RedirectResponse
+    {
+        DemoTikWebinarProject::rejectDirectionWorkspaceProposal($project);
+
+        return redirect()
+            ->route('growth.projects.show', $project)
+            ->with('success', 'Odrzucono propozycję AI. Kierunek bez zmian.')
             ->withFragment('direction');
     }
 
@@ -192,6 +410,25 @@ class ProjectController extends Controller
         );
         $wantsJson = $request->expectsJson()
             || $request->header('X-Requested-With') === 'XMLHttpRequest';
+        $item = DemoTikWebinarProject::requireProject($project);
+        $fromDirection = $intent === 'from_direction';
+        $fail = function (string $message) use ($project, $wantsJson): RedirectResponse|JsonResponse {
+            if ($wantsJson) {
+                return response()->json([
+                    'ok' => false,
+                    'message' => $message,
+                ], 422);
+            }
+
+            return redirect()
+                ->route('growth.projects.show', $project)
+                ->with('error', $message)
+                ->withFragment('concept');
+        };
+
+        if ($fromDirection && DemoTikWebinarProject::directionIsBlank($item)) {
+            return $fail('Najpierw uzupełnij pomysł i kierunek. Bez tego nie ma z czego ułożyć koncepcji.');
+        }
 
         if (config('growth_ai.enabled') !== true) {
             $updatedProject = DemoTikWebinarProject::requestConceptAiProposal($project, $intent);
@@ -212,7 +449,6 @@ class ProjectController extends Controller
         }
 
         $growthAiService = app(GrowthAiService::class);
-        $item = DemoTikWebinarProject::requireProject($project);
         $instruction = $intentLabel;
         if (filled($data['instruction'] ?? null)) {
             $instruction .= '. Dodatkowa instrukcja użytkownika: '.trim((string) $data['instruction']);
@@ -224,6 +460,8 @@ class ProjectController extends Controller
                 concept: is_array($item['concept'] ?? null) ? $item['concept'] : [],
                 audience: (string) data_get($item, 'direction.audience', ''),
                 instruction: $instruction,
+                direction: DemoTikWebinarProject::directionDraftContext($item),
+                fromDirection: $fromDirection,
             );
 
             $updatedProject = DemoTikWebinarProject::storeConceptAiProposal(
@@ -337,6 +575,7 @@ class ProjectController extends Controller
             'materialStatusLabels' => DemoTikWebinarProject::materialStatusLabels(),
             'aiDraftSupported' => $aiDraftSupported,
             'aiDraftUsesVoice' => MaterialDraftTask::usesVoice($material),
+            'aiDraftUsesWorkModes' => MaterialDraftTask::usesWorkModes($material),
             'aiDraftVoice' => MaterialDraftTask::usesVoice($material) ? GrowthPeople::voice($projectItem) : null,
             'aiDraftIsFacebookPost' => $isFacebookPost,
             'aiDraftIsGraphic' => $material === MaterialDraftTask::GRAPHIC_MATERIAL_KEY,
@@ -373,6 +612,13 @@ class ProjectController extends Controller
             'materialImages' => $material === GraphicImageTask::MATERIAL_KEY
                 ? DemoTikWebinarProject::materialImages($projectItem, $material)
                 : new EloquentCollection,
+            'pneLogoAvailable' => $material === GraphicImageTask::MATERIAL_KEY && GraphicLogoStore::pneAvailable(),
+            'sponsorLogoReady' => $material === GraphicImageTask::MATERIAL_KEY
+                && is_numeric($projectItem['growth_campaign_id'] ?? null)
+                && GraphicLogoStore::hasSponsor((int) $projectItem['growth_campaign_id']),
+            'imageDescriptionProposal' => $material === GraphicImageTask::MATERIAL_KEY
+                ? DemoTikWebinarProject::imageDescriptionAiProposal($projectItem)
+                : null,
         ]);
     }
 
@@ -384,6 +630,8 @@ class ProjectController extends Controller
             'format' => ['required', Rule::in(array_keys(GraphicImageTask::FORMATS))],
             'image_prompt' => ['required', 'string', 'max:'.GraphicImageTask::MAX_PROMPT_CHARS],
             'include_headline' => ['nullable', 'boolean'],
+            'include_pne_logo' => ['nullable', 'boolean'],
+            'include_sponsor_logo' => ['nullable', 'boolean'],
         ]);
         $back = redirect()->route('growth.projects.materials.show', [$project, $material]);
 
@@ -413,6 +661,8 @@ class ProjectController extends Controller
                 includeHeadline: $request->boolean('include_headline'),
                 headline: DemoTikWebinarProject::graphicHeadline($item),
                 liveLabel: DemoTikWebinarProject::liveLabel($item),
+                includePneLogo: $request->boolean('include_pne_logo'),
+                includeSponsorLogo: $request->boolean('include_sponsor_logo'),
             );
         } catch (GrowthAiException $exception) {
             return $back->withInput()->with('error', $exception->userMessage);
@@ -421,6 +671,186 @@ class ProjectController extends Controller
         return $back->with('success', $image->source === GrowthArtifactImage::SOURCE_SIMULATION
             ? 'Przygotowano obraz zastępczy (symulacja lokalna, bez wywołania OpenAI).'
             : 'Wygenerowano obraz. Sprawdź go w galerii. Nic nie opublikowano.');
+    }
+
+    public function reviseMaterialImage(Request $request, string $project, string $material, int $image): RedirectResponse
+    {
+        abort_unless($material === GraphicImageTask::MATERIAL_KEY, 404);
+        $item = DemoTikWebinarProject::requireProject($project);
+        $data = $request->validate([
+            'instruction' => ['required', 'string', 'max:'.GraphicImageTask::MAX_REVISE_CHARS],
+        ], [
+            'instruction.required' => self::IMAGE_REVISE_EMPTY_MESSAGE,
+        ]);
+        $source = DemoTikWebinarProject::requireMaterialImage($item, $material, $image);
+        $back = redirect()->route('growth.projects.materials.show', [$project, $material]);
+
+        if (DemoTikWebinarProject::isMaterialSkipped(DemoTikWebinarProject::material($project, $material))) {
+            return $back->with('error', self::MATERIAL_SKIPPED_MESSAGE);
+        }
+
+        if (! DemoTikWebinarProject::canDraftMaterialWithAi($item)) {
+            return $back->with('error', self::MATERIAL_AI_PRECONDITION_MESSAGE);
+        }
+
+        if (function_exists('set_time_limit')) {
+            @set_time_limit((int) config('growth_ai.images.timeout_seconds') + 60);
+        }
+
+        try {
+            $revised = app(GrowthImageService::class)->revise($request->user(), $source, trim((string) $data['instruction']));
+        } catch (GrowthAiException $exception) {
+            return $back->withInput()->with('error', $exception->userMessage);
+        }
+
+        return $back->with('success', $revised->source === GrowthArtifactImage::SOURCE_SIMULATION
+            ? 'Przygotowano poprawiony obraz zastępczy (symulacja lokalna, bez wywołania OpenAI). Poprzedni obraz został w galerii.'
+            : 'Poprawiono obraz według uwagi. Poprzedni obraz został w galerii. Nic nie opublikowano.');
+    }
+
+    public function requestImageDescriptionAi(Request $request, string $project, string $material): RedirectResponse
+    {
+        abort_unless($material === GraphicImageTask::MATERIAL_KEY, 404);
+        $item = DemoTikWebinarProject::requireProject($project);
+        $data = $request->validate([
+            'description_instruction' => ['nullable', 'string', 'max:'.config('growth_ai.limits.max_instruction_chars')],
+            'mode' => ['nullable', Rule::in([MaterialDraftTask::MODE_GENERATE, MaterialDraftTask::MODE_REFINE, MaterialDraftTask::MODE_ITERATE])],
+            'author_draft' => ['nullable', 'string', 'max:'.GraphicImageTask::MAX_PROMPT_CHARS],
+        ]);
+        $back = redirect()->route('growth.projects.materials.show', [$project, $material]);
+        $instruction = trim((string) ($data['description_instruction'] ?? ''));
+        $mode = MaterialDraftTask::aiMode($data['mode'] ?? null);
+        $work = ['mode' => $mode, 'text' => ''];
+
+        if (DemoTikWebinarProject::isMaterialSkipped(DemoTikWebinarProject::material($project, $material))) {
+            return $back->withInput()->with('error', self::MATERIAL_SKIPPED_MESSAGE);
+        }
+
+        if (! DemoTikWebinarProject::canDraftMaterialWithAi($item)) {
+            return $back->withInput()->with('error', self::MATERIAL_AI_PRECONDITION_MESSAGE);
+        }
+
+        if ($mode === MaterialDraftTask::MODE_REFINE) {
+            $work['text'] = trim((string) ($data['author_draft'] ?? ''));
+            if ($work['text'] === '') {
+                return $back->withInput()->with('error', self::IMAGE_DESCRIPTION_REFINE_EMPTY_MESSAGE);
+            }
+        }
+
+        if ($mode === MaterialDraftTask::MODE_ITERATE) {
+            if ($instruction === '') {
+                return $back->withInput()->with('error', self::IMAGE_DESCRIPTION_ITERATE_EMPTY_MESSAGE);
+            }
+            $previous = DemoTikWebinarProject::iterableImageDescriptionAiProposal($project);
+            if ($previous === null) {
+                return $back->with('error', self::MATERIAL_AI_STALE_MESSAGE);
+            }
+            $work['text'] = (string) $previous['description'];
+        }
+
+        if (config('growth_ai.enabled') !== true) {
+            DemoTikWebinarProject::requestImageDescriptionAiProposal($project, $work, $instruction);
+
+            return $back->with('success', 'AI przygotowało opis obrazu (symulacja lokalna). Obecny opis nie został nadpisany.');
+        }
+
+        try {
+            $result = app(GrowthAiService::class)->reviseImageDescription(
+                $request->user(),
+                DemoTikWebinarProject::imageDescriptionAiContext($item, $work, $instruction),
+            );
+        } catch (GrowthAiException $exception) {
+            $message = $exception->userMessage === GrowthAiException::INVALID_RESPONSE_MESSAGE
+                ? 'Nie udało się przygotować poprawnego opisu obrazu. Obecny opis nie został zmieniony.'
+                : $exception->userMessage;
+
+            return $back->withInput()->with('error', $message);
+        }
+
+        DemoTikWebinarProject::storeImageDescriptionAiProposal($project, $result, $work, $instruction);
+
+        return $back->with('success', 'AI przygotowało opis obrazu. Obecny opis nie został nadpisany.');
+    }
+
+    public function applyImageDescriptionAi(string $project, string $material): RedirectResponse
+    {
+        abort_unless($material === GraphicImageTask::MATERIAL_KEY, 404);
+        $back = redirect()->route('growth.projects.materials.show', [$project, $material]);
+        if (DemoTikWebinarProject::isMaterialSkipped(DemoTikWebinarProject::material($project, $material))) {
+            return $back->with('error', self::MATERIAL_SKIPPED_MESSAGE);
+        }
+
+        $outcome = DemoTikWebinarProject::applyImageDescriptionAiProposal($project);
+        if (! $outcome['ok']) {
+            return $back->with('error', self::MATERIAL_AI_STALE_MESSAGE);
+        }
+
+        return $back->with('success', 'Zastosowano opis obrazu. Nagłówek i reszta briefu zostały bez zmian. Materiał ma status Draft.');
+    }
+
+    public function rejectImageDescriptionAi(string $project, string $material): RedirectResponse
+    {
+        abort_unless($material === GraphicImageTask::MATERIAL_KEY, 404);
+        DemoTikWebinarProject::rejectImageDescriptionAiProposal($project);
+
+        return redirect()
+            ->route('growth.projects.materials.show', [$project, $material])
+            ->with('success', 'Odrzucono propozycję opisu obrazu. Nic nie zmieniono.');
+    }
+
+    public function storeSponsorLogo(Request $request, string $project, string $material): RedirectResponse
+    {
+        abort_unless($material === GraphicImageTask::MATERIAL_KEY, 404);
+        $item = DemoTikWebinarProject::requireProject($project);
+        $request->validate([
+            'sponsor_logo' => ['required', 'file', 'mimes:png,jpg,jpeg,webp', 'max:2048'],
+        ]);
+        $back = redirect()->route('growth.projects.materials.show', [$project, $material]);
+        $campaignId = $item['growth_campaign_id'] ?? null;
+        if (! is_numeric($campaignId)) {
+            return $back->with('error', self::IMAGE_NOT_PERSISTED_MESSAGE);
+        }
+
+        try {
+            GraphicLogoStore::storeSponsor(
+                (int) $campaignId,
+                (string) file_get_contents($request->file('sponsor_logo')->getRealPath()),
+                app(GraphicImageProcessor::class),
+            );
+        } catch (GrowthAiException $exception) {
+            return $back->with('error', $exception->userMessage);
+        }
+
+        return $back->with('success', 'Zapisano logo sponsora. Zaznacz je przy generowaniu, żeby trafiło na obraz.');
+    }
+
+    public function deleteSponsorLogo(string $project, string $material): RedirectResponse
+    {
+        abort_unless($material === GraphicImageTask::MATERIAL_KEY, 404);
+        $item = DemoTikWebinarProject::requireProject($project);
+        if (is_numeric($item['growth_campaign_id'] ?? null)) {
+            GraphicLogoStore::deleteSponsor((int) $item['growth_campaign_id']);
+        }
+
+        return redirect()
+            ->route('growth.projects.materials.show', [$project, $material])
+            ->with('success', 'Usunięto logo sponsora. Już wygenerowane obrazy zostają bez zmian.');
+    }
+
+    public function showSponsorLogo(string $project, string $material): StreamedResponse
+    {
+        abort_unless($material === GraphicImageTask::MATERIAL_KEY, 404);
+        $item = DemoTikWebinarProject::requireProject($project);
+        $campaignId = $item['growth_campaign_id'] ?? null;
+        abort_unless(is_numeric($campaignId), 404);
+        $path = GraphicLogoStore::sponsorPath((int) $campaignId);
+        $disk = Storage::disk((string) config('growth_ai.images.disk'));
+        abort_unless($disk->exists($path), 404);
+
+        return $disk->response($path, 'logo-sponsora.png', [
+            'Content-Type' => 'image/png',
+            'Cache-Control' => 'private, max-age=60',
+        ]);
     }
 
     public function adaptMaterialImageToSquare(string $project, string $material, int $image): RedirectResponse
@@ -451,6 +881,15 @@ class ProjectController extends Controller
         return $back->with('success', $square->source === GrowthArtifactImage::SOURCE_SIMULATION
             ? 'Przygotowano kwadratowy obraz zastępczy (symulacja lokalna, bez wywołania OpenAI).'
             : 'Utworzono wersję kwadratową z obrazu poziomego. Sprawdź, czy wszystkie elementy się zmieściły.');
+    }
+
+    public function resetAiDailyLimit(Request $request): RedirectResponse
+    {
+        app(GrowthAiService::class)->resetDailyLimit($request->user());
+
+        return redirect()
+            ->back()
+            ->with('success', 'Zresetowano dzienny limit AI. Możesz znów prosić o propozycje.');
     }
 
     public function resetMaterialImageLimit(Request $request, string $project, string $material): RedirectResponse
@@ -560,7 +999,7 @@ class ProjectController extends Controller
         }
 
         $work = [];
-        if (MaterialDraftTask::usesVoice($material)) {
+        if (MaterialDraftTask::usesWorkModes($material)) {
             $mode = MaterialDraftTask::aiMode($data['mode'] ?? null);
             $work = ['mode' => $mode, 'text' => ''];
 
@@ -582,6 +1021,11 @@ class ProjectController extends Controller
                 $work['text'] = (string) $previous['draft'];
             }
         }
+
+        $style['html'] = $material === MaterialDraftTask::MAIL_MATERIAL_KEY
+            && ($request->has('html')
+                ? $request->boolean('html')
+                : str_contains((string) ($work['text'] ?? ''), \App\Support\GrowthOS\MailHtmlFormatter::MARKER));
 
         if (config('growth_ai.enabled') !== true) {
             DemoTikWebinarProject::requestMaterialAiProposal($project, $material, $style, $instruction, $work);

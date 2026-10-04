@@ -18,10 +18,13 @@ class GrowthAiPilotTest extends TestCase
 
     private FakeGrowthAiProvider $provider;
 
+    private int $outputBufferLevel;
+
     protected function setUp(): void
     {
         parent::setUp();
 
+        $this->outputBufferLevel = ob_get_level();
         $this->withoutVite();
         config()->set('growth_os.enabled', true);
         config()->set('growth_ai.enabled', true);
@@ -33,6 +36,15 @@ class GrowthAiPilotTest extends TestCase
 
         $this->provider = new FakeGrowthAiProvider;
         $this->app->instance(GrowthAiProvider::class, $this->provider);
+    }
+
+    protected function tearDown(): void
+    {
+        while (ob_get_level() > $this->outputBufferLevel) {
+            ob_end_clean();
+        }
+
+        parent::tearDown();
     }
 
     public function test_disabled_flag_uses_local_simulation_without_external_provider(): void
@@ -107,6 +119,8 @@ class GrowthAiPilotTest extends TestCase
 
         $project = DemoTikWebinarProject::project();
         $this->assertSame(1, $this->provider->calls);
+        $this->assertSame('Canva AI w pracy nauczyciela', $this->provider->lastInput['direction']['topic'] ?? null);
+        $this->assertStringContainsString('granicą sensu', $this->provider->lastInstructions);
         $this->assertSame($before, $project['concept']);
         $this->assertSame('Tytuł po korekcie AI', $project['concept_ai_proposal']['concept']['title']);
         $this->assertSame('real_ai', $project['concept_ai_proposal']['source']);
@@ -131,7 +145,7 @@ class GrowthAiPilotTest extends TestCase
 
         $project = DemoTikWebinarProject::project();
         $this->assertSame('Tytuł po korekcie AI', $project['concept']['title']);
-        $this->assertSame('Nauczyciele i dyrektorzy szkół', $project['direction']['audience']);
+        $this->assertSame('', $project['direction']['audience']);
         $this->assertNull($project['concept_ai_proposal']);
     }
 
@@ -222,6 +236,158 @@ class GrowthAiPilotTest extends TestCase
         $this->assertSame('Ręcznie poprawiony tytuł', DemoTikWebinarProject::project()['concept']['title']);
     }
 
+    public function test_from_direction_drafts_empty_concept_without_changing_direction_topic(): void
+    {
+        $user = $this->superAdmin();
+        $this->actingAs($user)->post(route('growth.projects.store'), [
+            'type' => 'Webinar TIK',
+            'live_date' => now()->addDays(7)->toDateString(),
+            'live_time' => '20:00',
+            'host' => 'Waldemar Grabowski',
+            'goal' => 'education',
+            'topic' => 'NotebookLM w pracy nauczyciela',
+        ]);
+        $this->actingAs($user)->put(route('growth.projects.direction.update', DemoTikWebinarProject::PROJECT_ID), [
+            'why_now' => 'Nauczyciele sprawdzają NotebookLM przy dokumentach.',
+            'audience' => 'Nauczyciele pracujący z dokumentami.',
+            'problem' => 'Trudno oddzielić bezpieczne użycie od konta szkolnego Google.',
+            'takeaway' => 'Uczestnik ułoży jeden własny przykład.',
+            'sell_later' => 'być może',
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('growth.projects.show', DemoTikWebinarProject::PROJECT_ID))
+            ->assertOk()
+            ->assertSee('Wygeneruj lub zmień')
+            ->assertSee('Wygeneruj na podstawie pomysłu i kierunku')
+            ->assertSee('nie podmienia tematu');
+
+        $before = DemoTikWebinarProject::project();
+
+        $this->actingAs($user)
+            ->post(route('growth.projects.concept.ai', DemoTikWebinarProject::PROJECT_ID), [
+                'intent' => 'from_direction',
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $this->assertSame(1, $this->provider->calls);
+        $this->assertSame('NotebookLM w pracy nauczyciela', $this->provider->lastInput['direction']['topic'] ?? null);
+        $this->assertSame('Nauczyciele pracujący z dokumentami.', $this->provider->lastInput['direction']['audience'] ?? null);
+        $this->assertStringContainsString('na podstawie direction', $this->provider->lastInstructions);
+        $this->assertArrayNotHasKey('host', $this->provider->lastInput);
+
+        $project = DemoTikWebinarProject::project();
+        $this->assertSame($before['concept'], $project['concept']);
+        $this->assertSame($before['topic'], $project['topic']);
+        $this->assertSame($before['direction'], $project['direction']);
+        $this->assertSame('Tytuł po korekcie AI', $project['concept_ai_proposal']['concept']['title']);
+        $this->assertSame('być może', $project['concept_ai_proposal']['concept']['next_product']);
+
+        $this->actingAs($user)
+            ->post(route('growth.projects.concept.ai.apply', DemoTikWebinarProject::PROJECT_ID))
+            ->assertRedirect();
+
+        $applied = DemoTikWebinarProject::project();
+        $this->assertSame('Tytuł po korekcie AI', $applied['concept']['title']);
+        $this->assertSame('NotebookLM w pracy nauczyciela', $applied['topic']);
+        $this->assertSame('Nauczyciele pracujący z dokumentami.', $applied['direction']['audience']);
+        $this->assertSame('Nauczyciele sprawdzają NotebookLM przy dokumentach.', $applied['direction']['why_now']);
+    }
+
+    public function test_from_direction_simulation_uses_direction_not_sample_copy(): void
+    {
+        config()->set('growth_ai.enabled', false);
+        $user = $this->superAdmin();
+        $this->actingAs($user)->post(route('growth.projects.store'), [
+            'type' => 'Webinar TIK',
+            'live_date' => now()->addDays(7)->toDateString(),
+            'live_time' => '20:00',
+            'host' => 'Waldemar Grabowski',
+            'goal' => 'education',
+            'topic' => 'NotebookLM w pracy nauczyciela',
+        ]);
+        $this->actingAs($user)->put(route('growth.projects.direction.update', DemoTikWebinarProject::PROJECT_ID), [
+            'why_now' => 'Temat jest aktualny.',
+            'audience' => 'Nauczyciele dokumentów.',
+            'problem' => 'Bezpieczeństwo dokumentów.',
+            'takeaway' => 'Jeden własny przykład pracy.',
+            'sell_later' => 'nie',
+        ]);
+
+        $this->actingAs($user)
+            ->post(route('growth.projects.concept.ai', DemoTikWebinarProject::PROJECT_ID), [
+                'intent' => 'from_direction',
+            ]);
+
+        $proposal = DemoTikWebinarProject::project()['concept_ai_proposal']['concept'];
+        $this->assertSame('NotebookLM w pracy nauczyciela', $proposal['title']);
+        $this->assertSame('Jeden własny przykład pracy.', $proposal['promise']);
+        $this->assertSame('nie', $proposal['next_product']);
+        $this->assertStringNotContainsString('Canva', json_encode($proposal, JSON_UNESCAPED_UNICODE));
+        $this->assertSame(0, $this->provider->calls);
+    }
+
+    public function test_revision_sends_saved_direction_and_apply_leaves_it_approved(): void
+    {
+        $user = $this->superAdmin();
+        $this->actingAs($user)->post(route('growth.projects.store'), [
+            'type' => 'Webinar TIK',
+            'live_date' => now()->addDays(7)->toDateString(),
+            'live_time' => '20:00',
+            'host' => 'Waldemar Grabowski',
+            'goal' => 'education',
+            'topic' => 'NotebookLM w pracy nauczyciela',
+        ]);
+        $this->actingAs($user)->put(route('growth.projects.direction.update', DemoTikWebinarProject::PROJECT_ID), [
+            'why_now' => 'Nauczyciele sprawdzają NotebookLM przy dokumentach.',
+            'audience' => 'Nauczyciele pracujący z dokumentami.',
+            'problem' => 'Trudno oddzielić bezpieczne użycie od konta szkolnego Google.',
+            'takeaway' => 'Uczestnik ułoży jeden własny przykład.',
+            'sell_later' => 'nie',
+        ]);
+        $this->actingAs($user)->post(route('growth.projects.steps.complete', [DemoTikWebinarProject::PROJECT_ID, 'direction']));
+        $this->actingAs($user)->put(route('growth.projects.concept.update', DemoTikWebinarProject::PROJECT_ID), [
+            'title' => 'NotebookLM w pracy nauczyciela',
+            'subtitle' => 'Bezpieczna praca z dokumentami',
+            'promise' => 'Uczestnik ułoży jeden własny przykład.',
+            'points' => "Konto szkolne\nWłasny przykład",
+            'plan' => 'Wprowadzenie, pokaz i ćwiczenie.',
+            'cta' => 'Zapisz jeden przykład.',
+            'lead_magnet' => 'Lista kontrolna.',
+            'next_product' => 'nie',
+        ]);
+
+        $this->actingAs($user)
+            ->post(route('growth.projects.concept.ai', DemoTikWebinarProject::PROJECT_ID), [
+                'intent' => 'shorter',
+                'instruction' => 'Skróć plan.',
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $this->assertSame(1, $this->provider->calls);
+        $this->assertSame('NotebookLM w pracy nauczyciela', $this->provider->lastInput['direction']['topic'] ?? null);
+        $this->assertSame('Nauczyciele pracujący z dokumentami.', $this->provider->lastInput['direction']['audience'] ?? null);
+        $this->assertSame('Trudno oddzielić bezpieczne użycie od konta szkolnego Google.', $this->provider->lastInput['direction']['problem'] ?? null);
+        $this->assertSame('nie', $this->provider->lastInput['direction']['sell_later'] ?? null);
+        $this->assertArrayNotHasKey('host', $this->provider->lastInput);
+        $this->assertStringContainsString('granicą sensu', $this->provider->lastInstructions);
+        $this->assertStringNotContainsString('ułóż pierwszą koncepcję', $this->provider->lastInstructions);
+
+        $beforeDirection = DemoTikWebinarProject::project()['direction'];
+        $this->assertArrayHasKey('direction', DemoTikWebinarProject::project()['completed_steps']);
+
+        $this->actingAs($user)
+            ->post(route('growth.projects.concept.ai.apply', DemoTikWebinarProject::PROJECT_ID))
+            ->assertRedirect();
+
+        $applied = DemoTikWebinarProject::project();
+        $this->assertSame($beforeDirection, $applied['direction']);
+        $this->assertArrayHasKey('direction', $applied['completed_steps']);
+        $this->assertSame('Tytuł po korekcie AI', $applied['concept']['title']);
+    }
+
     private function createProject(User $user): void
     {
         $this->actingAs($user)->post(route('growth.projects.store'), [
@@ -257,6 +423,13 @@ final class FakeGrowthAiProvider implements GrowthAiProvider
 {
     public int $calls = 0;
 
+    public string $lastTaskType = '';
+
+    public string $lastInstructions = '';
+
+    /** @var array<string, mixed> */
+    public array $lastInput = [];
+
     public ?GrowthAiException $exception = null;
 
     /** @var array<string, mixed> */
@@ -288,8 +461,12 @@ final class FakeGrowthAiProvider implements GrowthAiProvider
         string $instructions,
         array $input,
         array $schema,
+        array $options = [],
     ): AiProviderResponse {
         $this->calls++;
+        $this->lastTaskType = $taskType;
+        $this->lastInstructions = $instructions;
+        $this->lastInput = $input;
 
         if ($this->exception !== null) {
             throw $this->exception;

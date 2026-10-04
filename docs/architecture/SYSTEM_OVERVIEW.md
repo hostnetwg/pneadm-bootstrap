@@ -134,7 +134,7 @@ Szczegóły tokenów ClickMeeting i provision: `docs/FORM_ORDERS_PNEDU_PROVISION
 
 PNE Growth OS jest planowany jako wydzielony, addytywny moduł wewnątrz `adm.pnedu.pl`, a nie trzecia aplikacja. Ma obejmować tematy, kampanie strategiczne, ekspertów, bibliotekę treści, approval, AI i integracje wykonawcze.
 
-Stan na 2026-09-29: Etap 0.3 wdrożony lokalnie. Obok fail-closed szkieletu jest sesyjny prototyp przygotowania webinaru TIK od zera: Dzisiaj, Projekty, Pomysły, Inbox, formularz startowy, workspace projektu, materiały i checklista czasowa. Stan projektu i materiałów trzymany jest wyłącznie w sesji HTTP. Nadal brak modeli domenowych, tabel, AI, kolejek i integracji.
+Stan na 2026-10-03: moduł działa za flagą w `adm.pnedu.pl`. Kampania, prowadzący, kierunek, koncepcja, decyzje, zadania i materiały zapisują się w bazie `pneadm`. Propozycje AI (Asystent planowania, asystent kierunku w projekcie, koncepcja, szkice materiałów) zostają w sesji HTTP. Kanon: [growth-os/CURRENT.md](../growth-os/CURRENT.md).
 
 Granice architektoniczne:
 

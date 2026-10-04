@@ -64,7 +64,7 @@
                             Zacznij od prostego planu: data live, prowadzący, cel i temat. Kampania i prowadzący zostaną zapisane.
                         </p>
                         <a href="{{ route('growth.projects.create') }}" class="btn btn-primary">
-                            Zaplanuj webinar TIK
+                            Zaplanuj webinar
                         </a>
                     </div>
                 </div>
