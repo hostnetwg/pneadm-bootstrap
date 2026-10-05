@@ -2131,7 +2131,7 @@ class DemoTikWebinarProject
                 'schema_version' => null,
                 'fingerprint' => self::materialAiFingerprint($project, $materialId),
                 'created_at' => now()->toIso8601String(),
-                'note' => 'Symulowana propozycja AI. Obecny szkic pozostaje bez zmian do chwili wybrania „Zastosuj”.',
+                'note' => self::materialAiProposalNote($materialId),
                 ...self::materialAiWorkMeta($project, $materialId, $mode, $text),
                 ...self::mailHtmlMeta($materialId, $style),
             ];
@@ -2170,7 +2170,7 @@ class DemoTikWebinarProject
             'schema_version' => null,
             'fingerprint' => self::materialAiFingerprint($project, $materialId),
             'created_at' => now()->toIso8601String(),
-            'note' => 'Symulowana propozycja AI. Obecny szkic pozostaje bez zmian do chwili wybrania „Zastosuj”.',
+            'note' => self::materialAiProposalNote($materialId),
             ...self::materialAiWorkMeta($project, $materialId, $mode, $text),
             ...self::mailHtmlMeta($materialId, $style),
         ];
@@ -2274,7 +2274,7 @@ class DemoTikWebinarProject
             'schema_version' => $result->schemaVersion,
             'fingerprint' => self::materialAiFingerprint($project, $materialId),
             'created_at' => now()->toIso8601String(),
-            'note' => 'Propozycja prawdziwego AI. Obecny szkic pozostaje bez zmian do chwili wybrania „Zastosuj”.',
+            'note' => self::materialAiProposalNote($materialId),
             ...self::materialAiWorkMeta(
                 $project,
                 $materialId,
@@ -2290,6 +2290,20 @@ class DemoTikWebinarProject
     }
 
     /**
+     * Drop a pending AI proposal without recording reject/apply (e.g. after saving edited mail fields).
+     */
+    public static function clearMaterialAiProposal(string $projectId, string $materialId): void
+    {
+        $project = self::requireProject($projectId);
+        if (! isset($project['material_ai_proposals'][$materialId])) {
+            return;
+        }
+
+        unset($project['material_ai_proposals'][$materialId]);
+        self::saveProject($project);
+    }
+
+    /**
      * @param  array<string, mixed>  $style
      * @return array{mail_html?: bool}
      */
@@ -2300,6 +2314,15 @@ class DemoTikWebinarProject
         }
 
         return ['mail_html' => (bool) ($style['html'] ?? false)];
+    }
+
+    private static function materialAiProposalNote(string $materialId): string
+    {
+        if (MaterialDraftTask::isMail($materialId)) {
+            return 'Propozycja AI jest w polach Temat, Preheader i Treść — popraw je i zapisz materiał. Panel poniżej służy do porównania. „Zastosuj” wstawia oryginalną propozycję bez Twoich poprawek z pól. „Odrzuć” wraca do poprzedniego szkicu.';
+        }
+
+        return 'Propozycja AI. Obecny szkic pozostaje bez zmian do chwili wybrania „Zastosuj”.';
     }
 
     /**

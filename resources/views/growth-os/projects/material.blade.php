@@ -47,6 +47,13 @@
                     </div>
                     <div class="card-body">
                         @if($mailFields !== null)
+                            @if(! empty($mailFieldsFromAiProposal) && ! $materialSkipped)
+                                <div class="alert alert-info small" role="status">
+                                    W polach poniżej jest <strong>propozycja AI</strong> (jeszcze nie zapisana jako szkic materiału).
+                                    Wprowadź poprawki i kliknij <strong>Zapisz materiał</strong>.
+                                    „Zastosuj” w panelu AI przywraca oryginalną propozycję bez Twoich zmian z pól.
+                                </div>
+                            @endif
                             <div class="mb-3">
                                 <label for="mail_subject" class="form-label">Temat</label>
                                 <input type="text" id="mail_subject" name="mail_subject" maxlength="200" class="form-control @error('mail_subject') is-invalid @enderror" value="{{ old('mail_subject', $mailFields['subject']) }}" @readonly($materialSkipped) data-mail-counter="60">
@@ -795,7 +802,7 @@
                     @unless($materialSkipped)
                         <form method="POST" action="{{ route('growth.projects.materials.ai.apply', [$project['id'], $material['id']]) }}">
                             @csrf
-                            <button type="submit" class="btn btn-primary">Zastosuj</button>
+                            <button type="submit" class="btn btn-primary">{{ $aiDraftIsMail ? 'Zastosuj oryginalną propozycję' : 'Zastosuj' }}</button>
                         </form>
                     @endunless
                     <form method="POST" action="{{ route('growth.projects.materials.ai.reject', [$project['id'], $material['id']]) }}">

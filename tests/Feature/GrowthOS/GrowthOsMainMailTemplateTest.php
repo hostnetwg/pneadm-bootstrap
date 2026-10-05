@@ -220,6 +220,43 @@ class GrowthOsMainMailTemplateTest extends TestCase
         $this->assertNull($this->proposal());
     }
 
+    public function test_ai_proposal_prefills_editable_mail_fields_and_save_closes_it(): void
+    {
+        $user = $this->readyProject();
+        $this->provider->payload = $this->mailPayload();
+
+        $this->actingAs($user)
+            ->post(route('growth.projects.materials.ai', [DemoTikWebinarProject::PROJECT_ID, self::MAIL]), [
+                'mode' => 'generate',
+                'length' => 'short',
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $this->assertNotNull($this->proposal());
+
+        $this->actingAs($user)
+            ->get(route('growth.projects.materials.show', [DemoTikWebinarProject::PROJECT_ID, self::MAIL]))
+            ->assertOk()
+            ->assertSee('value="Canva AI w pracy nauczyciela"', false)
+            ->assertSee('value="Zapraszamy na praktyczny webinar."', false)
+            ->assertSee('zapraszamy Państwa na webinar.')
+            ->assertSee('W polach poniżej jest')
+            ->assertSee('Zastosuj oryginalną propozycję');
+
+        $this->save($user, 'DRAFT', [
+            'mail_subject' => 'Canva AI — poprawiony temat',
+            'mail_preheader' => 'Zapraszamy na praktyczny webinar.',
+            'mail_body' => 'zapraszamy Państwa na webinar — poprawiona treść.',
+        ]);
+
+        $this->assertNull($this->proposal());
+        $fields = MaterialDraftTask::parseMainMail($this->artifact()->payload['draft']);
+        $this->assertSame('Canva AI — poprawiony temat', $fields['subject']);
+        $this->assertSame('zapraszamy Państwa na webinar — poprawiona treść.', $fields['body']);
+        $this->assertContains('Webinar Canva AI dla szkoły', $fields['alternatives']);
+    }
+
     public function test_project_links_save_and_reject_dangerous_urls(): void
     {
         $user = $this->readyProject();

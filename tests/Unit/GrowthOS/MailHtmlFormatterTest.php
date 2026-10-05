@@ -32,6 +32,17 @@ class MailHtmlFormatterTest extends TestCase
         $this->assertStringContainsString('href="https://pnedu.pl/courses/577"', $html);
         $this->assertStringContainsString(MailHtmlFormatter::CTA_LABEL, $html);
         $this->assertStringContainsString('[unsubscribe]', $html);
+        $this->assertStringContainsString('Akredytowany Niepubliczny Ośrodek Doskonalenia Nauczycieli', $html);
+        $this->assertStringContainsString('Platforma Nowoczesnej Edukacji', $html);
+        $this->assertStringContainsString('Canva AI', $html);
+        $this->assertStringContainsString('TERMIN', $html);
+        $this->assertStringContainsString('wtorek 6 października, godz. 20:00', $html);
+        $this->assertStringContainsString('PROWADZĄCY', $html);
+        $this->assertStringContainsString('Waldemar Grabowski', $html);
+        $this->assertTrue(
+            strpos($html, 'Canva AI') < strpos($html, MailHtmlFormatter::CTA_LABEL),
+        );
+        $this->assertStringNotContainsString('<strong>Temat:</strong>', $html);
         $this->assertStringNotContainsString('Zapisz się:', $html);
     }
 
@@ -84,8 +95,23 @@ class MailHtmlFormatterTest extends TestCase
         $this->assertStringStartsWith('<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">Krótki preheader.', $copied);
         $this->assertStringContainsString('href="https://pnedu.pl/courses/577"', $copied);
         $this->assertStringContainsString(MailHtmlFormatter::YOUTUBE_CTA_LABEL, $copied);
-        $this->assertStringContainsString('bezpłatne zaświadczenie', $copied);
+        $this->assertStringContainsString('bezpłatnego zaświadczenia', $copied);
         $this->assertStringContainsString('&#128220;', $copied);
+        $this->assertStringContainsString('ZAŚWIADCZENIE', $copied);
+        $this->assertStringContainsString('obecnych na żywo', $copied);
+        $this->assertStringContainsString('bądź z nami', $copied);
+        $this->assertStringContainsString('Canva AI', $copied);
+        $ctaPos = strpos($copied, MailHtmlFormatter::CTA_LABEL);
+        $youtubePos = strpos($copied, MailHtmlFormatter::YOUTUBE_CTA_LABEL);
+        $certPos = strpos($copied, 'bezpłatnego zaświadczenia');
+        $titlePos = strpos($copied, 'Canva AI');
+        $this->assertNotFalse($ctaPos);
+        $this->assertNotFalse($youtubePos);
+        $this->assertNotFalse($certPos);
+        $this->assertNotFalse($titlePos);
+        $this->assertTrue($titlePos < $certPos);
+        $this->assertTrue($certPos < $ctaPos);
+        $this->assertTrue($ctaPos < $youtubePos);
         $this->assertTrue(MailHtmlFormatter::canCopyHtml($context));
 
         $plain = MailHtmlFormatter::plainForAi("Temat: Temat\nPreheader: Krótki preheader.\n\n".$html);

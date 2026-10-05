@@ -30,6 +30,9 @@ final class MailHtmlFormatter
 
     public const GREETING = 'Dzień dobry [Name,fallback=]!';
 
+    public const CERTIFICATE_NOTE = 'Tuż po zakończeniu webinaru udostępnimy formularz rejestracji <strong>bezpłatnego zaświadczenia</strong>. '
+        .'Zaświadczenie jest dla osób obecnych na żywo — <strong>bądź z nami</strong>.';
+
     private const ALLOWED = ['p', 'br', 'strong', 'b', 'em', 'i', 'u', 'ul', 'ol', 'li', 'a'];
 
     private const SAFE_HREF = '/^(https?:\/\/|mailto:|\[LINK DO )/i';
@@ -308,37 +311,58 @@ final class MailHtmlFormatter
 
     private static function webinarCardHtml(MailRenderContext $context, string $registrationHref, string $youtube): string
     {
-        $title = $context->webinarTitle !== '' ? $context->webinarTitle : 'Webinar PNE';
-        $subtitle = $context->webinarSubtitle;
-        $host = $context->hostName !== '' && $context->hostName !== '—'
-            ? 'Prowadzący: '.$context->hostName
-            : '';
+        $title = trim($context->webinarTitle) !== '' ? trim($context->webinarTitle) : 'Webinar PNE';
+        $subtitle = trim($context->webinarSubtitle);
+        $liveLabel = trim($context->liveLabel);
+        $host = trim($context->hostName);
+        if ($host === '—') {
+            $host = '';
+        }
 
         $html = '<tr><td data-pne-mail-webinar-card="1" style="padding:12px 30px 24px;font-family:Arial,Helvetica,sans-serif;">'
             .'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#f8fafc" style="width:100%;background-color:#f8fafc;border:1px solid #dfe5ec;">'
             .'<tr><td style="padding:22px 22px 8px;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.4;color:#008c95;font-weight:bold;letter-spacing:0.03em;">WEBINAR PNE</td></tr>'
-            .'<tr><td style="padding:0 22px 12px;font-family:Arial,Helvetica,sans-serif;font-size:22px;line-height:1.35;color:#073b5c;font-weight:bold;">'
+            .'<tr><td style="padding:0 22px 10px;font-family:Arial,Helvetica,sans-serif;font-size:22px;line-height:1.35;color:#073b5c;font-weight:bold;">'
             .self::escape($title)
             .'</td></tr>';
 
         if ($subtitle !== '') {
-            $html .= '<tr><td style="padding:0 22px 16px;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.55;color:#243040;">'
+            $html .= '<tr><td style="padding:0 22px 14px;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.55;color:#243040;">'
                 .self::escape($subtitle)
                 .'</td></tr>';
         }
 
-        $html .= '<tr><td align="center" style="padding:8px 22px 18px;">'
+        $html .= '<tr><td style="padding:0 22px 16px;">'
+            .'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width:100%;">';
+
+        if ($liveLabel !== '') {
+            $html .= self::webinarMetaRowHtml('&#128197;', 'Termin', $liveLabel);
+        }
+
+        if ($host !== '') {
+            $html .= self::webinarMetaRowHtml('&#128100;', 'Prowadzący', $host);
+        }
+
+        if ($context->showCertificate) {
+            $html .= '<tr><td colspan="2" style="padding:4px 0 0;">'
+                .'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#eef7f8" style="width:100%;background-color:#eef7f8;border:1px solid #c9e3e6;">'
+                .'<tr><td align="center" style="padding:12px 14px 6px;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.3;font-weight:bold;letter-spacing:0.03em;color:#008c95;">'
+                .'<span aria-hidden="true" style="font-size:18px;line-height:1;vertical-align:middle;">&#128220;</span>'
+                .'<span style="display:inline-block;padding-left:8px;vertical-align:middle;">ZAŚWIADCZENIE</span>'
+                .'</td></tr>'
+                .'<tr><td align="center" style="padding:0 14px 12px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5;color:#073b5c;">'
+                .self::CERTIFICATE_NOTE
+                .'</td></tr>'
+                .'</table></td></tr>';
+        }
+
+        $html .= '</table></td></tr>'
+            .'<tr><td align="center" style="padding:4px 22px 14px;">'
             .self::buttonHtml($registrationHref, self::CTA_LABEL, '#f7b500', '#073b5c')
             .'</td></tr>';
 
-        if ($host !== '') {
-            $html .= '<tr><td style="padding:0 22px 14px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5;color:#243040;">'
-                .self::escape($host)
-                .'</td></tr>';
-        }
-
         if ($youtube !== '') {
-            $html .= '<tr><td align="center" style="padding:0 22px 18px;">'
+            $html .= '<tr><td align="center" style="padding:0 22px 14px;">'
                 .self::buttonHtml(self::escapeAttr($youtube), self::YOUTUBE_CTA_LABEL, '#ff0000', '#ffffff')
                 .'</td></tr>';
         }
@@ -347,20 +371,23 @@ final class MailHtmlFormatter
             $html .= '<tr><td align="center" style="padding:0 22px 18px;">'
                 .self::buttonHtml(self::escapeAttr(MaterialDraftTask::ROOM_LINK_PLACEHOLDER), self::ROOM_CTA_LABEL, '#008c95', '#ffffff')
                 .'</td></tr>';
-        }
-
-        if ($context->showCertificate) {
-            $html .= '<tr><td style="padding:0 22px 22px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#eef7f8" style="width:100%;background-color:#eef7f8;border:1px solid #c9e3e6;">'
-                .'<tr>'
-                .'<td width="40" align="center" valign="middle" style="padding:14px 0 14px 14px;font-family:Arial,Helvetica,sans-serif;font-size:22px;line-height:1;color:#073b5c;" aria-hidden="true">&#128220;</td>'
-                .'<td style="padding:14px 16px 14px 10px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5;color:#073b5c;">'
-                .'Po webinarze otrzymają Państwo <strong>bezpłatne zaświadczenie</strong> udziału.'
-                .'</td></tr></table></td></tr>';
+        } else {
+            $html .= '<tr><td style="padding:0 0 8px;">&nbsp;</td></tr>';
         }
 
         $html .= '</table></td></tr>';
 
         return $html;
+    }
+
+    private static function webinarMetaRowHtml(string $iconEntity, string $label, string $value): string
+    {
+        return '<tr>'
+            .'<td width="28" valign="top" style="padding:0 8px 10px 0;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:1.4;color:#008c95;" aria-hidden="true">'.$iconEntity.'</td>'
+            .'<td style="padding:0 0 10px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5;color:#243040;">'
+            .'<div style="font-size:12px;line-height:1.3;font-weight:bold;letter-spacing:0.03em;color:#008c95;padding-bottom:2px;">'.self::escape(mb_strtoupper($label, 'UTF-8')).'</div>'
+            .self::escape($value)
+            .'</td></tr>';
     }
 
     private static function ctaOnlyHtml(string $registrationHref, string $youtube, MailRenderContext $context): string
@@ -397,7 +424,7 @@ final class MailHtmlFormatter
 
         $allUrl = app(PaidCourseOfferBuilder::class)->allTrainingsUrl($context->growthCampaignId);
         $html = '<tr><td data-pne-mail-paid-courses="1" style="padding:8px 30px 24px;font-family:Arial,Helvetica,sans-serif;">'
-            .'<div style="font-size:18px;line-height:1.35;color:#073b5c;font-weight:bold;padding-bottom:12px;">Najbliższe płatne szkolenia</div>';
+            .'<div style="font-size:18px;line-height:1.35;color:#073b5c;font-weight:bold;padding-bottom:12px;">Najbliższe płatne szkolenia NODN Platforma Nowoczesnej Edukacji</div>';
 
         foreach ($context->paidCourses as $course) {
             if (! is_array($course)) {
@@ -479,7 +506,8 @@ final class MailHtmlFormatter
     private static function footerHtml(): string
     {
         return '<tr><td data-pne-mail-footer="1" align="center" style="padding:18px 30px;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.5;color:#6b7785;border-top:1px solid #e6eaee;">'
-            .'Platforma Nowoczesnej Edukacji · pnedu.pl<br>'
+            .'Akredytowany Niepubliczny Ośrodek Doskonalenia Nauczycieli<br>'
+            .'Platforma Nowoczesnej Edukacji<br>'
             .'<a href="[unsubscribe]" style="color:#6b7785;text-decoration:underline;">Wypisz się z listy</a>'
             .'</td></tr>';
     }

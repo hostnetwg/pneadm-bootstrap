@@ -606,13 +606,27 @@ class ProjectController extends Controller
         $aiDraftSupported = MaterialDraftTask::supports($material);
         $isFacebookPost = $material === MaterialDraftTask::FACEBOOK_MATERIAL_KEY;
         $skipped = DemoTikWebinarProject::isMaterialSkipped($item);
+        $aiDraftProposal = $aiDraftSupported ? DemoTikWebinarProject::materialAiProposal($projectItem, $material) : null;
+        $mailFields = null;
+        $mailFieldsFromAiProposal = false;
+
+        if (MaterialDraftTask::isMail($material)) {
+            $mailDraftSource = (string) ($item['draft'] ?? '');
+            $restoredDraft = session('material_restored_draft');
+            if (is_string($restoredDraft) && trim($restoredDraft) !== '') {
+                $mailDraftSource = $restoredDraft;
+            } elseif (is_array($aiDraftProposal) && trim((string) ($aiDraftProposal['draft'] ?? '')) !== '') {
+                $mailDraftSource = (string) $aiDraftProposal['draft'];
+                $mailFieldsFromAiProposal = true;
+            }
+            $mailFields = MaterialDraftTask::parseMainMail($mailDraftSource);
+        }
 
         return view('growth-os.projects.material', [
             'project' => $projectItem,
             'material' => $item,
-            'mailFields' => MaterialDraftTask::isMail($material)
-                ? MaterialDraftTask::parseMainMail((string) ($item['draft'] ?? ''))
-                : null,
+            'mailFields' => $mailFields,
+            'mailFieldsFromAiProposal' => $mailFieldsFromAiProposal,
             'materialStatusLabels' => DemoTikWebinarProject::materialStatusLabels(),
             'aiDraftSupported' => $aiDraftSupported,
             'aiDraftUsesVoice' => MaterialDraftTask::usesVoice($material),
@@ -633,7 +647,7 @@ class ProjectController extends Controller
                 && DemoTikWebinarProject::approvedYoutubeDescription($projectItem) !== '',
             'materialSkipped' => $skipped,
             'aiDraftAllowed' => $aiDraftSupported && ! $skipped && DemoTikWebinarProject::canDraftMaterialWithAi($projectItem),
-            'aiDraftProposal' => $aiDraftSupported ? DemoTikWebinarProject::materialAiProposal($projectItem, $material) : null,
+            'aiDraftProposal' => $aiDraftProposal,
             'aiRealEnabled' => config('growth_ai.enabled') === true,
             'aiModel' => (string) config('growth_ai.model'),
             'materialVersions' => DemoTikWebinarProject::materialVersions($projectItem, $material),
@@ -1080,7 +1094,9 @@ class ProjectController extends Controller
         if (config('growth_ai.enabled') !== true) {
             DemoTikWebinarProject::requestMaterialAiProposal($project, $material, $style, $instruction, $work);
 
-            return $back->with('success', 'AI przygotowało szkic (symulacja lokalna). Obecny szkic nie został nadpisany.');
+            return $back->with('success', MaterialDraftTask::isMail($material)
+                ? 'AI przygotowało szkic (symulacja lokalna). Temat, preheader i treść są w polach edycji — popraw i zapisz.'
+                : 'AI przygotowało szkic (symulacja lokalna). Obecny szkic nie został nadpisany.');
         }
 
         try {
@@ -1099,7 +1115,9 @@ class ProjectController extends Controller
 
         DemoTikWebinarProject::storeMaterialAiProposal($project, $material, $result, $instruction, $work, $style);
 
-        return $back->with('success', 'AI przygotowało szkic. Obecny szkic nie został nadpisany.');
+        return $back->with('success', MaterialDraftTask::isMail($material)
+            ? 'AI przygotowało szkic. Temat, preheader i treść są w polach edycji — popraw i zapisz.'
+            : 'AI przygotowało szkic. Obecny szkic nie został nadpisany.');
     }
 
     public function applyMaterialAi(string $project, string $material): RedirectResponse
@@ -1157,8 +1175,21 @@ class ProjectController extends Controller
             $body = $material === MaterialDraftTask::MAIL_MATERIAL_KEY
                 ? \App\Support\GrowthOS\MailHtmlFormatter::editorContent((string) ($data['mail_body'] ?? ''))
                 : (string) ($data['mail_body'] ?? '');
+            $subjects = $subject !== '' ? [$subject] : [];
+            $activeProposal = DemoTikWebinarProject::materialAiProposal(
+                DemoTikWebinarProject::requireProject($project),
+                $material,
+            );
+            if (is_array($activeProposal)) {
+                $proposalFields = MaterialDraftTask::parseMainMail((string) ($activeProposal['draft'] ?? ''));
+                foreach ($proposalFields['alternatives'] as $alternative) {
+                    if ($alternative !== '' && $alternative !== $subject) {
+                        $subjects[] = $alternative;
+                    }
+                }
+            }
             $data['draft'] = MaterialDraftTask::composeMainMail(
-                $subject !== '' ? [$subject] : [],
+                $subjects,
                 preg_replace('/\s+/u', ' ', (string) ($data['mail_preheader'] ?? '')),
                 $body,
             );
@@ -1172,6 +1203,8 @@ class ProjectController extends Controller
                 'refresh_paid_offer' => $request->boolean('refresh_paid_offer'),
             ]
             : null;
+        $hadMailAiProposal = MaterialDraftTask::isMail($material)
+            && DemoTikWebinarProject::materialAiProposal(DemoTikWebinarProject::requireProject($project), $material) !== null;
         $saved = DemoTikWebinarProject::updateMaterialStatus(
             $project,
             $material,
@@ -1181,9 +1214,14 @@ class ProjectController extends Controller
             $mailOptions,
         );
 
+        if ($hadMailAiProposal) {
+            DemoTikWebinarProject::clearMaterialAiProposal($project, $material);
+        }
+
         $message = match (true) {
             DemoTikWebinarProject::isMaterialSkipped($saved) => 'Materiał wyłączony (Nie dotyczy). Nie liczy się do następnego kroku ani elementów krytycznych. Szkic został zachowany.',
             $wasSkipped => 'Materiał jest znowu aktywny. Szkic jest taki jak przed wyłączeniem.',
+            $hadMailAiProposal => 'Zapisano poprawiony szkic AI. Propozycja została zamknięta. Nic nie opublikowano.',
             default => 'Status i szkic materiału zostały zapisane. Nic nie opublikowano.',
         };
 
