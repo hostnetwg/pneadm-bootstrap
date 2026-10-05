@@ -512,7 +512,8 @@
 
                             @if($aiDraftIsMail)
                                 <p class="small text-secondary mb-3">
-                                    AI zwraca 3 propozycje tematu (pierwsza jest główna), preheader i treść redakcyjną. Forma „Państwo”, podpis prowadzącego i „Zespół PNE”.
+                                    AI zwraca 3 propozycje tematu (pierwsza jest główna), preheader i treść redakcyjną. Forma zwrotu z ustawienia projektu ({{ \App\Services\GrowthOS\AI\Support\AddressFormPolicy::label($project['address_form'] ?? null) }}), podpis prowadzącego i „Zespół PNE”.
+                                    Możesz ją wyjątkowo nadpisać w dodatkowej instrukcji (np. „napisz na Państwo”).
                                     @if($aiDraftIsReminder)
                                         Greeting Sendy i przyciski zapisu / YouTube dodaje aplikacja — nie zaczynaj body od „Dzień dobry,” ani nie wstawiaj linków.
                                         Tematy w stylu „Widzimy się o 20!” z krótkim opisem webinaru. Termin: <span class="fw-semibold">{{ $aiDraftLiveLabel }}</span>.

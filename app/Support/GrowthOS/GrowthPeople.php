@@ -3,6 +3,7 @@
 namespace App\Support\GrowthOS;
 
 use App\Models\Instructor;
+use App\Services\GrowthOS\AI\Support\AddressFormPolicy;
 use Illuminate\Validation\Rule;
 
 /**
@@ -35,6 +36,7 @@ final class GrowthPeople
             'host_instructor_id' => ['nullable', 'required_if:host_source,'.self::HOST_SOURCE_INSTRUCTOR, 'integer', $instructor],
             'host' => ['nullable', 'required_unless:host_source,'.self::HOST_SOURCE_INSTRUCTOR, 'string', 'max:120'],
             'voice_instructor_id' => ['nullable', 'integer', $instructor],
+            'address_form' => ['nullable', Rule::in(AddressFormPolicy::values())],
         ];
     }
 
@@ -53,7 +55,7 @@ final class GrowthPeople
      * Validated form data to the stored shape. A presenter from the base gets the current full name as a snapshot.
      *
      * @param  array<string, mixed>  $data
-     * @return array{host: string, host_instructor_id: int|null, voice_instructor_id: int|null}
+     * @return array{host: string, host_instructor_id: int|null, voice_instructor_id: int|null, address_form: string}
      */
     public static function fromInput(array $data): array
     {
@@ -68,6 +70,7 @@ final class GrowthPeople
                 : trim((string) ($data['host'] ?? '')),
             'host_instructor_id' => $hostInstructor instanceof Instructor ? (int) $hostInstructor->id : null,
             'voice_instructor_id' => is_numeric($voiceId) ? (int) $voiceId : null,
+            'address_form' => AddressFormPolicy::normalize($data['address_form'] ?? null),
         ];
     }
 

@@ -26,7 +26,7 @@ Status: kampania, prowadzący, kierunek, koncepcja, decyzje, 9 zadań operacyjny
 
 `MarketingCampaign` w istniejącym systemie dotyczy kampanii atrybucyjnej, linków, UTM i analityki marketingowej.
 
-`Growth Campaign` to strategiczny projekt pracy: temat, ekspert, cel, treści, decyzje, zadania i wyniki.
+`Growth Campaign` to strategiczny projekt pracy: temat, ekspert, cel, treści, decyzje, zadania i wyniki. Od DEC-051 ma też `address_form` (`ty`|`panstwo`) — domyślną formę zwrotu dla wszystkich szkiców AI kampanii.
 
 ### Operator ≠ Prowadzący ≠ Głos komunikacji (DEC-035)
 

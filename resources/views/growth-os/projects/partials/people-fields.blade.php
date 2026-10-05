@@ -43,6 +43,27 @@
     <div class="form-text">Czyim stylem AI pisze treści. Nie musi to być prowadzący ani osoba zalogowana.</div>
     <div class="form-text d-none" data-people-voice-same>Ten sam co prowadzący.</div>
     <div class="form-text text-warning-emphasis d-none" data-people-voice-no-profile>Ten instruktor nie ma jeszcze indywidualnego profilu komunikacji. AI użyje głosu PNE.</div>
+
+    @php
+        $selectedAddressForm = old(
+            'address_form',
+            $addressForm ?? \App\Services\GrowthOS\AI\Support\AddressFormPolicy::DEFAULT
+        );
+        $selectedAddressForm = \App\Services\GrowthOS\AI\Support\AddressFormPolicy::normalize($selectedAddressForm);
+    @endphp
+    <fieldset class="mt-3 mb-0">
+        <legend class="form-label fs-6 mb-1">Forma zwrotu do odbiorcy</legend>
+        <div class="form-check">
+            <input class="form-check-input" type="radio" name="address_form" value="ty" id="{{ $idPrefix }}_address_form_ty" @checked($selectedAddressForm === 'ty')>
+            <label class="form-check-label" for="{{ $idPrefix }}_address_form_ty">Bezpośrednio — Ty</label>
+        </div>
+        <div class="form-check">
+            <input class="form-check-input" type="radio" name="address_form" value="panstwo" id="{{ $idPrefix }}_address_form_panstwo" @checked($selectedAddressForm === 'panstwo')>
+            <label class="form-check-label" for="{{ $idPrefix }}_address_form_panstwo">Formalnie — Państwo</label>
+        </div>
+        @error('address_form')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
+        <div class="form-text">Domyślna forma zwrotu stosowana we wszystkich materiałach AI. Możesz ją wyjątkowo nadpisać w „Dodatkowej instrukcji dla AI” dla pojedynczej propozycji.</div>
+    </fieldset>
 </div>
 
 @once

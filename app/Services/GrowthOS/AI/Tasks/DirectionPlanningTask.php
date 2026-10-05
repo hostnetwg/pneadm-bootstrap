@@ -6,6 +6,7 @@ use App\Services\GrowthOS\AI\Contracts\GrowthAiResearchTask;
 use App\Services\GrowthOS\AI\Data\AiProviderResponse;
 use App\Services\GrowthOS\AI\Data\DirectionPlanningResult;
 use App\Services\GrowthOS\AI\Exceptions\GrowthAiException;
+use App\Services\GrowthOS\AI\Support\AddressFormPolicy;
 use App\Services\GrowthOS\AI\Support\ProhibitedData;
 use App\Support\GrowthOS\AiListFormatter;
 use Illuminate\Support\Facades\Validator;
@@ -84,7 +85,7 @@ TRYB: generate. Najpierw sprawdź aktualne informacje w Internecie narzędziem w
 TEXT,
         };
 
-        return <<<PROMPT
+        $base = <<<PROMPT
 Jesteś strategicznym konsultantem PNE przygotowującym bezpłatny webinar dla polskich nauczycieli i/lub dyrektorów.
 Twoim zadaniem nie jest pisać reklamę ani marketingowy tekst. Masz pomóc zaplanować webinar: aktualność, odbiorców, problem, rezultat i ostrożną decyzję, czy temat może później prowadzić do oferty.
 
@@ -117,7 +118,10 @@ change_summary: krótko, co zaproponowałeś albo zmieniłeś.
 
 Pisz po polsku. Zwróć wyłącznie dane zgodne ze schematem. Nie dodawaj URL-i do pól kierunku.
 Jeżeli podajesz listę numerowaną albo wypunktowaną, każdy punkt zacznij od nowej linii. Dotyczy to także zapisu „1) 2) 3)”. Nie zapisuj punktów w jednym akapicie.
+
 PROMPT;
+
+        return $base."\n\n".AddressFormPolicy::promptBlock(AddressFormPolicy::CHANNEL_PLANNING);
     }
 
     /**
@@ -126,6 +130,12 @@ PROMPT;
      */
     public function input(array $context): array
     {
+        $resolved = AddressFormPolicy::resolve(
+            AddressFormPolicy::normalize($context['address_form'] ?? null),
+            $this->string($context['instruction'] ?? ''),
+            is_string($context['previous_address_form'] ?? null) ? (string) $context['previous_address_form'] : null,
+        );
+
         $input = [
             'mode' => $this->mode,
             'today' => $this->string($context['today'] ?? now()->toDateString()),
@@ -134,6 +144,11 @@ PROMPT;
                 'topic' => $this->string($context['topic'] ?? ''),
                 'goal' => $this->string($context['goal'] ?? ''),
                 'live_date' => $this->string($context['live_date'] ?? ''),
+                'address_form' => AddressFormPolicy::normalize($context['address_form'] ?? null),
+            ],
+            'style' => [
+                'address_form' => $resolved['form'],
+                'address_form_overridden' => $resolved['overridden'],
             ],
             'user_instruction' => $this->string($context['instruction'] ?? ''),
         ];

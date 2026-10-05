@@ -76,12 +76,14 @@
                         <span class="text-secondary">Prowadzący:</span> <span class="fw-semibold">{{ $project['host'] }}</span>
                         · <span class="text-secondary">Głos komunikacji:</span>
                         <span class="fw-semibold">{{ $voice['name'] !== '' ? $voice['name'] : 'PNE — neutralnie' }}</span>
+                        · <span class="text-secondary">Forma zwrotu:</span>
+                        <span class="fw-semibold">{{ \App\Services\GrowthOS\AI\Support\AddressFormPolicy::label($project['address_form'] ?? null) }}</span>
                     </p>
                     @if($voice['status'] === \App\Support\GrowthOS\GrowthPeople::VOICE_UNAVAILABLE)
                         <p class="small text-warning-emphasis mb-1">Instruktor wybrany jako głos jest nieaktywny albo usunięty. AI użyje głosu PNE.</p>
                     @endif
-                    <details class="mt-1" @if($errors->hasAny(['host', 'host_source', 'host_instructor_id', 'voice_instructor_id'])) open @endif>
-                        <summary class="small">Zmień prowadzącego lub głos komunikacji</summary>
+                    <details class="mt-1" @if($errors->hasAny(['host', 'host_source', 'host_instructor_id', 'voice_instructor_id', 'address_form'])) open @endif>
+                        <summary class="small">Zmień prowadzącego, głos komunikacji lub formę zwrotu</summary>
                         <form id="project-host" method="POST" action="{{ route('growth.projects.host.update', $project['id']) }}" class="mt-2" style="max-width: 28rem;">
                             @csrf
                             @method('PUT')
@@ -90,8 +92,9 @@
                                 'hostInstructorId' => $project['host_instructor_id'] ?? null,
                                 'hostName' => $project['host'],
                                 'voiceInstructorId' => $project['voice_instructor_id'] ?? null,
+                                'addressForm' => $project['address_form'] ?? \App\Services\GrowthOS\AI\Support\AddressFormPolicy::DEFAULT,
                             ])
-                            <button type="submit" class="btn btn-outline-primary btn-sm mt-2">Zapisz prowadzącego i głos</button>
+                            <button type="submit" class="btn btn-outline-primary btn-sm mt-2">Zapisz prowadzącego, głos i formę zwrotu</button>
                         </form>
                     </details>
                 </div>

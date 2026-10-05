@@ -37,14 +37,21 @@ final class GrowthAiService
      * @param  array<string, mixed>  $concept
      * @param  array<string, mixed>|null  $direction
      */
-    public function reviseConcept(User $user, array $concept, string $audience, string $instruction, ?array $direction = null, bool $fromDirection = false): ConceptRevisionResult
-    {
+    public function reviseConcept(
+        User $user,
+        array $concept,
+        string $audience,
+        string $instruction,
+        ?array $direction = null,
+        bool $fromDirection = false,
+        string $addressForm = \App\Services\GrowthOS\AI\Support\AddressFormPolicy::DEFAULT,
+    ): ConceptRevisionResult {
         $this->ensureAllowed($user);
 
         $task = $fromDirection
             ? $this->conceptRevisionTask->draftingFromDirection()
             : $this->conceptRevisionTask;
-        $input = $task->input($concept, $audience, $instruction, $direction);
+        $input = $task->input($concept, $audience, $instruction, $direction, $addressForm);
 
         return $this->run(
             $user,

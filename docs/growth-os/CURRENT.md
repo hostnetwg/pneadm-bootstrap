@@ -2,9 +2,9 @@
 
 Last updated: 2026-10-05 CEST<br>
 Branch: main<br>
-Commit: b447bd3<br>
-Stage: v0.2 — Asystent planowania kierunku, szkice AI materiałów, generator obrazu, historia wersji, Sendy PNE<br>
-Current blocker: none (produkcja: migracje v0.1 `Ran`, `/growth` działa — [runbook](../deploy/2026-09-pne-growth-os-stage-0-1-deploy.md); DEC-050 wymaga migracji `registration_url` / `youtube_live_url`)
+Commit: 086f95d (+ lokalnie: DEC-051 address_form)<br>
+Stage: v0.2 — Asystent planowania kierunku, szkice AI materiałów, generator obrazu, historia wersji, Sendy PNE, forma zwrotu Ty/Państwo<br>
+Current blocker: none (produkcja: migracje v0.1 `Ran`, `/growth` działa — [runbook](../deploy/2026-09-pne-growth-os-stage-0-1-deploy.md); DEC-050 wymaga migracji `registration_url` / `youtube_live_url`; DEC-051 wymaga migracji `address_form`)
 
 ## 1. Cel projektu
 
@@ -20,7 +20,7 @@ PNE Growth OS / PNE Rozwój to moduł w `adm.pnedu.pl`, który ma prowadzić wł
 - Formularz **Zaplanuj webinar** (DEC-037): opcjonalny **Asystent planowania** sprawdza aktualne informacje i proponuje kierunek; projekt powstaje dopiero po „Utwórz projekt webinaru”. „Użyj tego kierunku” wstępnie wypełnia szkic, ale nie zatwierdza go. Nowy projekt ma puste pola kierunku i puste szkice materiałów (koncepcja tylko z tytułem = temat).
 - Karta **Pomysł i kierunek** (DEC-039): po powstaniu projektu ten sam asystent zostaje w workspace. „Popraw propozycję” i „Popraw propozycję — szukaj w Internecie” pokazują nową wersję obok pól. „Zmień na” wstawia jeden fragment do pola, bez zapisu. Kierunek zapisuje się po „Zastosuj” i zostaje szkicem. Przy „Gotowe” najpierw trzeba cofnąć zatwierdzenie.
 - Concept stage: edycja ręczna, cofnięcie zatwierdzenia, opcjonalna propozycja OpenAI jako wariant do przyjęcia/odrzucenia. Przy pustej koncepcji pierwsza opcja to „Wygeneruj na podstawie pomysłu i kierunku”. Każda opcja dostaje zapisany kierunek jako granicę sensu (DEC-041). Nowy tytuł nie zmienia tematu kierunku, a „Zastosuj” nie zmienia pól kierunku.
-- Formularz webinaru i karta projektu (DEC-035): „Prowadzący” to „Instruktor z bazy” albo „Inna osoba (spoza bazy)”, a osobna lista „Głos komunikacji” (domyślnie „PNE — neutralnie”) wskazuje, czyim stylem AI pisze opis YouTube. W formularzu instruktora `super_admin` widzi pole „Profil komunikacji dla AI”.
+- Formularz webinaru i karta projektu (DEC-035 + DEC-051): „Prowadzący”, „Głos komunikacji” oraz **Forma zwrotu do odbiorcy** (`ty` / `panstwo`, domyślnie Ty). Forma obowiązuje wszystkie szkice AI; głos nie ją zmienia. Dodatkowa instrukcja może jawnie nadpisać formę tylko dla jednej propozycji.
 - Materiał „Opis YouTube” (DEC-036): po zatwierdzeniu kierunku i koncepcji „Poproś AI o nowy szkic” (od zera) albo „Popraw mój szkic” (redakcja tekstu z pola, także niezapisanego). Na karcie propozycji „Co jeszcze poprawić?” i „Popraw ponownie”. Zastosuj / Odrzuć jak wcześniej; po odrzuceniu niezapisany tekst wraca do pola.
 - Materiał „Post Facebook”: ten sam wzorzec, plus checkbox hashtagów; AI korzysta z opisu YouTube tylko zatwierdzonego i wstawia `[LINK DO ZAPISU]` zamiast linku.
 - Materiał „Grafika główna”: „Poproś AI o szkic” daje tekstowy brief (nagłówek, termin z aplikacji, kierunek wizualny i opcjonalne elementy z checkboxami) dla formatów 16:9 i kwadrat, z zatwierdzonym opisem YouTube jako źródłem. Pod szkicem „Generator obrazu”: format, opis obrazu (wstępnie z briefu), checkbox „Dodaj nagłówek i termin na obrazie”, „Generuj obraz”, licznik dziennego limitu z „Zresetuj limit” i galeria z Pobierz / Wybierz jako grafikę główną / Usuń, a przy obrazie poziomym „Utwórz wersję kwadratową”.

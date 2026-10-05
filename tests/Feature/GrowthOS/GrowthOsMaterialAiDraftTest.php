@@ -184,9 +184,12 @@ class GrowthOsMaterialAiDraftTest extends TestCase
         $input = $this->provider->input;
         $this->assertSame(['material', 'campaign', 'direction', 'concept', 'presenter', 'voice', 'mode', 'style', 'instruction'], array_keys($input));
         $this->assertSame('', $input['instruction']);
-        $this->assertSame(['emojis'], array_keys($input['style']));
+        $this->assertSame(['emojis', 'address_form', 'address_form_overridden'], array_keys($input['style']));
         $this->assertSame(['key', 'name', 'type'], array_keys($input['material']));
-        $this->assertSame(['working_topic', 'goal', 'live_date', 'live_time', 'timezone'], array_keys($input['campaign']));
+        $this->assertSame(['working_topic', 'goal', 'live_date', 'live_time', 'timezone', 'address_form'], array_keys($input['campaign']));
+        $this->assertSame('ty', $input['campaign']['address_form']);
+        $this->assertSame('ty', $input['style']['address_form']);
+        $this->assertFalse($input['style']['address_form_overridden']);
         $this->assertSame(['name'], array_keys($input['presenter']));
         $this->assertSame(['pne_version', 'pne_rules', 'personal'], array_keys($input['voice']));
         $this->assertNull($input['voice']['personal']);
@@ -769,7 +772,7 @@ class GrowthOsMaterialAiDraftTest extends TestCase
             array_keys($input),
         );
         $this->assertSame(['youtube_description'], array_keys($input['source_materials']));
-        $this->assertSame(['emojis', 'hashtags'], array_keys($input['style']));
+        $this->assertSame(['emojis', 'hashtags', 'address_form', 'address_form_overridden'], array_keys($input['style']));
         $this->assertSame(['key' => self::FACEBOOK, 'name' => 'Post Facebook', 'type' => 'facebook_post'], $input['material']);
         $this->assertTrue($input['style']['hashtags']);
         $this->assertSame(MaterialDraftTask::TYPE, $this->provider->taskType);
@@ -845,7 +848,7 @@ class GrowthOsMaterialAiDraftTest extends TestCase
         $this->requestDraft($user);
 
         $this->assertArrayNotHasKey('source_materials', $this->provider->input);
-        $this->assertSame(['emojis'], array_keys($this->provider->input['style']));
+        $this->assertSame(['emojis', 'address_form', 'address_form_overridden'], array_keys($this->provider->input['style']));
     }
 
     public function test_unchecked_hashtags_box_is_sent_as_false(): void
@@ -1000,7 +1003,7 @@ class GrowthOsMaterialAiDraftTest extends TestCase
         $this->assertSame(['material', 'campaign', 'direction', 'concept', 'source_materials', 'current_draft', 'style', 'instruction', 'mode'], array_keys($input));
         $this->assertSame('generate', $input['mode']);
         $this->assertSame(['youtube_description' => ''], $input['source_materials']);
-        $this->assertSame(['working_topic', 'goal', 'live_date', 'live_time', 'timezone', 'host_name', 'live_label'], array_keys($input['campaign']));
+        $this->assertSame(['working_topic', 'goal', 'live_date', 'live_time', 'timezone', 'host_name', 'live_label', 'address_form'], array_keys($input['campaign']));
         $this->assertSame($this->liveLabel(), $input['campaign']['live_label']);
         $this->assertSame(['formats', 'elements'], array_keys($input['style']));
         $this->assertSame(array_keys(MaterialDraftTask::GRAPHIC_OPTIONAL_ELEMENTS), array_keys($input['style']['elements']));
@@ -1239,12 +1242,13 @@ class GrowthOsMaterialAiDraftTest extends TestCase
         $this->assertSame(['key' => self::MAIL, 'name' => 'Mailing główny', 'type' => 'main_mail'], $input['material']);
         $this->assertSame($this->liveLabel(), $input['campaign']['live_label']);
         $this->assertSame(['youtube_description' => ''], $input['source_materials']);
-        $this->assertSame(['emojis' => false, 'length' => 'short', 'html' => false], $input['style']);
+        $this->assertSame(['emojis' => false, 'length' => 'short', 'html' => false, 'address_form' => 'ty', 'address_form_overridden' => false], $input['style']);
         $this->assertSame(['subject_options', 'preheader', 'body', 'change_summary'], $this->provider->schema['required']);
         $this->assertSame(MaterialDraftTask::MAIL_PROMPT_VERSION, $this->proposal(self::MAIL)['prompt_version']);
-        foreach (['Państwo', 'Zespół PNE', '[Name,fallback=]', 'style.length', 'campaign.live_label', 'NIE zaczynaj body od'] as $rule) {
+        foreach (['style.address_form', 'Zespół PNE', '[Name,fallback=]', 'style.length', 'campaign.live_label', 'NIE zaczynaj body od'] as $rule) {
             $this->assertStringContainsString($rule, $this->provider->instructions);
         }
+        $this->assertStringContainsString('Address Form Policy', $this->provider->instructions);
         $this->assertStringNotContainsString(MaterialDraftTask::LINK_PLACEHOLDER, $this->provider->instructions);
     }
 
@@ -1312,7 +1316,7 @@ class GrowthOsMaterialAiDraftTest extends TestCase
 
         $this->requestFor($user, self::MAIL, ['length' => 'long', 'emojis' => '1']);
 
-        $this->assertSame(['emojis' => true, 'length' => 'long', 'html' => false], $this->provider->input['style']);
+        $this->assertSame(['emojis' => true, 'length' => 'long', 'html' => false, 'address_form' => 'ty', 'address_form_overridden' => false], $this->provider->input['style']);
 
         $this->actingAs($user)
             ->from(route('growth.projects.materials.show', [DemoTikWebinarProject::PROJECT_ID, self::MAIL]))
@@ -1545,7 +1549,13 @@ class GrowthOsMaterialAiDraftTest extends TestCase
         $this->assertSame(['key' => self::REMINDER, 'name' => 'Mailing przypominający', 'type' => 'reminder_mail'], $input['material']);
         $this->assertSame($this->liveLabel(), $input['campaign']['live_label']);
         $this->assertSame(['youtube_description' => '', 'main_mail' => ''], $input['source_materials']);
-        $this->assertSame(['emojis' => false, 'length' => 'short', 'timing' => 'same_day'], $input['style']);
+        $this->assertSame([
+            'emojis' => false,
+            'length' => 'short',
+            'timing' => 'same_day',
+            'address_form' => 'ty',
+            'address_form_overridden' => false,
+        ], $input['style']);
         $this->assertSame(['subject_options', 'preheader', 'body', 'change_summary'], $this->provider->schema['required']);
         $this->assertSame(MaterialDraftTask::REMINDER_PROMPT_VERSION, $this->proposal(self::REMINDER)['prompt_version']);
         foreach (['style.timing', 'source_materials.main_mail', 'Widzimy się o 20', 'NIE zaczynaj body od „Dzień dobry,”', 'Zespół PNE'] as $rule) {
@@ -1562,7 +1572,7 @@ class GrowthOsMaterialAiDraftTest extends TestCase
         $this->provider->payload = $this->mailPayload();
 
         $this->requestFor($user, self::REMINDER, ['timing' => 'same_day', 'length' => 'long', 'emojis' => '1']);
-        $this->assertSame(['emojis' => true, 'length' => 'long', 'timing' => 'same_day'], $this->provider->input['style']);
+        $this->assertSame(['emojis' => true, 'length' => 'long', 'timing' => 'same_day', 'address_form' => 'ty', 'address_form_overridden' => false], $this->provider->input['style']);
 
         $this->actingAs($user)
             ->from(route('growth.projects.materials.show', [DemoTikWebinarProject::PROJECT_ID, self::REMINDER]))

@@ -52,6 +52,7 @@ class GrowthCampaign extends Model
         'owner_user_id',
         'primary_instructor_id',
         'communication_voice_instructor_id',
+        'address_form',
         'working_topic',
         'summary',
         'live_at',

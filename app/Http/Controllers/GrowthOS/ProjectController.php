@@ -91,6 +91,7 @@ class ProjectController extends Controller
                 DirectionPlanningTask::MODE_REFRESH,
             ])],
             'planning_instruction' => ['nullable', 'string', 'max:'.config('growth_ai.limits.max_instruction_chars')],
+            'address_form' => ['nullable', Rule::in(\App\Services\GrowthOS\AI\Support\AddressFormPolicy::values())],
         ]);
 
         $topic = trim((string) ($data['topic'] ?? ''));
@@ -119,6 +120,8 @@ class ProjectController extends Controller
             'goal' => $data['goal'],
             'topic' => $topic,
             'live_date' => (string) ($data['live_date'] ?? ''),
+            'address_form' => \App\Services\GrowthOS\AI\Support\AddressFormPolicy::normalize($data['address_form'] ?? null),
+            'instruction' => $instruction,
         ];
 
         if (config('growth_ai.enabled') !== true) {
@@ -205,12 +208,23 @@ class ProjectController extends Controller
     {
         $data = $request->validate(GrowthPeople::rules(), GrowthPeople::messages());
 
-        DemoTikWebinarProject::updatePeople($project, GrowthPeople::fromInput($data));
-
-        return redirect()
+        $outcome = DemoTikWebinarProject::updatePeople($project, GrowthPeople::fromInput($data));
+        $redirect = redirect()
             ->route('growth.projects.show', $project)
-            ->with('success', 'Zapisano prowadzącego i głos komunikacji.')
+            ->with('success', 'Zapisano prowadzącego, głos komunikacji i formę zwrotu.')
             ->withFragment('project-host');
+
+        if ($outcome['address_form_changed'] && $outcome['has_approved_materials']) {
+            $from = \App\Services\GrowthOS\AI\Support\AddressFormPolicy::label($outcome['previous_address_form']);
+            $to = \App\Services\GrowthOS\AI\Support\AddressFormPolicy::label($outcome['next_address_form']);
+
+            return $redirect->with(
+                'warning',
+                "Zmieniłeś formę zwrotu z „{$from}” na „{$to}”. Zatwierdzone materiały nie zostały automatycznie zmienione i mogą wymagać ponownego sprawdzenia."
+            );
+        }
+
+        return $redirect;
     }
 
     public function updateSchedule(Request $request, string $project): RedirectResponse
@@ -503,6 +517,7 @@ class ProjectController extends Controller
                 instruction: $instruction,
                 direction: DemoTikWebinarProject::directionDraftContext($item),
                 fromDirection: $fromDirection,
+                addressForm: \App\Services\GrowthOS\AI\Support\AddressFormPolicy::fromProject($item),
             );
 
             $updatedProject = DemoTikWebinarProject::storeConceptAiProposal(
@@ -1090,6 +1105,9 @@ class ProjectController extends Controller
                     return $back->with('error', self::MATERIAL_AI_STALE_MESSAGE);
                 }
                 $work['text'] = (string) $previous['draft'];
+                if (is_string($previous['address_form_effective'] ?? null)) {
+                    $style['previous_address_form'] = (string) $previous['address_form_effective'];
+                }
             }
         }
 

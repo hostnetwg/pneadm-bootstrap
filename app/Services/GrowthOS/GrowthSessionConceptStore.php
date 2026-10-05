@@ -9,6 +9,7 @@ use App\Models\GrowthOS\GrowthCampaign;
 use App\Models\GrowthOS\GrowthDecision;
 use App\Models\User;
 use App\Services\GrowthOS\AI\Tasks\MaterialDraftTask;
+use App\Services\GrowthOS\AI\Support\AddressFormPolicy;
 use App\Support\GrowthOS\DemoTikWebinarProject;
 use App\Support\GrowthOS\MailTemplates;
 use Carbon\CarbonImmutable;
@@ -65,6 +66,7 @@ class GrowthSessionConceptStore
             'owner_user_id' => $owner->id,
             'primary_instructor_id' => $this->instructorId($project['host_instructor_id'] ?? null),
             'communication_voice_instructor_id' => $this->instructorId($project['voice_instructor_id'] ?? null),
+            'address_form' => AddressFormPolicy::normalize($project['address_form'] ?? null),
             'working_topic' => $topic !== '' ? $topic : null,
             'live_at' => $liveAt,
         ]);
@@ -132,6 +134,7 @@ class GrowthSessionConceptStore
             'host_name' => $this->hostName((string) ($project['host'] ?? '')),
             'primary_instructor_id' => $this->instructorId($project['host_instructor_id'] ?? null),
             'communication_voice_instructor_id' => $this->instructorId($project['voice_instructor_id'] ?? null),
+            'address_form' => AddressFormPolicy::normalize($project['address_form'] ?? null),
         ]);
     }
 
@@ -240,6 +243,7 @@ class GrowthSessionConceptStore
         }
         $project['host_instructor_id'] = $this->instructorId($campaign->primary_instructor_id);
         $project['voice_instructor_id'] = $this->instructorId($campaign->communication_voice_instructor_id);
+        $project['address_form'] = AddressFormPolicy::normalize($campaign->address_form ?? null);
         $project['type'] = $campaign->type;
         $project['status'] = $this->sessionStatus($campaign->status);
         if ($campaign->live_at !== null) {

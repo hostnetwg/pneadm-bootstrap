@@ -6,6 +6,7 @@ use App\Services\GrowthOS\AI\Contracts\GrowthAiTask;
 use App\Services\GrowthOS\AI\Data\AiProviderResponse;
 use App\Services\GrowthOS\AI\Data\MaterialDraftResult;
 use App\Services\GrowthOS\AI\Exceptions\GrowthAiException;
+use App\Services\GrowthOS\AI\Support\AddressFormPolicy;
 use App\Services\GrowthOS\AI\Support\PneVoice;
 use App\Services\GrowthOS\AI\Support\ProhibitedData;
 use App\Support\GrowthOS\AiListFormatter;
@@ -357,7 +358,11 @@ final class MaterialDraftTask implements GrowthAiTask
 
     public function instructions(): string
     {
-        return match ($this->materialKey) {
+        $channel = $this->materialKey === self::HOST_SCRIPT_MATERIAL_KEY
+            ? AddressFormPolicy::CHANNEL_LIVE
+            : AddressFormPolicy::CHANNEL_WRITTEN;
+
+        $body = match ($this->materialKey) {
             self::FACEBOOK_MATERIAL_KEY => $this->facebookPostInstructions(),
             self::GRAPHIC_MATERIAL_KEY => $this->graphicBriefInstructions(),
             self::MAIL_MATERIAL_KEY => $this->mainMailInstructions(),
@@ -365,6 +370,8 @@ final class MaterialDraftTask implements GrowthAiTask
             self::HOST_SCRIPT_MATERIAL_KEY => $this->hostScriptInstructions(),
             default => $this->youtubeDescriptionInstructions(),
         };
+
+        return $body."\n\n".AddressFormPolicy::promptBlock($channel);
     }
 
     /**
@@ -397,6 +404,7 @@ final class MaterialDraftTask implements GrowthAiTask
                 'live_time' => $this->string($campaign['live_time'] ?? ''),
                 'timezone' => $this->string($campaign['timezone'] ?? ''),
                 'host_name' => $this->string($campaign['host_name'] ?? ''),
+                'address_form' => AddressFormPolicy::normalize($campaign['address_form'] ?? null),
             ],
             'direction' => [
                 'why_now' => $this->string($direction['why_now'] ?? ''),
@@ -468,6 +476,20 @@ final class MaterialDraftTask implements GrowthAiTask
         }
 
         $input['instruction'] = $this->string($context['instruction'] ?? '');
+
+        $mode = self::aiMode(data_get($context, 'work.mode'));
+        $previousEffective = $mode === self::MODE_ITERATE
+            ? (is_string(data_get($context, 'style.previous_address_form'))
+                ? (string) data_get($context, 'style.previous_address_form')
+                : null)
+            : null;
+        $resolved = AddressFormPolicy::resolve(
+            (string) $input['campaign']['address_form'],
+            $input['instruction'],
+            $previousEffective,
+        );
+        $input['style']['address_form'] = $resolved['form'];
+        $input['style']['address_form_overridden'] = $resolved['overridden'];
 
         if ($isGraphic || $isFacebook || in_array($this->materialKey, [self::MAIL_MATERIAL_KEY, self::REMINDER_MATERIAL_KEY], true)) {
             $this->addGraphicWork($input, $context);
@@ -881,18 +903,18 @@ PROMPT;
         return <<<'PROMPT'
 Jesteś redaktorem mailingów webinarów edukacyjnych PNE. Przygotuj szkic głównego maila zapraszającego na webinar. Mail wyśle później człowiek przez system mailingowy; Ty przygotowujesz tylko treść redakcyjną.
 Pisz wyłącznie po polsku, naturalną i poprawną polszczyzną. Ton życzliwy, ekspercki i rzeczowy. Bez agresywnej sprzedaży, sztucznej pilności, clickbaitu i obietnic bez pokrycia.
-Odbiorców określ na podstawie pola direction.audience (nauczyciele i/lub dyrektorzy). Zwracaj się do odbiorców w formie „Państwo”.
+Odbiorców określ na podstawie pola direction.audience (nauczyciele i/lub dyrektorzy). Formę zwrotu (Ty / Państwo) bierz wyłącznie ze style.address_form — patrz polityka na końcu instrukcji.
 NIE zaczynaj body od „Dzień dobry,” — aplikacja sama doda greeting Sendy z personalizacją [Name,fallback=].
 NIE dodawaj przycisków zapisu, linków YouTube, listy płatnych szkoleń, informacji o zaświadczeniu, stopki prawnej ani [unsubscribe]. Te elementy składa aplikacja.
 
 TRYB PRACY (pole mode):
 - "generate": nowy mail od zera na podstawie tematu, kierunku i koncepcji. current_draft nie jest tekstem do przepisania.
-- "refine": author_draft to mail autora, także niezapisany. Może mieć etykiety „Temat:” i „Preheader:”, a potem treść. Popraw tylko to, o co prosi instruction, oraz zdanie sprzeczne z tematem, kierunkiem albo koncepcją. Pierwsza propozycja tematu zostaje tematem autora, chyba że instruction każe go zmienić. Dwie pozostałe mogą być wariantami. Preheader i body redaguj, nie pisz maila od zera.
+- "refine": author_draft to mail autora, także niezapisany. Może mieć etykiety „Temat:” i „Preheader:”, a potem treść. Popraw tylko to, o co prosi instruction, oraz zdanie sprzeczne z tematem, kierunkiem albo koncepcją. Pierwsza propozycja tematu zostaje tematem autora, chyba że instruction każe go zmienić. Dwie pozostałe mogą być wariantami. Preheader i body redaguj, nie pisz maila od zera. Ujednolić formę zwrotu całego body do style.address_form.
 - "iterate": previous_proposal to Twoja poprzednia propozycja, a instruction mówi, co jeszcze poprawić. Zmień tylko to, o co prosi instruction. Etykiet „Temat:” i „Preheader:” nie przenoś do body.
 subject_options: dokładnie 3 różne propozycje tematu maila, każda najwyżej około 60 znaków. Zwykła polska pisownia: pierwsza litera tematu wielka, nazwy własne i produkty wielką literą (np. „Canva AI”), żadnych słów pisanych w całości wielkimi literami, bez emotikon i bez wykrzyknika. Pierwsza propozycja jest główna.
 preheader: jedno zdanie od wielkiej litery, najwyżej 100 znaków, które uzupełnia temat i go nie powtarza.
 body: treść redakcyjna maila, bez tematu i preheadera. Zawiera: wstęp, krótkie wyjaśnienie dlaczego warto przyjść, opis wartości oraz punkty zakresu webinaru.
-Jeżeli style.length ma wartość "short", body ma około 120–220 słów: 2–3 zdania o problemie lub korzyści odbiorcy oraz 3 punkty „Czego się Państwo dowiedzą” oparte na concept.points.
+Jeżeli style.length ma wartość "short", body ma około 120–220 słów: 2–3 zdania o problemie lub korzyści odbiorcy oraz 3 punkty „Czego się dowiesz” / „Czego się Państwo dowiedzą” (zgodnie ze style.address_form) oparte na concept.points.
 Jeżeli style.length ma wartość "long", body ma około 250–400 słów: szerszy kontekst problemu, pełniejszy program oparty na concept.points i concept.plan, krótki akapit o wartości spotkania i informacja o materiale dodatkowym (jeżeli concept.additional_material nie jest puste).
 Termin webinaru i prowadzącego nie musisz powtarzać w body — aplikacja pokaże je na karcie webinaru. Jeżeli wspominasz termin, podaj go dokładnie tak jak w campaign.live_label.
 Jeżeli campaign.host_name nie jest puste i wspominasz prowadzącego, użyj dokładnie tego imienia i nazwiska, bez dopisywania tytułów, stanowisk, osiągnięć ani biografii.
@@ -914,7 +936,7 @@ PROMPT;
         return <<<'PROMPT'
 Jesteś redaktorem mailingów webinarów edukacyjnych PNE. Przygotuj szkic maila przypominającego o webinarie — wysyłka tuż przed startem lub dzień wcześniej. Mail trafia do zapisanych i do osób, które jeszcze się nie zapisały. Ty przygotowujesz tylko treść redakcyjną (temat, preheader, body); layout Sendy PNE (greeting, czerwony pasek przypomnienia, karta webinaru, przyciski zapisu i YouTube, zaświadczenie, oferta, stopka) składa aplikacja.
 Pisz wyłącznie po polsku, naturalną i poprawną polszczyzną. Ton życzliwy, konkretny, z lekką pilnością „już zaraz start”, ale bez agresywnej sprzedaży, clickbaitu i obietnic bez pokrycia.
-Odbiorców określ na podstawie pola direction.audience (nauczyciele i/lub dyrektorzy). Zwracaj się w formie „Państwo”.
+Odbiorców określ na podstawie pola direction.audience (nauczyciele i/lub dyrektorzy). Formę zwrotu bierz wyłącznie ze style.address_form — patrz polityka na końcu instrukcji.
 NIE zaczynaj body od „Dzień dobry,” — greeting Sendy z personalizacją dodaje aplikacja.
 NIE podawaj adresów URL ani znaczników linków do ręcznej podmiany — przyciski zapisu, YouTube i linki z karty projektu dodaje aplikacja.
 NIE powtarzaj w body pełnej karty terminu i prowadzącego — aplikacja pokaże je pod treścią. Możesz wspomnieć godzinę startu (campaign.live_time, np. 20:00) w pierwszym zdaniu.
@@ -957,7 +979,7 @@ PROMPT;
     {
         return <<<'PROMPT'
 Jesteś doświadczonym prowadzącym webinary edukacyjne PNE. Przygotuj scenariusz dla prowadzącego webinar na żywo. Scenariusz czyta tylko prowadzący, nie jest publikowany.
-Pisz wyłącznie po polsku, naturalną i poprawną polszczyzną. Ton życzliwy, ekspercki i spokojny. Odbiorców określ na podstawie pola direction.audience (nauczyciele i/lub dyrektorzy); do widzów prowadzący zwraca się w formie „Państwo”.
+Pisz wyłącznie po polsku, naturalną i poprawną polszczyzną. Ton życzliwy, ekspercki i spokojny. Odbiorców określ na podstawie pola direction.audience (nauczyciele i/lub dyrektorzy). Formę zwrotu do widzów bierz wyłącznie ze style.address_form (dla live: Ty→Wy/Wam, Państwo→Państwo) — patrz polityka na końcu instrukcji.
 Format: zwykły tekst bez Markdown (bez #, ** i tabel), bez emotikon. Nagłówki sekcji i bloków w osobnych liniach, punkty zaczynające się od „- ”, pusta linia między blokami.
 Zacznij od sekcji „Checklista przed startem” dla prowadzącego: 4–6 krótkich punktów, np. dźwięk i kamera, udostępniany ekran, otwarte materiały i karty przeglądarki, włączone nagrywanie, znaczniki linków pod ręką.
 Webinar trwa style.duration_minutes minut: od campaign.live_time do style.end_time. Podziel go na bloki z nagłówkami w formacie „20:00–20:05 Nazwa bloku”. Bloki następują po sobie bez przerw: pierwszy zaczyna się o campaign.live_time, ostatni kończy się o style.end_time. Długość bloków dopasuj do czasu trwania.

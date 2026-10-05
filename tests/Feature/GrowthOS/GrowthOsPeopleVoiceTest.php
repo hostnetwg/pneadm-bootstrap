@@ -62,6 +62,31 @@ class GrowthOsPeopleVoiceTest extends TestCase
         parent::tearDown();
     }
 
+    public function test_address_form_defaults_to_ty_and_can_be_changed(): void
+    {
+        $user = $this->superAdmin();
+        $this->createProject($user)->assertSessionHasNoErrors();
+
+        $this->assertSame('ty', $this->campaign()->address_form);
+        $this->assertSame('ty', DemoTikWebinarProject::project()['address_form']);
+
+        $this->actingAs($user)
+            ->get(route('growth.projects.show', DemoTikWebinarProject::PROJECT_ID))
+            ->assertOk()
+            ->assertSee('Forma zwrotu do odbiorcy')
+            ->assertSee('Bezpośrednio — Ty');
+
+        $this->actingAs($user)->put(route('growth.projects.host.update', DemoTikWebinarProject::PROJECT_ID), [
+            'host_source' => 'manual',
+            'host' => 'Waldemar Grabowski',
+            'voice_instructor_id' => '',
+            'address_form' => 'panstwo',
+        ])->assertRedirect();
+
+        $this->assertSame('panstwo', $this->campaign()->fresh()->address_form);
+        $this->assertSame('panstwo', DemoTikWebinarProject::project()['address_form']);
+    }
+
     public function test_known_instructor_becomes_presenter_with_id_and_name_snapshot(): void
     {
         $user = $this->superAdmin();

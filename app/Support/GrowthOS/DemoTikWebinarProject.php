@@ -12,6 +12,7 @@ use App\Services\GrowthOS\AI\Data\ConceptRevisionResult;
 use App\Services\GrowthOS\AI\Data\DirectionPlanningResult;
 use App\Services\GrowthOS\AI\Data\MaterialDraftResult;
 use App\Services\GrowthOS\AI\GrowthImageService;
+use App\Services\GrowthOS\AI\Support\AddressFormPolicy;
 use App\Services\GrowthOS\AI\Support\PneVoice;
 use App\Services\GrowthOS\AI\Tasks\DirectionPlanningTask;
 use App\Services\GrowthOS\AI\Tasks\GraphicImageTask;
@@ -110,6 +111,7 @@ class DemoTikWebinarProject
             'host' => $data['host'],
             'host_instructor_id' => $data['host_instructor_id'] ?? null,
             'voice_instructor_id' => $data['voice_instructor_id'] ?? null,
+            'address_form' => \App\Services\GrowthOS\AI\Support\AddressFormPolicy::normalize($data['address_form'] ?? null),
             'goal' => $data['goal'],
             'topic' => $topic,
             'status' => 'PLANNING',
@@ -171,6 +173,10 @@ class DemoTikWebinarProject
                 : (int) ($previous['iteration_count'] ?? 0) + 1,
             'fingerprint' => self::directionPlanningFingerprint($fields['type'], $fields['goal'], $fields['topic']),
             'created_at' => now()->toIso8601String(),
+            ...self::addressFormMeta(
+                ['address_form' => AddressFormPolicy::normalize($fields['address_form'] ?? null)],
+                (string) ($fields['instruction'] ?? ''),
+            ),
         ];
 
         session([self::SESSION_DIRECTION_PLAN => $proposal]);
@@ -252,12 +258,16 @@ class DemoTikWebinarProject
             'topic' => trim((string) $fields['topic']),
             'goal' => (string) (collect(self::goals())->firstWhere('value', $fields['goal'])['label'] ?? $fields['goal']),
             'live_date' => (string) ($fields['live_date'] ?? ''),
+            'address_form' => AddressFormPolicy::normalize($fields['address_form'] ?? null),
             'instruction' => trim($instruction),
         ];
 
         if ($mode !== DirectionPlanningTask::MODE_GENERATE) {
             $previous = self::directionPlanningProposal();
             $context['previous_proposal'] = is_array($previous) ? $previous : [];
+            if (is_string($previous['address_form_effective'] ?? null)) {
+                $context['previous_address_form'] = (string) $previous['address_form_effective'];
+            }
         }
 
         return $context;
@@ -297,7 +307,11 @@ class DemoTikWebinarProject
             'topic' => trim((string) ($project['topic'] ?? '')),
             'goal' => (string) (collect(self::goals())->firstWhere('value', $goalValue)['label'] ?? $goalValue),
             'live_date' => (string) ($project['live_date'] ?? ''),
+            'address_form' => AddressFormPolicy::fromProject($project),
             'instruction' => trim($instruction),
+            'previous_address_form' => is_string($proposal['address_form_effective'] ?? null)
+                ? (string) $proposal['address_form_effective']
+                : null,
             'previous_proposal' => [
                 'working_topic' => trim((string) ($project['topic'] ?? '')),
                 'direction' => [
@@ -341,6 +355,7 @@ class DemoTikWebinarProject
             'iteration_count' => (int) ($previous['iteration_count'] ?? 0) + 1,
             'saved_fingerprint' => $savedFingerprint,
             'created_at' => now()->toIso8601String(),
+            ...self::addressFormMeta($project, trim((string) ($previous['instruction'] ?? ''))),
         ];
         $project['direction_ai_proposal'] = $proposal;
         self::saveProject($project);
@@ -437,19 +452,42 @@ class DemoTikWebinarProject
     }
 
     /**
-     * @param  array{host: string, host_instructor_id: int|null, voice_instructor_id: int|null}  $people
-     * @return array<string, mixed>
+     * @param  array{host: string, host_instructor_id: int|null, voice_instructor_id: int|null, address_form?: string}  $people
+     * @return array{project: array<string, mixed>, address_form_changed: bool, previous_address_form: string, next_address_form: string, has_approved_materials: bool}
      */
     public static function updatePeople(string $projectId, array $people): array
     {
         $project = self::requireProject($projectId);
+        $previousForm = \App\Services\GrowthOS\AI\Support\AddressFormPolicy::fromProject($project);
+        $nextForm = \App\Services\GrowthOS\AI\Support\AddressFormPolicy::normalize($people['address_form'] ?? $previousForm);
         $project['host'] = trim($people['host']);
         $project['host_instructor_id'] = $people['host_instructor_id'];
         $project['voice_instructor_id'] = $people['voice_instructor_id'];
+        $project['address_form'] = $nextForm;
         self::saveProject($project);
         app(GrowthSessionConceptStore::class)->persistPeople($project);
 
-        return $project;
+        return [
+            'project' => $project,
+            'address_form_changed' => $previousForm !== $nextForm,
+            'previous_address_form' => $previousForm,
+            'next_address_form' => $nextForm,
+            'has_approved_materials' => self::hasApprovedMaterials($project),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $project
+     */
+    public static function hasApprovedMaterials(array $project): bool
+    {
+        foreach ($project['materials'] ?? [] as $material) {
+            if (($material['status'] ?? null) === 'APPROVED') {
+                return true;
+            }
+        }
+
+        return isset($project['completed_steps']['direction']) || isset($project['completed_steps']['concept']);
     }
 
     /**
@@ -969,6 +1007,7 @@ class DemoTikWebinarProject
             'host' => $fields['host'] ?? '—',
             'host_instructor_id' => $fields['host_instructor_id'] ?? null,
             'voice_instructor_id' => $fields['voice_instructor_id'] ?? null,
+            'address_form' => \App\Services\GrowthOS\AI\Support\AddressFormPolicy::normalize($fields['address_form'] ?? null),
             'registration_url' => $fields['registration_url'] ?? '',
             'youtube_live_url' => $fields['youtube_live_url'] ?? '',
             'goal' => $fields['goal'] ?? 'unknown',
@@ -1923,6 +1962,7 @@ class DemoTikWebinarProject
                 'timezone' => (string) config('app.timezone'),
                 'host_name' => self::aiHostName($project),
                 'live_label' => self::liveLabel($project),
+                'address_form' => AddressFormPolicy::fromProject($project),
             ],
             'direction' => self::fingerprintDirection($direction),
             'concept' => self::fingerprintConcept($concept),
@@ -1936,6 +1976,9 @@ class DemoTikWebinarProject
                 'timing' => MaterialDraftTask::reminderTiming($style['timing'] ?? null),
                 'duration_minutes' => MaterialDraftTask::hostScriptDuration($style['duration_minutes'] ?? null),
                 'html' => (bool) ($style['html'] ?? false),
+                'previous_address_form' => is_string($style['previous_address_form'] ?? null)
+                    ? (string) $style['previous_address_form']
+                    : null,
             ],
             'instruction' => trim($instruction),
         ];
@@ -1969,6 +2012,7 @@ class DemoTikWebinarProject
             'concept' => self::hash(self::fingerprintConcept($concept)),
             'material' => self::hash(['draft' => self::materialDraft($project, $materialId)]),
             'host' => self::hash(['host_name' => self::aiHostName($project)]),
+            'address_form' => self::hash(['address_form' => AddressFormPolicy::fromProject($project)]),
         ];
 
         if (MaterialDraftTask::sourceMaterialKeys($materialId) !== []) {
@@ -2125,9 +2169,18 @@ class DemoTikWebinarProject
         $emojis = (bool) ($style['emojis'] ?? ! MaterialDraftTask::usesVoice($materialId));
         $mode = MaterialDraftTask::aiMode($work['mode'] ?? null);
         $text = trim((string) ($work['text'] ?? ''));
+        $previousEffective = is_string($style['previous_address_form'] ?? null)
+            ? (string) $style['previous_address_form']
+            : null;
+        $addressMeta = self::addressFormMeta(
+            $project,
+            $instruction,
+            $mode === MaterialDraftTask::MODE_ITERATE ? $previousEffective : null,
+        );
+        $addressForm = $addressMeta['address_form_effective'];
 
         if (MaterialDraftTask::usesWorkModes($materialId) && $mode !== MaterialDraftTask::MODE_GENERATE) {
-            $revised = self::simulatedRevision($text);
+            $revised = self::simulatedRevision($text, $addressForm);
             $project['material_ai_proposals'][$materialId] = [
                 'material_key' => $materialId,
                 'draft' => $revised,
@@ -2148,6 +2201,7 @@ class DemoTikWebinarProject
                 'fingerprint' => self::materialAiFingerprint($project, $materialId),
                 'created_at' => now()->toIso8601String(),
                 'note' => self::materialAiProposalNote($materialId),
+                ...$addressMeta,
                 ...self::materialAiWorkMeta($project, $materialId, $mode, $text),
                 ...self::mailHtmlMeta($materialId, $style),
             ];
@@ -2159,22 +2213,24 @@ class DemoTikWebinarProject
         $project['material_ai_proposals'][$materialId] = [
             'material_key' => $materialId,
             'draft' => match ($materialId) {
-                MaterialDraftTask::FACEBOOK_MATERIAL_KEY => self::simulatedFacebookPost($project, $concept, $emojis, (bool) ($style['hashtags'] ?? true)),
+                MaterialDraftTask::FACEBOOK_MATERIAL_KEY => self::simulatedFacebookPost($project, $concept, $emojis, (bool) ($style['hashtags'] ?? true), $addressForm),
                 MaterialDraftTask::GRAPHIC_MATERIAL_KEY => self::simulatedGraphicBrief($project, $concept, self::graphicElements($style)),
-                MaterialDraftTask::MAIL_MATERIAL_KEY => self::simulatedMainMail($project, $concept, $emojis, MaterialDraftTask::mailLength($style['length'] ?? null)),
+                MaterialDraftTask::MAIL_MATERIAL_KEY => self::simulatedMainMail($project, $concept, $emojis, MaterialDraftTask::mailLength($style['length'] ?? null), $addressForm),
                 MaterialDraftTask::REMINDER_MATERIAL_KEY => self::simulatedReminderMail(
                     $project,
                     $concept,
                     $emojis,
                     MaterialDraftTask::mailLength($style['length'] ?? null),
                     MaterialDraftTask::reminderTiming($style['timing'] ?? null),
+                    $addressForm,
                 ),
                 MaterialDraftTask::HOST_SCRIPT_MATERIAL_KEY => self::simulatedHostScript(
                     $project,
                     $concept,
                     MaterialDraftTask::hostScriptDuration($style['duration_minutes'] ?? null),
+                    $addressForm,
                 ),
-                default => self::simulatedYoutubeDescription($project, $concept, $emojis),
+                default => self::simulatedYoutubeDescription($project, $concept, $emojis, $addressForm),
             },
             'change_summary' => 'Symulacja lokalna: szkic złożony z zatwierdzonej koncepcji (tytuł, termin, obietnica, program, CTA).'
                 .($instruction !== '' ? ' Symulacja nie interpretuje dodatkowej instrukcji — uwzględni ją prawdziwe AI.' : ''),
@@ -2187,6 +2243,7 @@ class DemoTikWebinarProject
             'fingerprint' => self::materialAiFingerprint($project, $materialId),
             'created_at' => now()->toIso8601String(),
             'note' => self::materialAiProposalNote($materialId),
+            ...$addressMeta,
             ...self::materialAiWorkMeta($project, $materialId, $mode, $text),
             ...self::mailHtmlMeta($materialId, $style),
         ];
@@ -2253,14 +2310,55 @@ class DemoTikWebinarProject
         return $proposal;
     }
 
-    private static function simulatedRevision(string $text): string
+    private static function simulatedRevision(string $text, string $addressForm = AddressFormPolicy::DEFAULT): string
     {
         $paragraphs = preg_split('/\R{2,}/u', trim($text)) ?: [];
-
-        return implode("\n\n", array_map(
+        $normalized = implode("\n\n", array_map(
             static fn (string $paragraph): string => trim((string) preg_replace('/[ \t]+/u', ' ', $paragraph)),
             $paragraphs,
         ));
+
+        return self::applyAddressFormToSimulation($normalized, $addressForm);
+    }
+
+    private static function applyAddressFormToSimulation(string $text, string $addressForm): string
+    {
+        $form = AddressFormPolicy::normalize($addressForm);
+        if ($form === AddressFormPolicy::TY) {
+            return str_replace(
+                [
+                    'otrzymają Państwo',
+                    'Czego się Państwo dowiedzą',
+                    'zapraszamy Państwa',
+                    'mogą Państwo',
+                    'zobaczą Państwo',
+                    'nie mają Państwo',
+                    'się Państwo nie',
+                    'Skąd Państwo',
+                    'korzystali już Państwo',
+                    'chcieliby Państwo',
+                    'Dzień dobry Państwu',
+                    'pokażemy',
+                ],
+                [
+                    'otrzymasz',
+                    'Czego się dowiesz',
+                    'zapraszam Cię',
+                    'możesz',
+                    'zobaczysz',
+                    'nie masz',
+                    'się jeszcze nie',
+                    'Skąd',
+                    'korzystałeś już',
+                    'chcielibyście',
+                    'Dzień dobry',
+                    'pokażę',
+                ],
+                $text,
+            );
+        }
+
+        return $text;
     }
 
     /**
@@ -2277,6 +2375,15 @@ class DemoTikWebinarProject
         array $style = [],
     ): array {
         $project = self::requireProject($projectId);
+        $mode = MaterialDraftTask::aiMode($work['mode'] ?? null);
+        $previousEffective = is_string($style['previous_address_form'] ?? null)
+            ? (string) $style['previous_address_form']
+            : null;
+        $addressMeta = self::addressFormMeta(
+            $project,
+            $instruction,
+            $mode === MaterialDraftTask::MODE_ITERATE ? $previousEffective : null,
+        );
 
         $project['material_ai_proposals'][$materialId] = [
             'material_key' => $materialId,
@@ -2291,10 +2398,11 @@ class DemoTikWebinarProject
             'fingerprint' => self::materialAiFingerprint($project, $materialId),
             'created_at' => now()->toIso8601String(),
             'note' => self::materialAiProposalNote($materialId),
+            ...$addressMeta,
             ...self::materialAiWorkMeta(
                 $project,
                 $materialId,
-                MaterialDraftTask::aiMode($work['mode'] ?? null),
+                $mode,
                 trim((string) ($work['text'] ?? '')),
             ),
             ...self::mailHtmlMeta($materialId, $style),
@@ -2317,6 +2425,24 @@ class DemoTikWebinarProject
 
         unset($project['material_ai_proposals'][$materialId]);
         self::saveProject($project);
+    }
+
+    /**
+     * @param  array<string, mixed>  $project
+     * @return array{address_form_effective: string, address_form_overridden: bool}
+     */
+    private static function addressFormMeta(array $project, string $instruction = '', ?string $previousEffective = null): array
+    {
+        $resolved = AddressFormPolicy::resolve(
+            AddressFormPolicy::fromProject($project),
+            $instruction,
+            $previousEffective,
+        );
+
+        return [
+            'address_form_effective' => $resolved['form'],
+            'address_form_overridden' => $resolved['overridden'],
+        ];
     }
 
     /**
@@ -2521,7 +2647,7 @@ class DemoTikWebinarProject
      * @param  array<string, mixed>  $project
      * @param  array<string, mixed>  $concept
      */
-    private static function simulatedYoutubeDescription(array $project, array $concept, bool $emojis = true): string
+    private static function simulatedYoutubeDescription(array $project, array $concept, bool $emojis = true, string $addressForm = AddressFormPolicy::DEFAULT): string
     {
         $icon = static fn (string $emoji): string => $emojis ? $emoji.' ' : '';
         $bullet = $emojis ? '✅ ' : '• ';
@@ -2536,7 +2662,7 @@ class DemoTikWebinarProject
         $cta = trim((string) ($concept['cta'] ?? ''));
         $host = self::aiHostName($project);
 
-        return trim(implode("\n\n", array_filter([
+        return self::applyAddressFormToSimulation(trim(implode("\n\n", array_filter([
             $title !== '' ? $icon('🎓').$title : '',
             trim((string) ($concept['subtitle'] ?? '')),
             $icon('📅').'Termin: '.($project['live_date'] ?? '').', godz. '.($project['live_time'] ?? '').'.',
@@ -2544,7 +2670,7 @@ class DemoTikWebinarProject
             trim((string) ($concept['promise'] ?? '')),
             $points !== '' ? $icon('📌')."Program:\n".$points : '',
             $cta !== '' ? $icon('👉').$cta : '',
-        ])));
+        ]))), $addressForm);
     }
 
     /**
@@ -2576,11 +2702,12 @@ class DemoTikWebinarProject
      * @param  array<string, mixed>  $project
      * @param  array<string, mixed>  $concept
      */
-    private static function simulatedMainMail(array $project, array $concept, bool $emojis, string $length): string
+    private static function simulatedMainMail(array $project, array $concept, bool $emojis, string $length, string $addressForm = AddressFormPolicy::DEFAULT): string
     {
         $icon = static fn (string $emoji): string => $emojis ? $emoji.' ' : '';
         $title = trim((string) ($concept['title'] ?? $project['topic'] ?? ''));
         $host = self::aiHostName($project);
+        $ty = AddressFormPolicy::normalize($addressForm) === AddressFormPolicy::TY;
         $points = collect(is_array($concept['points'] ?? null) ? $concept['points'] : [])
             ->map(fn (mixed $point): string => trim((string) $point))
             ->filter(fn (string $point): bool => $point !== '')
@@ -2591,10 +2718,12 @@ class DemoTikWebinarProject
         $extra = trim((string) ($concept['additional_material'] ?? ''));
 
         $body = implode("\n\n", array_filter([
-            'zapraszamy Państwa na webinar „'.$title.'”. '.trim((string) ($concept['promise'] ?? '')),
-            $points !== '' ? $icon('📌')."Czego się Państwo dowiedzą:\n".$points : '',
+            ($ty ? 'zapraszam Cię na webinar „' : 'zapraszamy Państwa na webinar „').$title.'”. '.trim((string) ($concept['promise'] ?? '')),
+            $points !== '' ? $icon('📌').($ty ? "Czego się dowiesz:\n" : "Czego się Państwo dowiedzą:\n").$points : '',
             $length === 'long' && $plan !== '' ? 'Plan spotkania: '.$plan : '',
-            $length === 'long' && $extra !== '' ? 'Po webinarze otrzymają Państwo: '.$extra : '',
+            $length === 'long' && $extra !== ''
+                ? ($ty ? 'Po webinarze otrzymasz: ' : 'Po webinarze otrzymają Państwo: ').$extra
+                : '',
             "Z pozdrowieniami,\n".($host !== '' ? $host."\n" : '').'Zespół PNE',
         ]));
 
@@ -2609,11 +2738,18 @@ class DemoTikWebinarProject
      * @param  array<string, mixed>  $project
      * @param  array<string, mixed>  $concept
      */
-    private static function simulatedReminderMail(array $project, array $concept, bool $emojis, string $length, string $timing): string
-    {
+    private static function simulatedReminderMail(
+        array $project,
+        array $concept,
+        bool $emojis,
+        string $length,
+        string $timing,
+        string $addressForm = AddressFormPolicy::DEFAULT,
+    ): string {
         $icon = static fn (string $emoji): string => $emojis ? $emoji.' ' : '';
         $title = trim((string) ($concept['title'] ?? $project['topic'] ?? ''));
         $host = self::aiHostName($project);
+        $ty = AddressFormPolicy::normalize($addressForm) === AddressFormPolicy::TY;
         $when = $timing === 'same_day' ? 'dziś' : 'jutro';
         $liveTime = trim((string) ($project['live_time'] ?? '20:00'));
         $hourShort = preg_match('/^(\d{1,2})/', $liveTime, $matches) === 1 ? $matches[1] : '20';
@@ -2630,21 +2766,25 @@ class DemoTikWebinarProject
             : 'Już '.$when.' o godzinie '.$liveTime.' odbędzie się bezpłatny webinar „'.$title.'”.';
 
         $benefits = $points->isNotEmpty()
-            ? 'Podczas spotkania pokażemy m.in.: '.$points->implode('; ').'.'
+            ? 'Podczas spotkania pokażę m.in.: '.$points->implode('; ').'.'
             : '';
 
-        $bodyParts = array_filter([
+        $cta = $timing === 'same_day'
+            ? ($ty
+                ? $icon('🔹').'Jeżeli jeszcze nie masz miejsca, to ostatni moment na zapis. Tuż przed '.$liveTime.' kliknij link poniżej '.$icon('👇').' i dołącz do webinaru.'
+                : $icon('🔹').'Jeżeli jeszcze nie mają Państwo miejsca, to ostatni moment na zapis. Tuż przed '.$liveTime.' kliknij link poniżej '.$icon('👇').' i dołącz do webinaru.')
+            : ($ty
+                ? 'Jeżeli jeszcze się nie zapisałeś, zachęcam — link do zapisu jest poniżej.'
+                : 'Jeżeli jeszcze się Państwo nie zapisali, zachęcamy — link do zapisu jest poniżej.');
+
+        $body = implode("\n\n", array_filter([
             $intro,
             $benefits,
             $length === 'long' && $plan !== '' ? 'Plan: '.$plan : '',
             $length === 'long' && $extra !== '' ? 'Po webinarze: '.$extra : '',
-            $timing === 'same_day'
-                ? $icon('🔹').'Jeżeli jeszcze nie mają Państwo miejsca, to ostatni moment na zapis. Tuż przed '.$liveTime.' kliknij link poniżej '.$icon('👇').' i dołącz do webinaru.'
-                : 'Jeżeli jeszcze się Państwo nie zapisali, zachęcamy — link do zapisu jest poniżej.',
+            $cta,
             "Z pozdrowieniami,\n".($host !== '' ? $host."\n" : '').'Zespół PNE',
-        ]);
-
-        $body = implode("\n\n", $bodyParts);
+        ]));
 
         return MaterialDraftTask::composeMainMail(
             [
@@ -2663,10 +2803,15 @@ class DemoTikWebinarProject
      * @param  array<string, mixed>  $project
      * @param  array<string, mixed>  $concept
      */
-    private static function simulatedHostScript(array $project, array $concept, int $minutes): string
-    {
+    private static function simulatedHostScript(
+        array $project,
+        array $concept,
+        int $minutes,
+        string $addressForm = AddressFormPolicy::DEFAULT,
+    ): string {
         $title = trim((string) ($concept['title'] ?? $project['topic'] ?? ''));
         $host = self::aiHostName($project);
+        $ty = AddressFormPolicy::normalize($addressForm) === AddressFormPolicy::TY;
         $points = collect(is_array($concept['points'] ?? null) ? $concept['points'] : [])
             ->map(fn (mixed $point): string => trim((string) $point))
             ->filter(fn (string $point): bool => $point !== '')
@@ -2680,24 +2825,29 @@ class DemoTikWebinarProject
         $questions = max(5, (int) round($minutes * 0.15));
         $ending = max(3, (int) round($minutes * 0.1));
         $content = max($points->count(), $minutes - $intro - $questions - $ending);
+        $greeting = $ty
+            ? "Do powiedzenia:\n- Dzień dobry, witam na webinarze „".$title."”.\n- Spotkanie jest nagrywane.".($host !== '' ? "\n- Nazywam się ".$host.'.' : '')."\n- ".trim((string) ($concept['promise'] ?? ''))
+            : "Do powiedzenia:\n- Dzień dobry Państwu, witam na webinarze „".$title."”.\n- Spotkanie jest nagrywane.".($host !== '' ? "\n- Nazywam się ".$host.'.' : '')."\n- ".trim((string) ($concept['promise'] ?? ''));
         $blocks = [['Intro', $intro, [
             'Cel: przywitać uczestników i pokazać, co wyniosą ze spotkania.',
-            "Do powiedzenia:\n- Dzień dobry Państwu, witam na webinarze „".$title."”.\n- Spotkanie jest nagrywane.".($host !== '' ? "\n- Nazywam się ".$host.'.' : '')."\n- ".trim((string) ($concept['promise'] ?? '')),
-            'Pytanie na czat: Skąd Państwo dziś do nas dołączają?',
+            $greeting,
+            $ty ? 'Pytanie na czat: Skąd dziś do nas dołączacie?' : 'Pytanie na czat: Skąd Państwo dziś do nas dołączają?',
             'Przejście: Zaczynamy od pierwszego tematu.',
         ]]];
         foreach ($points as $index => $point) {
             $length = intdiv($content, $points->count()) + ($index < $content % $points->count() ? 1 : 0);
             $blocks[] = [$point, $length, array_values(array_filter([
                 'Cel: omówić temat „'.$point.'” na przykładzie.',
-                "Do powiedzenia:\n- Najważniejsza myśl tego bloku.\n- Pokaz na ekranie krok po kroku.",
-                $index === 0 ? 'Pytanie na czat: Czy korzystali już Państwo z tego rozwiązania?' : '',
+                "Do powiedzenia:\n- Najważniejsza myśl tego bloku.\n- Pokaz na ekranie krok po kroku.\n- Pokażę Wam konkretny przykład.",
+                $index === 0
+                    ? ($ty ? 'Pytanie na czat: Czy korzystaliście już z tego rozwiązania?' : 'Pytanie na czat: Czy korzystali już Państwo z tego rozwiązania?')
+                    : '',
                 'Przejście: Przechodzimy dalej.',
             ]))];
         }
         $blocks[] = ['Pytania i odpowiedzi', $questions, [
             'Cel: odpowiedzieć na pytania z czatu.',
-            'Pytanie na czat: Co chcieliby Państwo jeszcze zobaczyć?',
+            $ty ? 'Pytanie na czat: Co chcielibyście jeszcze zobaczyć?' : 'Pytanie na czat: Co chcieliby Państwo jeszcze zobaczyć?',
             'Przejście: Zbliżamy się do końca.',
         ]];
         $extra = trim((string) ($concept['additional_material'] ?? ''));
@@ -2705,7 +2855,7 @@ class DemoTikWebinarProject
             'Cel: podsumować spotkanie i zaprosić do dalszego działania.',
             "Do powiedzenia:\n- Krótkie podsumowanie trzech najważniejszych wniosków.\n- ".trim((string) ($concept['cta'] ?? '')),
             $extra !== '' ? 'Materiał dodatkowy: '.$extra : '',
-            'Dziękuję Państwu za udział.',
+            $ty ? 'Dziękuję Wam za udział.' : 'Dziękuję Państwu za udział.',
         ]))];
 
         $start = CarbonImmutable::createFromFormat('H:i', (string) ($project['live_time'] ?? '20:00'));
@@ -2729,10 +2879,16 @@ class DemoTikWebinarProject
      * @param  array<string, mixed>  $project
      * @param  array<string, mixed>  $concept
      */
-    private static function simulatedFacebookPost(array $project, array $concept, bool $emojis = true, bool $hashtags = true): string
-    {
+    private static function simulatedFacebookPost(
+        array $project,
+        array $concept,
+        bool $emojis = true,
+        bool $hashtags = true,
+        string $addressForm = AddressFormPolicy::DEFAULT,
+    ): string {
         $icon = static fn (string $emoji): string => $emojis ? $emoji.' ' : '';
         $bullet = $emojis ? '✅ ' : '• ';
+        $ty = AddressFormPolicy::normalize($addressForm) === AddressFormPolicy::TY;
 
         $points = collect(is_array($concept['points'] ?? null) ? $concept['points'] : [])
             ->map(fn (mixed $point): string => trim((string) $point))
@@ -2743,9 +2899,12 @@ class DemoTikWebinarProject
 
         $title = trim((string) ($concept['title'] ?? ''));
         $promise = trim((string) ($concept['promise'] ?? ''));
+        $invite = $ty
+            ? $icon('🎓').'Zapraszam na webinar „'.$title.'”.'
+            : $icon('🎓').'Zapraszamy na webinar „'.$title.'”.';
 
         return trim(implode("\n\n", array_filter([
-            $title !== '' ? $icon('🎓').'Zapraszamy na webinar „'.$title.'”.' : '',
+            $title !== '' ? $invite : '',
             $promise,
             $points,
             $icon('📅').($project['live_date'] ?? '').', godz. '.($project['live_time'] ?? ''),

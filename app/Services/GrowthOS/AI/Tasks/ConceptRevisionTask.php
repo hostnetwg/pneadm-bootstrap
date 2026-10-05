@@ -6,6 +6,7 @@ use App\Services\GrowthOS\AI\Contracts\GrowthAiTask;
 use App\Services\GrowthOS\AI\Data\AiProviderResponse;
 use App\Services\GrowthOS\AI\Data\ConceptRevisionResult;
 use App\Services\GrowthOS\AI\Exceptions\GrowthAiException;
+use App\Services\GrowthOS\AI\Support\AddressFormPolicy;
 use App\Services\GrowthOS\AI\Support\ProhibitedData;
 use App\Support\GrowthOS\AiListFormatter;
 use Illuminate\Support\Facades\Validator;
@@ -56,10 +57,10 @@ final class ConceptRevisionTask implements GrowthAiTask
 TRYB: ułóż pierwszą koncepcję na podstawie direction. current_concept może mieć tylko tytuł równy tematowi, a pozostałe pola puste. Uzupełnij wszystkie pola koncepcji. Tytuł może być jaśniejszą wersją tematu, ale nie zmieniaj sensu kierunku i nie wymyślaj innego webinaru. Nie zostawiaj pustych pól. Nie dopisuj faktów, których nie ma w direction.
 TEXT
             : <<<'TEXT'
-TRYB: zmień istniejącą koncepcję zgodnie z instrukcją. Blok direction jest granicą sensu: nie zaprzeczaj polom topic, audience, problem, takeaway ani sell_later, jeśli są wypełnione. Jeżeli zdanie w current_concept im przeczy, popraw to zdanie. Nie układaj koncepcji od nowa i nie wymyślaj innego webinaru. Puste pola direction nie są powodem, żeby coś dopisywać. Jeżeli pole nie wymaga zmiany ani takiej korekty, przepisz jego bieżącą wartość bez zmian.
+TRYB: zmień istniejącą koncepcję zgodnie z instrukcją. Blok direction jest granicą sensu: nie zaprzeczaj polom topic, audience, problem, takeaway ani sell_later, jeśli są wypełnione. Jeżeli zdanie w current_concept im przeczy, popraw to zdanie. Nie układaj koncepcji od nowa i nie wymyślaj innego webinaru. Puste pola direction nie są powodem, żeby coś dopisywać. Jeżeli pole nie wymaga zmiany ani takiej korekty, przepisz jego bieżącą wartość bez zmian. Ujednolić formę zwrotu w polach tekstowych do style.address_form.
 TEXT;
 
-        return <<<PROMPT
+        $base = <<<PROMPT
 Jesteś redaktorem koncepcji webinarów edukacyjnych PNE.
 Pisz wyłącznie po polsku, profesjonalnie, jasno i praktycznie dla polskiej oświaty.
 Zachowaj sens i fakty zawarte w wejściu. Nie wymyślaj wyników badań, statystyk, funkcji produktów ani faktów wymagających researchu.
@@ -69,19 +70,23 @@ Jeżeli podajesz listę numerowaną albo wypunktowaną, każdy punkt zacznij od 
 
 {$mode}
 PROMPT;
+
+        return $base."\n\n".AddressFormPolicy::promptBlock(AddressFormPolicy::CHANNEL_PLANNING);
     }
 
     /**
      * Build a strict allow-list projection. No other ADM data can enter the provider request.
      *
      * @param  array<string, mixed>  $concept
-     * @return array<string, mixed>
-     */
-    /**
      * @param  array<string, mixed>|null  $direction
      */
-    public function input(array $concept, string $audience, string $userInstruction, ?array $direction = null): array
-    {
+    public function input(
+        array $concept,
+        string $audience,
+        string $userInstruction,
+        ?array $direction = null,
+        string $addressForm = AddressFormPolicy::DEFAULT,
+    ): array {
         $userInstruction = trim($userInstruction);
         if ($userInstruction === '') {
             throw new GrowthAiException(
@@ -89,6 +94,8 @@ PROMPT;
                 userMessage: 'Instrukcja dla AI jest pusta. Możesz kontynuować ręcznie.',
             );
         }
+
+        $resolved = AddressFormPolicy::resolve($addressForm, $userInstruction);
 
         $input = [
             'current_concept' => [
@@ -100,6 +107,13 @@ PROMPT;
                 'agenda' => $this->string($concept['plan'] ?? ''),
                 'cta' => $this->string($concept['cta'] ?? ''),
                 'additional_material' => $this->string($concept['lead_magnet'] ?? ''),
+            ],
+            'campaign' => [
+                'address_form' => AddressFormPolicy::normalize($addressForm),
+            ],
+            'style' => [
+                'address_form' => $resolved['form'],
+                'address_form_overridden' => $resolved['overridden'],
             ],
             'user_instruction' => $userInstruction,
         ];
