@@ -2,7 +2,7 @@
 
 Last updated: 2026-10-05 CEST<br>
 Branch: main<br>
-Commit: (lokalnie, przed commitem)<br>
+Commit: b447bd3<br>
 Stage: v0.2 — Asystent planowania kierunku, szkice AI materiałów, generator obrazu, historia wersji, Sendy PNE<br>
 Current blocker: none (produkcja: migracje v0.1 `Ran`, `/growth` działa — [runbook](../deploy/2026-09-pne-growth-os-stage-0-1-deploy.md); DEC-050 wymaga migracji `registration_url` / `youtube_live_url`)
 
