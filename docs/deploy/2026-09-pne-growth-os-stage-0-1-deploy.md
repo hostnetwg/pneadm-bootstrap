@@ -375,12 +375,32 @@ Kolejność na produkcji:
 cd /home/srv66127/domains/adm.pnedu.pl/pneadm
 /bin/bash /home/srv66127/domains/adm.pnedu.pl/pneadm/docs/deploy/scripts/prod-mysql-nightly-backup.sh
 git pull
+/opt/alt/php82/usr/bin/php /home/srv66127/domains/adm.pnedu.pl/pneadm/composer.phar dump-autoload -o \
+  || /opt/alt/php82/usr/bin/php $(which composer) dump-autoload -o \
+  || composer dump-autoload -o
 /opt/alt/php82/usr/bin/php artisan migrate --force
 npm ci && npm run build
 /opt/alt/php82/usr/bin/php artisan optimize:clear
+/opt/alt/php82/usr/bin/php artisan view:clear
+/opt/alt/php82/usr/bin/php -r 'function_exists("opcache_reset") && opcache_reset(); echo "opcache_reset done\n";'
 ```
 
-Smoke: na karcie projektu widać „Linki webinaru”. Na mailingu głównym — Sendy PNE, checkboxy zaświadczenia i oferty. Bez linku zapisów „Kopiuj HTML” jest zablokowane. Reminder ma ten sam układ.
+Jeśli `composer` / `composer.phar` nie jest w PATH, użyj lokalnego:
+
+```bash
+/opt/alt/php82/usr/bin/php /usr/local/bin/composer dump-autoload -o
+```
+
+Diagnoza 500 na `/growth/projects/.../materials/main-mail`:
+
+```bash
+tail -n 120 storage/logs/laravel.log
+git rev-parse --short HEAD
+/opt/alt/php82/usr/bin/php artisan migrate:status | grep registration
+ls -la app/Support/GrowthOS/MailRenderContext.php public/build/manifest.json
+```
+
+Smoke: na karcie projektu widać „Linki webinaru”. Na mailingu głównym — Sendy PNE, checkboxy zaświadczenia i oferty. Bez linku zapisów „Kopiuj HTML” jest zablokowane. Reminder ma ten sam układ. Gdy edytor nie wstanie, strona pokazuje komunikat wyjątku zamiast pustego 500.
 
 Rollback: cofnąć kod; kolumny URL mogą zostać (`NULL`). Pełne cofnięcie migracji dopiero po backupie.
 

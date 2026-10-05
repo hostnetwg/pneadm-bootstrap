@@ -1,18 +1,43 @@
 @php
-    $mailContext = \App\Support\GrowthOS\MailRenderContext::fromProject($project, $material, false);
-    $mailEditorContent = \App\Support\GrowthOS\MailHtmlFormatter::editorContent((string) old('mail_body', $mailFields['body'] ?? ''));
-    $mailFinalHtml = \App\Support\GrowthOS\MailHtmlFormatter::copyHtml(
-        (string) old('mail_preheader', $mailFields['preheader'] ?? ''),
-        $mailEditorContent,
-        \App\Support\GrowthOS\MailTemplates::CANONICAL,
-        $mailContext,
-    );
-    $canCopyMailHtml = \App\Support\GrowthOS\MailHtmlFormatter::canCopyHtml($mailContext);
-    $includePaidOffer = (bool) old('include_paid_offer', $material['include_paid_offer'] ?? false);
-    $showCertificate = (bool) old('show_certificate', $material['show_certificate'] ?? false);
-    $paidSnapshot = is_array($material['paid_offer_snapshot'] ?? null) ? $material['paid_offer_snapshot'] : null;
-    $paidCoursesCount = is_array($paidSnapshot['courses'] ?? null) ? count($paidSnapshot['courses']) : 0;
+    $mailEditorBootError = null;
+    $mailEditorContent = '';
+    $mailFinalHtml = '';
+    $canCopyMailHtml = false;
+    $includePaidOffer = false;
+    $showCertificate = false;
+    $paidSnapshot = null;
+    $paidCoursesCount = 0;
+    $mailContext = null;
+
+    try {
+        // Load MailHtmlFormatter first so companion classes resolve after deploy
+        // even when an optimized/authoritative classmap was not regenerated.
+        $mailEditorContent = \App\Support\GrowthOS\MailHtmlFormatter::editorContent((string) old('mail_body', $mailFields['body'] ?? ''));
+        $mailContext = \App\Support\GrowthOS\MailRenderContext::fromProject($project, $material, false);
+        $mailFinalHtml = \App\Support\GrowthOS\MailHtmlFormatter::copyHtml(
+            (string) old('mail_preheader', $mailFields['preheader'] ?? ''),
+            $mailEditorContent,
+            \App\Support\GrowthOS\MailTemplates::CANONICAL,
+            $mailContext,
+        );
+        $canCopyMailHtml = \App\Support\GrowthOS\MailHtmlFormatter::canCopyHtml($mailContext);
+        $includePaidOffer = (bool) old('include_paid_offer', $material['include_paid_offer'] ?? false);
+        $showCertificate = (bool) old('show_certificate', $material['show_certificate'] ?? false);
+        $paidSnapshot = is_array($material['paid_offer_snapshot'] ?? null) ? $material['paid_offer_snapshot'] : null;
+        $paidCoursesCount = is_array($paidSnapshot['courses'] ?? null) ? count($paidSnapshot['courses']) : 0;
+    } catch (\Throwable $mailEditorBootException) {
+        report($mailEditorBootException);
+        $mailEditorBootError = $mailEditorBootException->getMessage()
+            .' @ '.$mailEditorBootException->getFile().':'.$mailEditorBootException->getLine();
+    }
 @endphp
+@if($mailEditorBootError !== null)
+    <div class="alert alert-danger" role="alert">
+        <p class="mb-1 fw-semibold">Nie udało się złożyć edytora maila Sendy PNE.</p>
+        <p class="mb-0 small font-monospace">{{ $mailEditorBootError }}</p>
+        <p class="mb-0 mt-2 small">Na produkcji zwykle pomaga: <code>composer dump-autoload -o</code>, <code>artisan optimize:clear</code>, migracja URL-i oraz <code>npm run build</code>.</p>
+    </div>
+@else
 <div class="alert alert-light border small mb-3" role="status">
     Układ: <strong>Sendy PNE</strong> (kanoniczny). Greeting, CTA, karta webinaru, oferta i stopka składa aplikacja.
     Edytujesz tylko treść redakcyjną.
@@ -87,3 +112,4 @@
 <textarea id="mail_body_html" class="form-control font-monospace d-none mb-2" rows="16" readonly data-mail-final-html>{{ $mailFinalHtml }}</textarea>
 <p class="form-text">Edycja formatuje treść redakcyjną. Kod HTML to gotowy mail Sendy PNE do skopiowania — layoutu nie edytujesz w tym polu.</p>
 <template id="mail-shell-sendy-pne">{!! \App\Support\GrowthOS\MailHtmlFormatter::render('', \App\Support\GrowthOS\MailTemplates::CANONICAL, $mailContext) !!}</template>
+@endif

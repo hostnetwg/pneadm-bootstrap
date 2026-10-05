@@ -8,6 +8,12 @@ use DOMDocument;
 use DOMElement;
 use DOMNode;
 
+// Deploy safety: load companion classes even when production classmap was not
+// regenerated after git pull (optimize-autoloader / stale OPcache edge cases).
+require_once __DIR__.'/MailRenderContext.php';
+require_once __DIR__.'/MailTemplates.php';
+require_once dirname(__DIR__, 2).'/Services/GrowthOS/PaidCourseOfferBuilder.php';
+
 /**
  * Composes the Sendy PNE email: greeting, editorial body, webinar card, CTAs, offer, footer (DEC-050).
  * The editor never receives the full document — only the editorial region.

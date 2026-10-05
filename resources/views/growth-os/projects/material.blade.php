@@ -1205,9 +1205,17 @@
         @endif
         @include('growth-os.partials.ai-daily-limit-reset-modal')
     </div>
-    @if($mailFields !== null && ! $aiDraftIsReminder)
+        @if($mailFields !== null && ! $aiDraftIsReminder)
         @push('scripts')
-            @vite('resources/js/growth-mail-editor.js')
+            @php
+                try {
+                    echo app(\Illuminate\Foundation\Vite::class)(['resources/js/growth-mail-editor.js']);
+                } catch (\Throwable $viteException) {
+                    report($viteException);
+                    echo '<div class="alert alert-warning m-3" role="alert">Brak zbudowanego JS edytora maila (<code>npm run build</code>). '
+                        .e($viteException->getMessage()).'</div>';
+                }
+            @endphp
         @endpush
     @endif
 </x-app-layout>
