@@ -393,37 +393,31 @@ Jeśli `composer` / `composer.phar` nie jest w PATH, użyj lokalnego:
 
 ### Brak `npm` na SeoHost (`npm: command not found`)
 
-Na współdzielonym hostingu Node często **nie jest w PATH**. Najpierw sprawdź:
+Na współdzielonym hostingu Node często **nie jest w PATH**. Assety Vite dla `pneadm` są **commitowane w Git** (`public/build/`), bo Sail/npm działa tylko lokalnie.
+
+Po zmianach w `resources/js` / `resources/css` lokalnie:
 
 ```bash
-which node npm 2>/dev/null
-find ~/nodevenv -name npm 2>/dev/null | head -5
-ls ~/nodevenv/domains/adm.pnedu.pl/pneadm/*/bin/npm 2>/dev/null
+# WSL — nie na SSH produkcji
+cd /home/hostnet/WEB-APP/pneadm
+./vendor/bin/sail npm ci && ./vendor/bin/sail npm run build
+git add -f public/build
+git commit -m "Build frontend assets."
+git push
 ```
 
-Jeśli znajdziesz npm (np. `~/nodevenv/.../bin/npm`), w katalogu projektu:
+Na produkcji wystarczy:
 
 ```bash
 cd ~/domains/adm.pnedu.pl/pneadm
-/path/do/npm ci && /path/do/npm run build
-```
-
-**Gdy Node na prod nie ma sensu włączać** — zbuduj assety lokalnie (Sail) i wgraj tylko `public/build/` (w repo jest w `.gitignore`, więc `git pull` tego nie dostarczy):
-
-```bash
-# WSL, projekt pneadm:
-./vendor/bin/sail npm ci && ./vendor/bin/sail npm run build
-rsync -avz --delete public/build/ srv66127@h30:~/domains/adm.pnedu.pl/pneadm/public/build/
-```
-
-Po rsync na prod:
-
-```bash
-ls -la public/build/manifest.json public/build/assets/growth-mail-editor-*.js
+git pull origin main
 /opt/alt/php82/usr/bin/php artisan optimize:clear
+grep growth-mail-editor public/build/manifest.json
 ```
 
-Bez wpisu `resources/js/growth-mail-editor.js` w `manifest.json` strona maila pada na `@vite` (500). Commit `1dde94b+` pokazuje wtedy ostrzeżenie zamiast pustego 500 — i tak trzeba wgrać build.
+**Nie uruchamiaj** `sail` ani `rsync …@h30` będąc już zalogowanym na `h30` — to lokalne komendy z WSL.
+
+Jeśli kiedyś włączysz Node na SeoHost (`~/nodevenv/.../bin/npm`), możesz budować też na serwerze; nadal bezpieczniej trzymać build w repo przy tym hostingu.
 
 Diagnoza 500 na `/growth/projects/.../materials/main-mail`:
 

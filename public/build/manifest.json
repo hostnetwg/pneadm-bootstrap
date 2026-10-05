@@ -1,0 +1,22 @@
+{
+  "resources/css/app.css": {
+    "file": "assets/app-ZPX7-Ier.css",
+    "src": "resources/css/app.css",
+    "isEntry": true
+  },
+  "resources/js/app.js": {
+    "file": "assets/app-BigbqCsK.js",
+    "name": "app",
+    "src": "resources/js/app.js",
+    "isEntry": true
+  },
+  "resources/js/growth-mail-editor.js": {
+    "file": "assets/growth-mail-editor-BZxfEojV.js",
+    "name": "growth-mail-editor",
+    "src": "resources/js/growth-mail-editor.js",
+    "isEntry": true,
+    "css": [
+      "assets/growth-mail-editor-BHv64JOu.css"
+    ]
+  }
+}
