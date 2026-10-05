@@ -93,61 +93,9 @@
                                 </details>
                             </div>
                             @if($aiDraftIsReminder)
-                                @php
-                                    $reminderContext = \App\Support\GrowthOS\MailRenderContext::fromProject($project, array_merge($material, [
-                                        'mail_body' => old('mail_body', $mailFields['body'] ?? ''),
-                                    ]), true);
-                                    $canCopyReminderHtml = \App\Support\GrowthOS\MailHtmlFormatter::canCopyHtml($reminderContext);
-                                    $reminderFinalHtml = \App\Support\GrowthOS\MailHtmlFormatter::copyHtml(
-                                        (string) old('mail_preheader', $mailFields['preheader'] ?? ''),
-                                        (string) old('mail_body', $mailFields['body'] ?? ''),
-                                        \App\Support\GrowthOS\MailTemplates::CANONICAL,
-                                        $reminderContext,
-                                    );
-                                @endphp
-                                <div class="alert alert-light border small mb-3" role="status">
-                                    Układ: <strong>Sendy PNE</strong> (ten sam co mailing główny). AI reminder bez zmian — zmienia się tylko finalny rendering.
-                                </div>
-                                @if(! $canCopyReminderHtml)
-                                    <div class="alert alert-warning small" role="status">
-                                        Brakuje linku do zapisów. Uzupełnij go na <a href="{{ route('growth.projects.show', $project['id']) }}#project-links">karcie projektu</a> przed skopiowaniem finalnego HTML.
-                                    </div>
-                                @endif
-                                <label id="mail_body_label" class="form-label">Treść</label>
-                                <div class="d-flex flex-wrap align-items-center gap-2 mb-2" data-mail-editor-toolbar>
-                                    <div class="btn-group btn-group-sm" role="group" aria-label="Tryb treści">
-                                        <button type="button" class="btn btn-primary" data-mail-mode="visual" aria-pressed="true">Edycja</button>
-                                        <button type="button" class="btn btn-outline-primary" data-mail-mode="html" aria-pressed="false">Kod HTML</button>
-                                    </div>
-                                    <div class="btn-group btn-group-sm" role="group" aria-label="Formatowanie" data-mail-tools>
-                                        <button type="button" class="btn btn-outline-secondary" data-mail-command="bold" title="Pogrubienie" aria-label="Pogrubienie"><i class="bi bi-type-bold" aria-hidden="true"></i></button>
-                                        <button type="button" class="btn btn-outline-secondary" data-mail-command="italic" title="Kursywa" aria-label="Kursywa"><i class="bi bi-type-italic" aria-hidden="true"></i></button>
-                                        <button type="button" class="btn btn-outline-secondary" data-mail-command="underline" title="Podkreślenie" aria-label="Podkreślenie"><i class="bi bi-type-underline" aria-hidden="true"></i></button>
-                                        <button type="button" class="btn btn-outline-secondary" data-mail-command="insertUnorderedList" title="Lista" aria-label="Lista"><i class="bi bi-list-ul" aria-hidden="true"></i></button>
-                                        <button type="button" class="btn btn-outline-secondary" data-mail-command="insertOrderedList" title="Lista numerowana" aria-label="Lista numerowana"><i class="bi bi-list-ol" aria-hidden="true"></i></button>
-                                        <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#mail-editor-link" title="Link" aria-label="Link"><i class="bi bi-link-45deg" aria-hidden="true"></i></button>
-                                        <button type="button" class="btn btn-outline-secondary" data-mail-command="removeFormat" title="Wyczyść formatowanie" aria-label="Wyczyść formatowanie"><i class="bi bi-eraser" aria-hidden="true"></i></button>
-                                    </div>
-                                    <button type="button" class="btn btn-outline-secondary btn-sm ms-auto" data-mail-copy-html @disabled(! $canCopyReminderHtml)>Kopiuj HTML maila</button>
-                                    <span class="small text-success d-none" role="status" data-mail-copy-html-status>Skopiowano. Wklej w Sendy w trybie HTML.</span>
-                                </div>
-                                <div
-                                    id="mail_body_visual"
-                                    class="border rounded mb-2"
-                                    style="min-height:28rem;background:#f4f6f8;"
-                                    data-mail-visual
-                                    role="textbox"
-                                    aria-multiline="true"
-                                    aria-labelledby="mail_body_label"
-                                    @if($materialSkipped) data-mail-locked="1" @endif
-                                ></div>
-                                <textarea id="mail_body" name="mail_body" class="form-control growth-draft-editor font-monospace d-none @error('mail_body') is-invalid @enderror" rows="16" aria-labelledby="mail_body_label" @readonly($materialSkipped)>{{ old('mail_body', $mailFields['body']) }}</textarea>
-                                <textarea id="mail_body_html" class="d-none" readonly data-mail-final-html data-mail-can-copy="{{ $canCopyReminderHtml ? '1' : '0' }}">{{ $reminderFinalHtml }}</textarea>
-                                <template id="mail-shell-sendy-pne">{!! \App\Support\GrowthOS\MailHtmlFormatter::render('', \App\Support\GrowthOS\MailTemplates::CANONICAL, $reminderContext) !!}</template>
-                                <p class="form-text">Edycja pokazuje treść. Kopiowanie składa finalny HTML Sendy PNE (CTA z linków projektu; znacznik pokoju staje się przyciskiem).</p>
-                            @else
-                                @include('growth-os.projects.partials.main-mail-editor')
+                                <input type="hidden" name="reminder_timing" value="{{ old('reminder_timing', $material['reminder_timing'] ?? \App\Services\GrowthOS\AI\Tasks\MaterialDraftTask::REMINDER_DEFAULT_TIMING) }}">
                             @endif
+                            @include('growth-os.projects.partials.main-mail-editor', ['isReminderMail' => $aiDraftIsReminder])
                             @error('mail_body')<div class="invalid-feedback">{{ $message }}</div>@enderror
                         @else
                             <label for="draft" class="visually-hidden">Szkic</label>
@@ -564,23 +512,24 @@
 
                             @if($aiDraftIsMail)
                                 <p class="small text-secondary mb-3">
-                                    AI zwraca 3 propozycje tematu (pierwsza jest główna), preheader i treść. Zwrot „Dzień dobry,” i forma „Państwo”, podpis prowadzącego i „Zespół PNE”.
-                                    Termin: <span class="fw-semibold">{{ $aiDraftLiveLabel }}</span>. Stopkę i link do wypisania dodaje system mailingowy.
-                                    @unless($aiDraftIsReminder)
+                                    AI zwraca 3 propozycje tematu (pierwsza jest główna), preheader i treść redakcyjną. Forma „Państwo”, podpis prowadzącego i „Zespół PNE”.
+                                    @if($aiDraftIsReminder)
+                                        Greeting Sendy i przyciski zapisu / YouTube dodaje aplikacja — nie zaczynaj body od „Dzień dobry,” ani nie wstawiaj linków.
+                                        Tematy w stylu „Widzimy się o 20!” z krótkim opisem webinaru. Termin: <span class="fw-semibold">{{ $aiDraftLiveLabel }}</span>.
                                         „Poproś AI o nowy szkic” pisze od zera. „Popraw mój szkic” redaguje temat, preheader i treść z pól powyżej, także niezapisane.
-                                    @endunless
+                                    @else
+                                        Zwrot „Dzień dobry,” nie wstawiaj do body — greeting dodaje aplikacja. Termin: <span class="fw-semibold">{{ $aiDraftLiveLabel }}</span>.
+                                        „Poproś AI o nowy szkic” pisze od zera. „Popraw mój szkic” redaguje temat, preheader i treść z pól powyżej, także niezapisane.
+                                    @endif
+                                    Stopkę prawną i wypisanie dodaje system mailingowy.
                                 </p>
                             @endif
 
-                            @if($aiDraftIsReminder)
-                                <p class="small text-secondary mb-3">AI nie poda linków. Wstawi {{ \App\Services\GrowthOS\AI\Tasks\MaterialDraftTask::ROOM_LINK_PLACEHOLDER }} dla zapisanych i {{ \App\Services\GrowthOS\AI\Tasks\MaterialDraftTask::LINK_PLACEHOLDER }} dla osób, które jeszcze się nie zapisały, do ręcznej podmiany.</p>
-                            @elseif($aiDraftIsFacebookPost)
+                            @if($aiDraftIsFacebookPost)
                                 <p class="small text-secondary mb-3">
                                     AI nie poda adresu URL — wstawi {{ \App\Services\GrowthOS\AI\Tasks\MaterialDraftTask::LINK_PLACEHOLDER }}.
                                     Aplikacja podmieni go na link do zapisów z karty projektu (gdy jest uzupełniony).
                                 </p>
-                            @elseif($aiDraftIsMail)
-                                <p class="small text-secondary mb-3">AI nie poda linku. W jego miejscu wstawi {{ \App\Services\GrowthOS\AI\Tasks\MaterialDraftTask::LINK_PLACEHOLDER }} do ręcznej podmiany.</p>
                             @endif
                             @if($aiDraftIsFacebookPost)
                                 <p class="small text-secondary mb-3">„Poproś AI o nowy szkic” pisze od zera. „Popraw mój szkic” redaguje tekst z pola powyżej, także niezapisany.</p>
@@ -708,7 +657,7 @@
                                 <div class="form-text mb-3">Do {{ number_format((int) config('growth_ai.limits.max_instruction_chars'), 0, ',', ' ') }} znaków. Nie wpisuj danych osobowych, danych klientów ani sekretów. Instrukcja nie zmieni terminu ani prowadzącego.</div>
                                 @if($aiDraftUsesWorkModes)
                                     <input type="hidden" name="mode" value="generate" data-growth-ai-mode-input>
-                                    <input type="hidden" name="author_draft" value="" data-growth-ai-author-draft @if($aiDraftIsMail && ! $aiDraftIsReminder) data-growth-ai-author-source="mail" @endif>
+                                    <input type="hidden" name="author_draft" value="" data-growth-ai-author-draft @if($aiDraftIsMail) data-growth-ai-author-source="mail" @endif>
                                     <div class="d-flex flex-wrap gap-2">
                                         <button type="submit" class="btn btn-outline-primary" @disabled(! $aiDraftAllowed) data-growth-ai-submit data-growth-ai-mode="generate">
                                             <span class="spinner-border spinner-border-sm me-1 d-none" aria-hidden="true" data-growth-ai-spinner></span>
@@ -996,202 +945,6 @@
                         copyStatus.classList.remove('d-none');
                     });
 
-                    const visual = document.querySelector('[data-mail-visual]');
-                    if (visual) {
-                    const body = document.getElementById('mail_body');
-                    const tools = document.querySelector('[data-mail-tools]');
-                    const locked = visual?.dataset.mailLocked === '1';
-                    let mode = 'visual';
-                    let savedRange = null;
-
-                    const looksLikeHtml = (value) => /<[a-z][\s\S]*>/i.test(value);
-
-                    const sanitize = (html) => {
-                        const template = document.createElement('template');
-                        template.innerHTML = html;
-                        template.content.querySelectorAll('script,iframe,object,embed,link,meta,style').forEach((node) => node.remove());
-                        template.content.querySelectorAll('*').forEach((node) => {
-                            [...node.attributes].forEach((attr) => {
-                                const name = attr.name.toLowerCase();
-                                if (name.startsWith('on') || name === 'srcdoc') {
-                                    node.removeAttribute(attr.name);
-                                }
-                                if ((name === 'href' || name === 'src') && /^\s*javascript:/i.test(attr.value)) {
-                                    node.removeAttribute(attr.name);
-                                }
-                            });
-                        });
-
-                        return template.innerHTML;
-                    };
-
-                    const plainToHtml = (text) => text.split(/\n{2,}/).map((block) => {
-                        const lines = block.split('\n').map((line) => escapeHtml(line)).join('<br>');
-
-                        return '<p style="margin:0 0 16px;">' + lines + '</p>';
-                    }).join('');
-
-                    const editableSurface = () => visual.querySelector('[data-pne-mail-body]') || visual;
-
-                    const loadVisual = () => {
-                        const value = body.value || '';
-                        if (looksLikeHtml(value)) {
-                            visual.innerHTML = sanitize(value);
-                            visual.dataset.mailRich = 'html';
-                        } else {
-                            visual.innerHTML = value.trim() === '' ? '<p style="margin:0 0 16px;"><br></p>' : plainToHtml(value);
-                            visual.dataset.mailRich = 'plain';
-                        }
-                        visual.querySelectorAll('[contenteditable]').forEach((node) => node.removeAttribute('contenteditable'));
-                        editableSurface().setAttribute('contenteditable', locked ? 'false' : 'true');
-                    };
-
-                    const syncBody = () => {
-                        if (!visual || mode !== 'visual' || visual.dataset.mailDirty !== '1') {
-                            return;
-                        }
-                        const formatted = visual.querySelector('table,b,strong,i,em,u,ul,ol,a,h1,h2,h3');
-                        if (visual.dataset.mailRich === 'html' || formatted) {
-                            body.value = visual.innerHTML;
-                            return;
-                        }
-                        body.value = visual.innerText.replace(/\n{3,}/g, '\n\n').trim();
-                    };
-
-                    window.growthSyncMailBody = syncBody;
-
-                    const setMode = (next) => {
-                        if (next === 'html') {
-                            syncBody();
-                        }
-                        mode = next;
-                        const visualOn = next === 'visual';
-                        visual.classList.toggle('d-none', ! visualOn);
-                        body.classList.toggle('d-none', visualOn);
-                        tools?.classList.toggle('d-none', ! visualOn);
-                        document.querySelectorAll('[data-mail-mode]').forEach((button) => {
-                            const active = button.dataset.mailMode === next;
-                            button.classList.toggle('btn-primary', active);
-                            button.classList.toggle('btn-outline-primary', ! active);
-                            button.setAttribute('aria-pressed', active ? 'true' : 'false');
-                        });
-                        if (visualOn) {
-                            loadVisual();
-                        }
-                    };
-
-                    document.querySelector('[data-mail-copy-html]')?.addEventListener('click', async () => {
-                        const canCopy = document.querySelector('[data-mail-final-html]')?.dataset.mailCanCopy;
-                        if (canCopy === '0') {
-                            return;
-                        }
-                        refresh();
-                        syncBody();
-                        const shell = document.getElementById('mail-shell-sendy-pne');
-                        const preheader = document.getElementById('mail_preheader')?.value.trim() || '';
-                        const escapeHtml = (value) => value
-                            .replace(/&/g, '&amp;')
-                            .replace(/</g, '&lt;')
-                            .replace(/>/g, '&gt;');
-                        let full = `<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">${escapeHtml(preheader)}${'&nbsp;&zwnj;'.repeat(40)}</div>`;
-                        if (shell) {
-                            const parsed = new DOMParser().parseFromString(shell.innerHTML, 'text/html');
-                            const cell = parsed.querySelector('[data-pne-mail-body]');
-                            if (cell) {
-                                const source = body.value || '';
-                                cell.innerHTML = /<[a-z]/i.test(source)
-                                    ? source
-                                    : source.split(/\n{2,}/).map((block) => `<p>${escapeHtml(block).replace(/\n/g, '<br>')}</p>`).join('');
-                                cell.querySelectorAll('a').forEach((link) => {
-                                    const href = link.getAttribute('href') || '';
-                                    if (href === '[LINK DO ZAPISU]' || href === '[LINK DO POKOJU]' || /^\s*javascript:/i.test(href)) {
-                                        link.remove();
-                                    }
-                                });
-                            }
-                            const table = parsed.querySelector('table[data-pne-mail]');
-                            full += table ? table.outerHTML : (body.value || '');
-                        } else {
-                            full += '\n' + (body.value || '');
-                        }
-                        const status = document.querySelector('[data-mail-copy-html-status]');
-                        try {
-                            await navigator.clipboard.writeText(full);
-                        } catch {
-                            setMode('html');
-                            body.select();
-                            document.execCommand('copy');
-                        }
-                        status?.classList.remove('d-none');
-                    });
-
-                    document.querySelectorAll('[data-mail-mode]').forEach((button) => {
-                        button.addEventListener('click', () => setMode(button.dataset.mailMode));
-                    });
-
-                    document.querySelectorAll('[data-mail-command]').forEach((button) => {
-                        button.addEventListener('mousedown', (event) => event.preventDefault());
-                        button.addEventListener('click', () => {
-                            if (locked || mode !== 'visual') {
-                                return;
-                            }
-                            editableSurface().focus();
-                            document.execCommand(button.dataset.mailCommand, false, null);
-                            visual.dataset.mailDirty = '1';
-                            if (button.dataset.mailCommand !== 'removeFormat') {
-                                visual.dataset.mailRich = 'html';
-                            }
-                            syncBody();
-                        });
-                    });
-
-                    document.getElementById('mail-editor-link')?.addEventListener('show.bs.modal', () => {
-                        const selection = window.getSelection();
-                        savedRange = selection && selection.rangeCount && visual.contains(selection.anchorNode)
-                            ? selection.getRangeAt(0)
-                            : null;
-                        document.getElementById('mail-editor-link-error')?.classList.add('d-none');
-                    });
-
-                    document.getElementById('mail-editor-link-save')?.addEventListener('click', () => {
-                        const url = document.getElementById('mail-editor-link-url').value.trim();
-                        const error = document.getElementById('mail-editor-link-error');
-                        if (!/^(https?:\/\/|mailto:|\[LINK DO ZAPISU\])/i.test(url)) {
-                            error?.classList.remove('d-none');
-                            return;
-                        }
-                        editableSurface().focus();
-                        const selection = window.getSelection();
-                        if (savedRange) {
-                            selection.removeAllRanges();
-                            selection.addRange(savedRange);
-                        }
-                        document.execCommand('createLink', false, url);
-                        visual.querySelectorAll('a[href]').forEach((link) => {
-                            if (!link.getAttribute('style')) {
-                                link.setAttribute('style', 'color:#1e4d8c;');
-                            }
-                        });
-                        visual.dataset.mailDirty = '1';
-                        visual.dataset.mailRich = 'html';
-                        syncBody();
-                        document.querySelector('#mail-editor-link [data-bs-dismiss="modal"]')?.click();
-                    });
-
-                    visual.addEventListener('input', () => {
-                        visual.dataset.mailDirty = '1';
-                    });
-                    document.getElementById('material-save')?.addEventListener('submit', syncBody);
-
-                    if (locked) {
-                        document.querySelectorAll('[data-mail-command], [data-bs-target="#mail-editor-link"]').forEach((button) => {
-                            button.disabled = true;
-                        });
-                    }
-
-                    loadVisual();
-                    }
-
                     subject.addEventListener('input', refresh);
                     preheader.addEventListener('input', () => {
                         copyStatus.classList.add('d-none');
@@ -1224,7 +977,7 @@
         @endif
         @include('growth-os.partials.ai-daily-limit-reset-modal')
     </div>
-        @if($mailFields !== null && ! $aiDraftIsReminder)
+        @if($mailFields !== null)
         @push('scripts')
             @php
                 try {

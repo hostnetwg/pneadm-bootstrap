@@ -143,4 +143,30 @@ class MailHtmlFormatterTest extends TestCase
         $this->assertStringNotContainsString('>'.MaterialDraftTask::ROOM_LINK_PLACEHOLDER.'<', $reminder);
         $this->assertFalse(MailHtmlFormatter::canCopyHtml(new MailRenderContext));
     }
+
+    public function test_reminder_same_day_shows_urgency_banner(): void
+    {
+        $html = MailHtmlFormatter::finalHtml('Treść przypomnienia.', null, new MailRenderContext(
+            registrationUrl: 'https://pnedu.pl/courses/1',
+            webinarTitle: 'Test',
+            isReminder: true,
+            reminderTiming: 'same_day',
+        ));
+
+        $this->assertStringContainsString('data-pne-mail-reminder-banner', $html);
+        $this->assertStringContainsString('OSTATNIE PRZYPOMNIENIE', $html);
+        $this->assertStringContainsString('DZISIAJ', $html);
+    }
+
+    public function test_reminder_day_before_shows_jutro_banner(): void
+    {
+        $html = MailHtmlFormatter::finalHtml('Treść.', null, new MailRenderContext(
+            registrationUrl: 'https://pnedu.pl/courses/1',
+            webinarTitle: 'Test',
+            isReminder: true,
+            reminderTiming: 'day_before',
+        ));
+
+        $this->assertStringContainsString('WEBINAR JUŻ JUTRO', $html);
+    }
 }

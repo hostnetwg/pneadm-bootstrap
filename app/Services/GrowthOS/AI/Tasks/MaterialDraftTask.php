@@ -84,11 +84,11 @@ final class MaterialDraftTask implements GrowthAiTask
 
     public const REMINDER_MATERIAL_KEY = 'reminder-mail';
 
-    public const REMINDER_PROFILE = 'reminder_mail_v1';
+    public const REMINDER_PROFILE = 'reminder_mail_v2';
 
-    public const REMINDER_PROMPT_VERSION = 'material_reminder_mail_v1';
+    public const REMINDER_PROMPT_VERSION = 'material_reminder_mail_v2';
 
-    public const REMINDER_SCHEMA_VERSION = 'material_reminder_mail_schema_v1';
+    public const REMINDER_SCHEMA_VERSION = 'material_reminder_mail_schema_v2';
 
     public const ROOM_LINK_PLACEHOLDER = '[LINK DO POKOJU]';
 
@@ -269,7 +269,8 @@ final class MaterialDraftTask implements GrowthAiTask
         return self::usesVoice($materialKey)
             || $materialKey === self::GRAPHIC_MATERIAL_KEY
             || $materialKey === self::FACEBOOK_MATERIAL_KEY
-            || $materialKey === self::MAIL_MATERIAL_KEY;
+            || $materialKey === self::MAIL_MATERIAL_KEY
+            || $materialKey === self::REMINDER_MATERIAL_KEY;
     }
 
     public static function aiMode(mixed $value): string
@@ -431,7 +432,7 @@ final class MaterialDraftTask implements GrowthAiTask
             $this->addVoiceAndWork($input, $context);
         } else {
             $input['current_draft'] = $this->string($context['current_draft'] ?? '');
-            if ($this->materialKey === self::MAIL_MATERIAL_KEY) {
+            if (in_array($this->materialKey, [self::MAIL_MATERIAL_KEY, self::REMINDER_MATERIAL_KEY], true)) {
                 $input['current_draft'] = \App\Support\GrowthOS\MailHtmlFormatter::plainForAi($input['current_draft']);
             }
         }
@@ -468,7 +469,7 @@ final class MaterialDraftTask implements GrowthAiTask
 
         $input['instruction'] = $this->string($context['instruction'] ?? '');
 
-        if ($isGraphic || $isFacebook || $this->materialKey === self::MAIL_MATERIAL_KEY) {
+        if ($isGraphic || $isFacebook || in_array($this->materialKey, [self::MAIL_MATERIAL_KEY, self::REMINDER_MATERIAL_KEY], true)) {
             $this->addGraphicWork($input, $context);
         }
 
@@ -528,7 +529,7 @@ final class MaterialDraftTask implements GrowthAiTask
     {
         $mode = self::aiMode(data_get($context, 'work.mode'));
         $text = $this->string(data_get($context, 'work.text', ''));
-        if ($this->materialKey === self::MAIL_MATERIAL_KEY) {
+        if (in_array($this->materialKey, [self::MAIL_MATERIAL_KEY, self::REMINDER_MATERIAL_KEY], true)) {
             $text = \App\Support\GrowthOS\MailHtmlFormatter::plainForAi($text);
         }
         $input['mode'] = $mode;
@@ -911,26 +912,42 @@ PROMPT;
     private function reminderMailInstructions(): string
     {
         return <<<'PROMPT'
-Jesteś redaktorem mailingów webinarów edukacyjnych PNE. Przygotuj szkic maila przypominającego o webinarze. Trafi on zarówno do osób już zapisanych, jak i do tych, które jeszcze się nie zapisały. Mail wyśle później człowiek przez system mailingowy; Ty przygotowujesz tylko treść.
-Pisz wyłącznie po polsku, naturalną i poprawną polszczyzną. Ton życzliwy, konkretny i rzeczowy. Bez agresywnej sprzedaży, sztucznej pilności, clickbaitu i obietnic bez pokrycia.
-Odbiorców określ na podstawie pola direction.audience (nauczyciele i/lub dyrektorzy). Zwracaj się do odbiorców w formie „Państwo”. Treść maila zacznij od „Dzień dobry,”.
-Jeżeli style.timing ma wartość "day_before", mail wychodzi dzień przed webinarem: pisz, że webinar jest jutro. Jeżeli ma wartość "same_day", mail wychodzi w dniu webinaru: pisz, że webinar jest dziś. Pierwsze zdanie body po „Dzień dobry,” musi zawierać słowo „jutro” albo „dziś” (zgodnie z style.timing) i tytuł webinaru. Słowo „jutro” albo „dziś” może się pojawić także w temacie.
-subject_options: dokładnie 3 różne propozycje tematu maila, każda najwyżej około 60 znaków. Temat ma jasno mówić, że to przypomnienie o webinarze. Zwykła polska pisownia: pierwsza litera tematu wielka, nazwy własne i produkty wielką literą (np. „Canva AI”), żadnych słów pisanych w całości wielkimi literami, bez emotikon i bez wykrzyknika. Pierwsza propozycja jest główna.
-preheader: jedno zdanie od wielkiej litery, najwyżej 100 znaków, które uzupełnia temat i go nie powtarza.
-body: treść maila, bez tematu i preheadera.
-Jeżeli style.length ma wartość "short", body ma około 80–150 słów: jedno zdanie przypomnienia z tytułem webinaru, 2–3 najważniejsze korzyści oparte na concept.points, termin, prowadzący i linki.
-Jeżeli style.length ma wartość "long", body ma około 180–280 słów: przypomnienie z tytułem, krótki plan spotkania oparty na concept.plan i concept.points, informacja o materiale dodatkowym (jeżeli concept.additional_material nie jest puste), termin, prowadzący i linki.
-Termin podaj dokładnie tak jak w campaign.live_label. Nie zmieniaj ani nie poprawiaj terminu.
-Jeżeli campaign.host_name nie jest puste, przedstaw prowadzącego dokładnie tym imieniem i nazwiskiem, bez dopisywania tytułów, stanowisk, osiągnięć ani biografii. Jeżeli jest puste, nie wymyślaj prowadzącego.
-Nie podawaj żadnego adresu URL. Dodaj dwa osobne miejsca na linki, każdy znacznik w osobnej linii: dla osób zapisanych zdanie zapraszające do dołączenia i pod nim dokładnie znacznik [LINK DO POKOJU]; dla osób, które jeszcze się nie zapisały, zdanie zachęcające do zapisu i pod nim dokładnie znacznik [LINK DO ZAPISU]. Właściciel podmieni je ręcznie.
-Zakończ body podpisem: „Z pozdrowieniami,”, a w kolejnych liniach campaign.host_name (jeżeli nie jest puste) i „Zespół PNE”. Nie dodawaj stopki prawnej, adresu firmy ani linku do wypisania się z listy — doda je system mailingowy.
-Jeżeli source_materials.youtube_description nie jest puste, to zatwierdzony opis tego webinaru na YouTube. Traktuj go jako źródło faktów i spójnego przekazu, ale go nie kopiuj.
-Jeżeli source_materials.main_mail nie jest puste, to zatwierdzony główny mail zapraszający na ten webinar. Trzymaj się tych samych obietnic i faktów, ale nie powtarzaj jego tematu ani zdań: przypomnienie ma być krótsze i świeże.
-Korzystaj wyłącznie z faktów zawartych w wejściu. Nie wymyślaj danych, statystyk, przepisów, funkcji produktów, ceny, certyfikatów, zaświadczeń, akredytacji ani dofinansowania.
-Jeżeli style.emojis ma wartość true, dodaj w body 2–4 adekwatne emotikony (np. przy terminie i linkach), nigdy w temacie i preheaderze. Jeżeli style.emojis ma wartość false, nie używaj emotikon.
-Jeżeli current_draft nie jest pusty, potraktuj go jako punkt wyjścia i popraw zgodnie z koncepcją. Może zawierać etykiety „Temat:”, „Inne propozycje tematu:” i „Preheader:” — nie przenoś ich do body.
-Jeżeli instruction nie jest puste, to dodatkowa instrukcja właściciela — uwzględnij ją w szkicu. Powyższe zasady mają pierwszeństwo: instrukcja nie może zmienić terminu ani prowadzącego, dodać wymyślonych faktów, adresów URL, cen, certyfikatów ani agresywnej sprzedaży.
-To jest szkic do sprawdzenia przez człowieka, nie ostateczna treść.
+Jesteś redaktorem mailingów webinarów edukacyjnych PNE. Przygotuj szkic maila przypominającego o webinarie — wysyłka tuż przed startem lub dzień wcześniej. Mail trafia do zapisanych i do osób, które jeszcze się nie zapisały. Ty przygotowujesz tylko treść redakcyjną (temat, preheader, body); layout Sendy PNE (greeting, czerwony pasek przypomnienia, karta webinaru, przyciski zapisu i YouTube, zaświadczenie, oferta, stopka) składa aplikacja.
+Pisz wyłącznie po polsku, naturalną i poprawną polszczyzną. Ton życzliwy, konkretny, z lekką pilnością „już zaraz start”, ale bez agresywnej sprzedaży, clickbaitu i obietnic bez pokrycia.
+Odbiorców określ na podstawie pola direction.audience (nauczyciele i/lub dyrektorzy). Zwracaj się w formie „Państwo”.
+NIE zaczynaj body od „Dzień dobry,” — greeting Sendy z personalizacją dodaje aplikacja.
+NIE podawaj adresów URL ani znaczników linków do ręcznej podmiany — przyciski zapisu, YouTube i linki z karty projektu dodaje aplikacja.
+NIE powtarzaj w body pełnej karty terminu i prowadzącego — aplikacja pokaże je pod treścią. Możesz wspomnieć godzinę startu (campaign.live_time, np. 20:00) w pierwszym zdaniu.
+
+TRYB PRACY (pole mode):
+- "generate": nowy mail przypominający od zera.
+- "refine": author_draft to szkic autora (temat, preheader, body w polach). Popraw według instruction; pierwszy temat zostaje, chyba że instruction każe zmienić.
+- "iterate": previous_proposal to poprzednia propozycja; zmień tylko to, o co prosi instruction.
+
+style.timing:
+- "day_before": mail wychodzi dzień przed webinarem — pisz, że webinar jest jutro; zachęć do zapisu, jeśli ktoś jeszcze nie ma miejsca.
+- "same_day": mail wychodzi w dniu webinaru — pisz, że to już dziś; pierwsze zdanie body powinno zawierać „dziś” (lub „dzisiaj”) i godzinę startu z campaign.live_time. Zachęć: tuż przed startem kliknąć link / dołączyć (bez podawania URL — aplikacja doda przyciski poniżej treści).
+
+subject_options: dokładnie 3 różne propozycje tematu, każda najwyżej około 70 znaków. Pierwsza propozycja jest główna. Wzoruj się na sprawdzonych formatach PNE (użyj campaign.live_time, np. godz. 20:00 → skrót „o 20”):
+- „Widzimy się o 20! …” + krótki temat webinaru (concept.title),
+- „Do zobaczenia o 20! …”,
+- „Bądź o 20! …”
+Każdy wariant ma inny początek; reszta tematu opisuje webinar. Dopuszczalny jeden wykrzyknik na końcu tematu. Bez emotikon w temacie. Nazwy własne wielką literą (np. „ChatGPT”, „Canva AI”).
+
+preheader: jedno zdanie od wielkiej litery, najwyżej 100 znaków, uzupełnia temat (np. bezpłatny webinar, godzina, ostatnia szansa zapisu).
+
+body: treść redakcyjna bez tematu i preheadera.
+Jeżeli style.length ma wartość "short", body około 80–150 słów: 2–4 zdania przypomnienia (co dziś/jutro na webinarze, 1–2 korzyści z concept.points), delikatna zachęta do zapisu dla niezapisanych, zdanie „tuż przed startem dołącz przez link poniżej” (bez URL).
+Jeżeli style.length ma wartość "long", body około 160–260 słów: rozwinięcie korzyści i planu (concept.plan, concept.points), materiał dodatkowy jeśli concept.additional_material nie jest puste, pilniejsze „ostatni moment na zapis” dla niezapisanych, zachęta do dołączenia tuż przed godziną startu.
+Godzinę startu podawaj zgodnie z campaign.live_time (np. „o godzinie 20:00”). Nie zmieniaj campaign.live_label ani daty.
+Jeżeli campaign.host_name nie jest puste, podpis może zawierać to imię i nazwisko. Nie wymyślaj prowadzącego.
+Zakończ body podpisem: „Z pozdrowieniami,”, potem campaign.host_name (jeśli nie puste) i „Zespół PNE”.
+Jeżeli source_materials.main_mail nie jest puste — zatwierdzony mail główny; te same fakty i obietnice, inne sformułowania i tematy (przypomnienie, nie zaproszenie).
+Jeżeli source_materials.youtube_description nie jest puste — źródło faktów, nie kopiuj.
+Korzystaj wyłącznie z faktów z wejścia. Nie wymyślaj statystyk, funkcji produktów, cen, certyfikatów ani dofinansowania.
+Jeżeli style.emojis ma wartość true, 2–4 emotikony w body (np. 👇 przy zachęcie do linku poniżej), nigdy w temacie i preheaderze. Jeżeli false — bez emotikon.
+Jeżeli instruction nie jest puste — uwzględnij; zasady powyżej mają pierwszeństwo.
+To jest szkic do sprawdzenia przez człowieka.
 W change_summary opisz krótko, co przygotowałeś lub zmieniłeś.
 Zwróć wyłącznie dane zgodne z przekazanym schematem.
 PROMPT;

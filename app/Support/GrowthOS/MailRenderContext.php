@@ -2,6 +2,8 @@
 
 namespace App\Support\GrowthOS;
 
+use App\Services\GrowthOS\AI\Tasks\MaterialDraftTask;
+
 /**
  * Data the Sendy PNE mail shell needs beyond the editorial body (DEC-050).
  */
@@ -22,6 +24,7 @@ final class MailRenderContext
         public readonly array $paidCourses = [],
         public readonly ?int $growthCampaignId = null,
         public readonly bool $isReminder = false,
+        public readonly string $reminderTiming = \App\Services\GrowthOS\AI\Tasks\MaterialDraftTask::REMINDER_DEFAULT_TIMING,
     ) {}
 
     /**
@@ -66,6 +69,9 @@ final class MailRenderContext
                 ? (int) $project['growth_campaign_id']
                 : null,
             isReminder: $isReminder,
+            reminderTiming: $isReminder
+                ? MaterialDraftTask::reminderTiming($material['reminder_timing'] ?? null)
+                : MaterialDraftTask::REMINDER_DEFAULT_TIMING,
         );
     }
 

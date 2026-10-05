@@ -1,4 +1,5 @@
 @php
+    $isReminderMail = $isReminderMail ?? false;
     $mailEditorBootError = null;
     $mailEditorContent = '';
     $mailFinalHtml = '';
@@ -13,7 +14,7 @@
         // Load MailHtmlFormatter first so companion classes resolve after deploy
         // even when an optimized/authoritative classmap was not regenerated.
         $mailEditorContent = \App\Support\GrowthOS\MailHtmlFormatter::editorContent((string) old('mail_body', $mailFields['body'] ?? ''));
-        $mailContext = \App\Support\GrowthOS\MailRenderContext::fromProject($project, $material, false);
+        $mailContext = \App\Support\GrowthOS\MailRenderContext::fromProject($project, $material, $isReminderMail);
         $mailFinalHtml = \App\Support\GrowthOS\MailHtmlFormatter::copyHtml(
             (string) old('mail_preheader', $mailFields['preheader'] ?? ''),
             $mailEditorContent,
@@ -39,7 +40,7 @@
     </div>
 @else
 <div class="alert alert-light border small mb-3" role="status">
-    Układ: <strong>Sendy PNE</strong> (kanoniczny). Greeting, CTA, karta webinaru, oferta i stopka składa aplikacja.
+    Układ: <strong>Sendy PNE</strong> (kanoniczny). Greeting, CTA, karta webinaru@if($isReminderMail), czerwony pasek przypomnienia@endif, oferta i stopka składa aplikacja.
     Edytujesz tylko treść redakcyjną.
 </div>
 @if(! $canCopyMailHtml)

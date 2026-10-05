@@ -102,6 +102,7 @@ final class MailHtmlFormatter
                 paidCourses: $context->paidCourses,
                 growthCampaignId: $context->growthCampaignId,
                 isReminder: true,
+                reminderTiming: $context->reminderTiming,
             );
         }
         $editorial = self::prepareEditorial($content, $context);
@@ -154,6 +155,7 @@ final class MailHtmlFormatter
             paidCourses: $context->paidCourses,
             growthCampaignId: $context->growthCampaignId,
             isReminder: true,
+            reminderTiming: $context->reminderTiming,
         );
     }
 
@@ -243,6 +245,9 @@ final class MailHtmlFormatter
         $parts = [];
         $parts[] = self::outerOpen($templateKey);
         $parts[] = self::headerHtml();
+        if ($context->isReminder) {
+            $parts[] = self::reminderBannerHtml($context);
+        }
         $parts[] = self::greetingHtml();
         $parts[] = '<tr><td data-pne-mail-body="1" style="padding:8px 30px 12px;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:1.65;color:#243040;">'
             .$inner
@@ -291,6 +296,18 @@ final class MailHtmlFormatter
     {
         return '<tr><td data-pne-mail-greeting="1" style="padding:28px 30px 8px;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:1.65;color:#243040;">'
             .'<p style="margin:0;">'.self::escape(self::GREETING).'</p>'
+            .'</td></tr>';
+    }
+
+    private static function reminderBannerHtml(MailRenderContext $context): string
+    {
+        $label = $context->reminderTiming === 'day_before'
+            ? 'PRZYPOMNIENIE – WEBINAR JUŻ JUTRO!'
+            : 'OSTATNIE PRZYPOMNIENIE – WEBINAR JUŻ DZISIAJ!';
+
+        return '<tr><td data-pne-mail-reminder-banner="1" bgcolor="#e63333" style="padding:14px 30px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.4;font-weight:bold;letter-spacing:0.02em;color:#ffffff;text-align:center;">'
+            .'<span aria-hidden="true" style="display:inline-block;width:10px;height:10px;border-radius:50%;background-color:#ffffff;margin-right:8px;vertical-align:middle;"></span>'
+            .self::escape($label)
             .'</td></tr>';
     }
 

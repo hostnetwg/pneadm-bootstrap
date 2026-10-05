@@ -1184,11 +1184,12 @@ class ProjectController extends Controller
             'include_paid_offer' => ['nullable', 'boolean'],
             'show_certificate' => ['nullable', 'boolean'],
             'refresh_paid_offer' => ['nullable', 'boolean'],
+            'reminder_timing' => ['nullable', Rule::in(array_keys(MaterialDraftTask::REMINDER_TIMINGS))],
         ]);
 
         if (MaterialDraftTask::isMail($material) && $request->has('mail_body')) {
             $subject = trim(preg_replace('/\s+/u', ' ', (string) ($data['mail_subject'] ?? '')));
-            $body = $material === MaterialDraftTask::MAIL_MATERIAL_KEY
+            $body = MaterialDraftTask::isMail($material)
                 ? \App\Support\GrowthOS\MailHtmlFormatter::editorContent((string) ($data['mail_body'] ?? ''))
                 : (string) ($data['mail_body'] ?? '');
             $subjects = $subject !== '' ? [$subject] : [];
@@ -1217,11 +1218,14 @@ class ProjectController extends Controller
         }
 
         $wasSkipped = DemoTikWebinarProject::isMaterialSkipped(DemoTikWebinarProject::material($project, $material));
-        $mailOptions = $material === MaterialDraftTask::MAIL_MATERIAL_KEY
+        $mailOptions = MaterialDraftTask::isMail($material)
             ? [
                 'include_paid_offer' => $request->boolean('include_paid_offer'),
                 'show_certificate' => $request->boolean('show_certificate'),
                 'refresh_paid_offer' => $request->boolean('refresh_paid_offer'),
+                ...($material === MaterialDraftTask::REMINDER_MATERIAL_KEY
+                    ? ['reminder_timing' => MaterialDraftTask::reminderTiming($data['reminder_timing'] ?? null)]
+                    : []),
             ]
             : null;
         $hadMailAiProposal = MaterialDraftTask::isMail($material)

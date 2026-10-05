@@ -54,7 +54,7 @@ class GrowthOsMainMailTemplateTest extends TestCase
         parent::tearDown();
     }
 
-    public function test_main_mail_uses_sendy_pne_and_reminder_stays_without_tiptap(): void
+    public function test_main_and_reminder_mail_use_sendy_pne_tiptap_editor(): void
     {
         $user = $this->readyProject();
 
@@ -73,9 +73,12 @@ class GrowthOsMainMailTemplateTest extends TestCase
         $this->actingAs($user)
             ->get(route('growth.projects.materials.show', [DemoTikWebinarProject::PROJECT_ID, self::REMINDER]))
             ->assertOk()
-            ->assertSee('data-mail-visual', false)
-            ->assertSee('Poproś AI o szkic')
+            ->assertSee('data-mail-editor', false)
+            ->assertSee('czerwony pasek przypomnienia')
+            ->assertSee('Poproś AI o nowy szkic', false)
             ->assertSee('Sendy PNE')
+            ->assertSee('Dołącz ofertę płatnych szkoleń')
+            ->assertDontSee('data-mail-visual', false)
             ->assertDontSee('Klasyczny PNE')
             ->assertDontSee('name="template_key"', false);
 

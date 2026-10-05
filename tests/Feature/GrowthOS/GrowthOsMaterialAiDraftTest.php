@@ -1521,15 +1521,14 @@ class GrowthOsMaterialAiDraftTest extends TestCase
         $this->actingAs($user)
             ->get(route('growth.projects.materials.show', [DemoTikWebinarProject::PROJECT_ID, self::REMINDER]))
             ->assertOk()
-            ->assertSee('Poproś AI o szkic')
+            ->assertSee('Poproś AI o nowy szkic', false)
             ->assertDontSee('Profesjonalny HTML maila')
             ->assertSee('Kiedy wysyłasz przypomnienie')
             ->assertSee('Dzień przed webinarem („jutro”)', false)
             ->assertSee('W dniu webinaru („dziś”)', false)
             ->assertSee('Krótki (ok. 80–150 słów)')
             ->assertSee('Dłuższy (ok. 180–280 słów)')
-            ->assertSee(MaterialDraftTask::ROOM_LINK_PLACEHOLDER)
-            ->assertSee(MaterialDraftTask::LINK_PLACEHOLDER)
+            ->assertSee('Widzimy się o 20!', false)
             ->assertSee('Mailing główny nie jest zatwierdzony')
             ->assertSee('id="mail_subject"', false)
             ->assertSee('id="mail_preheader"', false);
@@ -1549,8 +1548,11 @@ class GrowthOsMaterialAiDraftTest extends TestCase
         $this->assertSame(['emojis' => false, 'length' => 'short', 'timing' => 'same_day'], $input['style']);
         $this->assertSame(['subject_options', 'preheader', 'body', 'change_summary'], $this->provider->schema['required']);
         $this->assertSame(MaterialDraftTask::REMINDER_PROMPT_VERSION, $this->proposal(self::REMINDER)['prompt_version']);
-        foreach ([MaterialDraftTask::ROOM_LINK_PLACEHOLDER, MaterialDraftTask::LINK_PLACEHOLDER, 'style.timing', 'source_materials.main_mail', 'Dzień dobry,', 'Zespół PNE'] as $rule) {
+        foreach (['style.timing', 'source_materials.main_mail', 'Widzimy się o 20', 'NIE zaczynaj body od „Dzień dobry,”', 'Zespół PNE'] as $rule) {
             $this->assertStringContainsString($rule, $this->provider->instructions);
+        }
+        foreach ([MaterialDraftTask::ROOM_LINK_PLACEHOLDER, MaterialDraftTask::LINK_PLACEHOLDER] as $forbidden) {
+            $this->assertStringNotContainsString($forbidden, $this->provider->instructions);
         }
     }
 
@@ -1613,13 +1615,15 @@ class GrowthOsMaterialAiDraftTest extends TestCase
         $draft = $this->proposal(self::REMINDER)['draft'];
         $fields = MaterialDraftTask::parseMainMail($draft);
         $this->assertCount(2, $fields['alternatives']);
-        $this->assertStringContainsString('już jutro', $fields['body']);
-        $this->assertStringContainsString(MaterialDraftTask::ROOM_LINK_PLACEHOLDER, $fields['body']);
-        $this->assertStringContainsString(MaterialDraftTask::LINK_PLACEHOLDER, $fields['body']);
-        $this->assertStringContainsString('Termin: '.$this->liveLabel(), $fields['body']);
+        $this->assertStringContainsString('jutro', $fields['body']);
+        $this->assertStringNotContainsString(MaterialDraftTask::ROOM_LINK_PLACEHOLDER, $fields['body']);
+        $this->assertStringNotContainsString(MaterialDraftTask::LINK_PLACEHOLDER, $fields['body']);
+        $this->assertStringContainsString('Widzimy się o', $fields['subject']);
 
         $this->requestFor($user, self::REMINDER, ['timing' => 'same_day']);
-        $this->assertStringContainsString('już dziś', $this->proposal(self::REMINDER)['draft']);
+        $draft = $this->proposal(self::REMINDER)['draft'];
+        $this->assertStringContainsString('dziś', $draft);
+        $this->assertStringContainsString('link poniżej', MaterialDraftTask::parseMainMail($draft)['body']);
         $this->assertSame(0, $this->provider->calls);
     }
 

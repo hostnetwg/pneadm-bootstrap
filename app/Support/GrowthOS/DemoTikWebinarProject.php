@@ -1839,10 +1839,13 @@ class DemoTikWebinarProject
                 if ($draft !== null && ! self::isMaterialSkipped($material)) {
                     $project['materials'][$index]['draft'] = $draft;
                 }
-                if ($materialId === MaterialDraftTask::MAIL_MATERIAL_KEY && ! self::isMaterialSkipped($material)) {
-                    $project['materials'][$index]['template_key'] = MailTemplates::CANONICAL;
-                    if ($templateKey !== null) {
-                        $project['materials'][$index]['template_key'] = MailTemplates::key($templateKey);
+                $isSendyMail = in_array($materialId, [MaterialDraftTask::MAIL_MATERIAL_KEY, MaterialDraftTask::REMINDER_MATERIAL_KEY], true);
+                if ($isSendyMail && ! self::isMaterialSkipped($material)) {
+                    if ($materialId === MaterialDraftTask::MAIL_MATERIAL_KEY) {
+                        $project['materials'][$index]['template_key'] = MailTemplates::CANONICAL;
+                        if ($templateKey !== null) {
+                            $project['materials'][$index]['template_key'] = MailTemplates::key($templateKey);
+                        }
                     }
                     if (is_array($mailOptions)) {
                         if (array_key_exists('include_paid_offer', $mailOptions)) {
@@ -1863,6 +1866,10 @@ class DemoTikWebinarProject
                             && ! is_array($project['materials'][$index]['paid_offer_snapshot'] ?? null)) {
                             $project['materials'][$index]['paid_offer_snapshot'] = app(PaidCourseOfferBuilder::class)
                                 ->snapshot(is_numeric($project['growth_campaign_id'] ?? null) ? (int) $project['growth_campaign_id'] : null);
+                        }
+                        if ($materialId === MaterialDraftTask::REMINDER_MATERIAL_KEY
+                            && array_key_exists('reminder_timing', $mailOptions)) {
+                            $project['materials'][$index]['reminder_timing'] = MaterialDraftTask::reminderTiming($mailOptions['reminder_timing']);
                         }
                     }
                 }
@@ -2104,6 +2111,15 @@ class DemoTikWebinarProject
         array $work = [],
     ): array {
         $project = self::requireProject($projectId);
+        if ($materialId === MaterialDraftTask::REMINDER_MATERIAL_KEY) {
+            foreach ($project['materials'] as $index => $material) {
+                if (($material['id'] ?? null) === $materialId) {
+                    $project['materials'][$index]['reminder_timing'] = MaterialDraftTask::reminderTiming($style['timing'] ?? null);
+                    break;
+                }
+            }
+            self::saveProject($project);
+        }
         $concept = is_array($project['concept'] ?? null) ? $project['concept'] : [];
         $instruction = trim($instruction);
         $emojis = (bool) ($style['emojis'] ?? ! MaterialDraftTask::usesVoice($materialId));
@@ -2599,35 +2615,46 @@ class DemoTikWebinarProject
         $title = trim((string) ($concept['title'] ?? $project['topic'] ?? ''));
         $host = self::aiHostName($project);
         $when = $timing === 'same_day' ? 'dziś' : 'jutro';
+        $liveTime = trim((string) ($project['live_time'] ?? '20:00'));
+        $hourShort = preg_match('/^(\d{1,2})/', $liveTime, $matches) === 1 ? $matches[1] : '20';
         $points = collect(is_array($concept['points'] ?? null) ? $concept['points'] : [])
             ->map(fn (mixed $point): string => trim((string) $point))
             ->filter(fn (string $point): bool => $point !== '')
-            ->take($length === 'long' ? 5 : 3)
-            ->map(fn (string $point): string => '• '.$point)
-            ->implode("\n");
+            ->take($length === 'long' ? 3 : 2)
+            ->values();
         $plan = trim((string) ($concept['plan'] ?? ''));
         $extra = trim((string) ($concept['additional_material'] ?? ''));
 
-        $body = implode("\n\n", array_filter([
-            'Dzień dobry,',
-            'przypominamy, że już '.$when.' odbędzie się webinar „'.$title.'”.',
-            $points !== '' ? "Najważniejsze tematy:\n".$points : '',
-            $length === 'long' && $plan !== '' ? 'Plan spotkania: '.$plan : '',
-            $length === 'long' && $extra !== '' ? 'Po webinarze otrzymają Państwo: '.$extra : '',
-            $icon('📅').'Termin: '.self::liveLabel($project),
-            $host !== '' ? 'Prowadzący: '.$host : '',
-            $icon('👉')."Jeśli są Państwo zapisani, zapraszamy do pokoju webinaru:\n".MaterialDraftTask::ROOM_LINK_PLACEHOLDER,
-            "Jeśli jeszcze się Państwo nie zapisali, można to zrobić tutaj:\n".MaterialDraftTask::LINK_PLACEHOLDER,
+        $intro = $timing === 'same_day'
+            ? 'To już '.$when.' o godzinie '.$liveTime.' spotykamy się na bezpłatnym webinarze „'.$title.'”.'
+            : 'Już '.$when.' o godzinie '.$liveTime.' odbędzie się bezpłatny webinar „'.$title.'”.';
+
+        $benefits = $points->isNotEmpty()
+            ? 'Podczas spotkania pokażemy m.in.: '.$points->implode('; ').'.'
+            : '';
+
+        $bodyParts = array_filter([
+            $intro,
+            $benefits,
+            $length === 'long' && $plan !== '' ? 'Plan: '.$plan : '',
+            $length === 'long' && $extra !== '' ? 'Po webinarze: '.$extra : '',
+            $timing === 'same_day'
+                ? $icon('🔹').'Jeżeli jeszcze nie mają Państwo miejsca, to ostatni moment na zapis. Tuż przed '.$liveTime.' kliknij link poniżej '.$icon('👇').' i dołącz do webinaru.'
+                : 'Jeżeli jeszcze się Państwo nie zapisali, zachęcamy — link do zapisu jest poniżej.',
             "Z pozdrowieniami,\n".($host !== '' ? $host."\n" : '').'Zespół PNE',
-        ]));
+        ]);
+
+        $body = implode("\n\n", $bodyParts);
 
         return MaterialDraftTask::composeMainMail(
             [
-                ucfirst($when).' webinar: '.$title,
-                'Przypomnienie: '.$title,
-                'Do zobaczenia '.$when.' na webinarze',
+                'Widzimy się o '.$hourShort.'! '.$title,
+                'Do zobaczenia o '.$hourShort.'! '.$title,
+                'Bądź o '.$hourShort.'! '.$title,
             ],
-            'Termin: '.self::liveLabel($project).'. Link do pokoju i zapisu w środku.',
+            $timing === 'same_day'
+                ? 'Bezpłatny webinar '.$when.' o '.$liveTime.'. Link do zapisu i transmisji poniżej.'
+                : 'Przypomnienie: webinar '.$when.' o '.$liveTime.'.',
             $body,
         );
     }
