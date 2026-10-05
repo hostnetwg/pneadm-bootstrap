@@ -282,6 +282,35 @@ class GrowthOsMainMailTemplateTest extends TestCase
             ->assertSessionHasErrors(['registration_url', 'youtube_live_url']);
     }
 
+    public function test_facebook_post_shows_project_registration_url_instead_of_placeholder(): void
+    {
+        $user = $this->readyProject();
+
+        $this->actingAs($user)
+            ->put(route('growth.projects.links.update', DemoTikWebinarProject::PROJECT_ID), [
+                'registration_url' => 'https://pnedu.pl/courses/577',
+            ])
+            ->assertRedirect();
+
+        $this->actingAs($user)
+            ->post(route('growth.projects.materials.status', [DemoTikWebinarProject::PROJECT_ID, 'facebook-post']), [
+                'status' => 'DRAFT',
+                'draft' => "Zapraszamy.\n\nZapisz się: ".MaterialDraftTask::LINK_PLACEHOLDER,
+            ])
+            ->assertRedirect();
+
+        $this->actingAs($user)
+            ->get(route('growth.projects.materials.show', [DemoTikWebinarProject::PROJECT_ID, 'facebook-post']))
+            ->assertOk()
+            ->assertSee('https://pnedu.pl/courses/577')
+            ->assertDontSee('Zapisz się: '.MaterialDraftTask::LINK_PLACEHOLDER);
+
+        $artifact = GrowthArtifact::query()->where('key', 'facebook-post')->first();
+        $this->assertNotNull($artifact);
+        $this->assertStringContainsString('https://pnedu.pl/courses/577', (string) $artifact->payload['draft']);
+        $this->assertStringNotContainsString(MaterialDraftTask::LINK_PLACEHOLDER, (string) $artifact->payload['draft']);
+    }
+
     /**
      * @param  array{mail_subject: string, mail_preheader: string, mail_body: string}  $fields
      */

@@ -67,4 +67,17 @@ final class GrowthMailUrls
 
         return $expected !== '' && $host === $expected;
     }
+
+    /**
+     * Replace the AI registration placeholder with the campaign link when present.
+     */
+    public static function withRegistrationLink(string $text, mixed $registrationUrl): string
+    {
+        $url = trim((string) $registrationUrl);
+        if ($url === '' || self::isDangerous($url) || ! str_starts_with(strtolower($url), 'https://')) {
+            return $text;
+        }
+
+        return str_replace(\App\Services\GrowthOS\AI\Tasks\MaterialDraftTask::LINK_PLACEHOLDER, $url, $text);
+    }
 }

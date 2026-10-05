@@ -2355,7 +2355,11 @@ class DemoTikWebinarProject
 
         foreach ($project['materials'] as $index => $material) {
             if (($material['id'] ?? null) === $materialId) {
-                $project['materials'][$index]['draft'] = (string) $proposal['draft'];
+                $draft = (string) $proposal['draft'];
+                if ($materialId === MaterialDraftTask::FACEBOOK_MATERIAL_KEY) {
+                    $draft = GrowthMailUrls::withRegistrationLink($draft, $project['registration_url'] ?? null);
+                }
+                $project['materials'][$index]['draft'] = $draft;
                 $project['materials'][$index]['status'] = 'DRAFT';
                 $project['materials'][$index]['updated_at'] = now()->toIso8601String();
             }
@@ -2718,7 +2722,10 @@ class DemoTikWebinarProject
             $promise,
             $points,
             $icon('📅').($project['live_date'] ?? '').', godz. '.($project['live_time'] ?? ''),
-            $icon('👉').'Zapisz się: '.MaterialDraftTask::LINK_PLACEHOLDER,
+            $icon('👉').'Zapisz się: '.GrowthMailUrls::withRegistrationLink(
+                MaterialDraftTask::LINK_PLACEHOLDER,
+                $project['registration_url'] ?? null,
+            ),
             $hashtags ? '#nauczyciele #TIK #webinar' : '',
         ])));
     }

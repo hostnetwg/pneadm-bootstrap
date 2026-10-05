@@ -151,7 +151,14 @@
                             @error('mail_body')<div class="invalid-feedback">{{ $message }}</div>@enderror
                         @else
                             <label for="draft" class="visually-hidden">Szkic</label>
-                            <textarea id="draft" name="draft" class="form-control growth-draft-editor" rows="14" @readonly($materialSkipped)>{{ session('material_restored_draft', $material['draft']) }}</textarea>
+                            <textarea id="draft" name="draft" class="form-control growth-draft-editor" rows="14" @readonly($materialSkipped)>{{ old('draft', $materialEditorDraft ?? session('material_restored_draft', $material['draft'])) }}</textarea>
+                            @if($aiDraftIsFacebookPost)
+                                @if(filled($project['registration_url'] ?? null))
+                                    <p class="form-text mb-0">Link do zapisów z karty projektu jest wstawiany zamiast {{ \App\Services\GrowthOS\AI\Tasks\MaterialDraftTask::LINK_PLACEHOLDER }}.</p>
+                                @else
+                                    <p class="form-text mb-0 text-warning-emphasis">Brak linku do zapisów na <a href="{{ route('growth.projects.show', $project['id']) }}#project-links">karcie projektu</a> — w szkicu zostaje znacznik {{ \App\Services\GrowthOS\AI\Tasks\MaterialDraftTask::LINK_PLACEHOLDER }}.</p>
+                                @endif
+                            @endif
                         @endif
                     </div>
                     <div class="card-footer d-flex flex-column flex-sm-row align-items-sm-end justify-content-between gap-3">
@@ -567,7 +574,12 @@
 
                             @if($aiDraftIsReminder)
                                 <p class="small text-secondary mb-3">AI nie poda linków. Wstawi {{ \App\Services\GrowthOS\AI\Tasks\MaterialDraftTask::ROOM_LINK_PLACEHOLDER }} dla zapisanych i {{ \App\Services\GrowthOS\AI\Tasks\MaterialDraftTask::LINK_PLACEHOLDER }} dla osób, które jeszcze się nie zapisały, do ręcznej podmiany.</p>
-                            @elseif($aiDraftIsFacebookPost || $aiDraftIsMail)
+                            @elseif($aiDraftIsFacebookPost)
+                                <p class="small text-secondary mb-3">
+                                    AI nie poda adresu URL — wstawi {{ \App\Services\GrowthOS\AI\Tasks\MaterialDraftTask::LINK_PLACEHOLDER }}.
+                                    Aplikacja podmieni go na link do zapisów z karty projektu (gdy jest uzupełniony).
+                                </p>
+                            @elseif($aiDraftIsMail)
                                 <p class="small text-secondary mb-3">AI nie poda linku. W jego miejscu wstawi {{ \App\Services\GrowthOS\AI\Tasks\MaterialDraftTask::LINK_PLACEHOLDER }} do ręcznej podmiany.</p>
                             @endif
                             @if($aiDraftIsFacebookPost)

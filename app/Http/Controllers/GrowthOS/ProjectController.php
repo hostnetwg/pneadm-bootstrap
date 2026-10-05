@@ -622,9 +622,25 @@ class ProjectController extends Controller
             $mailFields = MaterialDraftTask::parseMainMail($mailDraftSource);
         }
 
+        $materialEditorDraft = (string) session('material_restored_draft', $item['draft'] ?? '');
+        if ($isFacebookPost) {
+            $registrationUrl = $projectItem['registration_url'] ?? null;
+            $materialEditorDraft = \App\Support\GrowthOS\GrowthMailUrls::withRegistrationLink(
+                $materialEditorDraft,
+                $registrationUrl,
+            );
+            if (is_array($aiDraftProposal)) {
+                $aiDraftProposal['draft'] = \App\Support\GrowthOS\GrowthMailUrls::withRegistrationLink(
+                    (string) ($aiDraftProposal['draft'] ?? ''),
+                    $registrationUrl,
+                );
+            }
+        }
+
         return view('growth-os.projects.material', [
             'project' => $projectItem,
             'material' => $item,
+            'materialEditorDraft' => $materialEditorDraft,
             'mailFields' => $mailFields,
             'mailFieldsFromAiProposal' => $mailFieldsFromAiProposal,
             'materialStatusLabels' => DemoTikWebinarProject::materialStatusLabels(),
@@ -1192,6 +1208,11 @@ class ProjectController extends Controller
                 $subjects,
                 preg_replace('/\s+/u', ' ', (string) ($data['mail_preheader'] ?? '')),
                 $body,
+            );
+        } elseif ($material === MaterialDraftTask::FACEBOOK_MATERIAL_KEY && array_key_exists('draft', $data)) {
+            $data['draft'] = \App\Support\GrowthOS\GrowthMailUrls::withRegistrationLink(
+                (string) ($data['draft'] ?? ''),
+                DemoTikWebinarProject::requireProject($project)['registration_url'] ?? null,
             );
         }
 
