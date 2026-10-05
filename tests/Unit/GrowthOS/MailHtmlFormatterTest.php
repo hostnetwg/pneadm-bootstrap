@@ -4,22 +4,35 @@ namespace Tests\Unit\GrowthOS;
 
 use App\Services\GrowthOS\AI\Tasks\MaterialDraftTask;
 use App\Support\GrowthOS\MailHtmlFormatter;
+use App\Support\GrowthOS\MailRenderContext;
+use App\Support\GrowthOS\MailTemplates;
 use PHPUnit\Framework\TestCase;
 
 class MailHtmlFormatterTest extends TestCase
 {
-    public function test_plain_mail_becomes_a_table_with_a_list_and_a_button(): void
+    public function test_plain_mail_becomes_sendy_pne_with_greeting_and_button(): void
     {
-        $html = MailHtmlFormatter::format("Dzień dobry,\n\n- Punkt pierwszy\n- Punkt drugi\n\nZapisz się:\n".MaterialDraftTask::LINK_PLACEHOLDER."\n\nZ pozdrowieniami,\nZespół PNE");
+        $context = new MailRenderContext(
+            registrationUrl: 'https://pnedu.pl/courses/577',
+            webinarTitle: 'Canva AI',
+            liveLabel: 'wtorek 6 października, godz. 20:00',
+            hostName: 'Waldemar Grabowski',
+        );
+        $html = MailHtmlFormatter::format(
+            "zapraszamy Państwa.\n\n- Punkt pierwszy\n- Punkt drugi\n\nZ pozdrowieniami,\nZespół PNE",
+            null,
+            $context,
+        );
 
         $this->assertStringContainsString(MailHtmlFormatter::MARKER, $html);
-        $this->assertStringContainsString('max-width:600px', $html);
-        $this->assertStringContainsString('Dzień dobry,', $html);
+        $this->assertStringContainsString('max-width:680px', $html);
+        $this->assertStringContainsString(MailHtmlFormatter::GREETING, $html);
+        $this->assertStringContainsString('data-pne-mail-template="sendy-pne"', $html);
         $this->assertStringContainsString('<li style="margin:0 0 8px;">Punkt pierwszy</li>', $html);
-        $this->assertStringContainsString('href="'.MaterialDraftTask::LINK_PLACEHOLDER.'"', $html);
-        $this->assertStringContainsString('Zapisz się na webinar', $html);
+        $this->assertStringContainsString('href="https://pnedu.pl/courses/577"', $html);
+        $this->assertStringContainsString(MailHtmlFormatter::CTA_LABEL, $html);
+        $this->assertStringContainsString('[unsubscribe]', $html);
         $this->assertStringNotContainsString('Zapisz się:', $html);
-        $this->assertStringContainsString('Zespół PNE', $html);
     }
 
     public function test_markup_in_the_plain_text_is_escaped_and_an_html_draft_is_not_wrapped_again(): void
@@ -31,7 +44,7 @@ class MailHtmlFormatterTest extends TestCase
         $this->assertSame(1, substr_count($again, MailHtmlFormatter::MARKER));
     }
 
-    public function test_templates_share_one_button_and_keep_the_editor_out_of_the_wrapper(): void
+    public function test_legacy_template_keys_render_as_sendy_pne(): void
     {
         $hostile = '<table '.MailHtmlFormatter::MARKER.'><tr><td data-pne-mail-body="1"><p>Treść</p>'
             .'<a href="'.MaterialDraftTask::LINK_PLACEHOLDER.'">Zapisz się na webinar</a>'
@@ -44,50 +57,63 @@ class MailHtmlFormatterTest extends TestCase
         $this->assertStringNotContainsString(MaterialDraftTask::LINK_PLACEHOLDER, $content);
         $this->assertStringContainsString('Treść', $content);
 
-        foreach (['classic', 'personal', 'minimal'] as $template) {
-            $html = MailHtmlFormatter::finalHtml($hostile, $template);
+        foreach (['classic', 'personal', 'minimal', 'sendy-pne'] as $template) {
+            $html = MailHtmlFormatter::finalHtml($hostile, $template, new MailRenderContext(
+                registrationUrl: 'https://pnedu.pl/courses/1',
+                webinarTitle: 'Test',
+            ));
             $this->assertSame(1, substr_count($html, MailHtmlFormatter::MARKER));
-            $this->assertSame(1, substr_count($html, 'href="'.MaterialDraftTask::LINK_PLACEHOLDER.'"'));
             $this->assertSame(1, substr_count($html, MailHtmlFormatter::CTA_LABEL));
             $this->assertStringNotContainsString('<script', $html);
-            $this->assertStringContainsString('data-pne-mail-template="'.$template.'"', $html);
+            $this->assertStringContainsString('data-pne-mail-template="sendy-pne"', $html);
+            $this->assertSame(MailTemplates::CANONICAL, MailTemplates::key($template));
         }
-
-        $this->assertStringContainsString('Spotkajmy się na kolejnym webinarze', MailHtmlFormatter::finalHtml('Treść', 'personal'));
-        $this->assertStringContainsString('pnedu.pl', MailHtmlFormatter::finalHtml('Treść', 'minimal'));
-        $this->assertStringContainsString('Praktyczna wiedza dla nauczycieli i dyrektorów', MailHtmlFormatter::finalHtml('Treść', 'classic'));
-        $this->assertStringNotContainsString('SAMPLE', MailHtmlFormatter::finalHtml('Treść', 'classic'));
     }
 
     public function test_copy_prepends_the_preheader_and_plain_text_for_ai_drops_the_layout(): void
     {
-        $html = MailHtmlFormatter::format("Dzień dobry,\n\nTreść zaproszenia.");
-        $copied = MailHtmlFormatter::copyHtml('Krótki preheader.', $html, 'personal');
+        $context = new MailRenderContext(
+            registrationUrl: 'https://pnedu.pl/courses/577',
+            youtubeLiveUrl: 'https://www.youtube.com/live/abc',
+            webinarTitle: 'Canva AI',
+            showCertificate: true,
+        );
+        $html = MailHtmlFormatter::format('zapraszamy Państwa na webinar.', null, $context);
+        $copied = MailHtmlFormatter::copyHtml('Krótki preheader.', $html, null, $context);
 
         $this->assertStringStartsWith('<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">Krótki preheader.', $copied);
-        $this->assertSame(1, substr_count($copied, 'href="'.MaterialDraftTask::LINK_PLACEHOLDER.'"'));
-        $this->assertStringContainsString('Spotkajmy się na kolejnym webinarze', $copied);
+        $this->assertStringContainsString('href="https://pnedu.pl/courses/577"', $copied);
+        $this->assertStringContainsString(MailHtmlFormatter::YOUTUBE_CTA_LABEL, $copied);
+        $this->assertStringContainsString('bezpłatne zaświadczenie', $copied);
+        $this->assertTrue(MailHtmlFormatter::canCopyHtml($context));
 
         $plain = MailHtmlFormatter::plainForAi("Temat: Temat\nPreheader: Krótki preheader.\n\n".$html);
         $this->assertStringNotContainsString(MailHtmlFormatter::MARKER, $plain);
         $this->assertStringNotContainsString('<table', $plain);
-        $this->assertStringNotContainsString('style=', $plain);
         $this->assertStringNotContainsString(MailHtmlFormatter::CTA_LABEL, $plain);
         $this->assertStringContainsString('Temat: Temat', $plain);
-        $this->assertStringContainsString('Preheader: Krótki preheader.', $plain);
-        $this->assertStringContainsString('Dzień dobry,', $plain);
-        $this->assertStringContainsString('Treść zaproszenia.', $plain);
-        $this->assertStringNotContainsString('Spotkajmy się na kolejnym webinarze', $plain);
+        $this->assertStringContainsString('zapraszamy Państwa na webinar.', $plain);
     }
 
-    public function test_plain_editor_content_is_stored_unchanged(): void
+    public function test_missing_youtube_omits_button_and_reminder_room_marker_becomes_cta(): void
     {
-        $plain = "Dzień dobry,\n\nTreść.";
+        $withoutYoutube = MailHtmlFormatter::finalHtml('Treść', null, new MailRenderContext(
+            registrationUrl: 'https://pnedu.pl/courses/1',
+            webinarTitle: 'Test',
+        ));
+        $this->assertStringNotContainsString(MailHtmlFormatter::YOUTUBE_CTA_LABEL, $withoutYoutube);
 
-        $this->assertSame($plain, MailHtmlFormatter::editorContent($plain));
-        $this->assertSame(
-            "Temat: Temat\nPreheader: Zdanie.\n\n".$plain,
-            MailHtmlFormatter::plainForAi("Temat: Temat\nPreheader: Zdanie.\n\n".$plain),
+        $reminder = MailHtmlFormatter::finalHtml(
+            "Przypomnienie\n\n".MaterialDraftTask::ROOM_LINK_PLACEHOLDER."\n\n".MaterialDraftTask::LINK_PLACEHOLDER,
+            null,
+            new MailRenderContext(
+                registrationUrl: 'https://pnedu.pl/courses/1',
+                webinarTitle: 'Test',
+                isReminder: true,
+            ),
         );
+        $this->assertStringContainsString(MailHtmlFormatter::ROOM_CTA_LABEL, $reminder);
+        $this->assertStringNotContainsString('>'.MaterialDraftTask::ROOM_LINK_PLACEHOLDER.'<', $reminder);
+        $this->assertFalse(MailHtmlFormatter::canCopyHtml(new MailRenderContext));
     }
 }

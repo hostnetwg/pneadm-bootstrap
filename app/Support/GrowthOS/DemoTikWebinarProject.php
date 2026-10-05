@@ -18,6 +18,7 @@ use App\Services\GrowthOS\AI\Tasks\GraphicImageTask;
 use App\Services\GrowthOS\AI\Tasks\MaterialDraftTask;
 use App\Services\GrowthOS\GrowthOperationalTasks;
 use App\Services\GrowthOS\GrowthSessionConceptStore;
+use App\Services\GrowthOS\PaidCourseOfferBuilder;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 
@@ -462,6 +463,21 @@ class DemoTikWebinarProject
         $project['live_time'] = $schedule['live_time'];
         self::saveProject($project);
         app(GrowthSessionConceptStore::class)->persistSchedule($project);
+
+        return $project;
+    }
+
+    /**
+     * @param  array{registration_url?: ?string, youtube_live_url?: ?string}  $links
+     * @return array<string, mixed>
+     */
+    public static function updateLinks(string $projectId, array $links): array
+    {
+        $project = self::requireProject($projectId);
+        $project['registration_url'] = trim((string) ($links['registration_url'] ?? ''));
+        $project['youtube_live_url'] = trim((string) ($links['youtube_live_url'] ?? ''));
+        self::saveProject($project);
+        app(GrowthSessionConceptStore::class)->persistLinks($project);
 
         return $project;
     }
@@ -953,6 +969,8 @@ class DemoTikWebinarProject
             'host' => $fields['host'] ?? '—',
             'host_instructor_id' => $fields['host_instructor_id'] ?? null,
             'voice_instructor_id' => $fields['voice_instructor_id'] ?? null,
+            'registration_url' => $fields['registration_url'] ?? '',
+            'youtube_live_url' => $fields['youtube_live_url'] ?? '',
             'goal' => $fields['goal'] ?? 'unknown',
             'topic' => $topic,
             'status' => $fields['status'] ?? 'PLANNING',
@@ -1178,13 +1196,35 @@ class DemoTikWebinarProject
         $versionTemplate = $materialId === MaterialDraftTask::MAIL_MATERIAL_KEY && array_key_exists('template_key', $row->payload)
             ? MailTemplates::key($row->payload['template_key'])
             : null;
+        $versionIncludePaid = $materialId === MaterialDraftTask::MAIL_MATERIAL_KEY
+            ? (bool) ($row->payload['include_paid_offer'] ?? false)
+            : null;
+        $versionShowCertificate = $materialId === MaterialDraftTask::MAIL_MATERIAL_KEY
+            ? (bool) ($row->payload['show_certificate'] ?? false)
+            : null;
+        $versionSnapshot = $materialId === MaterialDraftTask::MAIL_MATERIAL_KEY && is_array($row->payload['paid_offer_snapshot'] ?? null)
+            ? $row->payload['paid_offer_snapshot']
+            : null;
         $currentTemplate = null;
+        $currentIncludePaid = null;
+        $currentShowCertificate = null;
+        $currentSnapshot = null;
         foreach ($project['materials'] as $material) {
             if (is_array($material) && ($material['id'] ?? null) === $materialId) {
                 $currentTemplate = MailTemplates::key($material['template_key'] ?? null);
+                $currentIncludePaid = (bool) ($material['include_paid_offer'] ?? false);
+                $currentShowCertificate = (bool) ($material['show_certificate'] ?? false);
+                $currentSnapshot = is_array($material['paid_offer_snapshot'] ?? null) ? $material['paid_offer_snapshot'] : null;
             }
         }
-        if ($draft === self::materialDraft($project, $materialId) && ($versionTemplate === null || $versionTemplate === $currentTemplate)) {
+        $mailMetaUnchanged = $versionTemplate === null
+            || (
+                $versionTemplate === $currentTemplate
+                && $versionIncludePaid === $currentIncludePaid
+                && $versionShowCertificate === $currentShowCertificate
+                && json_encode($versionSnapshot) === json_encode($currentSnapshot)
+            );
+        if ($draft === self::materialDraft($project, $materialId) && $mailMetaUnchanged) {
             return ['ok' => false, 'unchanged' => true];
         }
 
@@ -1193,6 +1233,17 @@ class DemoTikWebinarProject
                 $project['materials'][$index]['draft'] = $draft;
                 if ($versionTemplate !== null) {
                     $project['materials'][$index]['template_key'] = $versionTemplate;
+                }
+                if ($versionIncludePaid !== null) {
+                    $project['materials'][$index]['include_paid_offer'] = $versionIncludePaid;
+                }
+                if ($versionShowCertificate !== null) {
+                    $project['materials'][$index]['show_certificate'] = $versionShowCertificate;
+                }
+                if ($versionSnapshot !== null) {
+                    $project['materials'][$index]['paid_offer_snapshot'] = $versionSnapshot;
+                } elseif ($versionIncludePaid === false) {
+                    unset($project['materials'][$index]['paid_offer_snapshot']);
                 }
                 $project['materials'][$index]['status'] = 'DRAFT';
                 $project['materials'][$index]['updated_at'] = now()->toIso8601String();
@@ -1768,10 +1819,17 @@ class DemoTikWebinarProject
     }
 
     /**
+     * @param  array<string, mixed>|null  $mailOptions
      * @return array<string, mixed>
      */
-    public static function updateMaterialStatus(string $projectId, string $materialId, string $status, ?string $draft = null, ?string $templateKey = null): array
-    {
+    public static function updateMaterialStatus(
+        string $projectId,
+        string $materialId,
+        string $status,
+        ?string $draft = null,
+        ?string $templateKey = null,
+        ?array $mailOptions = null,
+    ): array {
         $project = self::requireProject($projectId);
         abort_unless(array_key_exists($status, self::materialStatusLabels()), 422);
 
@@ -1781,8 +1839,32 @@ class DemoTikWebinarProject
                 if ($draft !== null && ! self::isMaterialSkipped($material)) {
                     $project['materials'][$index]['draft'] = $draft;
                 }
-                if ($templateKey !== null && $materialId === MaterialDraftTask::MAIL_MATERIAL_KEY && ! self::isMaterialSkipped($material)) {
-                    $project['materials'][$index]['template_key'] = MailTemplates::key($templateKey);
+                if ($materialId === MaterialDraftTask::MAIL_MATERIAL_KEY && ! self::isMaterialSkipped($material)) {
+                    $project['materials'][$index]['template_key'] = MailTemplates::CANONICAL;
+                    if ($templateKey !== null) {
+                        $project['materials'][$index]['template_key'] = MailTemplates::key($templateKey);
+                    }
+                    if (is_array($mailOptions)) {
+                        if (array_key_exists('include_paid_offer', $mailOptions)) {
+                            $project['materials'][$index]['include_paid_offer'] = (bool) $mailOptions['include_paid_offer'];
+                        }
+                        if (array_key_exists('show_certificate', $mailOptions)) {
+                            $project['materials'][$index]['show_certificate'] = (bool) $mailOptions['show_certificate'];
+                        }
+                        if (array_key_exists('paid_offer_snapshot', $mailOptions) && is_array($mailOptions['paid_offer_snapshot'])) {
+                            $project['materials'][$index]['paid_offer_snapshot'] = $mailOptions['paid_offer_snapshot'];
+                        }
+                        if (($mailOptions['refresh_paid_offer'] ?? false) === true
+                            && ($project['materials'][$index]['include_paid_offer'] ?? false) === true) {
+                            $project['materials'][$index]['paid_offer_snapshot'] = app(PaidCourseOfferBuilder::class)
+                                ->snapshot(is_numeric($project['growth_campaign_id'] ?? null) ? (int) $project['growth_campaign_id'] : null);
+                        }
+                        if (($project['materials'][$index]['include_paid_offer'] ?? false) === true
+                            && ! is_array($project['materials'][$index]['paid_offer_snapshot'] ?? null)) {
+                            $project['materials'][$index]['paid_offer_snapshot'] = app(PaidCourseOfferBuilder::class)
+                                ->snapshot(is_numeric($project['growth_campaign_id'] ?? null) ? (int) $project['growth_campaign_id'] : null);
+                        }
+                    }
                 }
                 $project['materials'][$index]['updated_at'] = now()->toIso8601String();
                 self::saveProject($project);
@@ -2466,14 +2548,10 @@ class DemoTikWebinarProject
         $extra = trim((string) ($concept['additional_material'] ?? ''));
 
         $body = implode("\n\n", array_filter([
-            'Dzień dobry,',
             'zapraszamy Państwa na webinar „'.$title.'”. '.trim((string) ($concept['promise'] ?? '')),
             $points !== '' ? $icon('📌')."Czego się Państwo dowiedzą:\n".$points : '',
             $length === 'long' && $plan !== '' ? 'Plan spotkania: '.$plan : '',
             $length === 'long' && $extra !== '' ? 'Po webinarze otrzymają Państwo: '.$extra : '',
-            $icon('📅').'Termin: '.self::liveLabel($project),
-            $host !== '' ? 'Prowadzący: '.$host : '',
-            "Zapisz się:\n".MaterialDraftTask::LINK_PLACEHOLDER,
             "Z pozdrowieniami,\n".($host !== '' ? $host."\n" : '').'Zespół PNE',
         ]));
 

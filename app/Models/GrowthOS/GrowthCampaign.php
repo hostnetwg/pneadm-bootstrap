@@ -57,6 +57,8 @@ class GrowthCampaign extends Model
         'live_at',
         'starts_at',
         'ends_at',
+        'registration_url',
+        'youtube_live_url',
     ];
 
     protected function casts(): array

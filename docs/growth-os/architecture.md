@@ -60,8 +60,9 @@ Nie tworzymy w v0.1 tabel `growth_topics`, `growth_experts`, `growth_campaign_to
 `growth_campaigns`
 
 - główny workspace strategiczny,
-- pola: `id`, `name`, `type`, `status`, `goal`, `host_name`, `owner_user_id`, `primary_instructor_id`, `working_topic`, `summary`, `live_at`, `starts_at`, `ends_at`, `timestamps`,
+- pola: `id`, `name`, `type`, `status`, `goal`, `host_name`, `owner_user_id`, `primary_instructor_id`, `working_topic`, `summary`, `live_at`, `starts_at`, `ends_at`, `registration_url`, `youtube_live_url`, `timestamps`,
 - `host_name` to imię i nazwisko prowadzącego z chwili zapisu: kopia `full_name` instruktora albo wpisana osoba spoza bazy (DEC-035),
+- `registration_url` / `youtube_live_url` (DEC-050) — HTTPS linki webinaru dla CTA maila Sendy PNE; nie w payloadzie materiału,
 - `communication_voice_instructor_id` (DEC-035, migracja `2026_10_02_130000`) to opcjonalny głos komunikacji (`instructors.id`, `nullOnDelete`); `null` = głos PNE,
 - `primary_instructor_id` jest opcjonalnym powiązaniem z istniejącym `instructors.id`,
 - `slug` nie jest obowiązkowy w v0.1.
@@ -94,9 +95,9 @@ Nie tworzymy w v0.1 tabel `growth_topics`, `growth_experts`, `growth_campaign_to
 
 `growth_artifact_versions` (DEC-027, poza zakresem v0.1)
 
-- historia treści materiału: `growth_artifact_id`, `version`, `source` (`baseline`, `manual`, `ai_apply`, `restore`), `restored_from_version`, `payload` (`status`, `draft`, a dla `main-mail` także `template_key`), `created_by_user_id`, `created_at`,
+- historia treści materiału: `growth_artifact_id`, `version`, `source` (`baseline`, `manual`, `ai_apply`, `restore`), `restored_from_version`, `payload` (`status`, `draft`, a dla `main-mail` także `template_key` = `sendy-pne`, `include_paid_offer`, `show_certificate`, `paid_offer_snapshot`), `created_by_user_id`, `created_at`,
 - `unique(growth_artifact_id, version)`, kasowanie razem z artifactem,
-- wiersz powstaje przy zmianie szkicu, a dla mailingu głównego także przy zmianie `template_key`; zostaje ostatnie 20 na artifact,
+- wiersz powstaje przy zmianie szkicu, a dla mailingu głównego także przy zmianie oferty/zaświadczenia; zostaje ostatnie 20 na artifact,
 - przywrócenie dopisuje nowy wiersz, nigdy nie zmienia starych.
 
 ### Statusy Kanoniczne

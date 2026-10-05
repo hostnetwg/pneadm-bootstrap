@@ -1242,9 +1242,10 @@ class GrowthOsMaterialAiDraftTest extends TestCase
         $this->assertSame(['emojis' => false, 'length' => 'short', 'html' => false], $input['style']);
         $this->assertSame(['subject_options', 'preheader', 'body', 'change_summary'], $this->provider->schema['required']);
         $this->assertSame(MaterialDraftTask::MAIL_PROMPT_VERSION, $this->proposal(self::MAIL)['prompt_version']);
-        foreach (['Dzień dobry,', 'Państwo', 'Zespół PNE', MaterialDraftTask::LINK_PLACEHOLDER, 'style.length', 'campaign.live_label'] as $rule) {
+        foreach (['Państwo', 'Zespół PNE', '[Name,fallback=]', 'style.length', 'campaign.live_label', 'NIE zaczynaj body od'] as $rule) {
             $this->assertStringContainsString($rule, $this->provider->instructions);
         }
+        $this->assertStringNotContainsString(MaterialDraftTask::LINK_PLACEHOLDER, $this->provider->instructions);
     }
 
     public function test_main_mail_refine_sends_the_unsaved_fields_and_iterate_uses_the_proposal(): void
@@ -1403,16 +1404,18 @@ class GrowthOsMaterialAiDraftTest extends TestCase
         $this->requestFor($user, self::MAIL, ['length' => 'short', 'emojis' => '0']);
         $short = $this->proposal(self::MAIL)['draft'];
         $this->assertStringStartsWith('Temat: ', $short);
-        $this->assertStringContainsString("Dzień dobry,\n\nzapraszamy Państwa", $short);
-        $this->assertStringContainsString('Termin: '.$this->liveLabel(), $short);
-        $this->assertStringContainsString(MaterialDraftTask::LINK_PLACEHOLDER, $short);
+        $this->assertStringContainsString('zapraszamy Państwa', $short);
+        $this->assertStringNotContainsString("Dzień dobry,\n", $short);
+        $shortBody = MaterialDraftTask::parseMainMail($short)['body'];
+        $this->assertStringNotContainsString('Termin: '.$this->liveLabel(), $shortBody);
+        $this->assertStringNotContainsString(MaterialDraftTask::LINK_PLACEHOLDER, $shortBody);
         $this->assertStringContainsString("Z pozdrowieniami,\nWaldemar Grabowski\nZespół PNE", $short);
         $this->assertStringNotContainsString('📅', $short);
-        $this->assertStringNotContainsString('Plan spotkania:', $short);
+        $this->assertStringNotContainsString('Plan spotkania:', $shortBody);
 
         $this->requestFor($user, self::MAIL, ['length' => 'long', 'emojis' => '1']);
         $long = $this->proposal(self::MAIL)['draft'];
-        $this->assertStringContainsString('📅', $long);
+        $this->assertStringContainsString('📌', $long);
         $this->assertStringContainsString('Plan spotkania:', $long);
         $this->assertSame(0, $this->provider->calls);
     }

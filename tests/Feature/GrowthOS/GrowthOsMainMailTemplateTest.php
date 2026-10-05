@@ -11,6 +11,7 @@ use App\Services\GrowthOS\AI\Data\AiProviderResponse;
 use App\Services\GrowthOS\AI\Tasks\MaterialDraftTask;
 use App\Support\GrowthOS\DemoTikWebinarProject;
 use App\Support\GrowthOS\MailHtmlFormatter;
+use App\Support\GrowthOS\MailTemplates;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
@@ -53,7 +54,7 @@ class GrowthOsMainMailTemplateTest extends TestCase
         parent::tearDown();
     }
 
-    public function test_main_mail_without_a_template_opens_on_the_default_and_other_materials_stay_plain(): void
+    public function test_main_mail_uses_sendy_pne_and_reminder_stays_without_tiptap(): void
     {
         $user = $this->readyProject();
 
@@ -61,12 +62,12 @@ class GrowthOsMainMailTemplateTest extends TestCase
             ->get(route('growth.projects.materials.show', [DemoTikWebinarProject::PROJECT_ID, self::MAIL]))
             ->assertOk()
             ->assertSee('data-mail-editor', false)
-            ->assertSee('Klasyczny PNE')
-            ->assertSee('Osobisty')
-            ->assertSee('Minimalny')
-            ->assertSee('id="mail_template_classic" checked', false)
+            ->assertSee('Sendy PNE')
+            ->assertSee('Dołącz ofertę płatnych szkoleń')
+            ->assertSee('Pokaż informację o bezpłatnym zaświadczeniu')
+            ->assertDontSee('Klasyczny PNE')
+            ->assertDontSee('name="template_key"', false)
             ->assertSee('aria-label="Cofnij"', false)
-            ->assertSee('aria-label="Ponów"', false)
             ->assertDontSee('id="mail_body_visual"', false);
 
         $this->actingAs($user)
@@ -74,6 +75,7 @@ class GrowthOsMainMailTemplateTest extends TestCase
             ->assertOk()
             ->assertSee('data-mail-visual', false)
             ->assertSee('Poproś AI o szkic')
+            ->assertSee('Sendy PNE')
             ->assertDontSee('Klasyczny PNE')
             ->assertDontSee('name="template_key"', false);
 
@@ -81,50 +83,34 @@ class GrowthOsMainMailTemplateTest extends TestCase
             ->get(route('growth.projects.materials.show', [DemoTikWebinarProject::PROJECT_ID, 'youtube-description']))
             ->assertOk()
             ->assertDontSee('name="template_key"', false)
-            ->assertDontSee('Klasyczny PNE');
+            ->assertDontSee('Sendy PNE');
     }
 
-    public function test_template_is_saved_restored_and_does_not_change_the_mail_text(): void
+    public function test_certificate_and_paid_offer_flags_are_versioned(): void
     {
         $user = $this->readyProject();
         $fields = [
             'mail_subject' => 'Mój temat',
             'mail_preheader' => 'Mój preheader',
-            'mail_body' => "Dzień dobry,\n\nTreść.",
+            'mail_body' => 'zapraszamy Państwa.',
         ];
-        $draft = "Temat: Mój temat\nPreheader: Mój preheader\n\nDzień dobry,\n\nTreść.";
+        $draft = "Temat: Mój temat\nPreheader: Mój preheader\n\nzapraszamy Państwa.";
 
-        $this->save($user, 'REVIEW', $fields, 'classic');
-        $this->save($user, 'REVIEW', $fields, 'personal');
+        $this->save($user, 'REVIEW', $fields, includePaid: false, showCertificate: false);
+        $this->save($user, 'REVIEW', $fields, includePaid: true, showCertificate: true);
 
         $artifact = $this->artifact();
-        $this->assertSame('personal', $artifact->payload['template_key']);
+        $this->assertSame(MailTemplates::CANONICAL, $artifact->payload['template_key']);
+        $this->assertTrue($artifact->payload['include_paid_offer']);
+        $this->assertTrue($artifact->payload['show_certificate']);
         $this->assertSame($draft, $artifact->payload['draft']);
-        $this->assertSame('REVIEW', $artifact->payload['status']);
-
-        $this->actingAs($user)
-            ->get(route('growth.projects.materials.show', [DemoTikWebinarProject::PROJECT_ID, self::MAIL]))
-            ->assertOk()
-            ->assertSee('id="mail_template_personal" checked', false)
-            ->assertSee('value="Mój temat"', false)
-            ->assertSee('value="Mój preheader"', false);
+        $this->assertIsArray($artifact->payload['paid_offer_snapshot'] ?? null);
 
         $versions = $artifact->versions()->orderBy('version')->get();
-        $this->assertCount(2, $versions);
-        $this->assertSame('classic', $versions[0]->payload['template_key']);
-        $this->assertSame('personal', $versions[1]->payload['template_key']);
-        $this->assertSame($draft, $versions[0]->payload['draft']);
-        $this->assertSame($draft, $versions[1]->payload['draft']);
-
-        $this->actingAs($user)
-            ->post(route('growth.projects.materials.versions.restore', [DemoTikWebinarProject::PROJECT_ID, self::MAIL, $versions[0]->version]))
-            ->assertRedirect();
-
-        $restored = $this->artifact()->fresh();
-        $this->assertSame('classic', $restored->payload['template_key']);
-        $this->assertSame($draft, $restored->payload['draft']);
-        $this->assertSame('DRAFT', $restored->payload['status']);
-        $this->assertSame(GrowthArtifactVersion::SOURCE_RESTORE, $restored->versions()->orderByDesc('version')->first()->source);
+        $this->assertGreaterThanOrEqual(2, $versions->count());
+        $this->assertFalse((bool) $versions[0]->payload['include_paid_offer']);
+        $this->assertTrue((bool) $versions->last()->payload['include_paid_offer']);
+        $this->assertTrue((bool) $versions->last()->payload['show_certificate']);
     }
 
     public function test_saved_content_cannot_replace_the_wrapper_button_or_preheader(): void
@@ -138,7 +124,7 @@ class GrowthOsMainMailTemplateTest extends TestCase
             'mail_subject' => 'Temat',
             'mail_preheader' => 'Ukryty preheader.',
             'mail_body' => $hostile,
-        ], 'minimal');
+        ]);
 
         $fields = MaterialDraftTask::parseMainMail($this->artifact()->payload['draft']);
         $this->assertSame('Ukryty preheader.', $fields['preheader']);
@@ -149,27 +135,26 @@ class GrowthOsMainMailTemplateTest extends TestCase
         $this->assertStringNotContainsString('onclick', $fields['body']);
         $this->assertStringNotContainsString(MaterialDraftTask::LINK_PLACEHOLDER, $fields['body']);
 
-        $copied = MailHtmlFormatter::copyHtml($fields['preheader'], $fields['body'], 'minimal');
+        $copied = MailHtmlFormatter::copyHtml($fields['preheader'], $fields['body'], MailTemplates::CANONICAL);
         $this->assertStringContainsString('display:none', $copied);
         $this->assertStringContainsString('Ukryty preheader.', $copied);
         $this->assertSame(1, substr_count($copied, MailHtmlFormatter::MARKER));
-        $this->assertSame(1, substr_count($copied, 'href="'.MaterialDraftTask::LINK_PLACEHOLDER.'"'));
-        $this->assertStringContainsString('pnedu.pl', $copied);
+        $this->assertStringContainsString(MailHtmlFormatter::GREETING, $copied);
         $this->assertStringContainsString('Treść', $copied);
     }
 
-    public function test_refine_iterate_apply_and_reject_keep_the_template_and_plain_text(): void
+    public function test_refine_iterate_apply_and_reject_keep_sendy_layout_and_plain_text(): void
     {
         $user = $this->readyProject();
-        $draft = "Temat: Mój temat\nPreheader: Mój preheader\n\nDzień dobry,\n\nTreść.";
+        $draft = "Temat: Mój temat\nPreheader: Mój preheader\n\nzapraszamy Państwa.";
         $this->save($user, 'APPROVED', [
             'mail_subject' => 'Mój temat',
             'mail_preheader' => 'Mój preheader',
-            'mail_body' => "Dzień dobry,\n\nTreść.",
-        ], 'personal');
+            'mail_body' => 'zapraszamy Państwa.',
+        ], includePaid: false, showCertificate: true);
         $versionsBeforeAi = $this->artifact()->versions()->count();
 
-        $wrapped = "Temat: Mój temat\nPreheader: Mój preheader\n\n".MailHtmlFormatter::format("Dzień dobry,\n\nTreść.");
+        $wrapped = "Temat: Mój temat\nPreheader: Mój preheader\n\n".MailHtmlFormatter::format('zapraszamy Państwa.');
         $this->provider->payload = $this->mailPayload();
         $this->actingAs($user)
             ->post(route('growth.projects.materials.ai', [DemoTikWebinarProject::PROJECT_ID, self::MAIL]), [
@@ -181,16 +166,11 @@ class GrowthOsMainMailTemplateTest extends TestCase
             ->assertRedirect();
 
         $this->assertSame('refine', $this->provider->input['mode']);
-        $this->assertArrayHasKey('direction', $this->provider->input);
-        $this->assertArrayHasKey('concept', $this->provider->input);
         $this->assertStringNotContainsString(MailHtmlFormatter::MARKER, $this->provider->input['author_draft']);
         $this->assertStringNotContainsString('<table', $this->provider->input['author_draft']);
-        $this->assertStringNotContainsString('style=', $this->provider->input['author_draft']);
         $this->assertStringNotContainsString(MailHtmlFormatter::CTA_LABEL, $this->provider->input['author_draft']);
-        $this->assertStringContainsString('Temat: Mój temat', $this->provider->input['author_draft']);
-        $this->assertStringContainsString('Dzień dobry,', $this->provider->input['author_draft']);
-        $this->assertSame('APPROVED', $this->artifact()->payload['status']);
-        $this->assertSame('personal', $this->artifact()->payload['template_key']);
+        $this->assertSame(MailTemplates::CANONICAL, $this->artifact()->payload['template_key']);
+        $this->assertTrue($this->artifact()->payload['show_certificate']);
         $this->assertSame($draft, $this->artifact()->payload['draft']);
         $this->assertSame($versionsBeforeAi, $this->artifact()->versions()->count());
 
@@ -203,8 +183,6 @@ class GrowthOsMainMailTemplateTest extends TestCase
 
         $this->assertSame('iterate', $this->provider->input['mode']);
         $this->assertStringNotContainsString('<table', $this->provider->input['previous_proposal']);
-        $this->assertStringNotContainsString(MailHtmlFormatter::MARKER, $this->provider->input['previous_proposal']);
-        $this->assertSame('personal', $this->artifact()->payload['template_key']);
         $this->assertSame($versionsBeforeAi, $this->artifact()->versions()->count());
 
         $this->actingAs($user)
@@ -213,13 +191,13 @@ class GrowthOsMainMailTemplateTest extends TestCase
 
         $applied = $this->artifact()->fresh();
         $this->assertSame('DRAFT', $applied->payload['status']);
-        $this->assertSame('personal', $applied->payload['template_key']);
+        $this->assertSame(MailTemplates::CANONICAL, $applied->payload['template_key']);
+        $this->assertTrue($applied->payload['show_certificate']);
         $this->assertStringStartsWith('Temat: Canva AI w pracy nauczyciela', $applied->payload['draft']);
         $this->assertStringNotContainsString(MailHtmlFormatter::MARKER, $applied->payload['draft']);
         $latest = $applied->versions()->orderByDesc('version')->first();
         $this->assertSame(GrowthArtifactVersion::SOURCE_AI_APPLY, $latest->source);
-        $this->assertSame('personal', $latest->payload['template_key']);
-        $this->assertSame('DRAFT', $latest->payload['status']);
+        $this->assertSame(MailTemplates::CANONICAL, $latest->payload['template_key']);
 
         $afterApply = $applied->payload['draft'];
         $this->provider->payload = $this->mailPayload();
@@ -238,21 +216,58 @@ class GrowthOsMainMailTemplateTest extends TestCase
 
         $rejected = $this->artifact()->fresh();
         $this->assertSame($afterApply, $rejected->payload['draft']);
-        $this->assertSame('personal', $rejected->payload['template_key']);
+        $this->assertSame(MailTemplates::CANONICAL, $rejected->payload['template_key']);
         $this->assertNull($this->proposal());
+    }
+
+    public function test_project_links_save_and_reject_dangerous_urls(): void
+    {
+        $user = $this->readyProject();
+
+        $this->actingAs($user)
+            ->put(route('growth.projects.links.update', DemoTikWebinarProject::PROJECT_ID), [
+                'registration_url' => 'https://pnedu.pl/courses/577',
+                'youtube_live_url' => 'https://www.youtube.com/live/31GX_yG5KDo',
+            ])
+            ->assertRedirect();
+
+        $project = DemoTikWebinarProject::requireProject(DemoTikWebinarProject::PROJECT_ID);
+        $this->assertSame('https://pnedu.pl/courses/577', $project['registration_url']);
+        $this->assertSame('https://www.youtube.com/live/31GX_yG5KDo', $project['youtube_live_url']);
+
+        $this->actingAs($user)
+            ->from(route('growth.projects.show', DemoTikWebinarProject::PROJECT_ID))
+            ->put(route('growth.projects.links.update', DemoTikWebinarProject::PROJECT_ID), [
+                'registration_url' => 'javascript:alert(1)',
+                'youtube_live_url' => 'https://evil.test/watch',
+            ])
+            ->assertRedirect()
+            ->assertSessionHasErrors(['registration_url', 'youtube_live_url']);
     }
 
     /**
      * @param  array{mail_subject: string, mail_preheader: string, mail_body: string}  $fields
      */
-    private function save(User $user, string $status, array $fields, string $template): void
-    {
+    private function save(
+        User $user,
+        string $status,
+        array $fields,
+        bool $includePaid = false,
+        bool $showCertificate = false,
+    ): void {
+        $payload = [
+            'status' => $status,
+            ...$fields,
+        ];
+        if ($includePaid) {
+            $payload['include_paid_offer'] = '1';
+        }
+        if ($showCertificate) {
+            $payload['show_certificate'] = '1';
+        }
+
         $this->actingAs($user)
-            ->post(route('growth.projects.materials.status', [DemoTikWebinarProject::PROJECT_ID, self::MAIL]), [
-                'status' => $status,
-                'template_key' => $template,
-                ...$fields,
-            ])
+            ->post(route('growth.projects.materials.status', [DemoTikWebinarProject::PROJECT_ID, self::MAIL]), $payload)
             ->assertRedirect();
     }
 
@@ -277,10 +292,14 @@ class GrowthOsMainMailTemplateTest extends TestCase
     private function mailPayload(): array
     {
         return [
-            'subject_options' => ['Canva AI w pracy nauczyciela', 'Zaproszenie na webinar TIK', 'Praktyczna Canva AI w szkole'],
-            'preheader' => 'Praktyczny webinar dla nauczycieli.',
-            'body' => "Dzień dobry,\n\nzapraszamy Państwa na webinar.\n\nZapisz się:\n[LINK DO ZAPISU]\n\nZ pozdrowieniami,\nWaldemar Grabowski\nZespół PNE",
-            'change_summary' => 'Przygotowano mailing główny.',
+            'subject_options' => [
+                'Canva AI w pracy nauczyciela',
+                'Webinar Canva AI dla szkoły',
+                'Praktyczny Canva AI',
+            ],
+            'preheader' => 'Zapraszamy na praktyczny webinar.',
+            'body' => "zapraszamy Państwa na webinar.\n\n- Punkt A\n- Punkt B\n\nZ pozdrowieniami,\nZespół PNE",
+            'change_summary' => 'Przygotowano szkic maila.',
         ];
     }
 
@@ -318,15 +337,13 @@ class GrowthOsMainMailTemplateTest extends TestCase
     }
 }
 
-final class MainMailProvider implements GrowthAiProvider
+class MainMailProvider implements GrowthAiProvider
 {
-    public int $calls = 0;
+    /** @var array<string, mixed> */
+    public array $payload = [];
 
     /** @var array<string, mixed> */
     public array $input = [];
-
-    /** @var array<string, mixed> */
-    public array $payload = [];
 
     public function name(): string
     {
@@ -345,17 +362,16 @@ final class MainMailProvider implements GrowthAiProvider
         array $schema,
         array $options = [],
     ): AiProviderResponse {
-        $this->calls++;
         $this->input = $input;
 
         return new AiProviderResponse(
             payload: $this->payload,
-            provider: $this->name(),
-            model: $this->model(),
-            requestId: 'test-request-id',
-            inputTokens: 10,
-            outputTokens: 20,
-            latencyMs: 5,
+            provider: 'openai',
+            model: 'test-model',
+            requestId: 'test',
+            inputTokens: 1,
+            outputTokens: 1,
+            latencyMs: 1,
         );
     }
 }

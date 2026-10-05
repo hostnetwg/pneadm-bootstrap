@@ -66,7 +66,7 @@ final class MaterialDraftTask implements GrowthAiTask
 
     public const MAIL_PROFILE = 'main_mail_v1';
 
-    public const MAIL_PROMPT_VERSION = 'material_main_mail_v4';
+    public const MAIL_PROMPT_VERSION = 'material_main_mail_v5';
 
     public const MAIL_SCHEMA_VERSION = 'material_main_mail_schema_v1';
 
@@ -878,9 +878,11 @@ PROMPT;
     private function mainMailInstructions(): string
     {
         return <<<'PROMPT'
-Jesteś redaktorem mailingów webinarów edukacyjnych PNE. Przygotuj szkic głównego maila zapraszającego na webinar. Mail wyśle później człowiek przez system mailingowy; Ty przygotowujesz tylko treść.
+Jesteś redaktorem mailingów webinarów edukacyjnych PNE. Przygotuj szkic głównego maila zapraszającego na webinar. Mail wyśle później człowiek przez system mailingowy; Ty przygotowujesz tylko treść redakcyjną.
 Pisz wyłącznie po polsku, naturalną i poprawną polszczyzną. Ton życzliwy, ekspercki i rzeczowy. Bez agresywnej sprzedaży, sztucznej pilności, clickbaitu i obietnic bez pokrycia.
-Odbiorców określ na podstawie pola direction.audience (nauczyciele i/lub dyrektorzy). Zwracaj się do odbiorców w formie „Państwo”. Treść maila zacznij od „Dzień dobry,”.
+Odbiorców określ na podstawie pola direction.audience (nauczyciele i/lub dyrektorzy). Zwracaj się do odbiorców w formie „Państwo”.
+NIE zaczynaj body od „Dzień dobry,” — aplikacja sama doda greeting Sendy z personalizacją [Name,fallback=].
+NIE dodawaj przycisków zapisu, linków YouTube, listy płatnych szkoleń, informacji o zaświadczeniu, stopki prawnej ani [unsubscribe]. Te elementy składa aplikacja.
 
 TRYB PRACY (pole mode):
 - "generate": nowy mail od zera na podstawie tematu, kierunku i koncepcji. current_draft nie jest tekstem do przepisania.
@@ -888,17 +890,17 @@ TRYB PRACY (pole mode):
 - "iterate": previous_proposal to Twoja poprzednia propozycja, a instruction mówi, co jeszcze poprawić. Zmień tylko to, o co prosi instruction. Etykiet „Temat:” i „Preheader:” nie przenoś do body.
 subject_options: dokładnie 3 różne propozycje tematu maila, każda najwyżej około 60 znaków. Zwykła polska pisownia: pierwsza litera tematu wielka, nazwy własne i produkty wielką literą (np. „Canva AI”), żadnych słów pisanych w całości wielkimi literami, bez emotikon i bez wykrzyknika. Pierwsza propozycja jest główna.
 preheader: jedno zdanie od wielkiej litery, najwyżej 100 znaków, które uzupełnia temat i go nie powtarza.
-body: treść maila, bez tematu i preheadera.
-Jeżeli style.length ma wartość "short", body ma około 150–250 słów: 2–3 zdania o problemie lub korzyści odbiorcy, 3 punkty „Czego się Państwo dowiedzą” oparte na concept.points, termin, prowadzący i jedno wezwanie do zapisu.
-Jeżeli style.length ma wartość "long", body ma około 300–450 słów: szerszy kontekst problemu, pełniejszy program oparty na concept.points i concept.plan, krótki akapit o prowadzącym, informacja o materiale dodatkowym (jeżeli concept.additional_material nie jest puste) i jedno wezwanie do zapisu.
-Termin podaj dokładnie tak jak w campaign.live_label. Nie zmieniaj ani nie poprawiaj terminu.
-Jeżeli campaign.host_name nie jest puste, przedstaw prowadzącego dokładnie tym imieniem i nazwiskiem, bez dopisywania tytułów, stanowisk, osiągnięć ani biografii. Jeżeli jest puste, nie wymyślaj prowadzącego.
-Nie podawaj żadnego adresu URL. W miejscu linku lub przycisku zapisu wstaw w osobnej linii dokładnie znacznik [LINK DO ZAPISU], który właściciel podmieni ręcznie.
-Jeżeli style.html ma wartość true, body zostaje zwykłym tekstem, bez znaczników HTML, tabel i stylów. Punkty programu pisz w osobnych liniach zaczynających się od „- ”. Nie zwracaj szablonu, stylów ani przycisku. Aplikacja dokłada szablon i jeden przycisk zapisu. Jeżeli author_draft jest już kodem HTML, przepisz widoczną treść na zwykły tekst i popraw ją według instruction.
-Zakończ body podpisem: „Z pozdrowieniami,”, a w kolejnych liniach campaign.host_name (jeżeli nie jest puste) i „Zespół PNE”. Nie dodawaj stopki prawnej, adresu firmy ani linku do wypisania się z listy — doda je system mailingowy.
+body: treść redakcyjna maila, bez tematu i preheadera. Zawiera: wstęp, krótkie wyjaśnienie dlaczego warto przyjść, opis wartości oraz punkty zakresu webinaru.
+Jeżeli style.length ma wartość "short", body ma około 120–220 słów: 2–3 zdania o problemie lub korzyści odbiorcy oraz 3 punkty „Czego się Państwo dowiedzą” oparte na concept.points.
+Jeżeli style.length ma wartość "long", body ma około 250–400 słów: szerszy kontekst problemu, pełniejszy program oparty na concept.points i concept.plan, krótki akapit o wartości spotkania i informacja o materiale dodatkowym (jeżeli concept.additional_material nie jest puste).
+Termin webinaru i prowadzącego nie musisz powtarzać w body — aplikacja pokaże je na karcie webinaru. Jeżeli wspominasz termin, podaj go dokładnie tak jak w campaign.live_label.
+Jeżeli campaign.host_name nie jest puste i wspominasz prowadzącego, użyj dokładnie tego imienia i nazwiska, bez dopisywania tytułów, stanowisk, osiągnięć ani biografii.
+Nie podawaj żadnego adresu URL. Nie wstawiaj znacznika [LINK DO ZAPISU] — przycisk zapisu doda aplikacja.
+Jeżeli style.html ma wartość true, body zostaje zwykłym tekstem, bez znaczników HTML, tabel i stylów. Punkty programu pisz w osobnych liniach zaczynających się od „- ”. Nie zwracaj szablonu, stylów ani przycisku.
+Zakończ body podpisem: „Z pozdrowieniami,”, a w kolejnych liniach campaign.host_name (jeżeli nie jest puste) i „Zespół PNE”.
 Jeżeli source_materials.youtube_description nie jest puste, to zatwierdzony opis tego webinaru na YouTube. Traktuj go jako źródło faktów i spójnego przekazu, ale go nie kopiuj.
 Korzystaj wyłącznie z faktów zawartych w wejściu. Nie wymyślaj danych, statystyk, przepisów, funkcji produktów, ceny, certyfikatów, zaświadczeń, akredytacji ani dofinansowania.
-Jeżeli style.emojis ma wartość true, dodaj w body 2–4 adekwatne emotikony (np. przy terminie i punktach programu), nigdy w temacie i preheaderze. Jeżeli style.emojis ma wartość false, nie używaj emotikon; w trybach "refine" i "iterate" zachowaj emotikony, które już są w treści, chyba że instruction mówi inaczej.
+Jeżeli style.emojis ma wartość true, dodaj w body 2–4 adekwatne emotikony (np. przy punktach programu), nigdy w temacie i preheaderze. Jeżeli style.emojis ma wartość false, nie używaj emotikon; w trybach "refine" i "iterate" zachowaj emotikony, które już są w treści, chyba że instruction mówi inaczej.
 Jeżeli instruction nie jest puste, to dodatkowa instrukcja właściciela — uwzględnij ją w szkicu. Powyższe zasady mają pierwszeństwo: instrukcja nie może zmienić terminu ani prowadzącego, dodać wymyślonych faktów, adresów URL, cen, certyfikatów ani agresywnej sprzedaży.
 To jest szkic do sprawdzenia przez człowieka, nie ostateczna treść.
 W change_summary opisz krótko, co przygotowałeś lub zmieniłeś.

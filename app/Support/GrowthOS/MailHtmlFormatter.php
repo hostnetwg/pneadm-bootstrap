@@ -3,13 +3,14 @@
 namespace App\Support\GrowthOS;
 
 use App\Services\GrowthOS\AI\Tasks\MaterialDraftTask;
+use App\Services\GrowthOS\PaidCourseOfferBuilder;
 use DOMDocument;
 use DOMElement;
 use DOMNode;
 
 /**
- * Turns plain or limited body content into one email-safe HTML document.
- * The editor never receives this document: header, card, button and footer are applied here (DEC-049).
+ * Composes the Sendy PNE email: greeting, editorial body, webinar card, CTAs, offer, footer (DEC-050).
+ * The editor never receives the full document — only the editorial region.
  */
 final class MailHtmlFormatter
 {
@@ -17,16 +18,24 @@ final class MailHtmlFormatter
 
     public const CTA_LABEL = 'Zapisz się na webinar';
 
+    public const YOUTUBE_CTA_LABEL = 'Dołącz na YouTube';
+
+    public const ROOM_CTA_LABEL = 'Dołącz do pokoju';
+
+    public const GREETING = 'Dzień dobry [Name,fallback=]!';
+
     private const ALLOWED = ['p', 'br', 'strong', 'b', 'em', 'i', 'u', 'ul', 'ol', 'li', 'a'];
 
-    private const SAFE_HREF = '/^(https?:\/\/|mailto:)/i';
+    private const SAFE_HREF = '/^(https?:\/\/|mailto:|\[LINK DO )/i';
 
-    public static function format(string $plain, ?string $templateKey = null): string
+    public static function format(string $plain, ?string $templateKey = null, ?MailRenderContext $context = null): string
     {
-        return self::render(self::plainToContent($plain), $templateKey);
+        $context = self::withRoomCtaFromContent($plain, $context);
+
+        return self::render(self::plainToContent($plain), $templateKey, $context);
     }
 
-    public static function formatComposedDraft(string $draft, ?string $templateKey = null): string
+    public static function formatComposedDraft(string $draft, ?string $templateKey = null, ?MailRenderContext $context = null): string
     {
         $fields = MaterialDraftTask::parseMainMail($draft);
         if (str_contains($fields['body'], self::MARKER)) {
@@ -38,7 +47,11 @@ final class MailHtmlFormatter
             static fn (string $subject): bool => $subject !== '',
         ));
 
-        return MaterialDraftTask::composeMainMail($subjects, $fields['preheader'], self::format($fields['body'], $templateKey));
+        return MaterialDraftTask::composeMainMail(
+            $subjects,
+            $fields['preheader'],
+            self::format($fields['body'], $templateKey, $context),
+        );
     }
 
     /**
@@ -62,39 +75,89 @@ final class MailHtmlFormatter
         return self::sanitizeContent($source);
     }
 
-    public static function render(string $content, ?string $templateKey = null): string
+    public static function render(string $content, ?string $templateKey = null, ?MailRenderContext $context = null): string
     {
-        return self::fillBody(
-            self::shell($templateKey),
-            self::emailize(self::sanitizeContent($content)),
-        );
+        $context ??= new MailRenderContext;
+        if ($context->isReminder && ! $context->includeRoomCta && (
+            str_contains($content, MaterialDraftTask::ROOM_LINK_PLACEHOLDER)
+        )) {
+            $context = new MailRenderContext(
+                registrationUrl: $context->registrationUrl,
+                youtubeLiveUrl: $context->youtubeLiveUrl,
+                hostName: $context->hostName,
+                liveLabel: $context->liveLabel,
+                webinarTitle: $context->webinarTitle,
+                webinarSubtitle: $context->webinarSubtitle,
+                showCertificate: $context->showCertificate,
+                includeRoomCta: true,
+                paidCourses: $context->paidCourses,
+                growthCampaignId: $context->growthCampaignId,
+                isReminder: true,
+            );
+        }
+        $editorial = self::prepareEditorial($content, $context);
+
+        return self::document($editorial, $context, MailTemplates::key($templateKey));
     }
 
     /**
      * Same shell as the copied mail, with the editor mounted in the content cell.
      */
-    public static function editorFrame(string $templateKey, bool $locked = false): string
+    public static function editorFrame(?string $templateKey = null, bool $locked = false, ?MailRenderContext $context = null): string
     {
         $lockedAttr = $locked ? ' data-mail-locked="1"' : '';
+        $context ??= new MailRenderContext;
 
-        return self::fillBody(
-            self::shell($templateKey),
+        return self::document(
             '<div id="mail_body_editor" data-mail-editor'.$lockedAttr.'></div>',
+            $context,
+            MailTemplates::key($templateKey),
+            emailizeEditorial: false,
         );
     }
 
-    public static function finalHtml(string $content, ?string $templateKey = null): string
+    public static function finalHtml(string $content, ?string $templateKey = null, ?MailRenderContext $context = null): string
     {
+        $context = self::withRoomCtaFromContent($content, $context);
         $content = self::editorContent($content);
 
         return self::isHtml($content)
-            ? self::render($content, $templateKey)
-            : self::format($content, $templateKey);
+            ? self::render($content, $templateKey, $context)
+            : self::format($content, $templateKey, $context);
     }
 
-    public static function copyHtml(string $preheader, string $content, ?string $templateKey = null): string
+    private static function withRoomCtaFromContent(string $content, ?MailRenderContext $context): MailRenderContext
     {
-        return self::preheaderHtml($preheader).self::finalHtml($content, $templateKey);
+        $context ??= new MailRenderContext;
+        if (! $context->isReminder || $context->includeRoomCta || ! str_contains($content, MaterialDraftTask::ROOM_LINK_PLACEHOLDER)) {
+            return $context;
+        }
+
+        return new MailRenderContext(
+            registrationUrl: $context->registrationUrl,
+            youtubeLiveUrl: $context->youtubeLiveUrl,
+            hostName: $context->hostName,
+            liveLabel: $context->liveLabel,
+            webinarTitle: $context->webinarTitle,
+            webinarSubtitle: $context->webinarSubtitle,
+            showCertificate: $context->showCertificate,
+            includeRoomCta: true,
+            paidCourses: $context->paidCourses,
+            growthCampaignId: $context->growthCampaignId,
+            isReminder: true,
+        );
+    }
+
+    public static function copyHtml(string $preheader, string $content, ?string $templateKey = null, ?MailRenderContext $context = null): string
+    {
+        return self::preheaderHtml($preheader).self::finalHtml($content, $templateKey, $context);
+    }
+
+    public static function canCopyHtml(?MailRenderContext $context): bool
+    {
+        $url = trim((string) ($context?->registrationUrl ?? ''));
+
+        return $url !== '' && preg_match('/^https:\/\//i', $url) === 1;
     }
 
     public static function preheaderHtml(string $preheader): string
@@ -147,64 +210,335 @@ final class MailHtmlFormatter
         return trim($result);
     }
 
-    private static function shell(?string $templateKey): string
+    private static function prepareEditorial(string $content, MailRenderContext $context): string
     {
-        $key = MailTemplates::key($templateKey);
-        $path = dirname(__DIR__, 3).'/resources/growth-os/mail-templates/'.$key.'.html';
-        $html = is_file($path) ? file_get_contents($path) : '';
+        $html = self::isHtml($content) ? self::sanitizeContent($content) : self::plainToContent($content);
+        $html = self::stripTechnicalMarkers($html);
+        $html = self::stripLeadingGreeting($html);
 
-        return is_string($html) ? $html : '';
+        return self::emailize($html);
     }
 
-    private static function fillBody(string $shell, string $innerHtml): string
+    private static function document(
+        string $editorialHtml,
+        MailRenderContext $context,
+        string $templateKey,
+        bool $emailizeEditorial = true,
+    ): string {
+        $inner = $emailizeEditorial ? $editorialHtml : $editorialHtml;
+        $paidBlock = self::paidCoursesHtml($context);
+        $youtube = trim((string) ($context->youtubeLiveUrl ?? ''));
+        $registration = trim((string) ($context->registrationUrl ?? ''));
+        $registrationHref = $registration !== '' ? self::escapeAttr($registration) : self::escapeAttr(MaterialDraftTask::LINK_PLACEHOLDER);
+
+        $parts = [];
+        $parts[] = self::outerOpen($templateKey);
+        $parts[] = self::headerHtml();
+        $parts[] = self::greetingHtml();
+        $parts[] = '<tr><td data-pne-mail-body="1" style="padding:8px 30px 12px;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:1.65;color:#243040;">'
+            .$inner
+            .'</td></tr>';
+
+        if ($context->liveLabel !== '' || $context->webinarTitle !== '') {
+            $parts[] = self::webinarLabelHtml($context);
+            $parts[] = self::webinarCardHtml($context, $registrationHref, $youtube);
+        } else {
+            $parts[] = self::ctaOnlyHtml($registrationHref, $youtube, $context);
+        }
+
+        if ($paidBlock !== '') {
+            $parts[] = $paidBlock;
+        }
+
+        $parts[] = self::footerHtml();
+        $parts[] = self::outerClose();
+
+        return implode('', $parts);
+    }
+
+    private static function outerOpen(string $templateKey): string
     {
+        return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" '.self::MARKER
+            .' data-pne-mail-template="'.self::escapeAttr($templateKey).'" bgcolor="#f3f6f9"'
+            .' style="width:100%;background-color:#f3f6f9;"><tr><td align="center" style="padding:28px 12px;">'
+            .'<table role="presentation" width="680" cellpadding="0" cellspacing="0" bgcolor="#ffffff"'
+            .' style="width:100%;max-width:680px;background-color:#ffffff;border:1px solid #dfe5ec;">';
+    }
+
+    private static function outerClose(): string
+    {
+        return '</table></td></tr></table>';
+    }
+
+    private static function headerHtml(): string
+    {
+        return '<tr><td data-pne-mail-header="1" bgcolor="#073b5c" style="padding:24px 30px;font-family:Arial,Helvetica,sans-serif;color:#ffffff;">'
+            .'<div style="font-size:20px;line-height:1.3;font-weight:bold;">Platforma Nowoczesnej Edukacji</div>'
+            .'<div style="padding-top:5px;font-size:13px;line-height:1.4;color:#dbe7f5;">Praktyczna wiedza dla nauczycieli i dyrektorów</div>'
+            .'</td></tr>';
+    }
+
+    private static function greetingHtml(): string
+    {
+        return '<tr><td data-pne-mail-greeting="1" style="padding:28px 30px 8px;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:1.65;color:#243040;">'
+            .'<p style="margin:0;">'.self::escape(self::GREETING).'</p>'
+            .'</td></tr>';
+    }
+
+    private static function webinarLabelHtml(MailRenderContext $context): string
+    {
+        $label = $context->liveLabel !== ''
+            ? 'BEZPŁATNY WEBINAR • '.$context->liveLabel
+            : 'BEZPŁATNY WEBINAR';
+
+        return '<tr><td data-pne-mail-webinar-label="1" align="center" style="padding:8px 30px 4px;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.4;letter-spacing:0.04em;color:#073b5c;font-weight:bold;">'
+            .self::escape(mb_strtoupper($label, 'UTF-8'))
+            .'</td></tr>';
+    }
+
+    private static function webinarCardHtml(MailRenderContext $context, string $registrationHref, string $youtube): string
+    {
+        $title = $context->webinarTitle !== '' ? $context->webinarTitle : 'Webinar PNE';
+        $subtitle = $context->webinarSubtitle;
+        $host = $context->hostName !== '' && $context->hostName !== '—'
+            ? 'Prowadzący: '.$context->hostName
+            : '';
+
+        $html = '<tr><td data-pne-mail-webinar-card="1" style="padding:12px 30px 24px;font-family:Arial,Helvetica,sans-serif;">'
+            .'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#f8fafc" style="width:100%;background-color:#f8fafc;border:1px solid #dfe5ec;">'
+            .'<tr><td style="padding:22px 22px 8px;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.4;color:#008c95;font-weight:bold;letter-spacing:0.03em;">WEBINAR PNE</td></tr>'
+            .'<tr><td style="padding:0 22px 12px;font-family:Arial,Helvetica,sans-serif;font-size:22px;line-height:1.35;color:#073b5c;font-weight:bold;">'
+            .self::escape($title)
+            .'</td></tr>';
+
+        if ($subtitle !== '') {
+            $html .= '<tr><td style="padding:0 22px 16px;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.55;color:#243040;">'
+                .self::escape($subtitle)
+                .'</td></tr>';
+        }
+
+        $html .= '<tr><td align="center" style="padding:8px 22px 18px;">'
+            .self::buttonHtml($registrationHref, self::CTA_LABEL, '#f7b500', '#073b5c')
+            .'</td></tr>';
+
+        if ($host !== '') {
+            $html .= '<tr><td style="padding:0 22px 14px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5;color:#243040;">'
+                .self::escape($host)
+                .'</td></tr>';
+        }
+
+        if ($youtube !== '') {
+            $html .= '<tr><td align="center" style="padding:0 22px 18px;">'
+                .self::buttonHtml(self::escapeAttr($youtube), self::YOUTUBE_CTA_LABEL, '#ff0000', '#ffffff')
+                .'</td></tr>';
+        }
+
+        if ($context->includeRoomCta) {
+            $html .= '<tr><td align="center" style="padding:0 22px 18px;">'
+                .self::buttonHtml(self::escapeAttr(MaterialDraftTask::ROOM_LINK_PLACEHOLDER), self::ROOM_CTA_LABEL, '#008c95', '#ffffff')
+                .'</td></tr>';
+        }
+
+        if ($context->showCertificate) {
+            $html .= '<tr><td style="padding:0 22px 22px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#eef7f8" style="width:100%;background-color:#eef7f8;border:1px solid #c9e3e6;">'
+                .'<tr><td style="padding:14px 16px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5;color:#073b5c;">'
+                .'Po webinarze otrzymają Państwo <strong>bezpłatne zaświadczenie</strong> udziału.'
+                .'</td></tr></table></td></tr>';
+        }
+
+        $html .= '</table></td></tr>';
+
+        return $html;
+    }
+
+    private static function ctaOnlyHtml(string $registrationHref, string $youtube, MailRenderContext $context): string
+    {
+        $html = '<tr><td data-pne-mail-cta="1" align="center" style="padding:16px 30px 24px;font-family:Arial,Helvetica,sans-serif;">'
+            .self::buttonHtml($registrationHref, self::CTA_LABEL, '#f7b500', '#073b5c');
+
+        if ($youtube !== '') {
+            $html .= '<div style="height:12px;line-height:12px;font-size:12px;">&nbsp;</div>'
+                .self::buttonHtml(self::escapeAttr($youtube), self::YOUTUBE_CTA_LABEL, '#ff0000', '#ffffff');
+        }
+
+        if ($context->includeRoomCta) {
+            $html .= '<div style="height:12px;line-height:12px;font-size:12px;">&nbsp;</div>'
+                .self::buttonHtml(self::escapeAttr(MaterialDraftTask::ROOM_LINK_PLACEHOLDER), self::ROOM_CTA_LABEL, '#008c95', '#ffffff');
+        }
+
+        return $html.'</td></tr>';
+    }
+
+    private static function buttonHtml(string $href, string $label, string $bg, string $color): string
+    {
+        return '<table role="presentation" cellpadding="0" cellspacing="0"><tr><td bgcolor="'.$bg.'" style="border-radius:4px;">'
+            .'<a href="'.$href.'" style="display:inline-block;padding:13px 26px;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:1.2;color:'.$color.';text-decoration:none;font-weight:bold;">'
+            .self::escape($label)
+            .'</a></td></tr></table>';
+    }
+
+    private static function paidCoursesHtml(MailRenderContext $context): string
+    {
+        if ($context->paidCourses === []) {
+            return '';
+        }
+
+        $allUrl = app(PaidCourseOfferBuilder::class)->allTrainingsUrl($context->growthCampaignId);
+        $html = '<tr><td data-pne-mail-paid-courses="1" style="padding:8px 30px 24px;font-family:Arial,Helvetica,sans-serif;">'
+            .'<div style="font-size:18px;line-height:1.35;color:#073b5c;font-weight:bold;padding-bottom:12px;">Najbliższe płatne szkolenia</div>';
+
+        foreach ($context->paidCourses as $course) {
+            if (! is_array($course)) {
+                continue;
+            }
+            $html .= self::paidCourseCardHtml($course);
+        }
+
+        $html .= '<div style="padding-top:8px;font-size:14px;line-height:1.5;">'
+            .'<a href="'.self::escapeAttr($allUrl).'" style="color:#008c95;font-weight:bold;text-decoration:underline;">Zobacz wszystkie najbliższe szkolenia →</a>'
+            .'</div></td></tr>';
+
+        return $html;
+    }
+
+    /**
+     * @param  array<string, mixed>  $course
+     */
+    private static function paidCourseCardHtml(array $course): string
+    {
+        $meta = array_values(array_filter([
+            trim((string) ($course['date_label'] ?? '')),
+            trim((string) ($course['time_label'] ?? '')),
+            trim((string) ($course['duration_label'] ?? '')),
+        ]));
+        $instructor = trim((string) ($course['instructor_name'] ?? ''));
+        $price = trim((string) ($course['price_label'] ?? ''));
+        $promo = trim((string) ($course['promotion_label'] ?? ''));
+        $omnibus = trim((string) ($course['omnibus_label'] ?? ''));
+        $url = trim((string) ($course['url'] ?? ''));
+        $title = trim((string) ($course['title'] ?? ''));
+
+        $html = '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#ffffff" style="width:100%;background-color:#ffffff;border:1px solid #dfe5ec;margin:0 0 12px;">'
+            .'<tr><td style="padding:16px 18px;font-family:Arial,Helvetica,sans-serif;">';
+
+        if ($meta !== []) {
+            $html .= '<div style="font-size:12px;line-height:1.4;color:#008c95;font-weight:bold;padding-bottom:6px;">'
+                .self::escape(implode(' • ', $meta))
+                .'</div>';
+        }
+
+        $html .= '<div style="font-size:16px;line-height:1.4;color:#073b5c;font-weight:bold;padding-bottom:6px;">'
+            .self::escape($title)
+            .'</div>';
+
+        if ($instructor !== '') {
+            $html .= '<div style="font-size:13px;line-height:1.45;color:#243040;padding-bottom:8px;">'
+                .self::escape('Prowadzący: '.$instructor)
+                .'</div>';
+        }
+
+        if ($price !== '') {
+            $html .= '<div style="font-size:15px;line-height:1.45;color:#243040;font-weight:bold;padding-bottom:4px;">'
+                .self::escape($price)
+                .'</div>';
+        }
+
+        if ($promo !== '') {
+            $html .= '<div style="font-size:12px;line-height:1.45;color:#073b5c;padding-bottom:4px;">'
+                .self::escape($promo)
+                .'</div>';
+        }
+
+        if ($omnibus !== '') {
+            $html .= '<div style="font-size:12px;line-height:1.45;color:#6b7785;padding-bottom:10px;">'
+                .self::escape($omnibus)
+                .'</div>';
+        }
+
+        if ($url !== '') {
+            $html .= '<div style="padding-top:6px;">'
+                .self::buttonHtml(self::escapeAttr($url), 'ZOBACZ SZCZEGÓŁY', '#073b5c', '#ffffff')
+                .'</div>';
+        }
+
+        return $html.'</td></tr></table>';
+    }
+
+    private static function footerHtml(): string
+    {
+        return '<tr><td data-pne-mail-footer="1" align="center" style="padding:18px 30px;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.5;color:#6b7785;border-top:1px solid #e6eaee;">'
+            .'Platforma Nowoczesnej Edukacji · pnedu.pl<br>'
+            .'<a href="[unsubscribe]" style="color:#6b7785;text-decoration:underline;">Wypisz się z listy</a>'
+            .'</td></tr>';
+    }
+
+    private static function stripTechnicalMarkers(string $html): string
+    {
+        $markers = [
+            MaterialDraftTask::LINK_PLACEHOLDER,
+            MaterialDraftTask::ROOM_LINK_PLACEHOLDER,
+        ];
+
+        if (! self::isHtml($html)) {
+            $lines = preg_split('/\R/u', $html) ?: [];
+            $kept = [];
+            foreach ($lines as $line) {
+                $trim = trim($line);
+                if (in_array($trim, $markers, true) || preg_match('/^zapisz się:?$/iu', $trim) === 1) {
+                    continue;
+                }
+                $kept[] = $line;
+            }
+
+            return trim(implode("\n", $kept));
+        }
+
         $document = new DOMDocument;
         $internal = libxml_use_internal_errors(true);
-        $document->loadHTML('<?xml encoding="UTF-8"><div id="pne-shell-root">'.$shell.'</div>', LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+        $document->loadHTML('<?xml encoding="UTF-8"><div id="pne-mail-root">'.$html.'</div>', LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
         libxml_clear_errors();
         libxml_use_internal_errors($internal);
+        $root = $document->getElementById('pne-mail-root');
+        if (! $root instanceof DOMElement) {
+            return $html;
+        }
 
-        $root = $document->getElementById('pne-shell-root');
-        $cell = null;
-        if ($root instanceof DOMElement) {
-            foreach ($root->getElementsByTagName('td') as $candidate) {
-                if ($candidate instanceof DOMElement && $candidate->getAttribute('data-pne-mail-body') === '1') {
-                    $cell = $candidate;
-                    break;
-                }
+        foreach ($root->getElementsByTagName('a') as $link) {
+            if (! $link instanceof DOMElement) {
+                continue;
+            }
+            $href = $link->getAttribute('href');
+            if (in_array($href, $markers, true)) {
+                $link->parentNode?->removeChild($link);
             }
         }
 
-        if (! $cell instanceof DOMElement) {
-            return $shell;
+        $result = '';
+        foreach ($root->childNodes as $child) {
+            $result .= $document->saveHTML($child);
         }
 
-        while ($cell->firstChild !== null) {
-            $cell->removeChild($cell->firstChild);
+        $plain = html_entity_decode(strip_tags($result, '<p><br><strong><b><em><i><u><ul><ol><li><a>'), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        foreach ($markers as $marker) {
+            $result = str_replace($marker, '', $result);
         }
 
-        if (trim($innerHtml) !== '') {
-            $fragment = new DOMDocument;
-            $fragmentInternal = libxml_use_internal_errors(true);
-            $fragment->loadHTML('<?xml encoding="UTF-8"><div id="pne-mail-root">'.$innerHtml.'</div>', LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
-            libxml_clear_errors();
-            libxml_use_internal_errors($fragmentInternal);
-            $innerRoot = $fragment->getElementById('pne-mail-root');
-            if ($innerRoot instanceof DOMElement) {
-                $children = [];
-                foreach ($innerRoot->childNodes as $child) {
-                    $children[] = $child;
-                }
-                foreach ($children as $child) {
-                    $cell->appendChild($document->importNode($child, true));
-                }
-            }
+        return trim($result !== '' ? $result : $plain);
+    }
+
+    private static function stripLeadingGreeting(string $html): string
+    {
+        $pattern = '/^(?:\s|<p[^>]*>)*(?:Dzień dobry(?:\s*\[Name,fallback=[^\]]*\])?[!,.]?\s*)+/iu';
+        if (! self::isHtml($html)) {
+            return trim((string) preg_replace($pattern, '', $html, 1));
         }
 
-        $table = $root->getElementsByTagName('table')->item(0);
-        $html = $table instanceof DOMElement ? (string) $document->saveHTML($table) : $shell;
-
-        return str_ireplace('%5BLINK%20DO%20ZAPISU%5D', MaterialDraftTask::LINK_PLACEHOLDER, $html);
+        return trim((string) preg_replace(
+            '/^(?:<p[^>]*>\s*)?Dzień dobry(?:\s*\[Name,fallback=[^\]]*\])?[!,.]?\s*(?:<br\s*\/?>)?\s*/iu',
+            '<p>',
+            $html,
+            1,
+        ));
     }
 
     private static function plainToContent(string $plain): string
@@ -251,7 +585,12 @@ final class MailHtmlFormatter
 
         foreach ($lines as $line) {
             $trim = trim($line);
-            if ($trim === '' || $trim === MaterialDraftTask::LINK_PLACEHOLDER || preg_match('/^zapisz się:?$/iu', $trim) === 1) {
+            if (
+                $trim === ''
+                || $trim === MaterialDraftTask::LINK_PLACEHOLDER
+                || $trim === MaterialDraftTask::ROOM_LINK_PLACEHOLDER
+                || preg_match('/^zapisz się:?$/iu', $trim) === 1
+            ) {
                 continue;
             }
 
@@ -298,7 +637,7 @@ final class MailHtmlFormatter
                 'p' => 'margin:0 0 16px;',
                 'ul', 'ol' => 'margin:0 0 16px;padding:0 0 0 22px;',
                 'li' => 'margin:0 0 8px;',
-                'a' => 'color:#1e4d8c;',
+                'a' => 'color:#008c95;',
                 default => null,
             };
             if ($style !== null) {
@@ -322,7 +661,7 @@ final class MailHtmlFormatter
         libxml_clear_errors();
         libxml_use_internal_errors($internal);
 
-        $node = $document->getElementsByTagName('td')->item(0);
+        $node = null;
         foreach ($document->getElementsByTagName('td') as $cell) {
             if ($cell instanceof DOMElement && $cell->getAttribute('data-pne-mail-body') === '1') {
                 $node = $cell;
@@ -330,7 +669,7 @@ final class MailHtmlFormatter
             }
         }
 
-        if (! $node instanceof DOMElement || $node->getAttribute('data-pne-mail-body') !== '1') {
+        if (! $node instanceof DOMElement) {
             return '';
         }
 
@@ -357,15 +696,17 @@ final class MailHtmlFormatter
         $kept = [];
         foreach ($lines as $line) {
             $trim = trim($line);
-            if ($trim === MaterialDraftTask::LINK_PLACEHOLDER || preg_match('/^zapisz się:?$/iu', $trim) === 1) {
+            if (
+                $trim === MaterialDraftTask::LINK_PLACEHOLDER
+                || $trim === MaterialDraftTask::ROOM_LINK_PLACEHOLDER
+                || preg_match('/^zapisz się:?$/iu', $trim) === 1
+            ) {
                 continue;
             }
             $kept[] = $trim;
         }
 
-        $plain = trim((string) preg_replace("/\n{3,}/u", "\n\n", implode("\n", $kept)));
-
-        return $plain;
+        return trim((string) preg_replace("/\n{3,}/u", "\n\n", implode("\n", $kept)));
     }
 
     private static function sanitizeChildren(DOMNode $parent): void
@@ -435,6 +776,11 @@ final class MailHtmlFormatter
     }
 
     private static function escape(string $value): string
+    {
+        return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    }
+
+    private static function escapeAttr(string $value): string
     {
         return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
     }

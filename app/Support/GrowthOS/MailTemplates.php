@@ -3,12 +3,14 @@
 namespace App\Support\GrowthOS;
 
 /**
- * Built-in main-mail layouts. HTML shells live in resources/growth-os/mail-templates.
- * The key lives in the material JSON payload, not in its own table (DEC-049).
+ * Canonical Sendy PNE mail layout (DEC-050).
+ * classic / personal / minimal remain as legacy keys mapped at runtime.
  */
 final class MailTemplates
 {
-    public const DEFAULT = 'classic';
+    public const CANONICAL = 'sendy-pne';
+
+    public const DEFAULT = self::CANONICAL;
 
     /**
      * @return array<string, string>
@@ -16,9 +18,7 @@ final class MailTemplates
     public static function labels(): array
     {
         return [
-            'classic' => 'Klasyczny PNE',
-            'personal' => 'Osobisty',
-            'minimal' => 'Minimalny',
+            self::CANONICAL => 'Sendy PNE',
         ];
     }
 
@@ -30,15 +30,32 @@ final class MailTemplates
         return array_keys(self::labels());
     }
 
+    /**
+     * @return list<string>
+     */
+    public static function legacyKeys(): array
+    {
+        return ['classic', 'personal', 'minimal'];
+    }
+
     public static function key(mixed $value): string
     {
         $value = is_string($value) ? $value : '';
 
-        return array_key_exists($value, self::labels()) ? $value : self::DEFAULT;
+        if ($value === self::CANONICAL || in_array($value, self::legacyKeys(), true)) {
+            return self::CANONICAL;
+        }
+
+        return self::DEFAULT;
     }
 
     public static function label(mixed $value): string
     {
         return self::labels()[self::key($value)];
+    }
+
+    public static function isLegacy(mixed $value): bool
+    {
+        return is_string($value) && in_array($value, self::legacyKeys(), true);
     }
 }

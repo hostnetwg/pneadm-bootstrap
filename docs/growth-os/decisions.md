@@ -387,7 +387,15 @@ Consequences: Przyciski: pogrubienie, kursywa, podkreślenie, listy, link i czys
 ## DEC-049
 
 Date: 2026-10-04<br>
-Status: ACTIVE<br>
+Status: SUPERSEDED by DEC-050<br>
 Decision: Mailing główny edytuje treść w Tiptap (pakiety MIT) i wybiera jeden z szablonów układu. AI nadal zwraca zwykły tekst w trybach generate, refine i iterate. Aplikacja składa końcowy HTML.<br>
 Rationale: Własne okno z DEC-048 nie dawało cofania ani pewnego formatowania. Pełny HTML maila w edytorze gubi tabelę Sendy, przycisk i znacznik zapisu. Szablon ma być wyborem wyglądu, nie odpowiedzią modelu.<br>
 Consequences: Tiptap dostaje tylko akapit, pogrubienie, kursywę, podkreślenie, listy, link, złamanie linii oraz cofnij i ponów. Nie edytuje tabeli, karty 600 px, przycisku „Zapisz się na webinar”, `[LINK DO ZAPISU]`, preheadera ani stopki. Szablony `classic`, `personal` i `minimal` (Klasyczny PNE, Osobisty, Minimalny) mają ten sam układ: nagłówek, treść, przycisk, stopka. Ich HTML jest w `resources/growth-os/mail-templates/`. Pole „Kod HTML” pokazuje gotowy mail i nie służy do zmiany układu. Klucz `template_key` jest w JSON materiału i w historii wersji. Brak klucza oznacza szablon klasyczny. Zmiana szablonu nie zmienia tematu, preheadera ani treści. Apply i odrzucenie propozycji nie zmieniają szablonu. Do AI nie idzie otoczka HTML. Prompt `material_main_mail_v4`. Mailing przypominający bez tej zmiany. Bez migracji.
+
+## DEC-050
+
+Date: 2026-10-05<br>
+Status: ACTIVE<br>
+Decision: Jeden kanoniczny layout **Sendy PNE** zastępuje classic/personal/minimal. AI/Tiptap pisze tylko treść redakcyjną (wstęp, wartość, punkty). Aplikacja dodaje greeting z `[Name,fallback=]`, kartę webinaru, CTA zapisu i YouTube z pól kampanii, opcjonalne zaświadczenie, opcjonalną ofertę płatnych szkoleń (snapshot) oraz stopkę z `[unsubscribe]`. Ten sam layout stosuje mailing przypominający; jego AI flow bez zmian.<br>
+Rationale: Autentyczny mailing Sendy właściciela wymaga kontrolowanych regionów technicznych i sprzedażowych. Wolny CONTENT + prosty shell nie wystarczał. Ceny i Omnibus muszą pochodzić z ADM, nie z AI.<br>
+Consequences: Migracja `growth_campaigns.registration_url` i `youtube_live_url`. UI linków na karcie projektu. Checkboxy main-mail: zaświadczenie i oferta płatna (`include_paid_offer`, `show_certificate`, `paid_offer_snapshot` w JSON materiału i historii wersji). Oferta: max 5 kursów `is_paid` + `show_on_pnedu` + `is_active` + `end_date >= now`, ceny z `CoursePriceVariant`, Omnibus z `PriceOmnibusService`. Brak `registration_url` blokuje „Kopiuj HTML”. Brak YouTube tylko ostrzega. Legacy `template_key` mapuje się do `sendy-pne`. Prompt `material_main_mail_v5`. Bez biblioteki szablonów DB, bez Sendy API, bez nowych trybów AI.

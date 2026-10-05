@@ -88,6 +88,7 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
         Route::get('/projects/{project}', [GrowthOsProjectController::class, 'show'])->name('projects.show');
         Route::put('/projects/{project}/host', [GrowthOsProjectController::class, 'updateHost'])->name('projects.host.update');
         Route::put('/projects/{project}/schedule', [GrowthOsProjectController::class, 'updateSchedule'])->name('projects.schedule.update');
+        Route::put('/projects/{project}/links', [GrowthOsProjectController::class, 'updateLinks'])->name('projects.links.update');
         Route::post('/projects/{project}/steps/{step}', [GrowthOsProjectController::class, 'completeStep'])->name('projects.steps.complete');
         Route::post('/projects/{project}/steps/{step}/reopen', [GrowthOsProjectController::class, 'reopenStep'])->name('projects.steps.reopen');
         Route::put('/projects/{project}/direction', [GrowthOsProjectController::class, 'updateDirection'])->name('projects.direction.update');

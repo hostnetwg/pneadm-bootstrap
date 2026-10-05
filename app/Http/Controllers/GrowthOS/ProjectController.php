@@ -231,6 +231,29 @@ class ProjectController extends Controller
             ->withFragment('project-schedule');
     }
 
+    public function updateLinks(Request $request, string $project): RedirectResponse
+    {
+        $data = $request->validate([
+            'registration_url' => \App\Support\GrowthOS\GrowthMailUrls::registrationRules(),
+            'youtube_live_url' => \App\Support\GrowthOS\GrowthMailUrls::youtubeRules(),
+        ], [
+            'registration_url.url' => 'Link do zapisów musi być poprawnym adresem URL.',
+            'registration_url.regex' => 'Link do zapisów musi zaczynać się od https://.',
+            'youtube_live_url.url' => 'Link do YouTube musi być poprawnym adresem URL.',
+            'youtube_live_url.regex' => 'Link do YouTube musi zaczynać się od https://.',
+        ]);
+
+        DemoTikWebinarProject::updateLinks($project, [
+            'registration_url' => $data['registration_url'] ?? null,
+            'youtube_live_url' => $data['youtube_live_url'] ?? null,
+        ]);
+
+        return redirect()
+            ->route('growth.projects.show', $project)
+            ->with('success', 'Zapisano linki webinaru.')
+            ->withFragment('project-links');
+    }
+
     public function show(string $project): View
     {
         $item = DemoTikWebinarProject::requireProject($project);
@@ -1124,7 +1147,9 @@ class ProjectController extends Controller
             'mail_subject' => ['nullable', 'string', 'max:200'],
             'mail_preheader' => ['nullable', 'string', 'max:200'],
             'mail_body' => ['nullable', 'string', 'max:20000'],
-            'template_key' => ['nullable', 'string', Rule::in(\App\Support\GrowthOS\MailTemplates::keys())],
+            'include_paid_offer' => ['nullable', 'boolean'],
+            'show_certificate' => ['nullable', 'boolean'],
+            'refresh_paid_offer' => ['nullable', 'boolean'],
         ]);
 
         if (MaterialDraftTask::isMail($material) && $request->has('mail_body')) {
@@ -1140,14 +1165,20 @@ class ProjectController extends Controller
         }
 
         $wasSkipped = DemoTikWebinarProject::isMaterialSkipped(DemoTikWebinarProject::material($project, $material));
+        $mailOptions = $material === MaterialDraftTask::MAIL_MATERIAL_KEY
+            ? [
+                'include_paid_offer' => $request->boolean('include_paid_offer'),
+                'show_certificate' => $request->boolean('show_certificate'),
+                'refresh_paid_offer' => $request->boolean('refresh_paid_offer'),
+            ]
+            : null;
         $saved = DemoTikWebinarProject::updateMaterialStatus(
             $project,
             $material,
             $data['status'],
             array_key_exists('draft', $data) ? (string) $data['draft'] : null,
-            $material === MaterialDraftTask::MAIL_MATERIAL_KEY && $request->has('template_key')
-                ? \App\Support\GrowthOS\MailTemplates::key($data['template_key'] ?? null)
-                : null,
+            null,
+            $mailOptions,
         );
 
         $message = match (true) {

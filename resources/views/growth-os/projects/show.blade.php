@@ -52,6 +52,26 @@
                             <button type="submit" class="btn btn-outline-primary btn-sm">Zapisz datę i godzinę</button>
                         </form>
                     </details>
+                    <details class="mb-2" id="project-links" @if($errors->hasAny(['registration_url', 'youtube_live_url'])) open @endif>
+                        <summary class="small">Linki webinaru (zapisy i YouTube)</summary>
+                        <form method="POST" action="{{ route('growth.projects.links.update', $project['id']) }}" class="mt-2" style="max-width: 36rem;">
+                            @csrf
+                            @method('PUT')
+                            <div class="mb-2">
+                                <label for="project_registration_url" class="form-label small">Link do zapisów</label>
+                                <input id="project_registration_url" name="registration_url" type="url" class="form-control form-control-sm @error('registration_url') is-invalid @enderror" value="{{ old('registration_url', $project['registration_url'] ?? '') }}" placeholder="https://pnedu.pl/courses/577" inputmode="url" autocomplete="off">
+                                @error('registration_url')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                <div class="form-text">HTTPS, najlepiej domena pnedu.pl. Bez tego nie skopiujesz finalnego HTML maila.</div>
+                            </div>
+                            <div class="mb-2">
+                                <label for="project_youtube_live_url" class="form-label small">Link do transmisji YouTube</label>
+                                <input id="project_youtube_live_url" name="youtube_live_url" type="url" class="form-control form-control-sm @error('youtube_live_url') is-invalid @enderror" value="{{ old('youtube_live_url', $project['youtube_live_url'] ?? '') }}" placeholder="https://youtube.com/live/31GX_yG5KDo" inputmode="url" autocomplete="off">
+                                @error('youtube_live_url')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                <div class="form-text">Opcjonalnie. Bez linku przycisk YouTube nie pojawi się w mailu.</div>
+                            </div>
+                            <button type="submit" class="btn btn-outline-primary btn-sm">Zapisz linki</button>
+                        </form>
+                    </details>
                     <p class="small mb-1">
                         <span class="text-secondary">Prowadzący:</span> <span class="fw-semibold">{{ $project['host'] }}</span>
                         · <span class="text-secondary">Głos komunikacji:</span>

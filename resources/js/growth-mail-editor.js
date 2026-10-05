@@ -97,10 +97,10 @@ if (mount && field) {
 
     window.growthSyncMailBody = syncBody;
 
-    const selectedTemplate = () => document.querySelector('[data-mail-template-choice]:checked')?.value || 'classic';
+    const shellId = () => 'mail-shell-sendy-pne';
 
     const showTemplate = () => {
-        const shell = document.getElementById(`mail-shell-${selectedTemplate()}`);
+        const shell = document.getElementById(shellId());
         const editorNode = document.getElementById('mail_body_editor');
         if (!shell || !frame || !editorNode) {
             return;
@@ -115,11 +115,11 @@ if (mount && field) {
 
         cell.appendChild(editorNode);
         frame.replaceChildren(table);
-        frame.dataset.mailTemplate = selectedTemplate();
+        frame.dataset.mailTemplate = 'sendy-pne';
     };
 
     const finalHtml = () => {
-        const shell = document.getElementById(`mail-shell-${selectedTemplate()}`);
+        const shell = document.getElementById(shellId());
         const preheader = document.getElementById('mail_preheader')?.value.trim() || '';
         const hidden = `<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">${escapeHtml(preheader)}${'&nbsp;&zwnj;'.repeat(40)}</div>`;
         if (!shell) {
@@ -133,7 +133,7 @@ if (mount && field) {
             cell.querySelectorAll('script,iframe,object,embed,form,style').forEach((node) => node.remove());
             cell.querySelectorAll('a').forEach((link) => {
                 const href = link.getAttribute('href') || '';
-                if (href === '[LINK DO ZAPISU]' || /^\s*javascript:/i.test(href)) {
+                if (href === '[LINK DO ZAPISU]' || href === '[LINK DO POKOJU]' || /^\s*javascript:/i.test(href)) {
                     link.remove();
                 }
             });
@@ -193,20 +193,21 @@ if (mount && field) {
     document.getElementById('mail-editor-link-save')?.addEventListener('click', () => {
         const url = document.getElementById('mail-editor-link-url')?.value.trim() || '';
         const error = document.getElementById('mail-editor-link-error');
-        if (!/^(https?:\/\/|mailto:|\[LINK DO ZAPISU\])/i.test(url)) {
+        if (!/^(https?:\/\/|mailto:)/i.test(url)) {
             error?.classList.remove('d-none');
 
             return;
         }
 
         error?.classList.add('d-none');
-        if (/^(https?:\/\/|mailto:)/i.test(url)) {
-            editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
-        }
+        editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
         document.querySelector('#mail-editor-link [data-bs-dismiss="modal"]')?.click();
     });
 
     document.querySelector('[data-mail-copy-html]')?.addEventListener('click', async () => {
+        if (frame?.dataset.mailCanCopy === '0') {
+            return;
+        }
         const status = document.querySelector('[data-mail-copy-html-status]');
         const html = finalHtml();
         if (finalField) {
@@ -220,15 +221,6 @@ if (mount && field) {
             document.execCommand('copy');
         }
         status?.classList.remove('d-none');
-    });
-
-    document.querySelectorAll('[data-mail-template-choice]').forEach((input) => {
-        input.addEventListener('change', () => {
-            showTemplate();
-            if (mode === 'html') {
-                refreshFinal();
-            }
-        });
     });
 
     document.getElementById('mail_preheader')?.addEventListener('input', () => {
@@ -245,5 +237,6 @@ if (mount && field) {
         });
     }
 
+    showTemplate();
     refreshFinal();
 }

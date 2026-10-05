@@ -86,6 +86,26 @@
                                 </details>
                             </div>
                             @if($aiDraftIsReminder)
+                                @php
+                                    $reminderContext = \App\Support\GrowthOS\MailRenderContext::fromProject($project, array_merge($material, [
+                                        'mail_body' => old('mail_body', $mailFields['body'] ?? ''),
+                                    ]), true);
+                                    $canCopyReminderHtml = \App\Support\GrowthOS\MailHtmlFormatter::canCopyHtml($reminderContext);
+                                    $reminderFinalHtml = \App\Support\GrowthOS\MailHtmlFormatter::copyHtml(
+                                        (string) old('mail_preheader', $mailFields['preheader'] ?? ''),
+                                        (string) old('mail_body', $mailFields['body'] ?? ''),
+                                        \App\Support\GrowthOS\MailTemplates::CANONICAL,
+                                        $reminderContext,
+                                    );
+                                @endphp
+                                <div class="alert alert-light border small mb-3" role="status">
+                                    Układ: <strong>Sendy PNE</strong> (ten sam co mailing główny). AI reminder bez zmian — zmienia się tylko finalny rendering.
+                                </div>
+                                @if(! $canCopyReminderHtml)
+                                    <div class="alert alert-warning small" role="status">
+                                        Brakuje linku do zapisów. Uzupełnij go na <a href="{{ route('growth.projects.show', $project['id']) }}#project-links">karcie projektu</a> przed skopiowaniem finalnego HTML.
+                                    </div>
+                                @endif
                                 <label id="mail_body_label" class="form-label">Treść</label>
                                 <div class="d-flex flex-wrap align-items-center gap-2 mb-2" data-mail-editor-toolbar>
                                     <div class="btn-group btn-group-sm" role="group" aria-label="Tryb treści">
@@ -101,7 +121,7 @@
                                         <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#mail-editor-link" title="Link" aria-label="Link"><i class="bi bi-link-45deg" aria-hidden="true"></i></button>
                                         <button type="button" class="btn btn-outline-secondary" data-mail-command="removeFormat" title="Wyczyść formatowanie" aria-label="Wyczyść formatowanie"><i class="bi bi-eraser" aria-hidden="true"></i></button>
                                     </div>
-                                    <button type="button" class="btn btn-outline-secondary btn-sm ms-auto" data-mail-copy-html>Kopiuj HTML maila</button>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm ms-auto" data-mail-copy-html @disabled(! $canCopyReminderHtml)>Kopiuj HTML maila</button>
                                     <span class="small text-success d-none" role="status" data-mail-copy-html-status>Skopiowano. Wklej w Sendy w trybie HTML.</span>
                                 </div>
                                 <div
@@ -115,7 +135,9 @@
                                     @if($materialSkipped) data-mail-locked="1" @endif
                                 ></div>
                                 <textarea id="mail_body" name="mail_body" class="form-control growth-draft-editor font-monospace d-none @error('mail_body') is-invalid @enderror" rows="16" aria-labelledby="mail_body_label" @readonly($materialSkipped)>{{ old('mail_body', $mailFields['body']) }}</textarea>
-                                <p class="form-text">Edycja pokazuje treść. Kod HTML to źródło tego maila.</p>
+                                <textarea id="mail_body_html" class="d-none" readonly data-mail-final-html data-mail-can-copy="{{ $canCopyReminderHtml ? '1' : '0' }}">{{ $reminderFinalHtml }}</textarea>
+                                <template id="mail-shell-sendy-pne">{!! \App\Support\GrowthOS\MailHtmlFormatter::render('', \App\Support\GrowthOS\MailTemplates::CANONICAL, $reminderContext) !!}</template>
+                                <p class="form-text">Edycja pokazuje treść. Kopiowanie składa finalny HTML Sendy PNE (CTA z linków projektu; znacznik pokoju staje się przyciskiem).</p>
                             @else
                                 @include('growth-os.projects.partials.main-mail-editor')
                             @endif
@@ -741,7 +763,11 @@
                                 if (is_array($proposalMail) && ! $aiDraftIsReminder && (($aiDraftProposal['mail_html'] ?? false) || str_contains($proposalMail['body'], \App\Support\GrowthOS\MailHtmlFormatter::MARKER))) {
                                     $proposalHtml = str_contains($proposalMail['body'], \App\Support\GrowthOS\MailHtmlFormatter::MARKER)
                                         ? $proposalMail['body']
-                                        : \App\Support\GrowthOS\MailHtmlFormatter::format($proposalMail['body'], \App\Support\GrowthOS\MailTemplates::key($material['template_key'] ?? null));
+                                        : \App\Support\GrowthOS\MailHtmlFormatter::format(
+                                            $proposalMail['body'],
+                                            \App\Support\GrowthOS\MailTemplates::CANONICAL,
+                                            \App\Support\GrowthOS\MailRenderContext::fromProject($project, $material, false),
+                                        );
                                 }
                             @endphp
                             @if(is_string($proposalHtml))
@@ -1036,9 +1062,39 @@
                     };
 
                     document.querySelector('[data-mail-copy-html]')?.addEventListener('click', async () => {
+                        const canCopy = document.querySelector('[data-mail-final-html]')?.dataset.mailCanCopy;
+                        if (canCopy === '0') {
+                            return;
+                        }
                         refresh();
                         syncBody();
-                        const full = preheaderHtml() + '\n' + (body.value || '');
+                        const shell = document.getElementById('mail-shell-sendy-pne');
+                        const preheader = document.getElementById('mail_preheader')?.value.trim() || '';
+                        const escapeHtml = (value) => value
+                            .replace(/&/g, '&amp;')
+                            .replace(/</g, '&lt;')
+                            .replace(/>/g, '&gt;');
+                        let full = `<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">${escapeHtml(preheader)}${'&nbsp;&zwnj;'.repeat(40)}</div>`;
+                        if (shell) {
+                            const parsed = new DOMParser().parseFromString(shell.innerHTML, 'text/html');
+                            const cell = parsed.querySelector('[data-pne-mail-body]');
+                            if (cell) {
+                                const source = body.value || '';
+                                cell.innerHTML = /<[a-z]/i.test(source)
+                                    ? source
+                                    : source.split(/\n{2,}/).map((block) => `<p>${escapeHtml(block).replace(/\n/g, '<br>')}</p>`).join('');
+                                cell.querySelectorAll('a').forEach((link) => {
+                                    const href = link.getAttribute('href') || '';
+                                    if (href === '[LINK DO ZAPISU]' || href === '[LINK DO POKOJU]' || /^\s*javascript:/i.test(href)) {
+                                        link.remove();
+                                    }
+                                });
+                            }
+                            const table = parsed.querySelector('table[data-pne-mail]');
+                            full += table ? table.outerHTML : (body.value || '');
+                        } else {
+                            full += '\n' + (body.value || '');
+                        }
                         const status = document.querySelector('[data-mail-copy-html-status]');
                         try {
                             await navigator.clipboard.writeText(full);

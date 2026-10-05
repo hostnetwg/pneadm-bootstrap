@@ -162,6 +162,29 @@ class GrowthSessionConceptStore
         app(GrowthOperationalTasks::class)->resyncDueDates($campaign->fresh());
     }
 
+    /**
+     * @param  array<string, mixed>  $project
+     */
+    public function persistLinks(array $project): void
+    {
+        $campaignId = $project['growth_campaign_id'] ?? null;
+        if (! is_numeric($campaignId)) {
+            return;
+        }
+
+        GrowthCampaign::query()->whereKey((int) $campaignId)->update([
+            'registration_url' => self::nullableString($project['registration_url'] ?? null),
+            'youtube_live_url' => self::nullableString($project['youtube_live_url'] ?? null),
+        ]);
+    }
+
+    private static function nullableString(mixed $value): ?string
+    {
+        $value = trim((string) $value);
+
+        return $value !== '' ? $value : null;
+    }
+
     public function latestOwnedCampaign(User $owner): ?GrowthCampaign
     {
         $campaign = $this->ownedCampaigns($owner)->first();
@@ -223,6 +246,8 @@ class GrowthSessionConceptStore
             $project['live_date'] = $campaign->live_at->toDateString();
             $project['live_time'] = $campaign->live_at->format('H:i');
         }
+        $project['registration_url'] = is_string($campaign->registration_url) ? $campaign->registration_url : '';
+        $project['youtube_live_url'] = is_string($campaign->youtube_live_url) ? $campaign->youtube_live_url : '';
 
         $artifact = GrowthArtifact::query()
             ->where('growth_campaign_id', $campaign->id)
@@ -340,14 +365,20 @@ class GrowthSessionConceptStore
         $templateKey = $isMainMail
             ? MailTemplates::key($material['template_key'] ?? ($previousPayload['template_key'] ?? null))
             : null;
-        $hadTemplate = is_array($previousPayload) && array_key_exists('template_key', $previousPayload);
-        $templateChanged = $isMainMail && $previousPayload !== null && (
-            ($hadTemplate && MailTemplates::key($previousPayload['template_key']) !== $templateKey)
-            || (! $hadTemplate && $templateKey !== MailTemplates::DEFAULT)
+        $includePaidOffer = $isMainMail && (bool) ($material['include_paid_offer'] ?? false);
+        $showCertificate = $isMainMail && (bool) ($material['show_certificate'] ?? false);
+        $paidSnapshot = $isMainMail && is_array($material['paid_offer_snapshot'] ?? null)
+            ? $material['paid_offer_snapshot']
+            : null;
+        $mailMetaChanged = $isMainMail && $previousPayload !== null && (
+            MailTemplates::key($previousPayload['template_key'] ?? null) !== $templateKey
+            || (bool) ($previousPayload['include_paid_offer'] ?? false) !== $includePaidOffer
+            || (bool) ($previousPayload['show_certificate'] ?? false) !== $showCertificate
+            || json_encode($previousPayload['paid_offer_snapshot'] ?? null) !== json_encode($paidSnapshot)
         );
-        $changed = $draftChanged || $templateChanged;
+        $changed = $draftChanged || $mailMetaChanged;
 
-        DB::transaction(function () use ($artifact, $material, $workspaceStatus, $draft, $previousPayload, $changed, $templateKey, $isMainMail, $actor, $source, $restoredFromVersion): void {
+        DB::transaction(function () use ($artifact, $material, $workspaceStatus, $draft, $previousPayload, $changed, $templateKey, $isMainMail, $includePaidOffer, $showCertificate, $paidSnapshot, $actor, $source, $restoredFromVersion): void {
             if ($changed && $previousPayload !== null && ! $artifact->versions()->exists()) {
                 $artifact->versions()->create([
                     'version' => (int) $artifact->version,
@@ -369,6 +400,11 @@ class GrowthSessionConceptStore
             ];
             if ($isMainMail) {
                 $payload['template_key'] = $templateKey;
+                $payload['include_paid_offer'] = $includePaidOffer;
+                $payload['show_certificate'] = $showCertificate;
+                if (is_array($paidSnapshot)) {
+                    $payload['paid_offer_snapshot'] = $paidSnapshot;
+                }
             }
             $artifact->payload = $payload;
             if (! $artifact->exists) {
@@ -649,8 +685,15 @@ class GrowthSessionConceptStore
             if (is_string($artifact->payload['draft'] ?? null)) {
                 $materials[$index]['draft'] = $artifact->payload['draft'];
             }
-            if (($material['id'] ?? null) === MaterialDraftTask::MAIL_MATERIAL_KEY && is_string($artifact->payload['template_key'] ?? null)) {
-                $materials[$index]['template_key'] = MailTemplates::key($artifact->payload['template_key']);
+            if (($material['id'] ?? null) === MaterialDraftTask::MAIL_MATERIAL_KEY) {
+                if (is_string($artifact->payload['template_key'] ?? null)) {
+                    $materials[$index]['template_key'] = MailTemplates::key($artifact->payload['template_key']);
+                }
+                $materials[$index]['include_paid_offer'] = (bool) ($artifact->payload['include_paid_offer'] ?? false);
+                $materials[$index]['show_certificate'] = (bool) ($artifact->payload['show_certificate'] ?? false);
+                if (is_array($artifact->payload['paid_offer_snapshot'] ?? null)) {
+                    $materials[$index]['paid_offer_snapshot'] = $artifact->payload['paid_offer_snapshot'];
+                }
             }
         }
 

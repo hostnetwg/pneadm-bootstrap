@@ -365,6 +365,25 @@ Smoke: widać „Klasyczny PNE”, „Osobisty” i „Minimalny” oraz „Cofn
 
 Rollback: cofnąć kod. Zapisany mail i klucz szablonu w JSON zostają. Starszy kod klucz ignoruje.
 
+## Sendy PNE (DEC-050, 2026-10-05)
+
+**Wymaga migracji** `2026_10_05_070000_add_registration_and_youtube_urls_to_growth_campaigns_table` oraz `npm run build` (JS edytora maila).
+
+Kolejność na produkcji:
+
+```bash
+cd /home/srv66127/domains/adm.pnedu.pl/pneadm
+/bin/bash /home/srv66127/domains/adm.pnedu.pl/pneadm/docs/deploy/scripts/prod-mysql-nightly-backup.sh
+git pull
+/opt/alt/php82/usr/bin/php artisan migrate --force
+npm ci && npm run build
+/opt/alt/php82/usr/bin/php artisan optimize:clear
+```
+
+Smoke: na karcie projektu widać „Linki webinaru”. Na mailingu głównym — Sendy PNE, checkboxy zaświadczenia i oferty. Bez linku zapisów „Kopiuj HTML” jest zablokowane. Reminder ma ten sam układ.
+
+Rollback: cofnąć kod; kolumny URL mogą zostać (`NULL`). Pełne cofnięcie migracji dopiero po backupie.
+
 ## Edytor treści maila (DEC-048, 2026-10-04)
 
 **Bez migracji.** Na mailingu treść ma przełącznik Edycja / Kod HTML i podstawowe formatowanie.
