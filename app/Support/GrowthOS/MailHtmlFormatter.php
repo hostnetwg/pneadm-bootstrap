@@ -291,8 +291,12 @@ final class MailHtmlFormatter
             ? 'BEZPŁATNY WEBINAR • '.$context->liveLabel
             : 'BEZPŁATNY WEBINAR';
 
+        $labelUpper = function_exists('mb_strtoupper')
+            ? mb_strtoupper($label, 'UTF-8')
+            : strtoupper($label);
+
         return '<tr><td data-pne-mail-webinar-label="1" align="center" style="padding:8px 30px 4px;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.4;letter-spacing:0.04em;color:#073b5c;font-weight:bold;">'
-            .self::escape(mb_strtoupper($label, 'UTF-8'))
+            .self::escape($labelUpper)
             .'</td></tr>';
     }
 
