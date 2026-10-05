@@ -85,6 +85,7 @@ class MailHtmlFormatterTest extends TestCase
         $this->assertStringContainsString('href="https://pnedu.pl/courses/577"', $copied);
         $this->assertStringContainsString(MailHtmlFormatter::YOUTUBE_CTA_LABEL, $copied);
         $this->assertStringContainsString('bezpłatne zaświadczenie', $copied);
+        $this->assertStringContainsString('&#128220;', $copied);
         $this->assertTrue(MailHtmlFormatter::canCopyHtml($context));
 
         $plain = MailHtmlFormatter::plainForAi("Temat: Temat\nPreheader: Krótki preheader.\n\n".$html);

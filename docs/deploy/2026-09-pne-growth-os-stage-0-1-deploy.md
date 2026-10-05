@@ -391,6 +391,40 @@ Jeśli `composer` / `composer.phar` nie jest w PATH, użyj lokalnego:
 /opt/alt/php82/usr/bin/php /usr/local/bin/composer dump-autoload -o
 ```
 
+### Brak `npm` na SeoHost (`npm: command not found`)
+
+Na współdzielonym hostingu Node często **nie jest w PATH**. Najpierw sprawdź:
+
+```bash
+which node npm 2>/dev/null
+find ~/nodevenv -name npm 2>/dev/null | head -5
+ls ~/nodevenv/domains/adm.pnedu.pl/pneadm/*/bin/npm 2>/dev/null
+```
+
+Jeśli znajdziesz npm (np. `~/nodevenv/.../bin/npm`), w katalogu projektu:
+
+```bash
+cd ~/domains/adm.pnedu.pl/pneadm
+/path/do/npm ci && /path/do/npm run build
+```
+
+**Gdy Node na prod nie ma sensu włączać** — zbuduj assety lokalnie (Sail) i wgraj tylko `public/build/` (w repo jest w `.gitignore`, więc `git pull` tego nie dostarczy):
+
+```bash
+# WSL, projekt pneadm:
+./vendor/bin/sail npm ci && ./vendor/bin/sail npm run build
+rsync -avz --delete public/build/ srv66127@h30:~/domains/adm.pnedu.pl/pneadm/public/build/
+```
+
+Po rsync na prod:
+
+```bash
+ls -la public/build/manifest.json public/build/assets/growth-mail-editor-*.js
+/opt/alt/php82/usr/bin/php artisan optimize:clear
+```
+
+Bez wpisu `resources/js/growth-mail-editor.js` w `manifest.json` strona maila pada na `@vite` (500). Commit `1dde94b+` pokazuje wtedy ostrzeżenie zamiast pustego 500 — i tak trzeba wgrać build.
+
 Diagnoza 500 na `/growth/projects/.../materials/main-mail`:
 
 ```bash

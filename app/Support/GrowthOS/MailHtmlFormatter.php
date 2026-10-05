@@ -351,7 +351,9 @@ final class MailHtmlFormatter
 
         if ($context->showCertificate) {
             $html .= '<tr><td style="padding:0 22px 22px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#eef7f8" style="width:100%;background-color:#eef7f8;border:1px solid #c9e3e6;">'
-                .'<tr><td style="padding:14px 16px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5;color:#073b5c;">'
+                .'<tr>'
+                .'<td width="40" align="center" valign="middle" style="padding:14px 0 14px 14px;font-family:Arial,Helvetica,sans-serif;font-size:22px;line-height:1;color:#073b5c;" aria-hidden="true">&#128220;</td>'
+                .'<td style="padding:14px 16px 14px 10px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5;color:#073b5c;">'
                 .'Po webinarze otrzymają Państwo <strong>bezpłatne zaświadczenie</strong> udziału.'
                 .'</td></tr></table></td></tr>';
         }
