@@ -603,6 +603,7 @@
                                     @endphp
                                     <p class="small mb-2">
                                         Scenariusz ma checklistę przed startem, bloki z godzinami od <span class="fw-semibold">{{ $project['live_time'] ?? '' }}</span>, pytania na czat, pytania i odpowiedzi oraz zakończenie z CTA.
+                                        „Poproś AI o nowy szkic” pisze od zera (bez obecnego scenariusza). „Popraw mój szkic” redaguje tekst z pola powyżej, także niezapisany.
                                     </p>
                                     <fieldset class="mb-3">
                                         <legend class="form-label fs-6">Czas trwania webinaru</legend>
@@ -680,7 +681,7 @@
                                 @if($aiDraftUsesWorkModes)
                                     <input type="hidden" name="mode" value="generate" data-growth-ai-mode-input>
                                     <input type="hidden" name="author_draft" value="" data-growth-ai-author-draft @if($aiDraftIsMail) data-growth-ai-author-source="mail" @endif>
-                                    <div class="d-flex flex-wrap gap-2">
+                                    <div class="d-flex flex-wrap align-items-center gap-2" @if($aiDraftIsHostScript) data-host-script-ai-actions @endif>
                                         <button type="submit" class="btn btn-outline-primary" @disabled(! $aiDraftAllowed) data-growth-ai-submit data-growth-ai-mode="generate">
                                             <span class="spinner-border spinner-border-sm me-1 d-none" aria-hidden="true" data-growth-ai-spinner></span>
                                             {{ $aiDraftIsGraphic ? 'Poproś AI o nowy brief' : 'Poproś AI o nowy szkic' }}
@@ -688,13 +689,6 @@
                                         <button type="submit" class="btn btn-outline-primary" @disabled(! $aiDraftAllowed) data-growth-ai-submit data-growth-ai-mode="refine">
                                             <span class="spinner-border spinner-border-sm me-1 d-none" aria-hidden="true" data-growth-ai-spinner></span>
                                             {{ $aiDraftIsGraphic ? 'Popraw mój brief' : 'Popraw mój szkic' }}
-                                        </button>
-                                    </div>
-                                @else
-                                    <div class="d-flex flex-wrap align-items-center gap-2" data-host-script-ai-actions>
-                                        <button type="submit" class="btn btn-outline-primary" @disabled(! $aiDraftAllowed) data-growth-ai-submit>
-                                            <span class="spinner-border spinner-border-sm me-1 d-none" aria-hidden="true" data-growth-ai-spinner></span>
-                                            Poproś AI o szkic
                                         </button>
                                         @if($aiDraftIsHostScript)
                                             <a
@@ -724,6 +718,13 @@
                                             Ikony PDF: pełny pakiet (prompt + dane) albo same dane projektu — do pracy na ChatGPT.com w ramach abonamentu, bez API.
                                         </p>
                                     @endif
+                                @else
+                                    <div class="d-flex flex-wrap align-items-center gap-2">
+                                        <button type="submit" class="btn btn-outline-primary" @disabled(! $aiDraftAllowed) data-growth-ai-submit>
+                                            <span class="spinner-border spinner-border-sm me-1 d-none" aria-hidden="true" data-growth-ai-spinner></span>
+                                            Poproś AI o szkic
+                                        </button>
+                                    </div>
                                 @endif
                             </form>
                             @if($aiDraftIsHostScript)

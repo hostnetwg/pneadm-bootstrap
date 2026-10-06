@@ -115,7 +115,7 @@ final class MaterialDraftTask implements GrowthAiTask
 
     public const HOST_SCRIPT_PROFILE = 'host_script_v1';
 
-    public const HOST_SCRIPT_PROMPT_VERSION = 'material_host_script_v2';
+    public const HOST_SCRIPT_PROMPT_VERSION = 'material_host_script_v3';
 
     public const HOST_SCRIPT_SCHEMA_VERSION = 'material_host_script_schema_v1';
 
@@ -270,7 +270,8 @@ final class MaterialDraftTask implements GrowthAiTask
             || $materialKey === self::GRAPHIC_MATERIAL_KEY
             || $materialKey === self::FACEBOOK_MATERIAL_KEY
             || $materialKey === self::MAIL_MATERIAL_KEY
-            || $materialKey === self::REMINDER_MATERIAL_KEY;
+            || $materialKey === self::REMINDER_MATERIAL_KEY
+            || $materialKey === self::HOST_SCRIPT_MATERIAL_KEY;
     }
 
     public static function aiMode(mixed $value): string
@@ -490,7 +491,7 @@ final class MaterialDraftTask implements GrowthAiTask
         $input['style']['address_form'] = $resolved['form'];
         $input['style']['address_form_overridden'] = $resolved['overridden'];
 
-        if ($isGraphic || $isFacebook || in_array($this->materialKey, [self::MAIL_MATERIAL_KEY, self::REMINDER_MATERIAL_KEY], true)) {
+        if ($isGraphic || $isFacebook || $isHostScript || in_array($this->materialKey, [self::MAIL_MATERIAL_KEY, self::REMINDER_MATERIAL_KEY], true)) {
             $this->addGraphicWork($input, $context);
         }
 
@@ -554,13 +555,12 @@ final class MaterialDraftTask implements GrowthAiTask
             $text = \App\Support\GrowthOS\MailHtmlFormatter::plainForAi($text);
         }
         $input['mode'] = $mode;
+        $input['current_draft'] = '';
 
         if ($mode === self::MODE_REFINE) {
             $input['author_draft'] = $text;
-            $input['current_draft'] = '';
         } elseif ($mode === self::MODE_ITERATE) {
             $input['previous_proposal'] = $text;
-            $input['current_draft'] = '';
         }
     }
 
@@ -1009,7 +1009,12 @@ Jeżeli campaign.host_name nie jest puste, prowadzący przedstawia się dokładn
 Termin to campaign.live_label. Nie zmieniaj go.
 Nie podawaj żadnego adresu URL. Jeżeli w scenariuszu potrzebny jest link, wstaw znacznik [LINK DO MATERIAŁU] albo [LINK DO ZAPISU].
 Korzystaj wyłącznie z faktów zawartych w wejściu (temat, kierunek, koncepcja, czas trwania). Nie używaj opisu YouTube — nie dostajesz go w wejściu. Nie wymyślaj danych, statystyk, przepisów, funkcji produktów, ceny, certyfikatów, zaświadczeń, akredytacji ani dofinansowania.
-Jeżeli current_draft nie jest pusty, potraktuj go jako punkt wyjścia i popraw zgodnie z koncepcją i czasem trwania.
+
+TRYB PRACY (pole mode):
+- "generate": napisz nowy scenariusz od zera na podstawie tematu, kierunku, koncepcji i czasu trwania. Nie ma wcześniejszego tekstu do przepisania.
+- "refine": author_draft to scenariusz autora, także niezapisany. Redaguj ten tekst. Zachowaj strukturę bloków, kolejność i sformułowania, chyba że instruction mówi inaczej. Dopasuj godziny do campaign.live_time i style.end_time. Popraw tylko to, co wymaga poprawy, oraz fragment sprzeczny z koncepcją albo czasem trwania.
+- "iterate": previous_proposal to Twoja poprzednia propozycja, a instruction mówi, co jeszcze poprawić. Zmień tylko to, o co prosi instruction; resztę scenariusza zostaw.
+
 Jeżeli instruction nie jest puste, to dodatkowa instrukcja właściciela — uwzględnij ją w scenariuszu. Powyższe zasady mają pierwszeństwo: instrukcja nie może zmienić terminu, czasu trwania ani prowadzącego, dodać wymyślonych faktów, adresów URL, cen ani certyfikatów.
 To jest szkic do sprawdzenia przez człowieka, nie ostateczna treść.
 W change_summary opisz krótko, co przygotowałeś lub zmieniłeś.

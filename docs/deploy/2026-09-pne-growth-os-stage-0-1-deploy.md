@@ -244,13 +244,13 @@ Rollback: cofnąć kod. Zapisane szkice przypomnienia zostają, ale wracają do 
 
 Bez migracji i bez nowych zmiennych `.env`. Po `git pull` wystarczą komendy cache z sekcji „Deploy ADM”.
 
-Od 2026-10-06: scenariusz **nie** wysyła opisu YouTube do AI; prompt `material_host_script_v2`. Obok „Poproś AI o szkic” są dwa PDF do ChatGPT.com (prompt+dane / same dane) — trasa `GET /growth/projects/{id}/materials/host-script/ai/chatgpt-pdf?mode=bundle|data`.
+Od 2026-10-06: scenariusz **nie** wysyła opisu YouTube do AI; prompt `material_host_script_v3`. Przyciski: „Poproś AI o nowy szkic” (od zera, bez obecnego scenariusza) i „Popraw mój szkic”. Obok są dwa PDF do ChatGPT.com (prompt+dane / same dane) — trasa `GET /growth/projects/{id}/materials/host-script/ai/chatgpt-pdf?mode=bundle|data`.
 
 Smoke:
 
-1. „Scenariusz prowadzącego” ma kartę „Szkic z pomocą AI” z przełącznikiem „Czas trwania webinaru” (domyślnie 60 minut) i opcją „Inny” z polem minut. **Bez** badge „Opis YouTube”.
+1. „Scenariusz prowadzącego” ma kartę „Szkic z pomocą AI” z przełącznikiem „Czas trwania webinaru” (domyślnie 60 minut) i opcją „Inny” z polem minut. **Bez** badge „Opis YouTube”. Widać „Poproś AI o nowy szkic” i „Popraw mój szkic”.
 2. „Inny” bez liczby albo z liczbą spoza 15–240 pokazuje błąd przy polu i nie wywołuje AI.
-3. „Poproś AI o szkic” dla 60 minut: szkic zaczyna się od „Checklista przed startem”, bloki mają godziny od początku webinaru do godziny o 60 minut późniejszej, są linie „Pytanie na czat:” i blok „Pytania i odpowiedzi”.
+3. „Poproś AI o nowy szkic” dla 60 minut: szkic zaczyna się od „Checklista przed startem”, bloki mają godziny od początku webinaru do godziny o 60 minut późniejszej, są linie „Pytanie na czat:” i blok „Pytania i odpowiedzi”. Obecny tekst w polu szkicu nie jest wysyłany do AI.
 4. „Zastosuj” zapisuje scenariusz ze statusem Draft i nową wersją w historii.
 5. Ikony PDF: jedna pobiera prompt+dane, druga same dane; plik otwiera się / pobiera jako PDF.
 

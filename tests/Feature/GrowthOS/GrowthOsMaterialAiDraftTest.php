@@ -1004,9 +1004,9 @@ class GrowthOsMaterialAiDraftTest extends TestCase
         $this->assertSame(['material', 'campaign', 'direction', 'concept', 'source_materials', 'current_draft', 'style', 'instruction', 'mode'], array_keys($input));
         $this->assertSame('generate', $input['mode']);
         $this->assertSame(['youtube_description' => ''], $input['source_materials']);
-        $this->assertSame(['working_topic', 'goal', 'live_date', 'live_time', 'timezone', 'host_name', 'live_label', 'address_form'], array_keys($input['campaign']));
+        $this->assertSame(['working_topic', 'goal', 'live_date', 'live_time', 'timezone', 'host_name', 'address_form', 'live_label'], array_keys($input['campaign']));
         $this->assertSame($this->liveLabel(), $input['campaign']['live_label']);
-        $this->assertSame(['formats', 'elements'], array_keys($input['style']));
+        $this->assertSame(['formats', 'elements', 'address_form', 'address_form_overridden'], array_keys($input['style']));
         $this->assertSame(array_keys(MaterialDraftTask::GRAPHIC_OPTIONAL_ELEMENTS), array_keys($input['style']['elements']));
         $this->assertSame(['key' => self::GRAPHIC, 'name' => 'Grafika główna', 'type' => 'graphic_brief'], $input['material']);
         $this->assertSame(
@@ -1664,7 +1664,9 @@ class GrowthOsMaterialAiDraftTest extends TestCase
         $this->actingAs($user)
             ->get(route('growth.projects.materials.show', [DemoTikWebinarProject::PROJECT_ID, self::HOST_SCRIPT]))
             ->assertOk()
-            ->assertSee('Poproś AI o szkic')
+            ->assertSee('Poproś AI o nowy szkic')
+            ->assertSee('Popraw mój szkic')
+            ->assertSee('bez obecnego scenariusza')
             ->assertSee('Czas trwania webinaru')
             ->assertSee('45 minut')
             ->assertSee('90 minut')
@@ -1673,7 +1675,8 @@ class GrowthOsMaterialAiDraftTest extends TestCase
             ->assertDontSee('id="material_ai_emojis"', false)
             ->assertSee('data-chatgpt-pdf="bundle"', false)
             ->assertSee('data-chatgpt-pdf="data"', false)
-            ->assertSee('Ikony PDF');
+            ->assertSee('Ikony PDF')
+            ->assertDontSee('Popraw ponownie');
     }
 
     public function test_host_script_chatgpt_pdf_exports_bundle_and_data_without_youtube(): void
@@ -1715,24 +1718,52 @@ class GrowthOsMaterialAiDraftTest extends TestCase
     public function test_host_script_payload_and_prompt(): void
     {
         $user = $this->readyProject();
+        $this->saveMaterial($user, self::HOST_SCRIPT, 'DRAFT', "Stary scenariusz do zignorowania\n".str_repeat('X', 200));
 
-        $this->requestFor($user, self::HOST_SCRIPT)->assertSessionHas('success');
+        $this->requestFor($user, self::HOST_SCRIPT, ['mode' => 'generate'])->assertSessionHas('success');
 
         $input = $this->provider->input;
         $this->assertSame(['key' => self::HOST_SCRIPT, 'name' => 'Scenariusz prowadzącego', 'type' => 'host_script'], $input['material']);
         $this->assertSame($this->liveLabel(), $input['campaign']['live_label']);
         $this->assertArrayNotHasKey('source_materials', $input);
+        $this->assertSame('', $input['current_draft']);
+        $this->assertSame(MaterialDraftTask::MODE_GENERATE, $input['mode']);
+        $this->assertArrayNotHasKey('author_draft', $input);
         $this->assertSame(60, $input['style']['duration_minutes']);
         $this->assertSame('21:00', $input['style']['end_time']);
         $this->assertSame('ty', $input['style']['address_form']);
         $this->assertFalse($input['style']['address_form_overridden']);
         $this->assertSame(['draft', 'change_summary'], $this->provider->schema['required']);
         $this->assertSame(MaterialDraftTask::HOST_SCRIPT_PROMPT_VERSION, $this->proposal(self::HOST_SCRIPT)['prompt_version']);
-        foreach (['Checklista przed startem', 'nagrywane', 'Pytanie na czat:', 'Pytania i odpowiedzi', 'Przejście:', 'style.end_time', 'direction.sell_later', 'concept.cta'] as $rule) {
+        foreach (['Checklista przed startem', 'nagrywane', 'Pytanie na czat:', 'Pytania i odpowiedzi', 'Przejście:', 'style.end_time', 'direction.sell_later', 'concept.cta', 'TRYB PRACY'] as $rule) {
             $this->assertStringContainsString($rule, $this->provider->instructions);
         }
         $this->assertStringContainsString('Nie używaj opisu YouTube', $this->provider->instructions);
+        $this->assertStringContainsString('"generate": napisz nowy scenariusz od zera', $this->provider->instructions);
         $this->assertStringNotContainsString('source_materials.youtube_description', $this->provider->instructions);
+        $this->assertStringNotContainsString('Jeżeli current_draft nie jest pusty', $this->provider->instructions);
+    }
+
+    public function test_host_script_refine_sends_author_draft_and_ignores_saved_draft(): void
+    {
+        $user = $this->readyProject();
+        $this->saveMaterial($user, self::HOST_SCRIPT, 'DRAFT', 'Zapisany scenariusz w bazie');
+
+        $this->requestFor($user, self::HOST_SCRIPT, [
+            'mode' => 'refine',
+            'author_draft' => "Checklista przed startem\n- Kamera\n\n20:00–20:05 Intro",
+            'duration' => '45',
+        ])->assertSessionHas('success');
+
+        $this->assertSame(MaterialDraftTask::MODE_REFINE, $this->provider->input['mode']);
+        $this->assertSame("Checklista przed startem\n- Kamera\n\n20:00–20:05 Intro", $this->provider->input['author_draft']);
+        $this->assertSame('', $this->provider->input['current_draft']);
+        $this->assertSame(45, $this->provider->input['style']['duration_minutes']);
+
+        $page = route('growth.projects.materials.show', [DemoTikWebinarProject::PROJECT_ID, self::HOST_SCRIPT]);
+        $url = route('growth.projects.materials.ai', [DemoTikWebinarProject::PROJECT_ID, self::HOST_SCRIPT]);
+        $this->actingAs($user)->from($page)->post($url, ['mode' => 'refine', 'author_draft' => ''])
+            ->assertSessionHas('error', ProjectController::MATERIAL_AI_REFINE_EMPTY_MESSAGE);
     }
 
     public function test_host_script_duration_options_and_custom_value_reach_the_model(): void

@@ -234,7 +234,7 @@ Szczegóły provision PNEDU: [FORM_ORDERS_PNEDU_PROVISION.md](./FORM_ORDERS_PNED
 ## Weryfikacja PNE Growth OS — scenariusz: bez YouTube + PDF ChatGPT (2026-10-06)
 
 - `sail artisan test --filter='GrowthOsMaterialAiDraftTest::test_host_script'`
-- Ręcznie: `/growth/projects/…/materials/host-script` — brak badge YouTube; dwie ikony PDF obok „Poproś AI o szkic” (bundle / data). Nie klikać prawdziwego AI bez potrzeby.
+- Ręcznie: `/growth/projects/…/materials/host-script` — „Poproś AI o nowy szkic” / „Popraw mój szkic”; brak badge YouTube; dwie ikony PDF (bundle / data). Nie klikać prawdziwego AI bez potrzeby.
 
 ## Weryfikacja PNE Growth OS — poprawka grafiki (DEC-043, 2026-10-03)
 

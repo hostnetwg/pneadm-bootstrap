@@ -2,7 +2,7 @@
 
 Last updated: 2026-10-06 CEST<br>
 Branch: main<br>
-Commit: 78676cd<br>
+Commit: (po pushu: host-script generate bez obecnego)<br>
 Stage: v0.2 — Asystent planowania kierunku, szkice AI materiałów, generator obrazu, historia wersji, Sendy PNE, forma zwrotu Ty/Państwo, ustawienia modelu/reasoning, eksport PDF scenariusza do ChatGPT.com<br>
 Current blocker: none (produkcja: migracje v0.1 `Ran`, `/growth` działa — [runbook](../deploy/2026-09-pne-growth-os-stage-0-1-deploy.md); DEC-050 wymaga migracji `registration_url` / `youtube_live_url`; DEC-051 wymaga migracji `address_form`; DEC-052 wymaga migracji `growth_ai_settings`)
 
@@ -24,7 +24,7 @@ PNE Growth OS / PNE Rozwój to moduł w `adm.pnedu.pl`, który ma prowadzić wł
 - Materiał „Opis YouTube” (DEC-036): po zatwierdzeniu kierunku i koncepcji „Poproś AI o nowy szkic” (od zera) albo „Popraw mój szkic” (redakcja tekstu z pola, także niezapisanego). Na karcie propozycji „Co jeszcze poprawić?” i „Popraw ponownie”. Zastosuj / Odrzuć jak wcześniej; po odrzuceniu niezapisany tekst wraca do pola.
 - Materiał „Post Facebook”: ten sam wzorzec, plus checkbox hashtagów; AI korzysta z opisu YouTube tylko zatwierdzonego i wstawia `[LINK DO ZAPISU]` zamiast linku.
 - Materiał „Grafika główna”: „Poproś AI o szkic” daje tekstowy brief (nagłówek, termin z aplikacji, kierunek wizualny i opcjonalne elementy z checkboxami) dla formatów 16:9 i kwadrat, z zatwierdzonym opisem YouTube jako źródłem. Pod szkicem „Generator obrazu”: format, opis obrazu (wstępnie z briefu), checkbox „Dodaj nagłówek i termin na obrazie”, „Generuj obraz”, licznik dziennego limitu z „Zresetuj limit” i galeria z Pobierz / Wybierz jako grafikę główną / Usuń, a przy obrazie poziomym „Utwórz wersję kwadratową”.
-- Materiał „Scenariusz prowadzącego” (DEC-034): „Poproś AI o szkic” z przełącznikiem „Czas trwania webinaru” (45, 60, 90 minut albo własna liczba minut). AI bierze kierunek, koncepcję i bieżący szkic — **bez** opisu YouTube. Obok przycisku AI: dwa PDF do ChatGPT.com (prompt+dane albo same dane). Scenariusz ma checklistę przed startem, bloki z godzinami, w każdym „Cel:”, „Do powiedzenia:” i „Przejście:”, pytania na czat, pytania i odpowiedzi oraz zakończenie z CTA.
+- Materiał „Scenariusz prowadzącego” (DEC-034): „Poproś AI o nowy szkic” (od zera, **bez** obecnego scenariusza) albo „Popraw mój szkic” (redakcja tekstu z pola). Na karcie propozycji „Popraw ponownie”. Przełącznik „Czas trwania webinaru” (45, 60, 90 minut albo własna liczba minut). AI bierze kierunek i koncepcję — **bez** opisu YouTube. Obok przycisków AI: dwa PDF do ChatGPT.com (prompt+dane albo same dane). Scenariusz ma checklistę przed startem, bloki z godzinami, w każdym „Cel:”, „Do powiedzenia:” i „Przejście:”, pytania na czat, pytania i odpowiedzi oraz zakończenie z CTA.
 - Każdy materiał: status „Nie dotyczy” wyłącza go w tym projekcie (wyszarzony na liście, bez wpływu na następny krok).
 - Każdy materiał: „Historia wersji” pod szkicem (ostatnie 20 zmian treści), podgląd w modalu i „Przywróć tę wersję”.
 
@@ -155,7 +155,7 @@ Ręczna weryfikacja asystenta kierunku w otwartym projekcie (DEC-039): „Popraw
 
 - Operator ≠ Prowadzący ≠ Głos komunikacji (DEC-035): migracje `2026_10_02_130000` (`growth_campaigns.communication_voice_instructor_id`) i `2026_10_02_130100` (`instructors.ai_voice_profile`), `GrowthPeople`, `PneVoice`, wybór prowadzącego z bazy lub spoza bazy oraz głosu w formularzu i na karcie projektu. Opis YouTube z trybami generate / refine / iterate (DEC-036), prompt `material_youtube_description_v3`, emotikony domyślnie wyłączone.
 
-- Szkic AI scenariusza prowadzącego (DEC-034): szósty profil `material_draft` (`host_script_v1`, prompt `material_host_script_v2`), bez YouTube w wejściu; PDF do ChatGPT.com (prompt+dane / same dane); czas trwania z przełącznika albo własny; bez migracji.
+- Szkic AI scenariusza prowadzącego (DEC-034): szósty profil `material_draft` (`host_script_v1`, prompt `material_host_script_v3`), tryby generate/refine/iterate; bez YouTube w wejściu; PDF do ChatGPT.com; czas trwania z przełącznika albo własny; bez migracji.
 
 - Szkic AI mailingu przypominającego (DEC-033): piąty profil `material_draft` (`reminder_mail_v1`), źródła opis YouTube i mailing główny, przełącznik „jutro” / „dziś”, dwa znaczniki linków, bez migracji.
 
