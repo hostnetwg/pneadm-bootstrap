@@ -115,7 +115,7 @@ final class MaterialDraftTask implements GrowthAiTask
 
     public const HOST_SCRIPT_PROFILE = 'host_script_v1';
 
-    public const HOST_SCRIPT_PROMPT_VERSION = 'material_host_script_v1';
+    public const HOST_SCRIPT_PROMPT_VERSION = 'material_host_script_v2';
 
     public const HOST_SCRIPT_SCHEMA_VERSION = 'material_host_script_schema_v1';
 
@@ -142,7 +142,6 @@ final class MaterialDraftTask implements GrowthAiTask
         self::GRAPHIC_MATERIAL_KEY => ['youtube_description'],
         self::MAIL_MATERIAL_KEY => ['youtube_description'],
         self::REMINDER_MATERIAL_KEY => ['youtube_description', 'main_mail'],
-        self::HOST_SCRIPT_MATERIAL_KEY => ['youtube_description'],
     ];
 
     /**
@@ -380,7 +379,7 @@ final class MaterialDraftTask implements GrowthAiTask
      * @param  array<string, mixed>  $context
      * @return array<string, mixed>
      */
-    public function input(array $context): array
+    public function input(array $context, bool $forExport = false): array
     {
         $campaign = is_array($context['campaign'] ?? null) ? $context['campaign'] : [];
         $direction = is_array($context['direction'] ?? null) ? $context['direction'] : [];
@@ -496,14 +495,14 @@ final class MaterialDraftTask implements GrowthAiTask
         }
 
         $encoded = json_encode($input, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
-        if (mb_strlen($encoded) > (int) config('growth_ai.limits.max_input_chars')) {
+        if (! $forExport && mb_strlen($encoded) > (int) config('growth_ai.limits.max_input_chars')) {
             throw new GrowthAiException(
                 errorType: 'input_too_long',
                 userMessage: 'Dane materiału są zbyt długie do bezpiecznego wysłania do AI. Możesz kontynuować ręcznie.',
             );
         }
 
-        if (ProhibitedData::containsIgnoringDates($encoded)) {
+        if (! $forExport && ProhibitedData::containsIgnoringDates($encoded)) {
             throw GrowthAiException::dataPolicyViolation();
         }
 
@@ -1009,8 +1008,7 @@ Zakończenie: krótkie podsumowanie, delikatne wezwanie do działania oparte na 
 Jeżeli campaign.host_name nie jest puste, prowadzący przedstawia się dokładnie tym imieniem i nazwiskiem, bez dopisywania tytułów, stanowisk, osiągnięć ani biografii. Jeżeli jest puste, nie wymyślaj prowadzącego.
 Termin to campaign.live_label. Nie zmieniaj go.
 Nie podawaj żadnego adresu URL. Jeżeli w scenariuszu potrzebny jest link, wstaw znacznik [LINK DO MATERIAŁU] albo [LINK DO ZAPISU].
-Jeżeli source_materials.youtube_description nie jest puste, to zatwierdzony opis tego webinaru na YouTube. Scenariusz ma realizować obietnice z tego opisu.
-Korzystaj wyłącznie z faktów zawartych w wejściu. Nie wymyślaj danych, statystyk, przepisów, funkcji produktów, ceny, certyfikatów, zaświadczeń, akredytacji ani dofinansowania.
+Korzystaj wyłącznie z faktów zawartych w wejściu (temat, kierunek, koncepcja, czas trwania). Nie używaj opisu YouTube — nie dostajesz go w wejściu. Nie wymyślaj danych, statystyk, przepisów, funkcji produktów, ceny, certyfikatów, zaświadczeń, akredytacji ani dofinansowania.
 Jeżeli current_draft nie jest pusty, potraktuj go jako punkt wyjścia i popraw zgodnie z koncepcją i czasem trwania.
 Jeżeli instruction nie jest puste, to dodatkowa instrukcja właściciela — uwzględnij ją w scenariuszu. Powyższe zasady mają pierwszeństwo: instrukcja nie może zmienić terminu, czasu trwania ani prowadzącego, dodać wymyślonych faktów, adresów URL, cen ani certyfikatów.
 To jest szkic do sprawdzenia przez człowieka, nie ostateczna treść.

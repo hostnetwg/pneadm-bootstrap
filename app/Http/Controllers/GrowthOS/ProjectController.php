@@ -19,11 +19,13 @@ use App\Support\GrowthOS\GrowthAiRequestOptions;
 use App\Support\GrowthOS\GrowthPeople;
 use App\Services\GrowthOS\AI\Support\GrowthAiExecutionOptions;
 use App\Services\GrowthOS\AI\Support\GrowthAiModelCatalog;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -1097,6 +1099,76 @@ class ProjectController extends Controller
         }
 
         return $back->with('success', 'Przywrócono wersję '.$version.' jako nową wersję. Materiał ma status Draft — sprawdź go przed dalszą pracą.');
+    }
+
+    /**
+     * PDF for ChatGPT.com: full API package (prompt + data) or project data only.
+     */
+    public function exportMaterialAiPdf(Request $request, string $project, string $material): Response|RedirectResponse
+    {
+        abort_unless($material === MaterialDraftTask::HOST_SCRIPT_MATERIAL_KEY, 404);
+        abort_unless(MaterialDraftTask::supports($material), 404);
+
+        $data = $request->validate([
+            'mode' => ['required', Rule::in(['bundle', 'data'])],
+            'instruction' => ['nullable', 'string', 'max:'.config('growth_ai.limits.max_instruction_chars')],
+            'duration' => ['nullable', Rule::in([...array_map('strval', MaterialDraftTask::HOST_SCRIPT_DURATIONS), 'custom'])],
+            'duration_custom' => [
+                'nullable',
+                'required_if:duration,custom',
+                'integer',
+                'min:'.MaterialDraftTask::HOST_SCRIPT_MIN_DURATION,
+                'max:'.MaterialDraftTask::HOST_SCRIPT_MAX_DURATION,
+            ],
+        ], [
+            'duration_custom.required_if' => 'Wpisz czas trwania w minutach.',
+        ]);
+
+        $item = DemoTikWebinarProject::requireProject($project);
+        $back = redirect()->route('growth.projects.materials.show', [$project, $material]);
+
+        if (DemoTikWebinarProject::isMaterialSkipped(DemoTikWebinarProject::material($project, $material))) {
+            return $back->with('error', self::MATERIAL_SKIPPED_MESSAGE);
+        }
+
+        if (! DemoTikWebinarProject::canDraftMaterialWithAi($item)) {
+            return $back->with('error', self::MATERIAL_AI_PRECONDITION_MESSAGE);
+        }
+
+        $style = [
+            'duration_minutes' => MaterialDraftTask::hostScriptDuration(
+                ($data['duration'] ?? null) === 'custom' ? ($data['duration_custom'] ?? null) : ($data['duration'] ?? null),
+            ),
+        ];
+        $instruction = trim((string) ($data['instruction'] ?? ''));
+        $context = DemoTikWebinarProject::materialAiContext($item, $material, $style, $instruction);
+        $task = app(MaterialDraftTask::class)->forMaterial($material);
+        $input = $task->input($context, forExport: true);
+        $prompt = $task->instructions();
+        $mode = (string) $data['mode'];
+        $includePrompt = $mode === 'bundle';
+        $topic = trim((string) ($item['topic'] ?? 'webinar'));
+        $slug = str($topic)->slug('_')->limit(40, '')->toString() ?: 'webinar';
+        $filename = $includePrompt
+            ? 'growth_scenariusz_prompt_i_dane_'.$slug.'.pdf'
+            : 'growth_scenariusz_dane_'.$slug.'.pdf';
+
+        $pdf = Pdf::loadView('growth-os.projects.partials.material-ai-chatgpt-export-pdf', [
+            'title' => $includePrompt
+                ? 'Pakiet do ChatGPT — prompt + dane projektu'
+                : 'Dane projektu do ChatGPT — bez promptu aplikacji',
+            'materialName' => 'Scenariusz prowadzącego',
+            'topic' => $topic,
+            'includePrompt' => $includePrompt,
+            'prompt' => $prompt,
+            'inputJson' => json_encode($input, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR),
+            'hint' => $includePrompt
+                ? 'Wgraj ten PDF na ChatGPT.com (lub wklej treść). Zawiera ten sam prompt i dane, które aplikacja wysyła przez API.'
+                : 'Wgraj ten PDF na ChatGPT.com i dopisz własny prompt. To same dane projektu (bez instrukcji systemowej aplikacji).',
+            'generatedAt' => now()->timezone(config('app.timezone'))->format('Y-m-d H:i'),
+        ])->setPaper('a4', 'portrait');
+
+        return $pdf->download($filename);
     }
 
     public function requestMaterialAi(Request $request, string $project, string $material): RedirectResponse

@@ -691,12 +691,81 @@
                                         </button>
                                     </div>
                                 @else
-                                    <button type="submit" class="btn btn-outline-primary" @disabled(! $aiDraftAllowed) data-growth-ai-submit>
-                                        <span class="spinner-border spinner-border-sm me-1 d-none" aria-hidden="true" data-growth-ai-spinner></span>
-                                        Poproś AI o szkic
-                                    </button>
+                                    <div class="d-flex flex-wrap align-items-center gap-2" data-host-script-ai-actions>
+                                        <button type="submit" class="btn btn-outline-primary" @disabled(! $aiDraftAllowed) data-growth-ai-submit>
+                                            <span class="spinner-border spinner-border-sm me-1 d-none" aria-hidden="true" data-growth-ai-spinner></span>
+                                            Poproś AI o szkic
+                                        </button>
+                                        @if($aiDraftIsHostScript)
+                                            <a
+                                                href="{{ route('growth.projects.materials.ai.chatgpt-pdf', [$project['id'], $material['id'], 'mode' => 'bundle']) }}"
+                                                class="btn btn-outline-secondary"
+                                                title="PDF: prompt aplikacji + dane projektu — wgraj na ChatGPT.com"
+                                                aria-label="Pobierz PDF z promptem i danymi projektu do ChatGPT"
+                                                data-chatgpt-pdf="bundle"
+                                                @if(! $aiDraftAllowed) tabindex="-1" aria-disabled="true" @endif
+                                            >
+                                                <i class="bi bi-file-earmark-richtext" aria-hidden="true"></i>
+                                            </a>
+                                            <a
+                                                href="{{ route('growth.projects.materials.ai.chatgpt-pdf', [$project['id'], $material['id'], 'mode' => 'data']) }}"
+                                                class="btn btn-outline-secondary"
+                                                title="PDF: tylko dane projektu — własny prompt na ChatGPT.com"
+                                                aria-label="Pobierz PDF z danymi projektu do ChatGPT"
+                                                data-chatgpt-pdf="data"
+                                                @if(! $aiDraftAllowed) tabindex="-1" aria-disabled="true" @endif
+                                            >
+                                                <i class="bi bi-file-earmark-text" aria-hidden="true"></i>
+                                            </a>
+                                        @endif
+                                    </div>
+                                    @if($aiDraftIsHostScript)
+                                        <p class="form-text mb-0 mt-2">
+                                            Ikony PDF: pełny pakiet (prompt + dane) albo same dane projektu — do pracy na ChatGPT.com w ramach abonamentu, bez API.
+                                        </p>
+                                    @endif
                                 @endif
                             </form>
+                            @if($aiDraftIsHostScript)
+                                <script>
+                                    (() => {
+                                        const form = document.querySelector('[data-growth-ai-form]');
+                                        if (!form || form.dataset.chatgptPdfBound === '1') return;
+                                        form.dataset.chatgptPdfBound = '1';
+                                        const syncPdfLinks = () => {
+                                            const duration = form.querySelector('input[name="duration"]:checked')?.value || '60';
+                                            const custom = form.querySelector('[data-duration-custom]')?.value || '';
+                                            const instruction = form.querySelector('#material_ai_instruction')?.value || '';
+                                            form.querySelectorAll('[data-chatgpt-pdf]').forEach((link) => {
+                                                const url = new URL(link.getAttribute('data-chatgpt-pdf-base') || link.href, window.location.origin);
+                                                url.searchParams.set('mode', link.getAttribute('data-chatgpt-pdf') || 'data');
+                                                url.searchParams.set('duration', duration);
+                                                if (duration === 'custom' && custom !== '') {
+                                                    url.searchParams.set('duration_custom', custom);
+                                                } else {
+                                                    url.searchParams.delete('duration_custom');
+                                                }
+                                                if (instruction.trim() !== '') {
+                                                    url.searchParams.set('instruction', instruction);
+                                                } else {
+                                                    url.searchParams.delete('instruction');
+                                                }
+                                                link.href = url.pathname + '?' + url.searchParams.toString();
+                                            });
+                                        };
+                                        form.querySelectorAll('[data-chatgpt-pdf]').forEach((link) => {
+                                            link.setAttribute('data-chatgpt-pdf-base', link.href.split('?')[0]);
+                                            if (link.getAttribute('aria-disabled') === 'true') {
+                                                link.classList.add('disabled');
+                                                link.addEventListener('click', (e) => e.preventDefault());
+                                            }
+                                        });
+                                        form.addEventListener('change', syncPdfLinks);
+                                        form.addEventListener('input', syncPdfLinks);
+                                        syncPdfLinks();
+                                    })();
+                                </script>
+                            @endif
                         </div>
                     </section>
                 @endif

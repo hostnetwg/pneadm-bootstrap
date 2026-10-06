@@ -1670,7 +1670,46 @@ class GrowthOsMaterialAiDraftTest extends TestCase
             ->assertSee('90 minut')
             ->assertSee('id="material_ai_duration_60" checked', false)
             ->assertSee('name="duration_custom"', false)
-            ->assertDontSee('id="material_ai_emojis"', false);
+            ->assertDontSee('id="material_ai_emojis"', false)
+            ->assertSee('data-chatgpt-pdf="bundle"', false)
+            ->assertSee('data-chatgpt-pdf="data"', false)
+            ->assertSee('Ikony PDF');
+    }
+
+    public function test_host_script_chatgpt_pdf_exports_bundle_and_data_without_youtube(): void
+    {
+        $user = $this->readyProject();
+        $this->saveMaterial($user, 'youtube-description', 'APPROVED', str_repeat('Opis YouTube bardzo długi. ', 80));
+
+        $bundle = $this->actingAs($user)
+            ->get(route('growth.projects.materials.ai.chatgpt-pdf', [
+                DemoTikWebinarProject::PROJECT_ID,
+                self::HOST_SCRIPT,
+                'mode' => 'bundle',
+                'duration' => '90',
+            ]));
+        $bundle->assertOk();
+        $bundle->assertHeader('content-type', 'application/pdf');
+        $this->assertStringContainsString('attachment', (string) $bundle->headers->get('content-disposition'));
+        $this->assertStringContainsString('prompt_i_dane', (string) $bundle->headers->get('content-disposition'));
+
+        $dataOnly = $this->actingAs($user)
+            ->get(route('growth.projects.materials.ai.chatgpt-pdf', [
+                DemoTikWebinarProject::PROJECT_ID,
+                self::HOST_SCRIPT,
+                'mode' => 'data',
+                'duration' => '60',
+            ]));
+        $dataOnly->assertOk();
+        $this->assertStringContainsString('dane_', (string) $dataOnly->headers->get('content-disposition'));
+
+        $this->actingAs($user)
+            ->get(route('growth.projects.materials.ai.chatgpt-pdf', [
+                DemoTikWebinarProject::PROJECT_ID,
+                'facebook-post',
+                'mode' => 'bundle',
+            ]))
+            ->assertNotFound();
     }
 
     public function test_host_script_payload_and_prompt(): void
@@ -1682,13 +1721,18 @@ class GrowthOsMaterialAiDraftTest extends TestCase
         $input = $this->provider->input;
         $this->assertSame(['key' => self::HOST_SCRIPT, 'name' => 'Scenariusz prowadzącego', 'type' => 'host_script'], $input['material']);
         $this->assertSame($this->liveLabel(), $input['campaign']['live_label']);
-        $this->assertSame(['youtube_description' => ''], $input['source_materials']);
-        $this->assertSame(['duration_minutes' => 60, 'end_time' => '21:00'], $input['style']);
+        $this->assertArrayNotHasKey('source_materials', $input);
+        $this->assertSame(60, $input['style']['duration_minutes']);
+        $this->assertSame('21:00', $input['style']['end_time']);
+        $this->assertSame('ty', $input['style']['address_form']);
+        $this->assertFalse($input['style']['address_form_overridden']);
         $this->assertSame(['draft', 'change_summary'], $this->provider->schema['required']);
         $this->assertSame(MaterialDraftTask::HOST_SCRIPT_PROMPT_VERSION, $this->proposal(self::HOST_SCRIPT)['prompt_version']);
         foreach (['Checklista przed startem', 'nagrywane', 'Pytanie na czat:', 'Pytania i odpowiedzi', 'Przejście:', 'style.end_time', 'direction.sell_later', 'concept.cta'] as $rule) {
             $this->assertStringContainsString($rule, $this->provider->instructions);
         }
+        $this->assertStringContainsString('Nie używaj opisu YouTube', $this->provider->instructions);
+        $this->assertStringNotContainsString('source_materials.youtube_description', $this->provider->instructions);
     }
 
     public function test_host_script_duration_options_and_custom_value_reach_the_model(): void
@@ -1696,10 +1740,12 @@ class GrowthOsMaterialAiDraftTest extends TestCase
         $user = $this->readyProject();
 
         $this->requestFor($user, self::HOST_SCRIPT, ['duration' => '90']);
-        $this->assertSame(['duration_minutes' => 90, 'end_time' => '21:30'], $this->provider->input['style']);
+        $this->assertSame(90, $this->provider->input['style']['duration_minutes']);
+        $this->assertSame('21:30', $this->provider->input['style']['end_time']);
 
         $this->requestFor($user, self::HOST_SCRIPT, ['duration' => 'custom', 'duration_custom' => '75']);
-        $this->assertSame(['duration_minutes' => 75, 'end_time' => '21:15'], $this->provider->input['style']);
+        $this->assertSame(75, $this->provider->input['style']['duration_minutes']);
+        $this->assertSame('21:15', $this->provider->input['style']['end_time']);
 
         $page = route('growth.projects.materials.show', [DemoTikWebinarProject::PROJECT_ID, self::HOST_SCRIPT]);
         $url = route('growth.projects.materials.ai', [DemoTikWebinarProject::PROJECT_ID, self::HOST_SCRIPT]);

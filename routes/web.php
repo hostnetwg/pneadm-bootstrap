@@ -110,6 +110,8 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
         Route::post('/projects/{project}/tasks/{taskKey}', [GrowthOsProjectController::class, 'updateOperationalTask'])->name('projects.tasks.update');
         Route::get('/projects/{project}/materials/{material}', [GrowthOsProjectController::class, 'material'])->name('projects.materials.show');
         Route::post('/projects/{project}/materials/{material}/status', [GrowthOsProjectController::class, 'updateMaterialStatus'])->name('projects.materials.status');
+        Route::get('/projects/{project}/materials/{material}/ai/chatgpt-pdf', [GrowthOsProjectController::class, 'exportMaterialAiPdf'])
+            ->name('projects.materials.ai.chatgpt-pdf');
         Route::post('/projects/{project}/materials/{material}/ai', [GrowthOsProjectController::class, 'requestMaterialAi'])
             ->middleware('throttle:growth-ai')
             ->name('projects.materials.ai');
