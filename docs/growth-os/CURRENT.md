@@ -2,7 +2,7 @@
 
 Last updated: 2026-10-06 CEST<br>
 Branch: main<br>
-Commit: (po pushu: host-script generate bez obecnego)<br>
+Commit: e6f65a2<br>
 Stage: v0.2 — Asystent planowania kierunku, szkice AI materiałów, generator obrazu, historia wersji, Sendy PNE, forma zwrotu Ty/Państwo, ustawienia modelu/reasoning, eksport PDF scenariusza do ChatGPT.com<br>
 Current blocker: none (produkcja: migracje v0.1 `Ran`, `/growth` działa — [runbook](../deploy/2026-09-pne-growth-os-stage-0-1-deploy.md); DEC-050 wymaga migracji `registration_url` / `youtube_live_url`; DEC-051 wymaga migracji `address_form`; DEC-052 wymaga migracji `growth_ai_settings`)
 
