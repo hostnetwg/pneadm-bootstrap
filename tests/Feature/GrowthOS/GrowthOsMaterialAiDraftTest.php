@@ -1840,6 +1840,8 @@ class GrowthOsMaterialAiDraftTest extends TestCase
         $this->assertSame(60, MaterialDraftTask::hostScriptDuration('abc'));
         $this->assertSame(60, MaterialDraftTask::hostScriptDuration(500));
         $this->assertSame(120, MaterialDraftTask::hostScriptDuration('120'));
+        $this->assertSame(MaterialDraftTask::HOST_SCRIPT_MIN_OUTPUT_TOKENS, (new MaterialDraftTask(self::HOST_SCRIPT))->preferredMaxOutputTokens());
+        $this->assertNull((new MaterialDraftTask(self::FACEBOOK))->preferredMaxOutputTokens());
     }
 
     /**

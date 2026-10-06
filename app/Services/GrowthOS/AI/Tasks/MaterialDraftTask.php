@@ -115,11 +115,14 @@ final class MaterialDraftTask implements GrowthAiTask
 
     public const HOST_SCRIPT_PROFILE = 'host_script_v1';
 
-    public const HOST_SCRIPT_PROMPT_VERSION = 'material_host_script_v3';
+    public const HOST_SCRIPT_PROMPT_VERSION = 'material_host_script_v4';
 
     public const HOST_SCRIPT_SCHEMA_VERSION = 'material_host_script_schema_v1';
 
-    public const HOST_SCRIPT_MAX_DRAFT_CHARS = 12000;
+    public const HOST_SCRIPT_MAX_DRAFT_CHARS = 20000;
+
+    /** Responses API output budget floor for long host scripts (reasoning + JSON share this). */
+    public const HOST_SCRIPT_MIN_OUTPUT_TOKENS = 16000;
 
     /**
      * @var list<int>
@@ -339,6 +342,16 @@ final class MaterialDraftTask implements GrowthAiTask
     public function materialKey(): string
     {
         return $this->materialKey;
+    }
+
+    /**
+     * Long scenarios need a higher Responses API output budget than short materials.
+     */
+    public function preferredMaxOutputTokens(): ?int
+    {
+        return $this->materialKey === self::HOST_SCRIPT_MATERIAL_KEY
+            ? self::HOST_SCRIPT_MIN_OUTPUT_TOKENS
+            : null;
     }
 
     public function type(): string
@@ -1008,7 +1021,9 @@ Zakończenie: krótkie podsumowanie, delikatne wezwanie do działania oparte na 
 Jeżeli campaign.host_name nie jest puste, prowadzący przedstawia się dokładnie tym imieniem i nazwiskiem, bez dopisywania tytułów, stanowisk, osiągnięć ani biografii. Jeżeli jest puste, nie wymyślaj prowadzącego.
 Termin to campaign.live_label. Nie zmieniaj go.
 Nie podawaj żadnego adresu URL. Jeżeli w scenariuszu potrzebny jest link, wstaw znacznik [LINK DO MATERIAŁU] albo [LINK DO ZAPISU].
+Pisz zwięźle: „Do powiedzenia:” to tylko kluczowe myśli (2–4 krótkie punkty), nie pełny tekst przemówienia. Cały draft trzymaj w rozsądnej długości — unikaj powtórzeń.
 Korzystaj wyłącznie z faktów zawartych w wejściu (temat, kierunek, koncepcja, czas trwania). Nie używaj opisu YouTube — nie dostajesz go w wejściu. Nie wymyślaj danych, statystyk, przepisów, funkcji produktów, ceny, certyfikatów, zaświadczeń, akredytacji ani dofinansowania.
+Jeżeli masz włączone web_search: użyj go wyłącznie do krótkiej weryfikacji 1–2 faktów o narzędziach lub produktach wymienionych w kierunku/koncepcji (np. czy funkcja istnieje). Nie buduj scenariusza ze stron internetowych, nie cytuj źródeł w draftcie i nie wstawiaj żadnych URL.
 
 TRYB PRACY (pole mode):
 - "generate": napisz nowy scenariusz od zera na podstawie tematu, kierunku, koncepcji i czasu trwania. Nie ma wcześniejszego tekstu do przepisania.

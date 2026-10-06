@@ -7,6 +7,9 @@
     $aiProposal = $aiProposal ?? null;
     $aiControlId = $aiControlId ?? ('ai-exec-'.uniqid());
     $aiDefaults = GrowthAiRequestOptions::uiDefaults($aiChannel, is_array($aiProposal) ? $aiProposal : null);
+    if (is_bool($aiWebSearchDefault ?? null)) {
+        $aiDefaults['web_search'] = $aiWebSearchDefault;
+    }
     $aiModels = GrowthAiModelCatalog::models();
     $aiEfforts = GrowthAiModelCatalog::effortLabels();
     $aiSelectedModel = old('ai_model', $aiDefaults['model']);

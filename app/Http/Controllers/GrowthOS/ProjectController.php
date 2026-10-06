@@ -1280,9 +1280,15 @@ class ProjectController extends Controller
                 $inherit,
             );
         } catch (GrowthAiException $exception) {
-            $message = $exception->userMessage === GrowthAiException::INVALID_RESPONSE_MESSAGE
-                ? 'Nie udało się przygotować poprawnej propozycji AI. Obecny szkic nie został zmieniony.'
-                : $exception->userMessage;
+            $message = match ($exception->errorType) {
+                'incomplete_output', 'invalid_json', 'missing_output_text' => $material === MaterialDraftTask::HOST_SCRIPT_MATERIAL_KEY
+                    ? 'AI nie dokończyło długiego scenariusza (limit odpowiedzi). Spróbuj krótszy czas, wyższy wysiłek w ⚙ albo ponów bez zmian. Obecny szkic nie został zmieniony.'
+                    : 'AI nie dokończyło odpowiedzi. Spróbuj wyższy wysiłek w ⚙ albo ponów. Obecny szkic nie został zmieniony.',
+                'unexpected_url' => 'AI wstawiło niedozwolony adres URL do szkicu. Spróbuj ponownie (prompt zabrania URL; przy „Sieci” model czasem je dopisuje). Obecny szkic nie został zmieniony.',
+                default => $exception->userMessage === GrowthAiException::INVALID_RESPONSE_MESSAGE
+                    ? 'Nie udało się przygotować poprawnej propozycji AI. Obecny szkic nie został zmieniony.'
+                    : $exception->userMessage,
+            };
 
             return $back->withInput()->with('error', $message);
         }

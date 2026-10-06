@@ -223,6 +223,13 @@ final class GrowthAiService
             $options['max_output_tokens'] = $resolved->maxOutputTokens;
             $options['selection_source'] = $resolved->selectionSource;
 
+            if ($task instanceof MaterialDraftTask) {
+                $preferred = $task->preferredMaxOutputTokens();
+                if (is_int($preferred)) {
+                    $options['max_output_tokens'] = max($options['max_output_tokens'], $preferred);
+                }
+            }
+
             $instructions = $task->instructions();
             if ($webSearchRequested) {
                 $instructions .= <<<'TEXT'
