@@ -15,6 +15,7 @@ use App\Services\GrowthOS\AI\Tasks\ConceptRevisionTask;
 use App\Services\GrowthOS\AI\Tasks\DirectionPlanningTask;
 use App\Services\GrowthOS\GrowthSessionConceptStore;
 use App\Support\GrowthOS\DemoTikWebinarProject;
+use App\Support\GrowthOS\GrowthAiRequestOptions;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
@@ -116,7 +117,7 @@ class GrowthOsDirectionPlanningTest extends TestCase
         $this->assertSame(1, $this->provider->calls);
         $this->assertSame(DirectionPlanningTask::TYPE, $this->provider->lastTaskType);
         $this->assertTrue($this->provider->lastOptions['web_search'] ?? false);
-        $this->assertTrue($this->provider->lastOptions['require_web_search'] ?? false);
+        $this->assertArrayNotHasKey('require_web_search', $this->provider->lastOptions);
         $this->assertTrue($this->provider->lastOptions['use_research_model'] ?? false);
         $this->assertSame($this->topic(), $this->provider->lastInput['campaign']['topic'] ?? null);
         $this->assertArrayNotHasKey('host', $this->provider->lastInput);
@@ -140,7 +141,8 @@ class GrowthOsDirectionPlanningTest extends TestCase
             ->assertSee('blog.google')
             ->assertSee('Użyj tego kierunku')
             ->assertSee('Popraw propozycję')
-            ->assertSee('Popraw propozycję — szukaj w Internecie');
+            ->assertSee('Wyszukiwanie w sieci')
+            ->assertDontSee('Popraw propozycję — szukaj w Internecie');
     }
 
     public function test_empty_topic_does_not_call_provider(): void
@@ -175,18 +177,21 @@ class GrowthOsDirectionPlanningTest extends TestCase
             ->post(route('growth.projects.direction-planning'), $this->planningPayload([
                 'planning_mode' => DirectionPlanningTask::MODE_ITERATE,
                 'planning_instruction' => 'Bardziej skup się na nauczycielach niż dyrektorach.',
+                'ai_web_search' => '0',
             ]))
             ->assertRedirect(route('growth.projects.create'));
 
         $this->assertSame(2, $this->provider->calls);
-        $this->assertSame(['use_research_model' => true], $this->provider->lastOptions);
+        $this->assertSame('gpt-6.1-sol', $this->provider->lastOptions['model'] ?? null);
+        $this->assertTrue(($this->provider->lastOptions['use_research_model'] ?? false) === true);
+        $this->assertFalse(($this->provider->lastOptions['web_search'] ?? false) === true);
         $this->assertSame('iterate', $this->provider->lastInput['mode']);
         $this->assertArrayHasKey('previous_proposal', $this->provider->lastInput);
         $this->assertStringContainsString('Nie wyszukuj w Internecie', $this->provider->lastInstructions);
         $this->assertSame(1, DemoTikWebinarProject::directionPlanningProposal()['iteration_count']);
     }
 
-    public function test_refresh_requires_web_search_again(): void
+    public function test_refresh_maps_to_iterate_with_web_search(): void
     {
         $user = $this->superAdmin();
         $this->actingAs($user)->post(route('growth.projects.direction-planning'), $this->planningPayload());
@@ -194,12 +199,13 @@ class GrowthOsDirectionPlanningTest extends TestCase
         $this->actingAs($user)
             ->post(route('growth.projects.direction-planning'), $this->planningPayload([
                 'planning_mode' => DirectionPlanningTask::MODE_REFRESH,
+                'planning_instruction' => 'Odśwież research.',
             ]))
             ->assertRedirect(route('growth.projects.create'));
 
         $this->assertTrue($this->provider->lastOptions['web_search'] ?? false);
-        $this->assertTrue($this->provider->lastOptions['require_web_search'] ?? false);
-        $this->assertSame('refresh', $this->provider->lastInput['mode']);
+        $this->assertArrayNotHasKey('require_web_search', $this->provider->lastOptions);
+        $this->assertSame('iterate', $this->provider->lastInput['mode']);
     }
 
     public function test_stale_iterate_does_not_call_provider(): void
@@ -303,7 +309,7 @@ class GrowthOsDirectionPlanningTest extends TestCase
         $this->actingAs($this->superAdmin())
             ->get(route('growth.projects.create'))
             ->assertOk()
-            ->assertSee('Symulacja lokalna — bez sprawdzania Internetu.');
+            ->assertSee('Symulacja lokalna nie sprawdza Internetu.');
     }
 
     public function test_only_super_admin_can_plan_direction(): void
@@ -329,15 +335,22 @@ class GrowthOsDirectionPlanningTest extends TestCase
         $this->assertNull(DemoTikWebinarProject::directionPlanningProposal());
     }
 
-    public function test_missing_web_search_fails_closed_without_proposal(): void
+    public function test_missing_web_search_soft_fails_with_note(): void
     {
-        $this->provider->exception = GrowthAiException::researchFailed('web_search_missing');
+        $this->provider->forceSkipWebSearch = true;
 
         $this->actingAs($this->superAdmin())
-            ->post(route('growth.projects.direction-planning'), $this->planningPayload())
-            ->assertSessionHas('error', GrowthAiException::RESEARCH_FAILED_MESSAGE);
+            ->post(route('growth.projects.direction-planning'), $this->planningPayload([
+                'ai_web_search' => '1',
+            ]))
+            ->assertSessionHas('success');
 
-        $this->assertNull(DemoTikWebinarProject::directionPlanningProposal());
+        $proposal = DemoTikWebinarProject::directionPlanningProposal();
+        $this->assertIsArray($proposal);
+        $this->assertTrue($proposal['web_search_requested'] ?? false);
+        $this->assertFalse($proposal['web_search_used'] ?? true);
+        $this->assertSame(GrowthAiRequestOptions::WEB_SEARCH_SKIPPED_MESSAGE, $proposal['web_search_note'] ?? null);
+        $this->assertSame([], $proposal['sources'] ?? null);
         $this->assertSame(0, GrowthCampaign::query()->count());
     }
 
@@ -396,7 +409,8 @@ class GrowthOsDirectionPlanningTest extends TestCase
             ->assertRedirect();
 
         $this->assertSame(ConceptRevisionTask::TYPE, $this->provider->lastTaskType);
-        $this->assertSame([], $this->provider->lastOptions);
+        $this->assertSame('gpt-6.1-sol', $this->provider->lastOptions['model'] ?? null);
+        $this->assertArrayNotHasKey('use_research_model', $this->provider->lastOptions);
         $this->assertNotSame(DirectionPlanningTask::TYPE, $this->provider->lastTaskType);
     }
 
@@ -515,6 +529,8 @@ final class FakeDirectionPlanningProvider implements GrowthAiProvider
 
     public ?GrowthAiException $exception = null;
 
+    public bool $forceSkipWebSearch = false;
+
     /** @var array<string, mixed> */
     public array $payload = [
         'working_topic' => 'NotebookLM w pracy nauczyciela — od przygotowania lekcji do pracy z dokumentami',
@@ -558,21 +574,28 @@ final class FakeDirectionPlanningProvider implements GrowthAiProvider
         }
 
         $webSearch = ($options['web_search'] ?? false) === true;
+        $webSearchUsed = $webSearch && ! $this->forceSkipWebSearch;
 
         return new AiProviderResponse(
             payload: $taskType === ConceptRevisionTask::TYPE ? $this->conceptPayload : $this->payload,
             provider: $this->name(),
-            model: $this->model(),
+            model: (string) ($options['model'] ?? $this->model()),
             requestId: 'test-request-id',
             inputTokens: 100,
             outputTokens: 200,
             latencyMs: 10,
-            webSearchUsed: $webSearch,
-            researchSources: $webSearch ? [[
+            webSearchUsed: $webSearchUsed,
+            researchSources: $webSearchUsed ? [[
                 'title' => 'NotebookLM blog',
                 'url' => 'https://blog.google/notebooklm/',
                 'domain' => 'blog.google',
             ]] : [],
+            reasoningEffort: (string) ($options['reasoning_effort'] ?? ''),
+            selectionSource: (string) ($options['selection_source'] ?? ''),
+            webSearchRequested: $webSearch,
+            webSearchNote: ($webSearch && ! $webSearchUsed)
+                ? GrowthAiRequestOptions::WEB_SEARCH_SKIPPED_MESSAGE
+                : null,
         );
     }
 }

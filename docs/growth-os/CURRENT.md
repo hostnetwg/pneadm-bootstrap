@@ -1,10 +1,10 @@
 # PNE Growth OS — Current State
 
-Last updated: 2026-10-05 CEST<br>
+Last updated: 2026-10-06 CEST<br>
 Branch: main<br>
-Commit: 086f95d (+ lokalnie: DEC-051 address_form)<br>
-Stage: v0.2 — Asystent planowania kierunku, szkice AI materiałów, generator obrazu, historia wersji, Sendy PNE, forma zwrotu Ty/Państwo<br>
-Current blocker: none (produkcja: migracje v0.1 `Ran`, `/growth` działa — [runbook](../deploy/2026-09-pne-growth-os-stage-0-1-deploy.md); DEC-050 wymaga migracji `registration_url` / `youtube_live_url`; DEC-051 wymaga migracji `address_form`)
+Commit: 6e0fcdc (+ lokalnie: DEC-052 AI runtime settings)<br>
+Stage: v0.2 — Asystent planowania kierunku, szkice AI materiałów, generator obrazu, historia wersji, Sendy PNE, forma zwrotu Ty/Państwo, ustawienia modelu/reasoning<br>
+Current blocker: none (produkcja: migracje v0.1 `Ran`, `/growth` działa — [runbook](../deploy/2026-09-pne-growth-os-stage-0-1-deploy.md); DEC-050 wymaga migracji `registration_url` / `youtube_live_url`; DEC-051 wymaga migracji `address_form`; DEC-052 wymaga migracji `growth_ai_settings`)
 
 ## 1. Cel projektu
 
@@ -18,8 +18,8 @@ PNE Growth OS / PNE Rozwój to moduł w `adm.pnedu.pl`, który ma prowadzić wł
 - Supporting views: **Dzisiaj / Projekty / Pomysły / Inbox**.
 - **Projekty** (DEC-038): lista wszystkich zapisanych webinariów właściciela. „Otwórz” wczytuje wybraną kampanię do workspace. „Usuń” (modal) kasuje kampanię, materiały, historię i obrazy na stałe.
 - Formularz **Zaplanuj webinar** (DEC-037): opcjonalny **Asystent planowania** sprawdza aktualne informacje i proponuje kierunek; projekt powstaje dopiero po „Utwórz projekt webinaru”. „Użyj tego kierunku” wstępnie wypełnia szkic, ale nie zatwierdza go. Nowy projekt ma puste pola kierunku i puste szkice materiałów (koncepcja tylko z tytułem = temat).
-- Karta **Pomysł i kierunek** (DEC-039): po powstaniu projektu ten sam asystent zostaje w workspace. „Popraw propozycję” i „Popraw propozycję — szukaj w Internecie” pokazują nową wersję obok pól. „Zmień na” wstawia jeden fragment do pola, bez zapisu. Kierunek zapisuje się po „Zastosuj” i zostaje szkicem. Przy „Gotowe” najpierw trzeba cofnąć zatwierdzenie.
-- Concept stage: edycja ręczna, cofnięcie zatwierdzenia, opcjonalna propozycja OpenAI jako wariant do przyjęcia/odrzucenia. Przy pustej koncepcji pierwsza opcja to „Wygeneruj na podstawie pomysłu i kierunku”. Każda opcja dostaje zapisany kierunek jako granicę sensu (DEC-041). Nowy tytuł nie zmienia tematu kierunku, a „Zastosuj” nie zmienia pól kierunku.
+- Karta **Pomysł i kierunek** (DEC-039): po powstaniu projektu ten sam asystent zostaje w workspace. Temat jest edytowalny i zapisuje się razem z pięcioma polami kierunku. „Popraw propozycję” pokazuje nową wersję obok pól. „Zmień na” wstawia jeden fragment do pola, bez zapisu. Kierunek zapisuje się po „Zastosuj” i zostaje szkicem (tematu „Zastosuj” nie zmienia). Przy „Gotowe” najpierw trzeba cofnąć zatwierdzenie.
+- Concept stage: edycja ręczna, cofnięcie zatwierdzenia, opcjonalna propozycja OpenAI jako wariant do przyjęcia/odrzucenia. Przy pustej koncepcji pierwsza opcja to „Wygeneruj na podstawie pomysłu i kierunku”. Lista ma też „Popraw zgodnie z moimi sugestiami” (wymaga pola sugestii). Każda opcja dostaje zapisany kierunek jako granicę sensu (DEC-041). Nowy tytuł nie zmienia tematu kierunku, a „Zastosuj” nie zmienia pól kierunku.
 - Formularz webinaru i karta projektu (DEC-035 + DEC-051): „Prowadzący”, „Głos komunikacji” oraz **Forma zwrotu do odbiorcy** (`ty` / `panstwo`, domyślnie Ty). Forma obowiązuje wszystkie szkice AI; głos nie ją zmienia. Dodatkowa instrukcja może jawnie nadpisać formę tylko dla jednej propozycji.
 - Materiał „Opis YouTube” (DEC-036): po zatwierdzeniu kierunku i koncepcji „Poproś AI o nowy szkic” (od zera) albo „Popraw mój szkic” (redakcja tekstu z pola, także niezapisanego). Na karcie propozycji „Co jeszcze poprawić?” i „Popraw ponownie”. Zastosuj / Odrzuć jak wcześniej; po odrzuceniu niezapisany tekst wraca do pola.
 - Materiał „Post Facebook”: ten sam wzorzec, plus checkbox hashtagów; AI korzysta z opisu YouTube tylko zatwierdzonego i wstawia `[LINK DO ZAPISU]` zamiast linku.
@@ -38,8 +38,9 @@ Etap v0.2. Pierwszy wycinek, szkic AI dla materiału `youtube-description` (DEC-
 - Menu **PNE Rozwój**: Dzisiaj, Projekty, Pomysły, Inbox.
 - Lista **Projekty** (DEC-038): wszystkie kampanie właściciela, otwieranie wybranej i trwałe usuwanie z modalem. Cudzej kampanii nie widać i nie da się usunąć.
 - Formularz **Zaplanuj webinar**.
-- **Asystent planowania** (DEC-037): zadanie `direction_planning`, prompt `direction_planning_v1`. Przy włączonej fladze OpenAI `gpt-5.5` z `web_search` (generate i refresh); iterate bez wyszukiwania. Propozycja tylko w sesji. „Użyj tego kierunku” zapisuje szkic `DRAFT` przy tworzeniu projektu, bez zatwierdzenia. Przy wyłączonej fladze — symulacja lokalna bez udawania źródeł. Statyczne karty pomysłów są na Pomysłach (etykieta „Przykład tematu”), nie na create.
-- **Asystent kierunku w projekcie** (DEC-039): na karcie „Pomysł i kierunek” te same tryby iterate i refresh. Propozycja w sesji projektu. „Zastosuj” zapisuje szkic, „Odrzuć” zostawia kierunek. Zatwierdzonego kierunku AI nie rusza.
+- **Wyszukiwanie w sieci** (DEC-053): checkbox w panelu ⚙ modelu/wysiłku, domyślnie włączony (kierunek, koncepcja, materiały). Soft-fail z komunikatem, gdy sieć nie zadziała. Osobny przycisk „szukaj w Internecie” usunięty.
+- **Asystent planowania** (DEC-037 / DEC-039): zadanie `direction_planning`, prompt `direction_planning_v3`. Generate / iterate; search z checkboxa. Propozycja tylko w sesji.
+- **Asystent kierunku w projekcie** (DEC-039 / DEC-053): na karcie „Pomysł i kierunek” generate / iterate oraz checkbox „Wyszukiwanie w sieci”. Propozycja w sesji projektu. „Zastosuj” zapisuje szkic, „Odrzuć” zostawia kierunek. Zatwierdzonego kierunku AI nie rusza.
 - Sesyjny projekt webinaru (`DemoTikWebinarProject`).
 - Modele Eloquent v0.1 i relacje: właściciel, instruktor, materiał, zadanie, decyzja. Workspace używa kampanii, kierunku, koncepcji, decyzji przy kierunku i koncepcji, 9 zadań operacyjnych i 10 materiałów roboczych.
 - Testy integralności: unikalny klucz materiału w kampanii, puste relacje, usuwanie kampanii razem z dziećmi, czyszczenie opcjonalnych powiązań.
@@ -61,6 +62,7 @@ Etap v0.2. Pierwszy wycinek, szkic AI dla materiału `youtube-description` (DEC-
 - **Poproś AI o szkic** dla „Mailing przypominający” (DEC-033): prompt `material_reminder_mail_v1`, ten sam format i te same pola co mailing główny. Przełącznik „Kiedy wysyłasz przypomnienie” (dzień przed, „jutro”, albo w dniu webinaru, „dziś”) i przełącznik długości (80–150 albo 180–280 słów). Dwa znaczniki: `[LINK DO POKOJU]` dla zapisanych i `[LINK DO ZAPISU]` dla pozostałych. AI dostaje zatwierdzony opis YouTube i zatwierdzony mailing główny, jeśli istnieją.
 - **Generator obrazu** dla „Grafika główna” (DEC-029, DEC-030, DEC-042): OpenAI `gpt-image-2`, jakość `medium`, jeden obraz w formacie poziomym (natywnie 16:9, 1920×1080 bez przycinania) albo kwadratowym (1080×1080). Przy obrazie poziomym jest „Utwórz wersję kwadratową”: te same elementy przekomponowane do kwadratu przez edycję obrazu w OpenAI, z tymi samymi napisami co oryginał. Logo Platformy i opcjonalne logo sponsora aplikacja dokłada na gotowy obraz (także po wersji kwadratowej); model ich nie rysuje. Generator pokazuje dzisiejsze zużycie limitu i ma przycisk „Zresetuj limit” (modal, wpis w logu). Aplikacja dokleja do opisu zasady bez tekstu i bez logotypów rysowanych przez model. Z checkboxem dokleja nagłówek z briefu i termin. Nagłówek briefu bierze się z tematu webinaru (DEC-043). Brief ma „Nowy brief” / „Popraw mój brief”, a opis obrazu poprawia się osobno. „Popraw ten obraz” edytuje gotowe zdjęcie jedną uwagą; logo dokłada się potem. Pliki JPEG są prywatne (`storage/app/private/growth-os/images`), tabela `growth_artifact_images`, galeria 10 ostatnich (wybrana grafika zostaje zawsze), limit 10 obrazów dziennie, osobny obwód awaryjny, log bez opisu obrazu. Przy wyłączonej fladze powstaje obraz zastępczy bez OpenAI.
 - Osobna, domyślnie wyłączona flaga `GROWTH_AI_ENABLED`; prawdziwe AI jest dostępne tylko dla `super_admin`.
+- **Ustawienia AI** (DEC-052): `/growth/ai-settings` — domyślny model i wysiłek (general + research). Po migracji: Sol/medium i Sol/high. Przy każdym requestcie tekstowym lokalna kontrolka modelu/effort (nie zmienia globalnych). Iterate dziedziczy parametry z proposal. Katalog: Luna, Sol, Astra, gpt-5-mini, gpt-5.5. Image picker osobno, później.
 - Provider i model są konfigurowane centralnie i widoczne w UI; logika Growth OS korzysta z abstrakcji providera.
 - Walidacja structured output, allowlisty danych (kierunek: temat/cel/typ; koncepcja; opis YouTube z `host_name` — DEC-025; post Facebook dodatkowo z zatwierdzonym opisem YouTube — DEC-026; poza tym bez innych materiałów), blokada e-maili/telefonów/sekretów i linków spoza wejścia, timeout, jeden retry, limity wywołań i prosty circuit breaker. Limit dzienny i circuit breaker są wspólne dla zadań tekstowych (`direction_planning`, `concept_revision`, `material_draft`). `direction_planning` ma osobny model i timeout researchu.
 - Osobny log techniczny zawiera tylko metadane wywołania (w tym `task_type`: `direction_planning`, `concept_revision`, `material_draft` albo `material_image`) — bez promptu, odpowiedzi, treści, PII i sekretów. `direction_planning` loguje też `web_search_used` i `source_count`.
@@ -145,7 +147,7 @@ Ręczna weryfikacja asystenta kierunku w otwartym projekcie (DEC-039): „Popraw
 
 - Koncepcja i kierunek (DEC-041): każda opcja „Wygeneruj lub zmień” dostaje zapisany temat i pięć pól kierunku. Poprawka nie układa koncepcji od nowa. „Zastosuj” nie zmienia kierunku i nie cofa jego zatwierdzenia. Bez migracji.
 
-- Asystent kierunku w otwartym projekcie (DEC-039): na karcie „Pomysł i kierunek” „Popraw propozycję” (bez wyszukiwania) i „Popraw propozycję — szukaj w Internecie”. Propozycja obok pól; „Zastosuj” zapisuje szkic `DRAFT`. Przy „Gotowe” AI jest zablokowane. Bez migracji.
+- Asystent kierunku w otwartym projekcie (DEC-039 / DEC-053): na karcie „Pomysł i kierunek” „Przygotuj od nowa”, „Popraw propozycję” oraz checkbox „Wyszukiwanie w sieci” (domyślnie ON, soft-fail z komunikatem). Propozycja obok pól; „Zastosuj” zapisuje szkic `DRAFT`. Przy „Gotowe” AI jest zablokowane. Bez migracji.
 
 - Lista i usuwanie projektów (DEC-038): `/growth/projects` pokazuje wszystkie kampanie właściciela, „Otwórz” i trwałe „Usuń” z modalem. Bez migracji.
 

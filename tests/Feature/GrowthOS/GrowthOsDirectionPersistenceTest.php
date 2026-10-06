@@ -80,6 +80,32 @@ class GrowthOsDirectionPersistenceTest extends TestCase
         $this->assertSame('Dla dyrektorów', $artifact->fresh()->payload['audience']);
     }
 
+    public function test_saving_direction_updates_editable_topic_on_campaign(): void
+    {
+        $user = $this->superAdmin();
+        $this->actingAs($user)->post(route('growth.projects.store'), $this->projectPayload());
+
+        $this->actingAs($user)
+            ->get(route('growth.projects.show', DemoTikWebinarProject::PROJECT_ID))
+            ->assertOk()
+            ->assertSee('name="topic"', false)
+            ->assertSee('id="direction_topic"', false);
+
+        $this->actingAs($user)
+            ->put(route('growth.projects.direction.update', DemoTikWebinarProject::PROJECT_ID), [
+                ...$this->directionPayload(),
+                'topic' => 'NotebookLM: nowy temat webinaru',
+            ])
+            ->assertRedirect();
+
+        $project = DemoTikWebinarProject::project();
+        $this->assertSame('NotebookLM: nowy temat webinaru', $project['topic']);
+
+        $campaign = \App\Models\GrowthOS\GrowthCampaign::query()->findOrFail($project['growth_campaign_id']);
+        $this->assertSame('NotebookLM: nowy temat webinaru', $campaign->working_topic);
+        $this->assertSame('NotebookLM: nowy temat webinaru', $campaign->name);
+    }
+
     public function test_approval_and_host_return_after_a_new_session(): void
     {
         $user = $this->superAdmin();
@@ -167,6 +193,7 @@ class GrowthOsDirectionPersistenceTest extends TestCase
     private function directionPayload(): array
     {
         return [
+            'topic' => 'Canva AI w pracy nauczyciela',
             'why_now' => 'Nauczyciele szukają prostego przykładu przed radą.',
             'audience' => 'Dla nauczycieli wczesnoszkolnych',
             'problem' => 'Brak czasu na materiały.',

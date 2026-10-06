@@ -90,7 +90,7 @@ class GrowthOsMaterialAiDraftTest extends TestCase
                 ->get(route('growth.projects.materials.show', [DemoTikWebinarProject::PROJECT_ID, $key]))
                 ->assertOk()
                 ->assertSee($button)
-                ->assertSee('AI: OpenAI / '.config('growth_ai.model'));
+                ->assertSee('AI: '.\App\Services\GrowthOS\AI\Support\GrowthAiModelCatalog::badgeForChannel(\App\Services\GrowthOS\AI\Support\GrowthAiModelCatalog::CHANNEL_GENERAL));
         }
 
         $this->actingAs($user)
@@ -529,6 +529,7 @@ class GrowthOsMaterialAiDraftTest extends TestCase
         $this->requestDraft($user);
 
         $this->actingAs($user)->put(route('growth.projects.direction.update', DemoTikWebinarProject::PROJECT_ID), [
+            'topic' => DemoTikWebinarProject::project()['topic'] ?? 'Canva AI w pracy nauczyciela',
             'why_now' => 'Nowy powód',
             'audience' => 'Dyrektorzy szkół',
             'problem' => 'Nowy problem',
@@ -1725,6 +1726,17 @@ class GrowthOsMaterialAiDraftTest extends TestCase
         $artifact = GrowthArtifact::query()->where('key', self::HOST_SCRIPT)->sole();
         $this->assertStringStartsWith('Checklista przed startem', $artifact->payload['draft']);
         $this->assertSame('DRAFT', $artifact->payload['status']);
+        $this->assertNotEmpty($artifact->payload['ai_origin']['model'] ?? null);
+
+        $material = collect(DemoTikWebinarProject::project()['materials'])
+            ->first(fn (array $item): bool => ($item['id'] ?? null) === self::HOST_SCRIPT);
+        $this->assertNotNull($material);
+        $this->assertNotEmpty($material['ai_origin']['model'] ?? null);
+
+        $this->actingAs($user)
+            ->get(route('growth.projects.materials.show', [DemoTikWebinarProject::PROJECT_ID, self::HOST_SCRIPT]))
+            ->assertOk()
+            ->assertSee('Wygenerowano:');
     }
 
     public function test_host_script_simulation_fills_the_whole_duration(): void

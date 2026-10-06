@@ -105,6 +105,13 @@
                                 Inbox
                             </a>
                         </li>
+                        <li>
+                            <a href="{{ route('growth.ai-settings.edit') }}"
+                               class="link-light d-inline-flex text-decoration-none rounded {{ request()->routeIs('growth.ai-settings.*') ? 'active fw-semibold text-white' : '' }}"
+                               onclick="event.stopPropagation();">
+                                Ustawienia AI
+                            </a>
+                        </li>
                     </ul>
                 </div>
             </li>

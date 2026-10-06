@@ -147,6 +147,12 @@ class GrowthAiPilotTest extends TestCase
         $this->assertSame('Tytuł po korekcie AI', $project['concept']['title']);
         $this->assertSame('', $project['direction']['audience']);
         $this->assertNull($project['concept_ai_proposal']);
+        $this->assertNotNull($project['concept_ai_origin']['model'] ?? null);
+
+        $this->actingAs($user)
+            ->get(route('growth.projects.show', DemoTikWebinarProject::PROJECT_ID).'#concept')
+            ->assertOk()
+            ->assertSee('Wygenerowano:');
     }
 
     public function test_reject_leaves_current_concept_unchanged(): void
@@ -248,6 +254,7 @@ class GrowthAiPilotTest extends TestCase
             'topic' => 'NotebookLM w pracy nauczyciela',
         ]);
         $this->actingAs($user)->put(route('growth.projects.direction.update', DemoTikWebinarProject::PROJECT_ID), [
+            'topic' => 'NotebookLM w pracy nauczyciela',
             'why_now' => 'Nauczyciele sprawdzają NotebookLM przy dokumentach.',
             'audience' => 'Nauczyciele pracujący z dokumentami.',
             'problem' => 'Trudno oddzielić bezpieczne użycie od konta szkolnego Google.',
@@ -308,6 +315,7 @@ class GrowthAiPilotTest extends TestCase
             'topic' => 'NotebookLM w pracy nauczyciela',
         ]);
         $this->actingAs($user)->put(route('growth.projects.direction.update', DemoTikWebinarProject::PROJECT_ID), [
+            'topic' => 'NotebookLM w pracy nauczyciela',
             'why_now' => 'Temat jest aktualny.',
             'audience' => 'Nauczyciele dokumentów.',
             'problem' => 'Bezpieczeństwo dokumentów.',
@@ -340,6 +348,7 @@ class GrowthAiPilotTest extends TestCase
             'topic' => 'NotebookLM w pracy nauczyciela',
         ]);
         $this->actingAs($user)->put(route('growth.projects.direction.update', DemoTikWebinarProject::PROJECT_ID), [
+            'topic' => 'NotebookLM w pracy nauczyciela',
             'why_now' => 'Nauczyciele sprawdzają NotebookLM przy dokumentach.',
             'audience' => 'Nauczyciele pracujący z dokumentami.',
             'problem' => 'Trudno oddzielić bezpieczne użycie od konta szkolnego Google.',
@@ -386,6 +395,47 @@ class GrowthAiPilotTest extends TestCase
         $this->assertSame($beforeDirection, $applied['direction']);
         $this->assertArrayHasKey('direction', $applied['completed_steps']);
         $this->assertSame('Tytuł po korekcie AI', $applied['concept']['title']);
+    }
+
+    public function test_by_suggestions_requires_instruction_and_sends_it_to_provider(): void
+    {
+        $user = $this->superAdmin();
+        $this->createProject($user);
+
+        $this->actingAs($user)
+            ->get(route('growth.projects.show', DemoTikWebinarProject::PROJECT_ID))
+            ->assertOk()
+            ->assertSee('Popraw zgodnie z moimi sugestiami');
+
+        $this->actingAs($user)
+            ->from(route('growth.projects.show', DemoTikWebinarProject::PROJECT_ID))
+            ->post(route('growth.projects.concept.ai', DemoTikWebinarProject::PROJECT_ID), [
+                'intent' => 'by_suggestions',
+                'instruction' => '',
+            ])
+            ->assertRedirect(route('growth.projects.show', DemoTikWebinarProject::PROJECT_ID).'#concept')
+            ->assertSessionHas('error', 'Dla opcji „Popraw zgodnie z moimi sugestiami” wpisz sugestie w polu „Dodatkowa instrukcja”.');
+
+        $this->assertSame(0, $this->provider->calls);
+
+        $this->actingAs($user)
+            ->post(route('growth.projects.concept.ai', DemoTikWebinarProject::PROJECT_ID), [
+                'intent' => 'by_suggestions',
+                'instruction' => 'Uprość język i dodaj przykład z lekcji matematyki.',
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $this->assertSame(1, $this->provider->calls);
+        $this->assertStringContainsString(
+            'Uprość język i dodaj przykład z lekcji matematyki.',
+            (string) ($this->provider->lastInput['user_instruction'] ?? ''),
+        );
+        $this->assertStringContainsString(
+            'wyłącznie zgodnie z poniższymi sugestiami',
+            (string) ($this->provider->lastInput['user_instruction'] ?? ''),
+        );
+        $this->assertStringNotContainsString('ułóż pierwszą koncepcję', $this->provider->lastInstructions);
     }
 
     private function createProject(User $user): void

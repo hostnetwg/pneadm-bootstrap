@@ -24,6 +24,7 @@ use App\Http\Controllers\DashboardOrdersController;
 use App\Http\Controllers\DashboardOrdersStatsController;
 use App\Http\Controllers\EducationController;
 use App\Http\Controllers\FormOrdersController;
+use App\Http\Controllers\GrowthOS\AiSettingsController as GrowthOsAiSettingsController;
 use App\Http\Controllers\GrowthOS\ApprovalController as GrowthOsApprovalController;
 use App\Http\Controllers\GrowthOS\DashboardController as GrowthOsDashboardController;
 use App\Http\Controllers\GrowthOS\IdeaController as GrowthOsIdeaController;
@@ -73,6 +74,9 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
         Route::post('/ai/limit/reset', [GrowthOsProjectController::class, 'resetAiDailyLimit'])
             ->name('ai.limit.reset');
         Route::get('/', GrowthOsDashboardController::class)->name('dashboard');
+        Route::get('/ai-settings', [GrowthOsAiSettingsController::class, 'edit'])->name('ai-settings.edit');
+        Route::put('/ai-settings', [GrowthOsAiSettingsController::class, 'update'])->name('ai-settings.update');
+        Route::post('/ai-settings/restore', [GrowthOsAiSettingsController::class, 'restoreRecommended'])->name('ai-settings.restore');
         Route::get('/projects', [GrowthOsProjectController::class, 'index'])->name('projects.index');
         Route::get('/projects/create', [GrowthOsProjectController::class, 'create'])->name('projects.create');
         Route::post('/projects', [GrowthOsProjectController::class, 'store'])->name('projects.store');

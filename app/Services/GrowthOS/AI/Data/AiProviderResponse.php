@@ -18,5 +18,9 @@ final readonly class AiProviderResponse
         public int $latencyMs,
         public bool $webSearchUsed = false,
         public array $researchSources = [],
+        public string $reasoningEffort = '',
+        public string $selectionSource = '',
+        public bool $webSearchRequested = false,
+        public ?string $webSearchNote = null,
     ) {}
 }

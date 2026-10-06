@@ -308,9 +308,9 @@ Consequences: Workspace nadal używa jednego projektu w sesji (`tik-webinar-sess
 
 Date: 2026-10-03<br>
 Status: ACTIVE<br>
-Decision: Po utworzeniu projektu asystent kierunku zostaje na karcie **Pomysł i kierunek**. „Popraw propozycję” (bez wyszukiwania) i „Popraw propozycję — szukaj w Internecie” (z `web_search`) biorą bieżące pola, także niezapisane. Nowa propozycja stoi obok. „Zmień na” wstawia jeden fragment do pola, bez zapisu. „Zastosuj” zapisuje pięć pól jako `DRAFT`. „Odrzuć” nic nie zapisuje. Przy statusie Gotowe asystent jest zablokowany do „Cofnij zatwierdzenie”.<br>
-Rationale: Po „Użyj tego kierunku” i „Utwórz projekt webinaru” propozycja znika z formularza tworzenia. Waldemar chce dalej poprawiać kierunek z AI albo ręcznie w otwartym projekcie.<br>
-Consequences: To samo zadanie `direction_planning`. Propozycja workspace jest w sesji projektu (`direction_ai_proposal`), osobno od propozycji sprzed utworzenia projektu. Odcisk dotyczy zapisanego kierunku z chwili prośby: niezapisane pola nie blokują „Zastosuj”, a „Zapisz kierunek” albo zatwierdzenie kasuje propozycję. „Zastosuj” nie zmienia tematu projektu i nie zatwierdza kierunku. Tytuły z AI są tylko podpowiedzią. Bez migracji i bez czatu.
+Decision: Po utworzeniu projektu asystent kierunku zostaje na karcie **Pomysł i kierunek**. „Przygotuj od nowa” (`generate` + `web_search`) układa kierunek z tematu projektu i opcjonalnych sugestii, **bez** opierania się na wypełnionych polach. „Popraw propozycję” (bez wyszukiwania) i „Popraw propozycję — szukaj w Internecie” (z `web_search`) biorą bieżące pola, także niezapisane. Nowa propozycja stoi obok. „Zmień na” wstawia jeden fragment do pola, bez zapisu. „Zastosuj” zapisuje pięć pól jako `DRAFT`. „Odrzuć” nic nie zapisuje. Przy statusie Gotowe asystent jest zablokowany do „Cofnij zatwierdzenie”.<br>
+Rationale: Po „Użyj tego kierunku” i „Utwórz projekt webinaru” propozycja znika z formularza tworzenia. Waldemar chce dalej poprawiać kierunek z AI albo ręcznie w otwartym projekcie — oraz móc zacząć od zera z samego tematu i sugestii, gdy obecne pola przeszkadzają.<br>
+Consequences: To samo zadanie `direction_planning` (prompt od 2026-10-06: `direction_planning_v2`). Propozycja workspace jest w sesji projektu (`direction_ai_proposal`), osobno od propozycji sprzed utworzenia projektu. Odcisk dotyczy zapisanego kierunku z chwili prośby: niezapisane pola nie blokują „Zastosuj”, a „Zapisz kierunek” albo zatwierdzenie kasuje propozycję. „Zastosuj” nie zmienia tematu projektu i nie zatwierdza kierunku. Tytuły z AI są tylko podpowiedzią. Generate w workspace nie dziedziczy lokalnego modelu z poprzedniej propozycji. Bez migracji i bez czatu.
 
 ## DEC-040
 
@@ -407,3 +407,19 @@ Status: ACTIVE<br>
 Decision: Każda GrowthCampaign ma `address_form`: `ty` | `panstwo` (domyślnie `ty`). Obowiązuje wszystkie szkice AI kampanii (materiały, kierunek, koncepcja). Głos komunikacji nie nadpisuje formy. Jawna „Dodatkowa instrukcja dla AI” może nadpisać formę tylko dla bieżącej operacji/proposal, bez zmiany ustawienia projektu. Refine ujednolica tekst do aktualnego `address_form` (lub lokalnego override). Iterate kontynuuje świadomy override, dopóki instrukcja go nie odwołuje. Host-script przy `ty` używa naturalnego Wy/Wam wobec grupy; działania jednego prowadzącego: „pokażę”, nie „pokażemy”. „My” tylko dla działań PNE/zespołu. Lokalna symulacja respektuje tę samą politykę. Zmiana settingu nie przepisuje zatwierdzonych materiałów — pokazuje ostrzeżenie.<br>
 Rationale: Właściciel pisze mailingi bezpośrednio na Ty; formalne Państwo ma zostać wyborem kampanii, nie hardcodem w promptach. Forma zwrotu to polityka kanału/kampanii, nie styl głosu instruktora.<br>
 Consequences: Migracja `growth_campaigns.address_form`. UX w formularzu prowadzącego/głosu (create + karta projektu). Centralna `AddressFormPolicy` wstrzykiwana do promptów. Fingerprint materiałów zawiera `address_form` (stale proposal po zmianie). Greeting Sendy bez zmian.
+
+## DEC-053
+
+Date: 2026-10-06<br>
+Status: ACTIVE<br>
+Decision: **Wyszukiwanie w sieci** jest lokalnym checkboxem w panelu modelu/wysiłku (wszędzie: create kierunku, karta kierunku, koncepcja, materiały, opis obrazu). Domyślnie **włączone**. Osobny przycisk „Popraw — szukaj w Internecie” znika. Gdy search włączony, a model nie wykona `web_search`, propozycja i tak wraca z informacją (soft-fail), bez blokady. Źródła pokazujemy, gdy search realnie zadziałał.<br>
+Rationale: Waldemar chce jeden wzorzec włączania Internetu dla wszystkich elementów Growth OS, zamiast osobnych przycisków tylko przy kierunku.<br>
+Consequences: `ai_web_search` w `GrowthAiRequestOptions` + checkbox w `ai-execution-controls`. `GrowthAiService` / OpenAI provider: opcjonalny `web_search` także dla koncepcji i materiałów; `require_web_search` hard-fail usunięty. Prompt kierunku `direction_planning_v3`. Legacy `planning_mode=refresh` mapuje się na iterate + search. Bez migracji.
+
+## DEC-052
+
+Date: 2026-10-06<br>
+Status: ACTIVE<br>
+Decision: Growth OS ma trwałe **domyślne ustawienia wykonania AI** (model + reasoning effort) oraz **lokalny override** przy każdym requestcie tekstowym. Katalog modeli jest kontrolowaną allowlistą (Luna / Sol / Astra / gpt-5-mini / gpt-5.5). Domyślnie: general = `gpt-6.1-sol` + `medium`, research = `gpt-6.1-sol` + `high`. Lokalny wybór dotyczy tylko bieżącego workflow/proposal i nie zmienia globalnych ustawień. Iterate dziedziczy model/effort z poprzedniej propozycji, chyba że użytkownik zmieni. Model/effort **nie** wchodzą do fingerprintu treści. Image API pozostaje osobne (bez reasoning effort w tym etapie).<br>
+Rationale: Właściciel chce jednym kliknięciem sensowne defaulty, a przy słabym wyniku — świadomie mocniejszy model i większy wysiłek, bez przebudowy całego Growth OS.<br>
+Consequences: Tabela `growth_ai_settings` (singleton). Ekran `/growth/ai-settings`. Kontrolka Model/Wysiłek przy requestach AI (kierunek, koncepcja, materiały, opis obrazu). `GrowthAiExecutionOptions` + `GrowthAiModelCatalog`. Provider Responses API dostaje `model`, `reasoning.effort` i effort-aware `max_output_tokens`. Log: `reasoning_effort`, `selection_source`; koszt ze stawek katalogu wybranego modelu. Bez image model picker w tym etapie.

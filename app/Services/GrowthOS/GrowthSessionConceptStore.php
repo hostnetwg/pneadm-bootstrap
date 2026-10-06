@@ -113,7 +113,18 @@ class GrowthSessionConceptStore
         $artifact->title = mb_substr(trim((string) ($concept['title'] ?? '')), 0, 180) ?: null;
         $artifact->schema_version = self::SCHEMA_VERSION;
         $artifact->version = $artifact->exists ? ((int) $artifact->version + 1) : 1;
-        $artifact->payload = $concept;
+
+        $payload = $concept;
+        unset($payload['ai_origin']);
+        $origin = DemoTikWebinarProject::normalizeAiOrigin($project['concept_ai_origin'] ?? null);
+        if ($origin === null && $artifact->exists && is_array($artifact->payload['ai_origin'] ?? null)) {
+            $origin = DemoTikWebinarProject::normalizeAiOrigin($artifact->payload['ai_origin']);
+        }
+        if ($origin !== null) {
+            $payload['ai_origin'] = $origin;
+        }
+        $artifact->payload = $payload;
+
         if (! $artifact->exists) {
             $artifact->created_by_user_id = $actor->id;
         }
@@ -135,6 +146,29 @@ class GrowthSessionConceptStore
             'primary_instructor_id' => $this->instructorId($project['host_instructor_id'] ?? null),
             'communication_voice_instructor_id' => $this->instructorId($project['voice_instructor_id'] ?? null),
             'address_form' => AddressFormPolicy::normalize($project['address_form'] ?? null),
+        ]);
+    }
+
+    /**
+     * Persist campaign working topic / list name from the workspace project.
+     *
+     * @param  array<string, mixed>  $project
+     */
+    public function persistTopic(array $project): void
+    {
+        $campaignId = $project['growth_campaign_id'] ?? null;
+        if (! is_numeric($campaignId)) {
+            return;
+        }
+
+        $topic = mb_substr(trim((string) ($project['topic'] ?? '')), 0, 180);
+        if ($topic === '') {
+            return;
+        }
+
+        GrowthCampaign::query()->whereKey((int) $campaignId)->update([
+            'name' => $topic,
+            'working_topic' => $topic,
         ]);
     }
 
@@ -259,7 +293,13 @@ class GrowthSessionConceptStore
             ->first();
 
         if ($artifact instanceof GrowthArtifact && is_array($artifact->payload)) {
-            $project['concept'] = $artifact->payload;
+            $conceptPayload = $artifact->payload;
+            $conceptOrigin = DemoTikWebinarProject::normalizeAiOrigin($conceptPayload['ai_origin'] ?? null);
+            unset($conceptPayload['ai_origin']);
+            $project['concept'] = $conceptPayload;
+            if ($conceptOrigin !== null) {
+                $project['concept_ai_origin'] = $conceptOrigin;
+            }
         }
 
         $project = $this->overlayDirection($project, $campaign->id);
@@ -410,6 +450,15 @@ class GrowthSessionConceptStore
                     $payload['paid_offer_snapshot'] = $paidSnapshot;
                 }
             }
+
+            $origin = DemoTikWebinarProject::normalizeAiOrigin($material['ai_origin'] ?? null);
+            if ($origin === null && is_array($previousPayload['ai_origin'] ?? null)) {
+                $origin = DemoTikWebinarProject::normalizeAiOrigin($previousPayload['ai_origin']);
+            }
+            if ($origin !== null) {
+                $payload['ai_origin'] = $origin;
+            }
+
             $artifact->payload = $payload;
             if (! $artifact->exists) {
                 $artifact->created_by_user_id = $actor->id;
@@ -563,13 +612,23 @@ class GrowthSessionConceptStore
         $artifact->title = 'Kierunek';
         $artifact->schema_version = self::SCHEMA_VERSION;
         $artifact->version = $artifact->exists ? ((int) $artifact->version + 1) : 1;
-        $artifact->payload = [
+        $payload = [
             'why_now' => trim((string) ($direction['why_now'] ?? '')),
             'audience' => trim((string) ($direction['audience'] ?? '')),
             'problem' => trim((string) ($direction['problem'] ?? '')),
             'takeaway' => trim((string) ($direction['takeaway'] ?? '')),
             'sell_later' => trim((string) ($direction['sell_later'] ?? '')),
         ];
+
+        $origin = DemoTikWebinarProject::normalizeAiOrigin($project['direction_ai_origin'] ?? null);
+        if ($origin === null && $artifact->exists && is_array($artifact->payload['ai_origin'] ?? null)) {
+            $origin = DemoTikWebinarProject::normalizeAiOrigin($artifact->payload['ai_origin']);
+        }
+        if ($origin !== null) {
+            $payload['ai_origin'] = $origin;
+        }
+
+        $artifact->payload = $payload;
         if (! $artifact->exists) {
             $artifact->created_by_user_id = $actor->id;
         }
@@ -652,6 +711,11 @@ class GrowthSessionConceptStore
 
         $project['direction'] = $direction;
 
+        $origin = DemoTikWebinarProject::normalizeAiOrigin($artifact->payload['ai_origin'] ?? null);
+        if ($origin !== null) {
+            $project['direction_ai_origin'] = $origin;
+        }
+
         return $project;
     }
 
@@ -698,6 +762,11 @@ class GrowthSessionConceptStore
                 if (is_array($artifact->payload['paid_offer_snapshot'] ?? null)) {
                     $materials[$index]['paid_offer_snapshot'] = $artifact->payload['paid_offer_snapshot'];
                 }
+            }
+
+            $origin = DemoTikWebinarProject::normalizeAiOrigin($artifact->payload['ai_origin'] ?? null);
+            if ($origin !== null) {
+                $materials[$index]['ai_origin'] = $origin;
             }
         }
 

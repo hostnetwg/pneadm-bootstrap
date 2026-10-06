@@ -13,7 +13,15 @@ interface GrowthAiProvider
     /**
      * @param  array<string, mixed>  $input
      * @param  array<string, mixed>  $schema
-     * @param  array{web_search?: bool, require_web_search?: bool, use_research_model?: bool}  $options
+     * @param  array{
+     *     web_search?: bool,
+     *     require_web_search?: bool,
+     *     use_research_model?: bool,
+     *     model?: string,
+     *     reasoning_effort?: string,
+     *     max_output_tokens?: int,
+     *     selection_source?: string
+     * }  $options
      */
     public function generateStructured(
         string $taskType,

@@ -254,17 +254,17 @@ Szczegóły provision PNEDU: [FORM_ORDERS_PNEDU_PROVISION.md](./FORM_ORDERS_PNED
 ## Weryfikacja PNE Growth OS — asystent kierunku w projekcie (DEC-039, 2026-10-03)
 
 - `sail artisan test --filter=GrowthOsDirectionWorkspaceAiTest`
-- Ręcznie: otwarty projekt, karta „Pomysł i kierunek” — „Popraw propozycję” i „Popraw propozycję — szukaj w Internecie” bez klikania prawdziwego AI, jeśli flaga jest włączona. Przy „Gotowe” widać prośbę o cofnięcie zatwierdzenia. „Zastosuj” nie zatwierdza kierunku.
+- Ręcznie: otwarty projekt, karta „Pomysł i kierunek” — „Przygotuj od nowa” / „Popraw propozycję” oraz checkbox „Wyszukiwanie w sieci” w ⚙ (bez klikania prawdziwego AI, jeśli flaga jest włączona). Przy „Gotowe” widać prośbę o cofnięcie zatwierdzenia. „Zastosuj” nie zatwierdza kierunku.
 
 ## Weryfikacja PNE Growth OS — usuwanie projektów (DEC-038, 2026-10-03)
 
 - `sail artisan test --filter=GrowthOsProjectDeleteTest`
 - Ręcznie: `/growth/projects` pokazuje wszystkie kampanie; **Usuń** otwiera modal (nie `confirm()`); po potwierdzeniu projekt znika, lista się odświeża.
 
-## Weryfikacja PNE Growth OS — Asystent planowania (DEC-037, 2026-10-02)
+## Weryfikacja PNE Growth OS — Asystent planowania (DEC-037 / DEC-053, 2026-10-02)
 
 - `sail artisan test tests/Feature/GrowthOS tests/Unit/GrowthOS` — bez prawdziwego OpenAI (`Http::preventStrayRequests`).
-- Zakres: `GrowthOsDirectionPlanningTest` (sesja, szkic DRAFT, puste defaulty, CTA, fail closed, wspólny limit) oraz `OpenAiProviderTest` (`web_search` tylko przy researchu, źródła z API, brak narzędzi przy `concept_revision`).
+- Zakres: `GrowthOsDirectionPlanningTest` (sesja, szkic DRAFT, puste defaulty, CTA, soft-fail web_search, wspólny limit) oraz `OpenAiProviderTest` (`web_search` opcjonalny, źródła z API, soft-fail bez `web_search_call`).
 - Ręcznie: **nie klikać** „Przeanalizuj temat” przy `GROWTH_AI_ENABLED=true` bez decyzji — to kosztuje. Przy wyłączonej fladze: temat NotebookLM → symulacja bez listy źródeł → Utwórz projekt → puste materiały, kierunek z symulacji dopiero po „Użyj tego kierunku”.
 
 ## Weryfikacja minimalnego legalnego checkoutu — 2026-09-08

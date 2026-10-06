@@ -13,6 +13,8 @@ use App\Services\GrowthOS\AI\Data\DirectionPlanningResult;
 use App\Services\GrowthOS\AI\Data\MaterialDraftResult;
 use App\Services\GrowthOS\AI\GrowthImageService;
 use App\Services\GrowthOS\AI\Support\AddressFormPolicy;
+use App\Services\GrowthOS\AI\Support\GrowthAiExecutionOptions;
+use App\Services\GrowthOS\AI\Support\GrowthAiModelCatalog;
 use App\Services\GrowthOS\AI\Support\PneVoice;
 use App\Services\GrowthOS\AI\Tasks\DirectionPlanningTask;
 use App\Services\GrowthOS\AI\Tasks\GraphicImageTask;
@@ -118,6 +120,10 @@ class DemoTikWebinarProject
             'direction' => $applyProposal ? ($proposal['direction'] ?? null) : null,
         ]);
 
+        if ($applyProposal && is_array($proposal)) {
+            $project['direction_ai_origin'] = self::aiOriginFromProposal($proposal);
+        }
+
         $user = auth()->user();
         if ($user instanceof User) {
             $project = app(GrowthSessionConceptStore::class)->createCampaign($project, $user);
@@ -160,11 +166,15 @@ class DemoTikWebinarProject
             'direction' => $result->direction,
             'title_suggestions' => $result->titleSuggestions,
             'change_summary' => $result->changeSummary,
-            'sources' => $simulation ? [] : $result->researchSources,
-            'web_search_used' => $simulation ? false : $result->webSearchUsed,
+            'sources' => $result->researchSources,
+            'web_search_used' => $result->webSearchUsed,
+            'web_search_requested' => $result->webSearchRequested,
+            'web_search_note' => $result->webSearchNote,
             'source' => $simulation ? 'simulation' : 'real_ai',
             'provider' => $simulation ? null : $result->provider,
-            'model' => $simulation ? null : $result->model,
+            'model' => $result->model !== '' ? $result->model : null,
+            'reasoning_effort' => $result->reasoningEffort !== '' ? $result->reasoningEffort : null,
+            'selection_source' => $result->selectionSource !== '' ? $result->selectionSource : null,
             'prompt_version' => $simulation ? null : $result->promptVersion,
             'schema_version' => $simulation ? null : $result->schemaVersion,
             'mode' => DirectionPlanningTask::mode($mode),
@@ -185,10 +195,15 @@ class DemoTikWebinarProject
     }
 
     /**
+     * @param  array{model?: ?string, reasoning_effort?: ?string}|null  $execution
      * @return array<string, mixed>
      */
-    public static function storeSimulatedDirectionPlanningProposal(array $fields, string $mode, string $instruction = ''): array
-    {
+    public static function storeSimulatedDirectionPlanningProposal(
+        array $fields,
+        string $mode,
+        string $instruction = '',
+        ?array $execution = null,
+    ): array {
         $topic = trim((string) $fields['topic']);
         $goal = (string) (collect(self::goals())->firstWhere('value', $fields['goal'])['label'] ?? $fields['goal']);
         $previous = self::directionPlanningProposal();
@@ -206,21 +221,53 @@ class DemoTikWebinarProject
             $direction['problem'] = trim($direction['problem'].' '.$instruction);
         }
 
+        $selected = self::resolveSimulationExecution(
+            GrowthAiModelCatalog::CHANNEL_RESEARCH,
+            $execution,
+            $mode === DirectionPlanningTask::MODE_GENERATE ? null : $previous,
+        );
+
+        $wantSearch = (bool) ($execution['web_search'] ?? true);
         $result = new DirectionPlanningResult(
             workingTopic: $topic,
             direction: $direction,
             titleSuggestions: [],
             changeSummary: 'Symulacja lokalna na podstawie tematu i celu.',
             provider: 'simulation',
-            model: '',
+            model: $selected['model'],
             promptVersion: DirectionPlanningTask::PROMPT_VERSION,
             schemaVersion: DirectionPlanningTask::SCHEMA_VERSION,
             requestId: '',
             researchSources: [],
             webSearchUsed: false,
+            reasoningEffort: $selected['reasoning_effort'],
+            selectionSource: $selected['selection_source'],
+            webSearchRequested: $wantSearch,
+            webSearchNote: $wantSearch ? 'Symulacja lokalna nie sprawdza Internetu.' : null,
         );
 
         return self::storeDirectionPlanningProposal($fields, $result, $mode, true);
+    }
+
+    /**
+     * @param  array{model?: ?string, reasoning_effort?: ?string}|null  $execution
+     * @param  array<string, mixed>|null  $previousProposal
+     * @return array{model: string, reasoning_effort: string, selection_source: string}
+     */
+    private static function resolveSimulationExecution(
+        string $channel,
+        ?array $execution,
+        ?array $previousProposal = null,
+    ): array {
+        $options = GrowthAiExecutionOptions::resolve(
+            requestedModel: is_string($execution['model'] ?? null) ? (string) $execution['model'] : null,
+            requestedEffort: is_string($execution['reasoning_effort'] ?? null) ? (string) $execution['reasoning_effort'] : null,
+            channel: $channel,
+            requiresWebSearch: $channel === GrowthAiModelCatalog::CHANNEL_RESEARCH,
+            inheritFrom: GrowthAiRequestOptions::inheritFromProposal($previousProposal),
+        );
+
+        return $options->toMeta();
     }
 
     public static function directionPlanningFingerprint(string $type, string $goal, string $topic): array
@@ -344,11 +391,15 @@ class DemoTikWebinarProject
             'direction' => $result->direction,
             'title_suggestions' => $result->titleSuggestions,
             'change_summary' => $result->changeSummary,
-            'sources' => $simulation ? [] : $result->researchSources,
-            'web_search_used' => $simulation ? false : $result->webSearchUsed,
+            'sources' => $result->researchSources,
+            'web_search_used' => $result->webSearchUsed,
+            'web_search_requested' => $result->webSearchRequested,
+            'web_search_note' => $result->webSearchNote,
             'source' => $simulation ? 'simulation' : 'real_ai',
             'provider' => $simulation ? null : $result->provider,
-            'model' => $simulation ? null : $result->model,
+            'model' => $result->model !== '' ? $result->model : null,
+            'reasoning_effort' => $result->reasoningEffort !== '' ? $result->reasoningEffort : null,
+            'selection_source' => $result->selectionSource !== '' ? $result->selectionSource : null,
             'prompt_version' => $simulation ? null : $result->promptVersion,
             'schema_version' => $simulation ? null : $result->schemaVersion,
             'mode' => DirectionPlanningTask::mode($mode),
@@ -365,6 +416,7 @@ class DemoTikWebinarProject
 
     /**
      * @param  array<string, mixed>  $direction
+     * @param  array{model?: ?string, reasoning_effort?: ?string}|null  $execution
      * @return array<string, mixed>
      */
     public static function storeSimulatedDirectionWorkspaceProposal(
@@ -373,39 +425,74 @@ class DemoTikWebinarProject
         string $mode,
         string $instruction,
         string $savedFingerprint,
+        ?array $execution = null,
     ): array {
         $project = self::requireProject($projectId);
         $topic = trim((string) ($project['topic'] ?? ''));
-        $next = [
-            'why_now' => trim((string) ($direction['why_now'] ?? '')),
-            'audience' => trim((string) ($direction['audience'] ?? '')),
-            'problem' => trim((string) ($direction['problem'] ?? '')),
-            'takeaway' => trim((string) ($direction['takeaway'] ?? '')),
-            'sell_later' => trim((string) ($direction['sell_later'] ?? '')),
-        ];
-        if ($next['why_now'] === '') {
-            $next['why_now'] = 'Temat „'.$topic.'” może być aktualny. To szkic startowy, nie research.';
-            $next['audience'] = $next['audience'] !== '' ? $next['audience'] : 'Nauczyciele, którzy pracują z tym tematem w szkole.';
-            $next['problem'] = $next['problem'] !== '' ? $next['problem'] : 'Przygotowanie i sprawdzenie materiałów zajmuje dużo czasu.';
-            $next['takeaway'] = $next['takeaway'] !== '' ? $next['takeaway'] : 'Uczestnik odniesie temat do własnej lekcji.';
-            $next['sell_later'] = in_array($next['sell_later'], DirectionPlanningTask::SELL_LATER, true) ? $next['sell_later'] : 'być może';
-        }
-        if ($instruction !== '' && $mode === DirectionPlanningTask::MODE_ITERATE) {
-            $next['problem'] = trim($next['problem'].' '.$instruction);
+        $previous = is_array($project['direction_ai_proposal'] ?? null) ? $project['direction_ai_proposal'] : null;
+
+        if ($mode === DirectionPlanningTask::MODE_GENERATE) {
+            $next = [
+                'why_now' => 'Temat „'.$topic.'” może być aktualny. To szkic startowy, nie research.',
+                'audience' => 'Nauczyciele, którzy pracują z tym tematem w szkole.',
+                'problem' => 'Przygotowanie i sprawdzenie materiałów zajmuje dużo czasu.',
+                'takeaway' => 'Uczestnik odniesie temat do własnej lekcji.',
+                'sell_later' => 'być może',
+            ];
+            if ($instruction !== '') {
+                $next['problem'] = trim($next['problem'].' '.$instruction);
+            }
+            $changeSummary = 'Symulacja lokalna: nowy kierunek od zera na podstawie tematu'
+                .($instruction !== '' ? ' i Twoich sugestii' : '')
+                .'.';
+            $selected = self::resolveSimulationExecution(
+                GrowthAiModelCatalog::CHANNEL_RESEARCH,
+                $execution,
+                null,
+            );
+        } else {
+            $next = [
+                'why_now' => trim((string) ($direction['why_now'] ?? '')),
+                'audience' => trim((string) ($direction['audience'] ?? '')),
+                'problem' => trim((string) ($direction['problem'] ?? '')),
+                'takeaway' => trim((string) ($direction['takeaway'] ?? '')),
+                'sell_later' => trim((string) ($direction['sell_later'] ?? '')),
+            ];
+            if ($next['why_now'] === '') {
+                $next['why_now'] = 'Temat „'.$topic.'” może być aktualny. To szkic startowy, nie research.';
+                $next['audience'] = $next['audience'] !== '' ? $next['audience'] : 'Nauczyciele, którzy pracują z tym tematem w szkole.';
+                $next['problem'] = $next['problem'] !== '' ? $next['problem'] : 'Przygotowanie i sprawdzenie materiałów zajmuje dużo czasu.';
+                $next['takeaway'] = $next['takeaway'] !== '' ? $next['takeaway'] : 'Uczestnik odniesie temat do własnej lekcji.';
+                $next['sell_later'] = in_array($next['sell_later'], DirectionPlanningTask::SELL_LATER, true) ? $next['sell_later'] : 'być może';
+            }
+            if ($instruction !== '' && $mode === DirectionPlanningTask::MODE_ITERATE) {
+                $next['problem'] = trim($next['problem'].' '.$instruction);
+            }
+            $changeSummary = 'Symulacja lokalna na podstawie obecnego kierunku.';
+            $selected = self::resolveSimulationExecution(
+                GrowthAiModelCatalog::CHANNEL_RESEARCH,
+                $execution,
+                $previous,
+            );
         }
 
+        $wantSearch = (bool) ($execution['web_search'] ?? true);
         $result = new DirectionPlanningResult(
             workingTopic: $topic,
             direction: $next,
             titleSuggestions: [],
-            changeSummary: 'Symulacja lokalna na podstawie obecnego kierunku.',
+            changeSummary: $changeSummary,
             provider: 'simulation',
-            model: '',
+            model: $selected['model'],
             promptVersion: DirectionPlanningTask::PROMPT_VERSION,
             schemaVersion: DirectionPlanningTask::SCHEMA_VERSION,
             requestId: '',
             researchSources: [],
             webSearchUsed: false,
+            reasoningEffort: $selected['reasoning_effort'],
+            selectionSource: $selected['selection_source'],
+            webSearchRequested: $wantSearch,
+            webSearchNote: $wantSearch ? 'Symulacja lokalna nie sprawdza Internetu.' : null,
         );
 
         return self::storeDirectionWorkspaceProposal($projectId, $result, $mode, true, $savedFingerprint);
@@ -437,11 +524,107 @@ class DemoTikWebinarProject
             'takeaway' => trim((string) ($proposal['direction']['takeaway'] ?? '')),
             'sell_later' => trim((string) ($proposal['direction']['sell_later'] ?? '')),
         ];
+        $project['direction_ai_origin'] = self::aiOriginFromProposal($proposal);
         $project['direction_ai_proposal'] = null;
         self::persistDirection($project);
         self::saveProject($project);
 
         return 'applied';
+    }
+
+    /**
+     * Last AI execution that shaped saved content (survives Apply / Approve).
+     *
+     * @param  array<string, mixed>  $proposal
+     * @return array{model: ?string, reasoning_effort: ?string, selection_source: ?string, source: string, applied_at: string}|null
+     */
+    public static function aiOriginFromProposal(array $proposal): ?array
+    {
+        $model = trim((string) ($proposal['model'] ?? ''));
+        $effort = trim((string) ($proposal['reasoning_effort'] ?? ''));
+        if ($model === '' && $effort === '') {
+            return null;
+        }
+
+        return [
+            'model' => $model !== '' ? $model : null,
+            'reasoning_effort' => $effort !== '' ? $effort : null,
+            'selection_source' => is_string($proposal['selection_source'] ?? null)
+                ? (string) $proposal['selection_source']
+                : null,
+            'source' => (string) ($proposal['source'] ?? 'real_ai'),
+            'applied_at' => now()->toIso8601String(),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $origin
+     * @return array{model: ?string, reasoning_effort: ?string, selection_source: ?string, source: string, applied_at: string}|null
+     */
+    public static function normalizeAiOrigin(mixed $origin): ?array
+    {
+        if (! is_array($origin)) {
+            return null;
+        }
+
+        $model = trim((string) ($origin['model'] ?? ''));
+        $effort = trim((string) ($origin['reasoning_effort'] ?? ''));
+        if ($model === '' && $effort === '') {
+            return null;
+        }
+
+        return [
+            'model' => $model !== '' ? $model : null,
+            'reasoning_effort' => $effort !== '' ? $effort : null,
+            'selection_source' => is_string($origin['selection_source'] ?? null)
+                ? (string) $origin['selection_source']
+                : null,
+            'source' => (string) ($origin['source'] ?? 'real_ai'),
+            'applied_at' => is_string($origin['applied_at'] ?? null)
+                ? (string) $origin['applied_at']
+                : now()->toIso8601String(),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $project
+     * @return array{model: ?string, reasoning_effort: ?string, selection_source: ?string, source: string, applied_at: string}|null
+     */
+    public static function directionAiOrigin(array $project): ?array
+    {
+        return self::normalizeAiOrigin($project['direction_ai_origin'] ?? null);
+    }
+
+    /**
+     * @param  array<string, mixed>  $project
+     * @return array{model: ?string, reasoning_effort: ?string, selection_source: ?string, source: string, applied_at: string}|null
+     */
+    public static function conceptAiOrigin(array $project): ?array
+    {
+        return self::normalizeAiOrigin($project['concept_ai_origin'] ?? null);
+    }
+
+    /**
+     * @param  array<string, mixed>  $material
+     * @return array{model: ?string, reasoning_effort: ?string, selection_source: ?string, source: string, applied_at: string}|null
+     */
+    public static function materialAiOrigin(array $material): ?array
+    {
+        return self::normalizeAiOrigin($material['ai_origin'] ?? null);
+    }
+
+    /**
+     * @param  array<string, mixed>  $origin
+     * @return array<string, string|null>
+     */
+    public static function aiOriginDecisionMeta(array $origin): array
+    {
+        return [
+            'model' => is_string($origin['model'] ?? null) ? $origin['model'] : null,
+            'reasoning_effort' => is_string($origin['reasoning_effort'] ?? null) ? $origin['reasoning_effort'] : null,
+            'selection_source' => is_string($origin['selection_source'] ?? null) ? $origin['selection_source'] : null,
+            'ai_source' => is_string($origin['source'] ?? null) ? $origin['source'] : null,
+        ];
     }
 
     public static function rejectDirectionWorkspaceProposal(string $projectId): void
@@ -570,29 +753,43 @@ class DemoTikWebinarProject
         $project['completed_steps'] = $completed;
         $project['status'] = $step === 'direction' ? 'PLANNING' : 'PREPARING';
         if ($step === 'direction') {
+            if (self::directionAiOrigin($project) === null && is_array($project['direction_ai_proposal'] ?? null)) {
+                $project['direction_ai_origin'] = self::aiOriginFromProposal($project['direction_ai_proposal']);
+            }
             $project['direction_ai_proposal'] = null;
+        }
+        if ($step === 'concept') {
+            if (self::conceptAiOrigin($project) === null && is_array($project['concept_ai_proposal'] ?? null)) {
+                $project['concept_ai_origin'] = self::aiOriginFromProposal($project['concept_ai_proposal']);
+            }
         }
 
         self::saveProject($project);
         if ($step === 'direction') {
             self::persistDirection($project);
+            $directionOrigin = self::directionAiOrigin($project);
             self::recordConceptDecision(
                 $project,
                 GrowthSessionConceptStore::DECISION_DIRECTION_APPROVAL,
                 GrowthDecision::STATUS_APPROVED,
                 'Czy kierunek webinaru jest gotowy?',
                 'Kierunek zatwierdzony.',
-                [],
+                $directionOrigin !== null ? self::aiOriginDecisionMeta($directionOrigin) : [],
                 GrowthSessionConceptStore::DIRECTION_KEY,
             );
         }
         if ($step === 'concept') {
+            $conceptOrigin = self::conceptAiOrigin($project);
+            if ($conceptOrigin !== null) {
+                self::persistConcept($project);
+            }
             self::recordConceptDecision(
                 $project,
                 GrowthSessionConceptStore::DECISION_CONCEPT_APPROVAL,
                 GrowthDecision::STATUS_APPROVED,
                 'Czy koncepcja webinaru jest gotowa?',
                 'Koncepcja oznaczona jako gotowa.',
+                $conceptOrigin !== null ? self::aiOriginDecisionMeta($conceptOrigin) : [],
             );
         }
 
@@ -660,7 +857,13 @@ class DemoTikWebinarProject
             ['value' => 'directors', 'label' => 'Bardziej dla dyrektora'],
             ['value' => 'less_sales', 'label' => 'Mniej sprzedażowo'],
             ['value' => 'expand', 'label' => 'Rozbuduj program'],
+            ['value' => 'by_suggestions', 'label' => 'Popraw zgodnie z moimi sugestiami'],
         ];
+    }
+
+    public static function conceptAiIntentRequiresInstruction(string $intent): bool
+    {
+        return $intent === 'by_suggestions';
     }
 
     /**
@@ -748,7 +951,7 @@ class DemoTikWebinarProject
     /**
      * @return array<string, mixed>
      */
-    public static function requestConceptAiProposal(string $projectId, string $intent): array
+    public static function requestConceptAiProposal(string $projectId, string $intent, string $instruction = ''): array
     {
         $project = self::requireProject($projectId);
         abort_unless(in_array($intent, collect(self::conceptAiIntents())->pluck('value')->all(), true), 422);
@@ -757,13 +960,18 @@ class DemoTikWebinarProject
         $intentLabel = collect(self::conceptAiIntents())->firstWhere('value', $intent)['label'] ?? $intent;
         $concept = $intent === 'from_direction'
             ? self::simulatedConceptFromDirection($project)
-            : self::simulatedConceptProposal(is_array($current) ? $current : [], $intent);
+            : self::simulatedConceptProposal(is_array($current) ? $current : [], $intent, $instruction);
+
+        $note = 'Symulowana propozycja AI. Nic nie zostało nadpisane — możesz przyjąć albo odrzucić.';
+        if ($intent === 'by_suggestions' && $instruction !== '') {
+            $note = 'Symulacja: korekta według Twoich sugestii. Nic nie zostało nadpisane — możesz przyjąć albo odrzucić.';
+        }
 
         $project['concept_ai_proposal'] = [
             'intent' => $intent,
             'intent_label' => $intentLabel,
             'created_at' => now()->toIso8601String(),
-            'note' => 'Symulowana propozycja AI. Nic nie zostało nadpisane — możesz przyjąć albo odrzucić.',
+            'note' => $note,
             'concept' => $concept,
         ];
 
@@ -804,11 +1012,17 @@ class DemoTikWebinarProject
             'source' => 'real_ai',
             'provider' => $result->provider,
             'model' => $result->model,
+            'reasoning_effort' => $result->reasoningEffort !== '' ? $result->reasoningEffort : null,
+            'selection_source' => $result->selectionSource !== '' ? $result->selectionSource : null,
             'prompt_version' => $result->promptVersion,
             'schema_version' => $result->schemaVersion,
             'request_id' => $result->requestId,
             'changed_fields' => $result->changedFields,
             'change_summary' => $result->changeSummary,
+            'sources' => $result->researchSources,
+            'web_search_used' => $result->webSearchUsed,
+            'web_search_requested' => $result->webSearchRequested,
+            'web_search_note' => $result->webSearchNote,
             'concept' => [
                 ...$result->concept,
                 'next_product' => $nextProduct,
@@ -841,6 +1055,7 @@ class DemoTikWebinarProject
         );
 
         $project['concept'] = self::normalizeConcept($proposal['concept']);
+        $project['concept_ai_origin'] = self::aiOriginFromProposal($proposal);
         $project['concept_ai_proposal'] = null;
 
         if (isset($project['completed_steps']['concept'])) {
@@ -860,6 +1075,9 @@ class DemoTikWebinarProject
             [
                 'intent' => (string) ($proposal['intent'] ?? ''),
                 'intent_label' => (string) ($proposal['intent_label'] ?? ''),
+                ...(self::conceptAiOrigin($project) !== null
+                    ? self::aiOriginDecisionMeta(self::conceptAiOrigin($project))
+                    : []),
             ],
         );
 
@@ -1038,6 +1256,8 @@ class DemoTikWebinarProject
             'concept_versions' => [],
             'concept_ai_proposal' => null,
             'direction_ai_proposal' => null,
+            'direction_ai_origin' => null,
+            'concept_ai_origin' => null,
             'material_ai_proposals' => [],
             'materials' => self::defaultMaterials(),
         ];
@@ -1071,6 +1291,14 @@ class DemoTikWebinarProject
             $meta,
             $artifactKey,
         );
+    }
+
+    /**
+     * @param  array<string, mixed>  $project
+     */
+    private static function persistTopic(array $project): void
+    {
+        app(GrowthSessionConceptStore::class)->persistTopic($project);
     }
 
     /**
@@ -1111,6 +1339,11 @@ class DemoTikWebinarProject
             $direction = [];
         }
 
+        $topic = trim((string) ($data['topic'] ?? $project['topic'] ?? ''));
+        if ($topic !== '') {
+            $project['topic'] = mb_substr($topic, 0, 180);
+        }
+
         $direction['why_now'] = trim((string) ($data['why_now'] ?? ''));
         $direction['audience'] = trim((string) ($data['audience'] ?? ''));
         $direction['problem'] = trim((string) ($data['problem'] ?? ''));
@@ -1124,6 +1357,7 @@ class DemoTikWebinarProject
             self::supersedeDirectionApproval($project);
         }
 
+        self::persistTopic($project);
         self::persistDirection($project);
         self::saveProject($project);
 
@@ -1518,6 +1752,8 @@ class DemoTikWebinarProject
             $result->schemaVersion,
             MaterialDraftTask::aiMode($work['mode'] ?? null),
             trim((string) ($work['text'] ?? '')),
+            $result->reasoningEffort,
+            $result->selectionSource,
         );
         self::saveProject($project);
 
@@ -1640,6 +1876,8 @@ class DemoTikWebinarProject
         ?string $schemaVersion,
         string $mode,
         string $text,
+        ?string $reasoningEffort = null,
+        ?string $selectionSource = null,
     ): array {
         $previous = self::imageDescriptionAiProposal($project);
         $iterate = $mode === MaterialDraftTask::MODE_ITERATE && $previous !== null;
@@ -1651,6 +1889,8 @@ class DemoTikWebinarProject
             'source' => $source,
             'provider' => $provider,
             'model' => $model,
+            'reasoning_effort' => $reasoningEffort !== null && $reasoningEffort !== '' ? $reasoningEffort : null,
+            'selection_source' => $selectionSource !== null && $selectionSource !== '' ? $selectionSource : null,
             'prompt_version' => $promptVersion,
             'schema_version' => $schemaVersion,
             'fingerprint' => self::imageDescriptionAiFingerprint($project),
@@ -1761,7 +2001,7 @@ class DemoTikWebinarProject
      * @param  array<string, mixed>  $current
      * @return array<string, mixed>
      */
-    private static function simulatedConceptProposal(array $current, string $intent): array
+    private static function simulatedConceptProposal(array $current, string $intent, string $instruction = ''): array
     {
         $title = (string) ($current['title'] ?? 'Webinar TIK');
         $points = is_array($current['points'] ?? null) ? $current['points'] : [];
@@ -1824,6 +2064,26 @@ class DemoTikWebinarProject
                 'cta' => 'Zostaw e-mail i odbierz checklistę po spotkaniu.',
                 'lead_magnet' => (string) ($current['lead_magnet'] ?? 'Checklista promptów.'),
                 'next_product' => 'nie',
+            ],
+            'by_suggestions' => [
+                'title' => $title,
+                'subtitle' => trim((string) ($current['subtitle'] ?? '')) !== ''
+                    ? (string) $current['subtitle']
+                    : 'Korekta według Twoich sugestii',
+                'promise' => $instruction !== ''
+                    ? (trim((string) ($current['promise'] ?? '')) !== ''
+                        ? (string) $current['promise']
+                        : 'Propozycja uwzględnia Twoje sugestie (symulacja lokalna).')
+                    : (string) ($current['promise'] ?? 'Propozycja uwzględnia Twoje sugestie (symulacja lokalna).'),
+                'points' => $points ?: [
+                    'Punkt dopasowany do sugestii właściciela.',
+                    'Drugi punkt po korekcie.',
+                    'Trzeci punkt po korekcie.',
+                ],
+                'plan' => (string) ($current['plan'] ?? 'Wprowadzenie -> pokaz -> pytania -> podsumowanie.'),
+                'cta' => (string) ($current['cta'] ?? 'Pobierz materiały po webinarze.'),
+                'lead_magnet' => (string) ($current['lead_magnet'] ?? 'Checklista po webinarze.'),
+                'next_product' => (string) ($current['next_product'] ?? 'być może'),
             ],
             default => [
                 'title' => $title,
@@ -2145,6 +2405,7 @@ class DemoTikWebinarProject
 
     /**
      * @param  array{emojis?: bool, hashtags?: bool}  $style
+     * @param  array{model?: ?string, reasoning_effort?: ?string}|null  $execution
      * @return array<string, mixed>
      */
     public static function requestMaterialAiProposal(
@@ -2153,6 +2414,7 @@ class DemoTikWebinarProject
         array $style = [],
         string $instruction = '',
         array $work = [],
+        ?array $execution = null,
     ): array {
         $project = self::requireProject($projectId);
         if ($materialId === MaterialDraftTask::REMINDER_MATERIAL_KEY) {
@@ -2178,6 +2440,18 @@ class DemoTikWebinarProject
             $mode === MaterialDraftTask::MODE_ITERATE ? $previousEffective : null,
         );
         $addressForm = $addressMeta['address_form_effective'];
+        $selected = self::resolveSimulationExecution(
+            GrowthAiModelCatalog::CHANNEL_GENERAL,
+            $execution,
+            $mode === MaterialDraftTask::MODE_GENERATE
+                ? null
+                : self::materialAiProposal($project, $materialId),
+        );
+        $executionMeta = [
+            'model' => $selected['model'],
+            'reasoning_effort' => $selected['reasoning_effort'],
+            'selection_source' => $selected['selection_source'],
+        ];
 
         if (MaterialDraftTask::usesWorkModes($materialId) && $mode !== MaterialDraftTask::MODE_GENERATE) {
             $revised = self::simulatedRevision($text, $addressForm);
@@ -2195,12 +2469,12 @@ class DemoTikWebinarProject
                 'instruction' => $instruction,
                 'source' => 'simulation',
                 'provider' => null,
-                'model' => null,
                 'prompt_version' => null,
                 'schema_version' => null,
                 'fingerprint' => self::materialAiFingerprint($project, $materialId),
                 'created_at' => now()->toIso8601String(),
-                'note' => self::materialAiProposalNote($materialId),
+                'note' => 'Symulowana propozycja AI. Obecny szkic pozostaje bez zmian do chwili wybrania „Zastosuj”.',
+                ...$executionMeta,
                 ...$addressMeta,
                 ...self::materialAiWorkMeta($project, $materialId, $mode, $text),
                 ...self::mailHtmlMeta($materialId, $style),
@@ -2237,12 +2511,14 @@ class DemoTikWebinarProject
             'instruction' => $instruction,
             'source' => 'simulation',
             'provider' => null,
-            'model' => null,
             'prompt_version' => null,
             'schema_version' => null,
             'fingerprint' => self::materialAiFingerprint($project, $materialId),
             'created_at' => now()->toIso8601String(),
-            'note' => self::materialAiProposalNote($materialId),
+            'note' => MaterialDraftTask::isMail($materialId)
+                ? self::materialAiProposalNote($materialId)
+                : 'Symulowana propozycja AI. Obecny szkic pozostaje bez zmian do chwili wybrania „Zastosuj”.',
+            ...$executionMeta,
             ...$addressMeta,
             ...self::materialAiWorkMeta($project, $materialId, $mode, $text),
             ...self::mailHtmlMeta($materialId, $style),
@@ -2393,11 +2669,17 @@ class DemoTikWebinarProject
             'source' => 'real_ai',
             'provider' => $result->provider,
             'model' => $result->model,
+            'reasoning_effort' => $result->reasoningEffort !== '' ? $result->reasoningEffort : null,
+            'selection_source' => $result->selectionSource !== '' ? $result->selectionSource : null,
             'prompt_version' => $result->promptVersion,
             'schema_version' => $result->schemaVersion,
             'fingerprint' => self::materialAiFingerprint($project, $materialId),
             'created_at' => now()->toIso8601String(),
             'note' => self::materialAiProposalNote($materialId),
+            'sources' => $result->researchSources,
+            'web_search_used' => $result->webSearchUsed,
+            'web_search_requested' => $result->webSearchRequested,
+            'web_search_note' => $result->webSearchNote,
             ...$addressMeta,
             ...self::materialAiWorkMeta(
                 $project,
@@ -2504,6 +2786,10 @@ class DemoTikWebinarProject
                 $project['materials'][$index]['draft'] = $draft;
                 $project['materials'][$index]['status'] = 'DRAFT';
                 $project['materials'][$index]['updated_at'] = now()->toIso8601String();
+                $origin = self::aiOriginFromProposal($proposal);
+                if ($origin !== null) {
+                    $project['materials'][$index]['ai_origin'] = $origin;
+                }
             }
         }
 
@@ -2558,6 +2844,11 @@ class DemoTikWebinarProject
             'prompt_version' => (string) ($proposal['prompt_version'] ?? ''),
             'source' => (string) ($proposal['source'] ?? ''),
         ];
+
+        $origin = self::aiOriginFromProposal($proposal);
+        if ($origin !== null) {
+            $meta = [...$meta, ...self::aiOriginDecisionMeta($origin)];
+        }
 
         if (isset($proposal['mode'])) {
             $meta['ai_mode'] = (string) $proposal['mode'];

@@ -270,28 +270,29 @@ class OpenAiProviderTest extends TestCase
         $this->assertSame('www.gov.pl', $response->researchSources[0]['domain']);
     }
 
-    public function test_missing_web_search_call_fails_closed_when_required(): void
+    public function test_missing_web_search_call_soft_fails_with_note(): void
     {
         Http::fake([
             'openai.invalid/*' => Http::response($this->openAiResponse($this->directionPayload()), 200),
         ]);
 
-        try {
-            $this->provider()->generateStructured(
-                taskType: 'direction_planning',
-                instructions: 'research',
-                input: ['topic' => 'NotebookLM'],
-                schema: ['type' => 'object'],
-                options: [
-                    'web_search' => true,
-                    'require_web_search' => true,
-                ],
-            );
-            $this->fail('Expected GrowthAiException was not thrown.');
-        } catch (GrowthAiException $exception) {
-            $this->assertSame('web_search_missing', $exception->errorType);
-            $this->assertSame(GrowthAiException::RESEARCH_FAILED_MESSAGE, $exception->userMessage);
-        }
+        $response = $this->provider()->generateStructured(
+            taskType: 'direction_planning',
+            instructions: 'research',
+            input: ['topic' => 'NotebookLM'],
+            schema: ['type' => 'object'],
+            options: [
+                'web_search' => true,
+            ],
+        );
+
+        $this->assertTrue($response->webSearchRequested);
+        $this->assertFalse($response->webSearchUsed);
+        $this->assertSame([], $response->researchSources);
+        $this->assertSame(
+            \App\Support\GrowthOS\GrowthAiRequestOptions::WEB_SEARCH_SKIPPED_MESSAGE,
+            $response->webSearchNote,
+        );
     }
 
     public function test_research_rate_limit_is_retried_once(): void

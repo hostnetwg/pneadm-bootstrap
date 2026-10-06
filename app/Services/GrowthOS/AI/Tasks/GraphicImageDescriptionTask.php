@@ -172,6 +172,8 @@ PROMPT;
             promptVersion: $this->promptVersion(),
             schemaVersion: $this->schemaVersion(),
             requestId: $response->requestId,
+            reasoningEffort: $response->reasoningEffort,
+            selectionSource: $response->selectionSource,
         );
     }
 }

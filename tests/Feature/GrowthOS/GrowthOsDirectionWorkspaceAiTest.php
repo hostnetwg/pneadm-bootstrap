@@ -12,6 +12,7 @@ use App\Services\GrowthOS\AI\Data\AiProviderResponse;
 use App\Services\GrowthOS\AI\Tasks\DirectionPlanningTask;
 use App\Services\GrowthOS\GrowthSessionConceptStore;
 use App\Support\GrowthOS\DemoTikWebinarProject;
+use App\Support\GrowthOS\GrowthAiRequestOptions;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
@@ -61,8 +62,10 @@ class GrowthOsDirectionWorkspaceAiTest extends TestCase
             ->get(route('growth.projects.show', DemoTikWebinarProject::PROJECT_ID))
             ->assertOk()
             ->assertSee('Asystent kierunku')
+            ->assertSee('Przygotuj od nowa')
             ->assertSee('Popraw propozycję')
-            ->assertSee('Popraw propozycję — szukaj w Internecie')
+            ->assertSee('Wyszukiwanie w sieci')
+            ->assertDontSee('Popraw propozycję — szukaj w Internecie')
             ->assertSee('data-growth-ai-spinner', false)
             ->assertSee('gpt-5.5')
             ->assertSee('Zapisz kierunek');
@@ -75,7 +78,73 @@ class GrowthOsDirectionWorkspaceAiTest extends TestCase
             ->assertOk()
             ->assertSee('Najpierw cofnij zatwierdzenie')
             ->assertDontSee('Asystent kierunku')
-            ->assertDontSee('Popraw propozycję');
+            ->assertDontSee('Popraw propozycję')
+            ->assertDontSee('Przygotuj od nowa');
+    }
+
+    public function test_generate_from_scratch_ignores_current_direction_fields(): void
+    {
+        $user = $this->superAdmin();
+        $this->createProject($user);
+        $this->actingAs($user)->put(route('growth.projects.direction.update', DemoTikWebinarProject::PROJECT_ID), $this->savedDirection([
+            'audience' => 'Tylko dyrektorzy — nie używaj tego w generate.',
+        ]));
+
+        $this->actingAs($user)
+            ->post(route('growth.projects.direction.ai', DemoTikWebinarProject::PROJECT_ID), $this->revisePayload([
+                'audience' => 'Tylko dyrektorzy — nie używaj tego w generate.',
+                'planning_mode' => DirectionPlanningTask::MODE_GENERATE,
+                'planning_instruction' => 'Skup się na bezpieczeństwie danych uczniów.',
+            ]))
+            ->assertRedirect(route('growth.projects.show', DemoTikWebinarProject::PROJECT_ID).'#direction')
+            ->assertSessionHas('success');
+
+        $this->assertSame(1, $this->provider->calls);
+        $this->assertSame(DirectionPlanningTask::MODE_GENERATE, $this->provider->lastInput['mode']);
+        $this->assertSame('Skup się na bezpieczeństwie danych uczniów.', $this->provider->lastInput['user_instruction']);
+        $this->assertArrayNotHasKey('previous_proposal', $this->provider->lastInput);
+        $this->assertSame('gpt-6.1-sol', $this->provider->lastOptions['model'] ?? null);
+
+        $project = DemoTikWebinarProject::project();
+        $this->assertSame('Tylko dyrektorzy — nie używaj tego w generate.', $project['direction']['audience']);
+        $this->assertSame('Nauczyciele przedmiotowi korzystający z dokumentów na lekcji', $project['direction_ai_proposal']['direction']['audience']);
+        $this->assertSame(DirectionPlanningTask::MODE_GENERATE, $project['direction_ai_proposal']['mode']);
+    }
+
+    public function test_applied_ai_origin_stays_visible_after_direction_approval(): void
+    {
+        $user = $this->superAdmin();
+        $this->createProject($user);
+
+        $this->actingAs($user)->post(
+            route('growth.projects.direction.ai', DemoTikWebinarProject::PROJECT_ID),
+            $this->revisePayload(['planning_instruction' => 'Doprecyzuj odbiorców.']),
+        );
+        $this->actingAs($user)->post(route('growth.projects.direction.ai.apply', DemoTikWebinarProject::PROJECT_ID));
+
+        $project = DemoTikWebinarProject::project();
+        $this->assertSame('gpt-6.1-sol', $project['direction_ai_origin']['model'] ?? null);
+        $this->assertNull($project['direction_ai_proposal']);
+
+        $this->actingAs($user)
+            ->post(route('growth.projects.steps.complete', [DemoTikWebinarProject::PROJECT_ID, 'direction']))
+            ->assertRedirect();
+
+        $project = DemoTikWebinarProject::project();
+        $this->assertSame('gpt-6.1-sol', $project['direction_ai_origin']['model'] ?? null);
+        $this->assertArrayHasKey('direction', $project['completed_steps']);
+
+        $artifact = GrowthArtifact::query()->where('key', GrowthSessionConceptStore::DIRECTION_KEY)->first();
+        $this->assertNotNull($artifact);
+        $this->assertSame('gpt-6.1-sol', $artifact->payload['ai_origin']['model'] ?? null);
+
+        $this->actingAs($user)
+            ->get(route('growth.projects.show', DemoTikWebinarProject::PROJECT_ID))
+            ->assertOk()
+            ->assertSee('Gotowe')
+            ->assertSee('Wygenerowano:')
+            ->assertSee('GPT-6.1 Sol')
+            ->assertDontSee('Asystent kierunku');
     }
 
     public function test_approved_direction_blocks_ai_without_calling_provider(): void
@@ -121,13 +190,17 @@ class GrowthOsDirectionWorkspaceAiTest extends TestCase
             ->post(route('growth.projects.direction.ai', DemoTikWebinarProject::PROJECT_ID), $this->revisePayload([
                 'audience' => 'Dyrektorzy szkół podstawowych',
                 'planning_instruction' => 'Bardziej skup się na nauczycielach niż dyrektorach.',
+                'ai_web_search' => '0',
             ]))
             ->assertRedirect(route('growth.projects.show', DemoTikWebinarProject::PROJECT_ID).'#direction')
             ->assertSessionHas('success');
 
         $this->assertSame(1, $this->provider->calls);
         $this->assertSame(DirectionPlanningTask::TYPE, $this->provider->lastTaskType);
-        $this->assertSame(['use_research_model' => true], $this->provider->lastOptions);
+        $this->assertSame('gpt-6.1-sol', $this->provider->lastOptions['model'] ?? null);
+        $this->assertSame('high', $this->provider->lastOptions['reasoning_effort'] ?? null);
+        $this->assertTrue(($this->provider->lastOptions['use_research_model'] ?? false) === true);
+        $this->assertFalse(($this->provider->lastOptions['web_search'] ?? false) === true);
         $this->assertSame('iterate', $this->provider->lastInput['mode']);
         $this->assertSame('Dyrektorzy szkół podstawowych', $this->provider->lastInput['previous_proposal']['direction']['audience']);
         $this->assertArrayNotHasKey('host', $this->provider->lastInput);
@@ -150,7 +223,8 @@ class GrowthOsDirectionWorkspaceAiTest extends TestCase
             ->assertSee('data-direction-apply-field="audience"', false)
             ->assertSee('data-direction-apply-field="sell_later"', false)
             ->assertSee('Nauczyciele przedmiotowi korzystający z dokumentów na lekcji')
-            ->assertSee('Ta poprawka nie sprawdzała Internetu.')
+            ->assertDontSee(GrowthAiRequestOptions::WEB_SEARCH_SKIPPED_MESSAGE)
+            ->assertDontSee('Źródła wykorzystane przez AI')
             ->assertDontSee('Symulacja lokalna')
             ->assertSee('Zastosuj')
             ->assertSee('Odrzuć')
@@ -176,11 +250,13 @@ class GrowthOsDirectionWorkspaceAiTest extends TestCase
         $this->assertSame($this->topic(), $project['topic']);
         $this->assertSame($this->topic(), $project['concept']['title']);
         $this->assertNull($project['direction_ai_proposal']);
+        $this->assertSame('gpt-6.1-sol', $project['direction_ai_origin']['model'] ?? null);
         $this->assertArrayNotHasKey('direction', $project['completed_steps'] ?? []);
 
         $artifact = GrowthArtifact::query()->where('key', GrowthSessionConceptStore::DIRECTION_KEY)->first();
         $this->assertNotNull($artifact);
         $this->assertSame(GrowthArtifact::STATUS_DRAFT, $artifact->status);
+        $this->assertSame('gpt-6.1-sol', $artifact->payload['ai_origin']['model'] ?? null);
         $this->assertSame(0, GrowthDecision::query()->where('type', GrowthSessionConceptStore::DECISION_DIRECTION_APPROVAL)->count());
     }
 
@@ -251,7 +327,7 @@ class GrowthOsDirectionWorkspaceAiTest extends TestCase
         $this->assertSame(0, GrowthArtifact::query()->where('key', GrowthSessionConceptStore::DIRECTION_KEY)->count());
     }
 
-    public function test_refresh_requires_web_search(): void
+    public function test_refresh_maps_to_iterate_with_web_search(): void
     {
         $user = $this->superAdmin();
         $this->createProject($user);
@@ -265,9 +341,10 @@ class GrowthOsDirectionWorkspaceAiTest extends TestCase
 
         $this->assertSame(1, $this->provider->calls);
         $this->assertTrue($this->provider->lastOptions['web_search'] ?? false);
-        $this->assertTrue($this->provider->lastOptions['require_web_search'] ?? false);
+        $this->assertArrayNotHasKey('require_web_search', $this->provider->lastOptions);
         $this->assertTrue($this->provider->lastOptions['use_research_model'] ?? false);
-        $this->assertSame('refresh', $this->provider->lastInput['mode']);
+        $this->assertSame('iterate', $this->provider->lastInput['mode']);
+        $this->assertNotSame('', trim((string) ($this->provider->lastInput['user_instruction'] ?? '')));
     }
 
     public function test_simulation_has_no_sources_and_does_not_change_direction(): void
@@ -295,7 +372,7 @@ class GrowthOsDirectionWorkspaceAiTest extends TestCase
         $this->actingAs($user)
             ->get(route('growth.projects.show', DemoTikWebinarProject::PROJECT_ID))
             ->assertOk()
-            ->assertSee('Symulacja lokalna — bez sprawdzania Internetu.')
+            ->assertSee('Symulacja lokalna nie sprawdza Internetu.')
             ->assertDontSee('blog.google');
     }
 
@@ -382,6 +459,7 @@ class GrowthOsDirectionWorkspaceAiTest extends TestCase
     private function savedDirection(array $overrides = []): array
     {
         return [
+            'topic' => $this->topic(),
             'why_now' => 'Zapisany powód.',
             'audience' => 'Zapisani odbiorcy.',
             'problem' => 'Zapisany problem kierunku.',
@@ -427,6 +505,8 @@ final class FakeDirectionWorkspaceProvider implements GrowthAiProvider
 
     public string $lastTaskType = '';
 
+    public bool $forceSkipWebSearch = false;
+
     /** @var array<string, mixed> */
     public array $payload = [
         'working_topic' => 'NotebookLM w pracy nauczyciela — od przygotowania lekcji do pracy z dokumentami',
@@ -462,21 +542,28 @@ final class FakeDirectionWorkspaceProvider implements GrowthAiProvider
         $this->lastOptions = $options;
 
         $webSearch = ($options['web_search'] ?? false) === true;
+        $webSearchUsed = $webSearch && ! $this->forceSkipWebSearch;
 
         return new AiProviderResponse(
             payload: $this->payload,
             provider: $this->name(),
-            model: $this->model(),
+            model: (string) ($options['model'] ?? $this->model()),
             requestId: 'test-request-id',
             inputTokens: 100,
             outputTokens: 200,
             latencyMs: 10,
-            webSearchUsed: $webSearch,
-            researchSources: $webSearch ? [[
+            webSearchUsed: $webSearchUsed,
+            researchSources: $webSearchUsed ? [[
                 'title' => 'NotebookLM blog',
                 'url' => 'https://blog.google/notebooklm/',
                 'domain' => 'blog.google',
             ]] : [],
+            reasoningEffort: (string) ($options['reasoning_effort'] ?? ''),
+            selectionSource: (string) ($options['selection_source'] ?? ''),
+            webSearchRequested: $webSearch,
+            webSearchNote: ($webSearch && ! $webSearchUsed)
+                ? GrowthAiRequestOptions::WEB_SEARCH_SKIPPED_MESSAGE
+                : null,
         );
     }
 }

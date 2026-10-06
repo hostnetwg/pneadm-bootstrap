@@ -21,5 +21,9 @@ final readonly class DirectionPlanningResult
         public string $requestId,
         public array $researchSources,
         public bool $webSearchUsed,
+        public string $reasoningEffort = '',
+        public string $selectionSource = '',
+        public bool $webSearchRequested = false,
+        public ?string $webSearchNote = null,
     ) {}
 }

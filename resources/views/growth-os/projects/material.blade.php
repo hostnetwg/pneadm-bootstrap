@@ -23,6 +23,11 @@
                     <div class="d-flex flex-wrap gap-2 mb-2">
                         <span class="badge text-bg-secondary">{{ $material['kind'] }}</span>
                         <span class="badge {{ \App\Support\GrowthOS\DemoTikWebinarProject::materialStatusBadgeClasses()[$material['status']] ?? 'bg-light text-secondary border' }}">{{ in_array($material['status'], ['APPROVED', 'PUBLISHED'], true) ? '✓ ' : '' }}{{ $materialStatusLabels[$material['status']] ?? $material['status'] }}</span>
+                        @include('growth-os.partials.ai-origin-badge', [
+                            'origin' => \App\Support\GrowthOS\DemoTikWebinarProject::materialAiOrigin($material),
+                            'channel' => \App\Services\GrowthOS\AI\Support\GrowthAiModelCatalog::CHANNEL_GENERAL,
+                            'title' => 'Ostatnie AI, które ukształtowało ten materiał',
+                        ])
                     </div>
                     <h2 class="h4 mb-2">{{ $material['name'] }}</h2>
                     <p class="text-secondary mb-0">{{ $material['summary'] }}</p>
@@ -298,6 +303,12 @@
                                 </p>
                                 <form method="POST" action="{{ route('growth.projects.materials.images.description.ai', [$project['id'], $material['id']]) }}" data-growth-ai-form>
                                     @csrf
+                                    @include('growth-os.partials.ai-execution-controls', [
+                                        'aiChannel' => \App\Services\GrowthOS\AI\Support\GrowthAiModelCatalog::CHANNEL_GENERAL,
+                                        'aiProposal' => $imageDescriptionProposal,
+                                        'aiControlId' => 'image-description-ai-exec',
+                                        'aiDisabled' => ! $imageCanGenerate,
+                                    ])
                                     <input type="hidden" name="mode" value="generate" data-growth-ai-mode-input>
                                     <input type="hidden" name="author_draft" value="" data-growth-ai-author-draft data-growth-ai-author-source="material_image_prompt">
                                     <label for="image_description_instruction" class="form-label small">Dodatkowa instrukcja (opcjonalnie)</label>
@@ -326,7 +337,11 @@
                                         <div class="d-flex flex-wrap justify-content-between gap-2 mb-2">
                                             <div class="small fw-semibold">Propozycja opisu</div>
                                             <span class="badge bg-white text-secondary border">
-                                                {{ ($imageDescriptionProposal['source'] ?? '') === 'real_ai' ? 'AI: OpenAI / '.($imageDescriptionProposal['model'] ?? '') : 'AI: symulacja lokalna' }}
+                                                @if(($imageDescriptionProposal['source'] ?? '') === 'real_ai')
+                                                    Wygenerowano: {{ \App\Services\GrowthOS\AI\Support\GrowthAiModelCatalog::badgeForProposal($imageDescriptionProposal, \App\Services\GrowthOS\AI\Support\GrowthAiModelCatalog::CHANNEL_GENERAL) }}
+                                                @else
+                                                    AI: symulacja lokalna
+                                                @endif
                                             </span>
                                         </div>
                                         <p class="small text-secondary mb-2">
@@ -482,7 +497,7 @@
                         <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
                             <h3 class="h6 mb-0" id="material-ai-heading">Szkic z pomocą AI</h3>
                             <span class="badge bg-light text-secondary border">
-                                {{ $aiRealEnabled ? 'AI: OpenAI / '.$aiModel : 'AI: symulacja lokalna' }}
+                                {{ $aiRealEnabled ? 'AI: '.$aiGeneralLabel : 'AI: symulacja lokalna' }}
                             </span>
                         </div>
                         <div class="card-body">
@@ -560,6 +575,12 @@
 
                             <form method="POST" action="{{ route('growth.projects.materials.ai', [$project['id'], $material['id']]) }}" data-growth-ai-form>
                                 @csrf
+                                @include('growth-os.partials.ai-execution-controls', [
+                                    'aiChannel' => \App\Services\GrowthOS\AI\Support\GrowthAiModelCatalog::CHANNEL_GENERAL,
+                                    'aiProposal' => $aiDraftProposal,
+                                    'aiControlId' => 'material-ai-exec',
+                                    'aiDisabled' => $materialSkipped || ! $aiDraftAllowed,
+                                ])
                                 @if($aiDraftIsGraphic)
                                     <p class="small mb-2">
                                         Brief zawsze ma nagłówek, termin i kierunek wizualny. Formaty: {{ \App\Services\GrowthOS\AI\Tasks\MaterialDraftTask::GRAPHIC_FORMATS }}.
@@ -701,7 +722,14 @@
                 <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
                     <h3 class="h6 mb-0" id="material-ai-proposal-heading">Propozycja AI</h3>
                     <span class="badge bg-light text-secondary border">
-                        {{ ($aiDraftProposal['source'] ?? '') === 'real_ai' ? 'AI: OpenAI / '.($aiDraftProposal['model'] ?? '') : 'AI: symulacja lokalna' }}
+                        @if(($aiDraftProposal['source'] ?? '') === 'real_ai')
+                            Wygenerowano: {{ \App\Services\GrowthOS\AI\Support\GrowthAiModelCatalog::badgeForProposal($aiDraftProposal, \App\Services\GrowthOS\AI\Support\GrowthAiModelCatalog::CHANNEL_GENERAL) }}
+                        @else
+                            AI: symulacja lokalna
+                            @if(! empty($aiDraftProposal['model']) && ! empty($aiDraftProposal['reasoning_effort']))
+                                (wybór: {{ \App\Services\GrowthOS\AI\Support\GrowthAiModelCatalog::compactLabel((string) $aiDraftProposal['model'], (string) $aiDraftProposal['reasoning_effort']) }})
+                            @endif
+                        @endif
                     </span>
                 </div>
                 <div class="card-body">
@@ -747,10 +775,17 @@
                         </div>
                     </div>
                     <p class="small mt-3 mb-0 growth-ai-text"><span class="fw-semibold">Co zmieniono:</span> {{ $aiDraftProposal['change_summary'] }}</p>
+                    @include('growth-os.partials.ai-web-search-feedback', ['proposal' => $aiDraftProposal])
                     @if($aiDraftUsesWorkModes && ! $materialSkipped)
                         <form method="POST" action="{{ route('growth.projects.materials.ai', [$project['id'], $material['id']]) }}" class="mt-3" data-growth-ai-form>
                             @csrf
                             <input type="hidden" name="mode" value="iterate">
+                            @include('growth-os.partials.ai-execution-controls', [
+                                'aiChannel' => \App\Services\GrowthOS\AI\Support\GrowthAiModelCatalog::CHANNEL_GENERAL,
+                                'aiProposal' => $aiDraftProposal,
+                                'aiControlId' => 'material-ai-iterate-exec',
+                                'aiDisabled' => ! $aiDraftAllowed,
+                            ])
                             <label for="material_ai_iterate_instruction" class="form-label small fw-semibold">Co jeszcze poprawić?</label>
                             <textarea id="material_ai_iterate_instruction" name="instruction" rows="2" maxlength="{{ config('growth_ai.limits.max_instruction_chars') }}" class="form-control form-control-sm" placeholder="{{ $aiDraftIsGraphic ? 'Np. zmień tylko nagłówek na pełny temat; zostaw opis obrazu' : 'Np. popraw tylko CTA; zostaw pierwszy akapit bez zmian; popraw tylko literówki' }}" @disabled(! $aiDraftAllowed)></textarea>
                             <button type="submit" class="btn btn-outline-primary btn-sm mt-2" @disabled(! $aiDraftAllowed) data-growth-ai-submit>

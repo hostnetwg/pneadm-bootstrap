@@ -90,7 +90,11 @@
                         <div class="card-header bg-white d-flex flex-wrap justify-content-between align-items-center gap-2">
                             <h3 class="h6 mb-0" id="direction-planning-heading">Asystent planowania</h3>
                             <span class="badge bg-light text-secondary border">
-                                {{ $growthAiEnabled ? 'AI: OpenAI / '.$growthAiModel : 'AI: symulacja lokalna' }}
+                                @if($growthAiEnabled)
+                                    AI: {{ \App\Services\GrowthOS\AI\Support\GrowthAiModelCatalog::badgeForProposal(is_array($proposal ?? null) ? $proposal : null, \App\Services\GrowthOS\AI\Support\GrowthAiModelCatalog::CHANNEL_RESEARCH) }}
+                                @else
+                                    AI: symulacja lokalna
+                                @endif
                             </span>
                         </div>
                         <div class="card-body">
@@ -100,6 +104,15 @@
                                 </p>
                             @else
                                 <h4 class="h6">Kierunek proponowany przez AI</h4>
+                                <p class="small mb-2">
+                                    <span class="badge bg-light text-secondary border">
+                                        @if(($proposal['source'] ?? '') === 'real_ai')
+                                            Wygenerowano: {{ \App\Services\GrowthOS\AI\Support\GrowthAiModelCatalog::badgeForProposal($proposal, \App\Services\GrowthOS\AI\Support\GrowthAiModelCatalog::CHANNEL_RESEARCH) }}
+                                        @else
+                                            Symulacja lokalna
+                                        @endif
+                                    </span>
+                                </p>
                                 <p class="small mb-2"><span class="text-secondary">Temat roboczy:</span> <span class="fw-semibold">{{ $proposal['working_topic'] }}</span></p>
                                 <p class="small mb-2 growth-ai-text"><span class="fw-semibold">Dlaczego teraz</span><br>{{ $proposal['direction']['why_now'] }}</p>
                                 <p class="small mb-2 growth-ai-text"><span class="fw-semibold">Dla kogo</span><br>{{ $proposal['direction']['audience'] }}</p>
@@ -115,23 +128,14 @@
                                     </ul>
                                 @endif
                                 <p class="small text-secondary growth-ai-text">{{ $proposal['change_summary'] ?? '' }}</p>
-
-                                <h4 class="h6 mt-3">Źródła wykorzystane przez AI</h4>
-                                @if(($proposal['source'] ?? '') === 'simulation' || ! ($proposal['web_search_used'] ?? false))
-                                    <p class="small text-warning-emphasis">Symulacja lokalna — bez sprawdzania Internetu.</p>
-                                @elseif(($proposal['sources'] ?? []) === [])
-                                    <p class="small text-secondary">Brak listy źródeł z researchu.</p>
-                                @else
-                                    <ul class="small list-unstyled">
-                                        @foreach($proposal['sources'] as $source)
-                                            <li class="mb-1">
-                                                <a href="{{ $source['url'] }}" target="_blank" rel="noopener noreferrer">{{ $source['title'] }}</a>
-                                                <span class="text-secondary">({{ $source['domain'] }})</span>
-                                            </li>
-                                        @endforeach
-                                    </ul>
-                                @endif
+                                @include('growth-os.partials.ai-web-search-feedback', ['proposal' => $proposal])
                             @endif
+
+                            @include('growth-os.partials.ai-execution-controls', [
+                                'aiChannel' => \App\Services\GrowthOS\AI\Support\GrowthAiModelCatalog::CHANNEL_RESEARCH,
+                                'aiProposal' => $proposal ?? null,
+                                'aiControlId' => 'create-direction-ai-exec',
+                            ])
 
                             <button type="submit" class="btn btn-outline-primary w-100" formaction="{{ route('growth.projects.direction-planning') }}" name="planning_mode" value="generate" data-growth-ai-submit>
                                 <span class="spinner-border spinner-border-sm me-1 d-none" aria-hidden="true" data-growth-ai-spinner></span>
@@ -145,10 +149,6 @@
                                     <button type="submit" class="btn btn-outline-primary btn-sm" formaction="{{ route('growth.projects.direction-planning') }}" name="planning_mode" value="iterate" data-growth-ai-submit>
                                         <span class="spinner-border spinner-border-sm me-1 d-none" role="status" aria-hidden="true" data-growth-ai-spinner></span>
                                         Popraw propozycję
-                                    </button>
-                                    <button type="submit" class="btn btn-outline-secondary btn-sm" formaction="{{ route('growth.projects.direction-planning') }}" name="planning_mode" value="refresh" data-growth-ai-submit>
-                                        <span class="spinner-border spinner-border-sm me-1 d-none" role="status" aria-hidden="true" data-growth-ai-spinner></span>
-                                        Popraw propozycję — szukaj w Internecie
                                     </button>
                                 </div>
                                 <button type="button" class="btn btn-primary btn-sm mt-3" data-mark-direction-proposal>

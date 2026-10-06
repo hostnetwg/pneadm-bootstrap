@@ -139,17 +139,36 @@
         <section id="direction" class="card border mb-4 {{ isset($project['completed_steps']['direction']) ? 'growth-done' : '' }}" aria-labelledby="direction-heading">
             <div class="card-header bg-white d-flex flex-wrap justify-content-between gap-2">
                 <h2 class="h5 mb-0" id="direction-heading">Pomysł i kierunek</h2>
-                @if(isset($project['completed_steps']['direction']))
-                    <span class="badge text-bg-success">Gotowe</span>
-                @else
-                    <span class="badge text-bg-danger">Czeka na decyzję</span>
-                @endif
+                <div class="d-flex flex-wrap align-items-center gap-2">
+                    @include('growth-os.partials.ai-origin-badge', [
+                        'origin' => \App\Support\GrowthOS\DemoTikWebinarProject::directionAiOrigin($project),
+                        'channel' => \App\Services\GrowthOS\AI\Support\GrowthAiModelCatalog::CHANNEL_RESEARCH,
+                        'title' => 'Ostatnie AI, które ukształtowało zapisany kierunek',
+                    ])
+                    @if(isset($project['completed_steps']['direction']))
+                        <span class="badge text-bg-success">Gotowe</span>
+                    @else
+                        <span class="badge text-bg-danger">Czeka na decyzję</span>
+                    @endif
+                </div>
             </div>
             <div class="card-body">
-                <p class="mb-3"><span class="h6 text-secondary">Temat</span><br>{{ $project['topic'] }}</p>
                 <form id="direction-edit-form" method="POST" action="{{ route('growth.projects.direction.update', $project['id']) }}">
                     @csrf
                     @method('PUT')
+                    <div class="mb-3">
+                        <label for="direction_topic" class="form-label">Temat</label>
+                        <input
+                            id="direction_topic"
+                            name="topic"
+                            type="text"
+                            maxlength="180"
+                            class="form-control @error('topic') is-invalid @enderror"
+                            value="{{ old('topic', $project['topic'] ?? '') }}"
+                            required
+                        >
+                        @error('topic')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                    </div>
                     <div class="row g-3">
                         <div class="col-md-6">
                             <label for="direction_why_now" class="form-label">Dlaczego teraz</label>
@@ -194,6 +213,7 @@
                 @else
                     <form method="POST" action="{{ route('growth.projects.direction.ai', $project['id']) }}" class="border rounded p-3 mt-4" data-direction-ai-form aria-labelledby="direction-assistant-heading">
                         @csrf
+                        <input type="hidden" name="topic" value="">
                         <input type="hidden" name="why_now" value="">
                         <input type="hidden" name="audience" value="">
                         <input type="hidden" name="problem" value="">
@@ -202,20 +222,29 @@
                         <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
                             <h3 class="h6 mb-0" id="direction-assistant-heading">Asystent kierunku</h3>
                             <span class="badge bg-light text-secondary border">
-                                {{ $growthAiEnabled ? 'AI: OpenAI / '.$growthAiResearchModel : 'AI: symulacja lokalna' }}
+                                @if($growthAiEnabled)
+                                    AI: {{ \App\Services\GrowthOS\AI\Support\GrowthAiModelCatalog::badgeForProposal($directionProposal, \App\Services\GrowthOS\AI\Support\GrowthAiModelCatalog::CHANNEL_RESEARCH) }}
+                                @else
+                                    AI: symulacja lokalna
+                                @endif
                             </span>
                         </div>
-                        <p class="small text-secondary">AI proponuje zmiany obok obecnych pól. Kierunek zmienia się dopiero po „Zastosuj”.</p>
-                        <label for="planning_instruction" class="form-label small">Co chcesz zmienić?</label>
-                        <textarea id="planning_instruction" name="planning_instruction" rows="3" class="form-control form-control-sm" maxlength="{{ config('growth_ai.limits.max_instruction_chars') }}" placeholder="Np. bardziej skup się na nauczycielach niż dyrektorach.">{{ old('planning_instruction') }}</textarea>
+                        <p class="small text-secondary">„Przygotuj od nowa” układa kierunek z tematu i opcjonalnych sugestii. „Popraw propozycję” bierze bieżące pola. Wyszukiwanie w sieci włączysz w ⚙ przy modelu. Kierunek w projekcie zmienia się dopiero po „Zastosuj”.</p>
+                        @include('growth-os.partials.ai-execution-controls', [
+                            'aiChannel' => \App\Services\GrowthOS\AI\Support\GrowthAiModelCatalog::CHANNEL_RESEARCH,
+                            'aiProposal' => $project['direction_ai_proposal'] ?? null,
+                            'aiControlId' => 'workspace-direction-ai-exec',
+                        ])
+                        <label for="planning_instruction" class="form-label small">Sugestie dla AI (opcjonalnie przy „od nowa”; wymagane przy „Popraw propozycję”)</label>
+                        <textarea id="planning_instruction" name="planning_instruction" rows="3" class="form-control form-control-sm" maxlength="{{ config('growth_ai.limits.max_instruction_chars') }}" placeholder="Np. skup się na bezpieczeństwie danych uczniów; unikaj marketingowego tonu.">{{ old('planning_instruction') }}</textarea>
                         <div class="d-flex flex-wrap gap-2 mt-2">
+                            <button type="submit" class="btn btn-primary btn-sm" name="planning_mode" value="generate" data-growth-ai-submit>
+                                <span class="spinner-border spinner-border-sm me-1 d-none" role="status" aria-hidden="true" data-growth-ai-spinner></span>
+                                Przygotuj od nowa
+                            </button>
                             <button type="submit" class="btn btn-outline-primary btn-sm" name="planning_mode" value="iterate" data-growth-ai-submit>
                                 <span class="spinner-border spinner-border-sm me-1 d-none" role="status" aria-hidden="true" data-growth-ai-spinner></span>
                                 Popraw propozycję
-                            </button>
-                            <button type="submit" class="btn btn-outline-secondary btn-sm" name="planning_mode" value="refresh" data-growth-ai-submit>
-                                <span class="spinner-border spinner-border-sm me-1 d-none" role="status" aria-hidden="true" data-growth-ai-spinner></span>
-                                Popraw propozycję — szukaj w Internecie
                             </button>
                         </div>
                     </form>
@@ -223,7 +252,7 @@
                         document.querySelectorAll('[data-direction-ai-form]').forEach((form) => {
                             form.addEventListener('submit', (event) => {
                                 const source = document.getElementById('direction-edit-form');
-                                ['why_now', 'audience', 'problem', 'takeaway', 'sell_later'].forEach((name) => {
+                                ['topic', 'why_now', 'audience', 'problem', 'takeaway', 'sell_later'].forEach((name) => {
                                     const from = source?.querySelector(`[name="${name}"]`);
                                     const to = form.querySelector(`[name="${name}"]`);
                                     if (from && to) {
@@ -246,7 +275,19 @@
                 @if($directionProposal)
                     <section class="card border mt-3" aria-labelledby="direction-proposal-heading">
                         <div class="card-body">
-                            <h3 class="h6" id="direction-proposal-heading">Kierunek proponowany przez AI</h3>
+                            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                                <h3 class="h6 mb-0" id="direction-proposal-heading">Kierunek proponowany przez AI</h3>
+                                <span class="badge bg-light text-secondary border">
+                                    @if(($directionProposal['source'] ?? '') === 'real_ai')
+                                        Wygenerowano: {{ \App\Services\GrowthOS\AI\Support\GrowthAiModelCatalog::badgeForProposal($directionProposal, \App\Services\GrowthOS\AI\Support\GrowthAiModelCatalog::CHANNEL_RESEARCH) }}
+                                    @else
+                                        Symulacja lokalna
+                                        @if(! empty($directionProposal['model']) && ! empty($directionProposal['reasoning_effort']))
+                                            (wybór: {{ \App\Services\GrowthOS\AI\Support\GrowthAiModelCatalog::compactLabel((string) $directionProposal['model'], (string) $directionProposal['reasoning_effort']) }})
+                                        @endif
+                                    @endif
+                                </span>
+                            </div>
                             <p class="small text-secondary">„Zmień na” wstawia tylko ten fragment do pola powyżej. Nic nie zapisuje. Następne pytanie do AI weźmie to, co jest w polach.</p>
                             <p class="small text-success d-none mb-2" data-direction-apply-status role="status"></p>
                             <script type="application/json" id="direction-proposal-fields">@json($directionProposal['direction'])</script>
@@ -268,23 +309,7 @@
                                 </ul>
                             @endif
                             <p class="small text-secondary growth-ai-text">{{ $directionProposal['change_summary'] ?? '' }}</p>
-                            <h4 class="h6 mt-3">Źródła wykorzystane przez AI</h4>
-                            @if(($directionProposal['source'] ?? '') === 'simulation')
-                                <p class="small text-warning-emphasis">Symulacja lokalna — bez sprawdzania Internetu.</p>
-                            @elseif(! ($directionProposal['web_search_used'] ?? false))
-                                <p class="small text-secondary">Ta poprawka nie sprawdzała Internetu.</p>
-                            @elseif(($directionProposal['sources'] ?? []) === [])
-                                <p class="small text-secondary">Brak listy źródeł z researchu.</p>
-                            @else
-                                <ul class="small list-unstyled">
-                                    @foreach($directionProposal['sources'] as $source)
-                                        <li class="mb-1">
-                                            <a href="{{ $source['url'] }}" target="_blank" rel="noopener noreferrer">{{ $source['title'] }}</a>
-                                            <span class="text-secondary">({{ $source['domain'] }})</span>
-                                        </li>
-                                    @endforeach
-                                </ul>
-                            @endif
+                            @include('growth-os.partials.ai-web-search-feedback', ['proposal' => $directionProposal])
                             <div class="d-flex flex-wrap gap-2 mt-3">
                                 <form method="POST" action="{{ route('growth.projects.direction.ai.apply', $project['id']) }}">
                                     @csrf
@@ -350,11 +375,18 @@
         <section id="concept" class="card border mb-4 {{ isset($project['completed_steps']['concept']) ? 'growth-done' : '' }}" aria-labelledby="concept-heading">
             <div class="card-header bg-white d-flex flex-wrap justify-content-between gap-2">
                 <h2 class="h5 mb-0" id="concept-heading">Koncepcja webinaru</h2>
-                @if(isset($project['completed_steps']['concept']))
-                    <span class="badge text-bg-success">Gotowe</span>
-                @else
-                    <span class="badge text-bg-danger">Do dopracowania</span>
-                @endif
+                <div class="d-flex flex-wrap align-items-center gap-2">
+                    @include('growth-os.partials.ai-origin-badge', [
+                        'origin' => \App\Support\GrowthOS\DemoTikWebinarProject::conceptAiOrigin($project),
+                        'channel' => \App\Services\GrowthOS\AI\Support\GrowthAiModelCatalog::CHANNEL_GENERAL,
+                        'title' => 'Ostatnie AI, które ukształtowało zapisaną koncepcję',
+                    ])
+                    @if(isset($project['completed_steps']['concept']))
+                        <span class="badge text-bg-success">Gotowe</span>
+                    @else
+                        <span class="badge text-bg-danger">Do dopracowania</span>
+                    @endif
+                </div>
             </div>
             <div class="card-body">
                 @php
@@ -449,7 +481,7 @@
                             <p class="small mb-2">
                                 <span class="badge bg-light text-secondary border">
                                     @if($growthAiEnabled)
-                                        AI: {{ ucfirst($growthAiProvider) }} / {{ $growthAiModel }}
+                                        AI: {{ \App\Services\GrowthOS\AI\Support\GrowthAiModelCatalog::badgeForProposal(is_array($project['concept_ai_proposal'] ?? null) ? $project['concept_ai_proposal'] : null, \App\Services\GrowthOS\AI\Support\GrowthAiModelCatalog::CHANNEL_GENERAL) }}
                                     @else
                                         AI: symulacja lokalna
                                     @endif
@@ -469,7 +501,7 @@
                                 </select>
                                 @error('intent')<div class="invalid-feedback mb-2">{{ $message }}</div>@enderror
 
-                                <label for="concept_ai_instruction" class="form-label small">Dodatkowa instrukcja (opcjonalnie)</label>
+                                <label for="concept_ai_instruction" class="form-label small" id="concept_ai_instruction_label">Dodatkowa instrukcja (opcjonalnie)</label>
                                 <textarea
                                     id="concept_ai_instruction"
                                     name="instruction"
@@ -477,11 +509,19 @@
                                     maxlength="{{ config('growth_ai.limits.max_instruction_chars') }}"
                                     class="form-control form-control-sm mb-2 @error('instruction') is-invalid @enderror"
                                     placeholder="Np. uprość język i dodaj dwa przykłady z lekcji"
+                                    data-label-optional="Dodatkowa instrukcja (opcjonalnie)"
+                                    data-label-required="Twoje sugestie (wymagane)"
+                                    data-requires-intent="by_suggestions"
                                 >{{ old('instruction') }}</textarea>
                                 @error('instruction')<div class="invalid-feedback mb-2">{{ $message }}</div>@enderror
+                                @include('growth-os.partials.ai-execution-controls', [
+                                    'aiChannel' => \App\Services\GrowthOS\AI\Support\GrowthAiModelCatalog::CHANNEL_GENERAL,
+                                    'aiProposal' => $project['concept_ai_proposal'] ?? null,
+                                    'aiControlId' => 'concept-ai-exec',
+                                ])
                                 @if($growthAiEnabled)
                                     <p class="small text-secondary mb-2">
-                                        Każda opcja dostaje zapisaną koncepcję i zapisany pomysł z kierunkiem. Kierunek jest granicą sensu. „Wygeneruj na podstawie pomysłu i kierunku” układa pola, gdy koncepcja jest jeszcze pusta. Nie wpisuj danych osobowych, danych klientów ani sekretów.
+                                        Każda opcja dostaje zapisaną koncepcję i zapisany pomysł z kierunkiem. Kierunek jest granicą sensu. „Wygeneruj na podstawie pomysłu i kierunku” układa pola, gdy koncepcja jest jeszcze pusta. „Popraw zgodnie z moimi sugestiami” nanosi zmiany tylko według tekstu z pola sugestii. Nie wpisuj danych osobowych, danych klientów ani sekretów.
                                     </p>
                                 @endif
 
@@ -499,6 +539,21 @@
                             <div id="growth-concept-ai-status" class="alert mt-3 mb-0 d-none" role="status" data-daily-limit-message="{{ \App\Services\GrowthOS\AI\GrowthAiService::DAILY_LIMIT_MESSAGE }}"></div>
                             <script>
                                 document.addEventListener('DOMContentLoaded', function () {
+                                    const intentSelect = document.getElementById('concept_ai_intent');
+                                    const instruction = document.getElementById('concept_ai_instruction');
+                                    const instructionLabel = document.getElementById('concept_ai_instruction_label');
+                                    if (intentSelect && instruction && instructionLabel) {
+                                        const syncInstructionRequirement = function () {
+                                            const required = intentSelect.value === (instruction.dataset.requiresIntent || 'by_suggestions');
+                                            instruction.required = required;
+                                            instructionLabel.textContent = required
+                                                ? (instruction.dataset.labelRequired || 'Twoje sugestie (wymagane)')
+                                                : (instruction.dataset.labelOptional || 'Dodatkowa instrukcja (opcjonalnie)');
+                                        };
+                                        intentSelect.addEventListener('change', syncInstructionRequirement);
+                                        syncInstructionRequirement();
+                                    }
+
                                     const form = document.getElementById('growth-concept-ai-form');
                                     const button = document.getElementById('growth-concept-ai-submit');
                                     const hint = document.getElementById('growth-concept-ai-wait-hint');
@@ -726,6 +781,18 @@
                         <span>
                             <span class="badge text-bg-secondary me-2">{{ $material['kind'] }}</span>
                             <span class="fw-semibold">{{ $material['name'] }}</span>
+                            @php
+                                $materialOrigin = \App\Support\GrowthOS\DemoTikWebinarProject::materialAiOrigin(is_array($material) ? $material : []);
+                            @endphp
+                            @if($materialOrigin !== null)
+                                <span class="d-block mt-1">
+                                    @include('growth-os.partials.ai-origin-badge', [
+                                        'origin' => $materialOrigin,
+                                        'channel' => \App\Services\GrowthOS\AI\Support\GrowthAiModelCatalog::CHANNEL_GENERAL,
+                                        'title' => 'Ostatnie AI, które ukształtowało ten materiał',
+                                    ])
+                                </span>
+                            @endif
                             <span class="d-block small text-secondary mt-1">{{ $material['summary'] }}</span>
                         </span>
                         <span class="badge {{ $materialBadgeClasses[$material['status']] ?? 'bg-light text-secondary border' }} text-nowrap">

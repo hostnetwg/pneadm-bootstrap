@@ -1,6 +1,6 @@
 # PNE Growth OS — Architecture
 
-Status: kampania, prowadzący, kierunek, koncepcja, decyzje, 9 zadań operacyjnych i 10 materiałów zapisują się z prototypu. `/growth/projects` listuje wszystkie kampanie właściciela; usunięcie kasuje kampanię z dziećmi i plikami obrazów (DEC-038). Propozycje AI (planowanie kierunku przed projektem i na karcie kierunku, koncepcja oraz szkice materiałów) zostają w sesji HTTP.
+Status: kampania, prowadzący, kierunek, koncepcja, decyzje, 9 zadań operacyjnych i 10 materiałów zapisują się z prototypu. `/growth/projects` listuje wszystkie kampanie właściciela; usunięcie kasuje kampanię z dziećmi i plikami obrazów (DEC-038). Propozycje AI (planowanie kierunku przed projektem i na karcie kierunku, koncepcja oraz szkice materiałów) zostają w sesji HTTP. Domyślne model/effort AI i lokalny override: DEC-052 (`growth_ai_settings`).
 
 ## Zasada Główna
 
@@ -244,15 +244,15 @@ Jedyną rzeczywistą integracją zewnętrzną jest opcjonalne OpenAI w trzech za
 ```text
 Formularz Zaplanuj webinar (Asystent planowania)
 → GrowthAiService (flaga, super_admin, circuit breaker, wspólny limit dzienny, log)
-→ DirectionPlanningTask (GrowthAiResearchTask; generate/refresh = web_search)
+→ DirectionPlanningTask (GrowthAiResearchTask; opcjonalny web_search z checkboxa, DEC-053)
 → GrowthAiProvider / OpenAiProvider
-→ OpenAI Responses API (json_schema + tools web_search, store: false)
-→ źródła z API, walidacja, propozycja w sesji
+→ OpenAI Responses API (json_schema + opcjonalnie tools web_search, store: false)
+→ źródła z API gdy search użyty; soft-fail z notatką gdy nie; walidacja, propozycja w sesji
 → „Użyj tego kierunku” + Utwórz projekt (szkic DRAFT) albo ręczny kierunek
-→ w otwartym projekcie ten sam task: iterate bez web_search, refresh z web_search, Zastosuj = DRAFT (DEC-039)
+→ w otwartym projekcie ten sam task: generate / iterate + checkbox sieci, Zastosuj = DRAFT (DEC-039 / DEC-053)
 ```
 
-Trzy zadania tekstowe implementują `GrowthAiTask`. `direction_planning` dodatkowo `GrowthAiResearchTask`. Serwis loguje typ i wersje z zadania. Nie ma rejestru zadań ani automatycznego routera modeli; model researchu jest osobną konfiguracją (`GROWTH_AI_RESEARCH_MODEL`, domyślnie `gpt-5.5`) i nie zmienia `concept_revision` ani `material_draft`.
+Trzy zadania tekstowe implementują `GrowthAiTask`. `direction_planning` dodatkowo `GrowthAiResearchTask`. Serwis loguje typ i wersje z zadania. Nie ma rejestru zadań ani automatycznego routera modeli; model/effort/kanał wybiera `GrowthAiExecutionOptions` (DEC-052), a `web_search` włącza lokalny checkbox (DEC-053) także dla koncepcji i materiałów.
 
 `MaterialDraftTask` (DEC-024): prompt `material_youtube_description_v2`, schema `material_youtube_description_schema_v1`, profil `youtube_description_v1`. Wejście to allowlista: `material` (klucz, nazwa, typ), `campaign` (`working_topic`, etykieta celu, `live_date`, `live_time`, strefa aplikacji, `host_name`), pięć pól kierunku, pola koncepcji (`title`, `subtitle`, `promise`, `points`, `plan`, `cta`, `additional_material`), bieżący szkic tego materiału, `style.emojis` i opcjonalna `instruction` właściciela. Bez innych materiałów. `host_name` trafia do AI od DEC-025; pusty lub „—” jest wysyłany jako pusty, a prompt każe przepisać imię i nazwisko bez dopisywania biografii. Wyjście: `draft` i `change_summary`; dodatkowe pola, dane osobowe i linki spoza wejścia odrzucają odpowiedź. Data i godzina idą osobno, a przy kontroli telefonów wzorce dat są pomijane, żeby termin nie wyglądał jak numer telefonu.
 
@@ -266,7 +266,7 @@ Generator obrazu (DEC-029) jest osobną ścieżką, bo zwraca plik, a nie JSON: 
 
 Propozycje są w sesji osobno dla każdego materiału (`material_ai_proposals[klucz]`). Propozycja szkicu ma odcisk sha256 czterech źródeł: pól kierunku, pól koncepcji, bieżącego szkicu materiału i prowadzącego. Przy poście, briefie grafiki, obu mailingach i scenariuszu prowadzącego dochodzi piąte źródło, `source_materials`: zatwierdzony opis YouTube, a przy mailingu przypominającym także zatwierdzony mailing główny (`MaterialDraftTask::sourceMaterialKeys`). „Zastosuj” liczy odcisk ponownie i sprawdza oba zatwierdzenia. Różnica czyści propozycję i niczego nie zapisuje. Zgodność zapisuje szkic, ustawia status `DRAFT`, zapisuje artifact `material` i decyzję `material_ai_apply`. „Odrzuć” zapisuje tylko decyzję `material_ai_reject`.
 
-Logika Growth OS nie zależy bezpośrednio od endpointu ani SDK OpenAI. Provider i model są konfiguracją centralną. Istnieje tylko implementacja OpenAI; nie ma automatycznego routingu ani fallbacku do innego dostawcy. `web_search` jest włączane wyłącznie dla zadań `GrowthAiResearchTask` (dziś `direction_planning` w trybach generate i refresh).
+Logika Growth OS nie zależy bezpośrednio od endpointu ani SDK OpenAI. Provider i model są konfiguracją centralną. Istnieje tylko implementacja OpenAI; nie ma automatycznego routingu ani fallbacku do innego dostawcy. `web_search` włącza lokalny checkbox (DEC-053, domyślnie ON) dla zadań tekstowych; soft-fail z komunikatem, gdy model nie wykona wyszukiwania.
 
 Od DEC-037 `DirectionPlanningTask` dostaje allowlistę: `mode`, `today`, `campaign` (`type`, `topic`, `goal`, `live_date`), `user_instruction` oraz przy iterate/refresh `previous_proposal`. Bez prowadzącego, głosu komunikacji i materiałów. Wyjście: `working_topic`, pięć pól kierunku, `title_suggestions` (0–3), `change_summary`. Źródła researchu nie pochodzą z JSON modelu. Propozycja na create ma odcisk sha256 typu, celu i tematu. „Użyj tego kierunku” przy zgodnym odcisku zapisuje artifact `direction` jako `DRAFT` przy tworzeniu projektu. Od DEC-039 ten sam task działa na karcie kierunku: poprzednia propozycja to pola z formularza (także niezapisane), a odcisk dotyczy zapisanego kierunku. „Zastosuj” zapisuje `DRAFT` i nie zmienia tematu. Zatwierdzenie nadal jest osobnym krokiem.
 

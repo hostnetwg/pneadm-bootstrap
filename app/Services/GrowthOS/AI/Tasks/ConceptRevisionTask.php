@@ -266,6 +266,12 @@ PROMPT;
             promptVersion: $this->promptVersion(),
             schemaVersion: $this->schemaVersion(),
             requestId: $response->requestId,
+            reasoningEffort: $response->reasoningEffort,
+            selectionSource: $response->selectionSource,
+            webSearchUsed: $response->webSearchUsed,
+            researchSources: $response->researchSources,
+            webSearchRequested: $response->webSearchRequested,
+            webSearchNote: $response->webSearchNote,
         );
     }
 

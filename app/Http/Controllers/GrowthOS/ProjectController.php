@@ -15,7 +15,10 @@ use App\Services\GrowthOS\AI\Tasks\MaterialDraftTask;
 use App\Services\GrowthOS\GrowthOperationalTasks;
 use App\Support\GrowthOS\DemoTikWebinarProject;
 use App\Support\GrowthOS\GraphicLogoStore;
+use App\Support\GrowthOS\GrowthAiRequestOptions;
 use App\Support\GrowthOS\GrowthPeople;
+use App\Services\GrowthOS\AI\Support\GrowthAiExecutionOptions;
+use App\Services\GrowthOS\AI\Support\GrowthAiModelCatalog;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Http\JsonResponse;
@@ -73,7 +76,7 @@ class ProjectController extends Controller
             'instructorOptions' => GrowthPeople::instructorOptions(),
             'directionProposal' => DemoTikWebinarProject::directionPlanningProposal(),
             'growthAiEnabled' => config('growth_ai.enabled') === true,
-            'growthAiModel' => (string) config('growth_ai.research.model', config('growth_ai.model')),
+            'growthAiResearchLabel' => GrowthAiModelCatalog::badgeForChannel(GrowthAiModelCatalog::CHANNEL_RESEARCH),
         ]);
     }
 
@@ -92,12 +95,21 @@ class ProjectController extends Controller
             ])],
             'planning_instruction' => ['nullable', 'string', 'max:'.config('growth_ai.limits.max_instruction_chars')],
             'address_form' => ['nullable', Rule::in(\App\Services\GrowthOS\AI\Support\AddressFormPolicy::values())],
+            ...GrowthAiExecutionOptions::requestRules(),
         ]);
 
         $topic = trim((string) ($data['topic'] ?? ''));
         $mode = DirectionPlanningTask::mode($data['planning_mode'] ?? null);
         $instruction = trim((string) ($data['planning_instruction'] ?? ''));
         $back = redirect()->route('growth.projects.create')->withInput();
+        $execution = GrowthAiRequestOptions::fromRequest($request);
+        if ($mode === DirectionPlanningTask::MODE_REFRESH) {
+            $mode = DirectionPlanningTask::MODE_ITERATE;
+            $execution['web_search'] = true;
+            if ($instruction === '') {
+                $instruction = 'Odśwież kierunek na podstawie aktualnych informacji z sieci.';
+            }
+        }
 
         if ($topic === '') {
             return $back->with('error', self::DIRECTION_PLAN_EMPTY_TOPIC_MESSAGE);
@@ -123,9 +135,12 @@ class ProjectController extends Controller
             'address_form' => \App\Services\GrowthOS\AI\Support\AddressFormPolicy::normalize($data['address_form'] ?? null),
             'instruction' => $instruction,
         ];
+        $inherit = $mode === DirectionPlanningTask::MODE_GENERATE
+            ? null
+            : GrowthAiRequestOptions::inheritFromProposal($proposal);
 
         if (config('growth_ai.enabled') !== true) {
-            DemoTikWebinarProject::storeSimulatedDirectionPlanningProposal($fields, $mode, $instruction);
+            DemoTikWebinarProject::storeSimulatedDirectionPlanningProposal($fields, $mode, $instruction, $execution);
 
             return $back->with('success', 'Przygotowano szkic kierunku (symulacja lokalna — informacje nie zostały sprawdzone w Internecie).');
         }
@@ -135,6 +150,8 @@ class ProjectController extends Controller
                 $request->user(),
                 DemoTikWebinarProject::directionPlanningContext($fields, $mode, $instruction),
                 $mode,
+                $execution,
+                $inherit,
             );
         } catch (GrowthAiException $exception) {
             $message = $exception->errorType === 'web_search_missing' || $exception->userMessage === GrowthAiException::RESEARCH_FAILED_MESSAGE
@@ -282,9 +299,8 @@ class ProjectController extends Controller
             'materialStatusLabels' => DemoTikWebinarProject::materialStatusLabels(),
             'conceptAiIntents' => DemoTikWebinarProject::conceptAiIntents(),
             'growthAiEnabled' => config('growth_ai.enabled') === true,
-            'growthAiProvider' => (string) config('growth_ai.provider'),
-            'growthAiModel' => (string) config('growth_ai.model'),
-            'growthAiResearchModel' => (string) config('growth_ai.research.model', config('growth_ai.model')),
+            'growthAiGeneralLabel' => GrowthAiModelCatalog::badgeForChannel(GrowthAiModelCatalog::CHANNEL_GENERAL),
+            'growthAiResearchLabel' => GrowthAiModelCatalog::badgeForChannel(GrowthAiModelCatalog::CHANNEL_RESEARCH),
             'conceptDecisions' => DemoTikWebinarProject::conceptDecisions($item),
             'operationalTasks' => DemoTikWebinarProject::operationalTasks($item),
             'instructorOptions' => GrowthPeople::instructorOptions([
@@ -324,6 +340,7 @@ class ProjectController extends Controller
     public function updateDirection(Request $request, string $project): RedirectResponse
     {
         $data = $request->validate([
+            'topic' => ['required', 'string', 'max:180'],
             'why_now' => ['required', 'string', 'max:1500'],
             'audience' => ['required', 'string', 'max:1000'],
             'problem' => ['required', 'string', 'max:1500'],
@@ -342,24 +359,33 @@ class ProjectController extends Controller
     public function reviseDirection(Request $request, string $project): RedirectResponse
     {
         $data = $request->validate([
+            'topic' => ['nullable', 'string', 'max:180'],
             'why_now' => ['nullable', 'string', 'max:1500'],
             'audience' => ['nullable', 'string', 'max:1000'],
             'problem' => ['nullable', 'string', 'max:1500'],
             'takeaway' => ['nullable', 'string', 'max:1500'],
             'sell_later' => ['nullable', Rule::in(DirectionPlanningTask::SELL_LATER)],
             'planning_mode' => ['nullable', Rule::in([
+                DirectionPlanningTask::MODE_GENERATE,
                 DirectionPlanningTask::MODE_ITERATE,
                 DirectionPlanningTask::MODE_REFRESH,
             ])],
             'planning_instruction' => ['nullable', 'string', 'max:'.config('growth_ai.limits.max_instruction_chars')],
+            ...GrowthAiExecutionOptions::requestRules(),
         ]);
 
         $item = DemoTikWebinarProject::requireProject($project);
         $back = redirect()->route('growth.projects.show', $project)->withFragment('direction')->withInput();
-        $mode = DirectionPlanningTask::mode($data['planning_mode'] ?? null) === DirectionPlanningTask::MODE_REFRESH
-            ? DirectionPlanningTask::MODE_REFRESH
-            : DirectionPlanningTask::MODE_ITERATE;
+        $mode = DirectionPlanningTask::mode($data['planning_mode'] ?? null);
         $instruction = trim((string) ($data['planning_instruction'] ?? ''));
+        $execution = GrowthAiRequestOptions::fromRequest($request);
+        if ($mode === DirectionPlanningTask::MODE_REFRESH) {
+            $mode = DirectionPlanningTask::MODE_ITERATE;
+            $execution['web_search'] = true;
+            if ($instruction === '') {
+                $instruction = 'Odśwież kierunek na podstawie aktualnych informacji z sieci.';
+            }
+        }
 
         if (DemoTikWebinarProject::directionIsApproved($item)) {
             return $back->with('error', self::DIRECTION_WORKSPACE_APPROVED_MESSAGE);
@@ -367,6 +393,11 @@ class ProjectController extends Controller
 
         if ($mode === DirectionPlanningTask::MODE_ITERATE && $instruction === '') {
             return $back->with('error', self::DIRECTION_PLAN_ITERATE_EMPTY_MESSAGE);
+        }
+
+        $topic = trim((string) ($data['topic'] ?? $item['topic'] ?? ''));
+        if ($topic !== '') {
+            $item['topic'] = $topic;
         }
 
         $direction = [
@@ -378,11 +409,18 @@ class ProjectController extends Controller
         ];
         $saved = is_array($item['direction'] ?? null) ? $item['direction'] : DemoTikWebinarProject::emptyDirection();
         $savedFingerprint = DemoTikWebinarProject::directionFieldsFingerprint($saved);
+        $inherit = $mode === DirectionPlanningTask::MODE_GENERATE
+            ? null
+            : GrowthAiRequestOptions::inheritFromProposal(
+                is_array($item['direction_ai_proposal'] ?? null) ? $item['direction_ai_proposal'] : null,
+            );
 
         if (config('growth_ai.enabled') !== true) {
-            DemoTikWebinarProject::storeSimulatedDirectionWorkspaceProposal($project, $direction, $mode, $instruction, $savedFingerprint);
+            DemoTikWebinarProject::storeSimulatedDirectionWorkspaceProposal($project, $direction, $mode, $instruction, $savedFingerprint, $execution);
 
-            return $back->with('success', 'Przygotowano propozycję kierunku (symulacja lokalna — obecny kierunek nie został zmieniony).');
+            return $back->with('success', $mode === DirectionPlanningTask::MODE_GENERATE
+                ? 'Przygotowano nową propozycję kierunku od zera (symulacja lokalna — obecny kierunek nie został zmieniony).'
+                : 'Przygotowano propozycję kierunku (symulacja lokalna — obecny kierunek nie został zmieniony).');
         }
 
         try {
@@ -390,6 +428,8 @@ class ProjectController extends Controller
                 $request->user(),
                 DemoTikWebinarProject::directionWorkspaceContext($item, $direction, $instruction),
                 $mode,
+                $execution,
+                $inherit,
             );
         } catch (GrowthAiException $exception) {
             $message = $exception->errorType === 'web_search_missing' || $exception->userMessage === GrowthAiException::RESEARCH_FAILED_MESSAGE
@@ -403,7 +443,9 @@ class ProjectController extends Controller
 
         DemoTikWebinarProject::storeDirectionWorkspaceProposal($project, $result, $mode, false, $savedFingerprint);
 
-        return $back->with('success', 'AI przygotowało propozycję kierunku. Obecny kierunek nie został zmieniony.');
+        return $back->with('success', $mode === DirectionPlanningTask::MODE_GENERATE
+            ? 'AI przygotowało nową propozycję kierunku od zera. Obecny kierunek nie został zmieniony.'
+            : 'AI przygotowało propozycję kierunku. Obecny kierunek nie został zmieniony.');
     }
 
     public function applyDirectionAi(string $project): RedirectResponse
@@ -457,16 +499,19 @@ class ProjectController extends Controller
         $data = $request->validate([
             'intent' => ['required', Rule::in(collect(DemoTikWebinarProject::conceptAiIntents())->pluck('value')->all())],
             'instruction' => ['nullable', 'string', 'max:'.config('growth_ai.limits.max_instruction_chars')],
+            ...GrowthAiExecutionOptions::requestRules(),
         ]);
         $intent = (string) $data['intent'];
         $intentLabel = (string) (
             collect(DemoTikWebinarProject::conceptAiIntents())->firstWhere('value', $intent)['label']
             ?? $intent
         );
+        $ownerInstruction = trim((string) ($data['instruction'] ?? ''));
         $wantsJson = $request->expectsJson()
             || $request->header('X-Requested-With') === 'XMLHttpRequest';
         $item = DemoTikWebinarProject::requireProject($project);
         $fromDirection = $intent === 'from_direction';
+        $execution = GrowthAiRequestOptions::fromRequest($request);
         $fail = function (string $message) use ($project, $wantsJson): RedirectResponse|JsonResponse {
             if ($wantsJson) {
                 return response()->json([
@@ -481,12 +526,16 @@ class ProjectController extends Controller
                 ->withFragment('concept');
         };
 
+        if (DemoTikWebinarProject::conceptAiIntentRequiresInstruction($intent) && $ownerInstruction === '') {
+            return $fail('Dla opcji „Popraw zgodnie z moimi sugestiami” wpisz sugestie w polu „Dodatkowa instrukcja”.');
+        }
+
         if ($fromDirection && DemoTikWebinarProject::directionIsBlank($item)) {
             return $fail('Najpierw uzupełnij pomysł i kierunek. Bez tego nie ma z czego ułożyć koncepcji.');
         }
 
         if (config('growth_ai.enabled') !== true) {
-            $updatedProject = DemoTikWebinarProject::requestConceptAiProposal($project, $intent);
+            $updatedProject = DemoTikWebinarProject::requestConceptAiProposal($project, $intent, $ownerInstruction);
 
             if ($wantsJson) {
                 return response()->json([
@@ -504,9 +553,15 @@ class ProjectController extends Controller
         }
 
         $growthAiService = app(GrowthAiService::class);
-        $instruction = $intentLabel;
-        if (filled($data['instruction'] ?? null)) {
-            $instruction .= '. Dodatkowa instrukcja użytkownika: '.trim((string) $data['instruction']);
+        if (DemoTikWebinarProject::conceptAiIntentRequiresInstruction($intent)) {
+            $instruction = 'Popraw koncepcję wyłącznie zgodnie z poniższymi sugestiami użytkownika. '
+                .'Nie zmieniaj pól, których sugestie nie dotyczą.'."\n\n"
+                .'Sugestie:'."\n".$ownerInstruction;
+        } else {
+            $instruction = $intentLabel;
+            if ($ownerInstruction !== '') {
+                $instruction .= '. Dodatkowa instrukcja użytkownika: '.$ownerInstruction;
+            }
         }
 
         try {
@@ -518,6 +573,7 @@ class ProjectController extends Controller
                 direction: DemoTikWebinarProject::directionDraftContext($item),
                 fromDirection: $fromDirection,
                 addressForm: \App\Services\GrowthOS\AI\Support\AddressFormPolicy::fromProject($item),
+                execution: $execution,
             );
 
             $updatedProject = DemoTikWebinarProject::storeConceptAiProposal(
@@ -680,7 +736,7 @@ class ProjectController extends Controller
             'aiDraftAllowed' => $aiDraftSupported && ! $skipped && DemoTikWebinarProject::canDraftMaterialWithAi($projectItem),
             'aiDraftProposal' => $aiDraftProposal,
             'aiRealEnabled' => config('growth_ai.enabled') === true,
-            'aiModel' => (string) config('growth_ai.model'),
+            'aiGeneralLabel' => GrowthAiModelCatalog::badgeForChannel(GrowthAiModelCatalog::CHANNEL_GENERAL),
             'materialVersions' => DemoTikWebinarProject::materialVersions($projectItem, $material),
             'imageGeneratorEnabled' => $material === GraphicImageTask::MATERIAL_KEY,
             'imageGeneratorReady' => is_numeric($projectItem['growth_campaign_id'] ?? null),
@@ -802,11 +858,14 @@ class ProjectController extends Controller
             'description_instruction' => ['nullable', 'string', 'max:'.config('growth_ai.limits.max_instruction_chars')],
             'mode' => ['nullable', Rule::in([MaterialDraftTask::MODE_GENERATE, MaterialDraftTask::MODE_REFINE, MaterialDraftTask::MODE_ITERATE])],
             'author_draft' => ['nullable', 'string', 'max:'.GraphicImageTask::MAX_PROMPT_CHARS],
+            ...GrowthAiExecutionOptions::requestRules(),
         ]);
         $back = redirect()->route('growth.projects.materials.show', [$project, $material]);
         $instruction = trim((string) ($data['description_instruction'] ?? ''));
         $mode = MaterialDraftTask::aiMode($data['mode'] ?? null);
         $work = ['mode' => $mode, 'text' => ''];
+        $execution = GrowthAiRequestOptions::fromRequest($request);
+        $inherit = null;
 
         if (DemoTikWebinarProject::isMaterialSkipped(DemoTikWebinarProject::material($project, $material))) {
             return $back->withInput()->with('error', self::MATERIAL_SKIPPED_MESSAGE);
@@ -832,6 +891,7 @@ class ProjectController extends Controller
                 return $back->with('error', self::MATERIAL_AI_STALE_MESSAGE);
             }
             $work['text'] = (string) $previous['description'];
+            $inherit = GrowthAiRequestOptions::inheritFromProposal($previous);
         }
 
         if (config('growth_ai.enabled') !== true) {
@@ -844,6 +904,8 @@ class ProjectController extends Controller
             $result = app(GrowthAiService::class)->reviseImageDescription(
                 $request->user(),
                 DemoTikWebinarProject::imageDescriptionAiContext($item, $work, $instruction),
+                $execution,
+                $inherit,
             );
         } catch (GrowthAiException $exception) {
             $message = $exception->userMessage === GrowthAiException::INVALID_RESPONSE_MESSAGE
@@ -1055,6 +1117,7 @@ class ProjectController extends Controller
                 'min:'.MaterialDraftTask::HOST_SCRIPT_MIN_DURATION,
                 'max:'.MaterialDraftTask::HOST_SCRIPT_MAX_DURATION,
             ],
+            ...GrowthAiExecutionOptions::requestRules(),
         ], [
             'duration_custom.required_if' => 'Wpisz czas trwania w minutach.',
             'duration_custom.integer' => 'Czas trwania podaj jako liczbę minut.',
@@ -1075,6 +1138,7 @@ class ProjectController extends Controller
             ),
         ];
         $instruction = trim((string) ($data['instruction'] ?? ''));
+        $execution = GrowthAiRequestOptions::fromRequest($request);
 
         if (DemoTikWebinarProject::isMaterialSkipped(DemoTikWebinarProject::material($project, $material))) {
             return $back->withInput()->with('error', self::MATERIAL_SKIPPED_MESSAGE);
@@ -1085,6 +1149,7 @@ class ProjectController extends Controller
         }
 
         $work = [];
+        $inherit = null;
         if (MaterialDraftTask::usesWorkModes($material)) {
             $mode = MaterialDraftTask::aiMode($data['mode'] ?? null);
             $work = ['mode' => $mode, 'text' => ''];
@@ -1108,6 +1173,7 @@ class ProjectController extends Controller
                 if (is_string($previous['address_form_effective'] ?? null)) {
                     $style['previous_address_form'] = (string) $previous['address_form_effective'];
                 }
+                $inherit = GrowthAiRequestOptions::inheritFromProposal($previous);
             }
         }
 
@@ -1126,7 +1192,7 @@ class ProjectController extends Controller
         }
 
         if (config('growth_ai.enabled') !== true) {
-            DemoTikWebinarProject::requestMaterialAiProposal($project, $material, $style, $instruction, $work);
+            DemoTikWebinarProject::requestMaterialAiProposal($project, $material, $style, $instruction, $work, $execution);
 
             return $back->with('success', MaterialDraftTask::isMail($material)
                 ? 'AI przygotowało szkic (symulacja lokalna). Temat, preheader i treść są w polach edycji — popraw i zapisz.'
@@ -1138,6 +1204,8 @@ class ProjectController extends Controller
                 $request->user(),
                 $material,
                 DemoTikWebinarProject::materialAiContext($item, $material, $style, $instruction, $work),
+                $execution,
+                $inherit,
             );
         } catch (GrowthAiException $exception) {
             $message = $exception->userMessage === GrowthAiException::INVALID_RESPONSE_MESSAGE

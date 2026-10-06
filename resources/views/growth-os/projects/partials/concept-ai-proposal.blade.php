@@ -19,12 +19,15 @@
         </p>
         @if(($proposal['source'] ?? null) === 'real_ai')
             <p class="small text-secondary mb-2">
-                AI: {{ ucfirst($proposal['provider'] ?? '') }} / {{ $proposal['model'] ?? '' }}
+                Wygenerowano: {{ \App\Services\GrowthOS\AI\Support\GrowthAiModelCatalog::badgeForProposal($proposal, \App\Services\GrowthOS\AI\Support\GrowthAiModelCatalog::CHANNEL_GENERAL) }}
             </p>
+        @elseif(($proposal['source'] ?? null) === 'simulation')
+            <p class="small text-secondary mb-2">AI: symulacja lokalna</p>
         @endif
         @if(filled($proposal['change_summary'] ?? null))
             <p class="small mb-2 growth-ai-text"><strong>Podsumowanie zmian:</strong> {{ $proposal['change_summary'] }}</p>
         @endif
+        @include('growth-os.partials.ai-web-search-feedback', ['proposal' => $proposal])
         @if(!empty($proposal['changed_fields']))
             <p class="small mb-2">
                 <strong>Zmienione pola:</strong>

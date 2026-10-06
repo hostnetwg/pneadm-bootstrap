@@ -14,13 +14,13 @@ use Illuminate\Validation\Rule;
 use InvalidArgumentException;
 
 /**
- * Strategic webinar direction from a topic, with hosted web search on first analysis (DEC-037).
+ * Strategic webinar direction from a topic; optional hosted web_search (DEC-037, DEC-053).
  */
 final class DirectionPlanningTask implements GrowthAiResearchTask
 {
     public const TYPE = 'direction_planning';
 
-    public const PROMPT_VERSION = 'direction_planning_v1';
+    public const PROMPT_VERSION = 'direction_planning_v3';
 
     public const SCHEMA_VERSION = 'direction_planning_schema_v1';
 
@@ -32,8 +32,10 @@ final class DirectionPlanningTask implements GrowthAiResearchTask
 
     public const SELL_LATER = ['nie', 'być może', 'tak'];
 
-    public function __construct(private readonly string $mode = self::MODE_GENERATE)
-    {
+    public function __construct(
+        private readonly string $mode = self::MODE_GENERATE,
+        private readonly ?bool $webSearch = null,
+    ) {
         if (! in_array($this->mode, [self::MODE_GENERATE, self::MODE_ITERATE, self::MODE_REFRESH], true)) {
             throw new InvalidArgumentException('Unsupported direction planning mode.');
         }
@@ -48,7 +50,12 @@ final class DirectionPlanningTask implements GrowthAiResearchTask
 
     public function forMode(string $mode): self
     {
-        return new self(self::mode($mode));
+        return new self(self::mode($mode), $this->webSearch);
+    }
+
+    public function withWebSearch(bool $enabled): self
+    {
+        return new self($this->mode, $enabled);
     }
 
     public function type(): string
@@ -68,20 +75,29 @@ final class DirectionPlanningTask implements GrowthAiResearchTask
 
     public function requiresWebSearch(): bool
     {
+        if ($this->webSearch !== null) {
+            return $this->webSearch;
+        }
+
         return $this->mode !== self::MODE_ITERATE;
     }
 
     public function instructions(): string
     {
-        $modeRules = match ($this->mode) {
-            self::MODE_ITERATE => <<<'TEXT'
-TRYB: iterate. Masz previous_proposal i user_instruction. Zmień tylko to, o co prosi instrukcja. Nie przepisuj całego kierunku bez potrzeby. Nie wyszukuj w Internecie. Możesz korzystać z previous_proposal.research_sources jako już zebranego kontekstu, ale nie wymyślaj nowych URL-i i nie przedstawiaj ich jako świeżego researchu.
+        $searchOn = $this->requiresWebSearch();
+
+        $modeRules = match (true) {
+            $this->mode === self::MODE_GENERATE && $searchOn => <<<'TEXT'
+TRYB: generate + web_search. Najpierw sprawdź aktualne informacje w Internecie narzędziem web_search. Potem zaproponuj realistyczny kierunek webinaru od zera na podstawie campaign.topic, celu i daty. Nie masz poprzedniego kierunku do przepisywania. Jeśli user_instruction nie jest puste, potraktuj je jako sugestie właściciela. Nie kopiuj sugestii dosłownie do pól.
 TEXT,
-            self::MODE_REFRESH => <<<'TEXT'
-TRYB: refresh. Ponownie sprawdź aktualne informacje w Internecie (narzędzie web_search jest wymagane), potem zaktualizuj kierunek. Zachowaj to, co nadal jest prawdziwe. Oznacz w change_summary, co zmieniło się przez nowy research.
+            $this->mode === self::MODE_GENERATE && ! $searchOn => <<<'TEXT'
+TRYB: generate bez web_search. Zaproponuj realistyczny kierunek webinaru od zera na podstawie campaign.topic, celu i daty — bez wyszukiwania w Internecie. Nie wymyślaj konkretnych newsów, dat przepisów ani funkcji produktu, których nie znasz pewnie. Jeśli user_instruction nie jest puste, potraktuj je jako sugestie właściciela.
+TEXT,
+            ($this->mode === self::MODE_ITERATE || $this->mode === self::MODE_REFRESH) && $searchOn => <<<'TEXT'
+TRYB: iterate + web_search. Masz previous_proposal i user_instruction. Sprawdź aktualne informacje w Internecie narzędziem web_search, potem zaktualizuj kierunek. Zmień to, o co prosi instrukcja, oraz to, co research unieważnia. Oznacz w change_summary, co wynika z researchu.
 TEXT,
             default => <<<'TEXT'
-TRYB: generate. Najpierw sprawdź aktualne informacje w Internecie narzędziem web_search. Nie wolno pominąć wyszukiwania. Potem zaproponuj realistyczny kierunek webinaru.
+TRYB: iterate. Masz previous_proposal i user_instruction. Zmień tylko to, o co prosi instrukcja. Nie przepisuj całego kierunku bez potrzeby. Nie wyszukuj w Internecie. Możesz korzystać z previous_proposal.research_sources jako już zebranego kontekstu, ale nie wymyślaj nowych URL-i i nie przedstawiaj ich jako świeżego researchu.
 TEXT,
         };
 
@@ -284,6 +300,10 @@ PROMPT;
             requestId: $response->requestId,
             researchSources: $response->researchSources,
             webSearchUsed: $response->webSearchUsed,
+            reasoningEffort: $response->reasoningEffort,
+            selectionSource: $response->selectionSource,
+            webSearchRequested: $response->webSearchRequested,
+            webSearchNote: $response->webSearchNote,
         );
     }
 

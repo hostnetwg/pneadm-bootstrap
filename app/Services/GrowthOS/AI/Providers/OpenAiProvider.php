@@ -26,7 +26,15 @@ final class OpenAiProvider implements GrowthAiProvider
     /**
      * @param  array<string, mixed>  $input
      * @param  array<string, mixed>  $schema
-     * @param  array{web_search?: bool, require_web_search?: bool, use_research_model?: bool}  $options
+     * @param  array{
+     *     web_search?: bool,
+     *     require_web_search?: bool,
+     *     use_research_model?: bool,
+     *     model?: string,
+     *     reasoning_effort?: string,
+     *     max_output_tokens?: int,
+     *     selection_source?: string
+     * }  $options
      */
     public function generateStructured(
         string $taskType,
@@ -45,12 +53,27 @@ final class OpenAiProvider implements GrowthAiProvider
 
         $webSearch = ($options['web_search'] ?? false) === true;
         $useResearchModel = $webSearch || ($options['use_research_model'] ?? false) === true;
-        $requireWebSearch = ($options['require_web_search'] ?? false) === true;
+
+        $fallbackModel = $useResearchModel
+            ? (string) config('growth_ai.research.model', $this->model())
+            : $this->model();
+        $fallbackEffort = $useResearchModel
+            ? (string) config('growth_ai.research.reasoning_effort', 'medium')
+            : (string) config('growth_ai.reasoning_effort', 'low');
+
+        $model = trim((string) ($options['model'] ?? '')) !== ''
+            ? (string) $options['model']
+            : $fallbackModel;
+        $reasoningEffort = trim((string) ($options['reasoning_effort'] ?? '')) !== ''
+            ? (string) $options['reasoning_effort']
+            : $fallbackEffort;
+        $maxOutputTokens = isset($options['max_output_tokens']) && (int) $options['max_output_tokens'] > 0
+            ? (int) $options['max_output_tokens']
+            : (int) config('growth_ai.limits.max_output_tokens');
+        $selectionSource = (string) ($options['selection_source'] ?? '');
 
         $body = [
-            'model' => $useResearchModel
-                ? (string) config('growth_ai.research.model', $this->model())
-                : $this->model(),
+            'model' => $model,
             'instructions' => $instructions,
             'input' => [
                 [
@@ -71,13 +94,11 @@ final class OpenAiProvider implements GrowthAiProvider
                     'schema' => $schema,
                 ],
             ],
-            'max_output_tokens' => (int) config('growth_ai.limits.max_output_tokens'),
+            'max_output_tokens' => $maxOutputTokens,
             'store' => false,
-            // gpt-5* zużywa limity też na reasoning; niski effort zmniejsza ucinanie JSON.
+            // Reasoning tokens share the output budget; effort-aware max_output_tokens reduces incomplete JSON.
             'reasoning' => [
-                'effort' => $useResearchModel
-                    ? (string) config('growth_ai.research.reasoning_effort', 'medium')
-                    : (string) config('growth_ai.reasoning_effort', 'low'),
+                'effort' => $reasoningEffort,
             ],
         ];
 
@@ -91,7 +112,7 @@ final class OpenAiProvider implements GrowthAiProvider
         $response = $this->sendWithSingleRetry(
             $apiKey,
             $body,
-            $webSearch
+            $webSearch || $useResearchModel
                 ? (int) config('growth_ai.research.timeout_seconds', config('growth_ai.timeout_seconds'))
                 : (int) config('growth_ai.timeout_seconds'),
         );
@@ -127,9 +148,9 @@ final class OpenAiProvider implements GrowthAiProvider
         }
 
         $webSearchUsed = $this->webSearchWasUsed($response);
-        if ($requireWebSearch && ! $webSearchUsed) {
-            throw GrowthAiException::researchFailed('web_search_missing');
-        }
+        $webSearchNote = ($webSearch && ! $webSearchUsed)
+            ? \App\Support\GrowthOS\GrowthAiRequestOptions::WEB_SEARCH_SKIPPED_MESSAGE
+            : null;
 
         return new AiProviderResponse(
             payload: $payload,
@@ -140,7 +161,11 @@ final class OpenAiProvider implements GrowthAiProvider
             outputTokens: (int) $response->json('usage.output_tokens', 0),
             latencyMs: $latencyMs,
             webSearchUsed: $webSearchUsed,
-            researchSources: $this->extractResearchSources($response),
+            researchSources: $webSearchUsed ? $this->extractResearchSources($response) : [],
+            reasoningEffort: $reasoningEffort,
+            selectionSource: $selectionSource,
+            webSearchRequested: $webSearch,
+            webSearchNote: $webSearchNote,
         );
     }
 
