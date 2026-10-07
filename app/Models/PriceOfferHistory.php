@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\UtcImmutableDatetime;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -30,10 +31,10 @@ class PriceOfferHistory extends Model
 
     protected $casts = [
         'offered_price' => 'decimal:2',
-        'effective_from' => 'immutable_datetime',
-        'effective_to' => 'immutable_datetime',
+        'effective_from' => UtcImmutableDatetime::class,
+        'effective_to' => UtcImmutableDatetime::class,
         'excluded_from_omnibus' => 'boolean',
-        'excluded_at' => 'immutable_datetime',
+        'excluded_at' => UtcImmutableDatetime::class,
     ];
 
     public function excludedByUser(): BelongsTo

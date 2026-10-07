@@ -55,7 +55,7 @@
             <label class="form-label" for="{{ $formId }}AccessStartsAt">Start dostępu (przedsprzedaż)</label>
             <input id="{{ $formId }}AccessStartsAt" type="datetime-local" name="access_starts_at" class="form-control"
                    value="{{ old('access_starts_at', $accessStarts) }}">
-            <div class="form-text">Puste = od razu po nadaniu. Przyszła data = klient widzi kartę z datą, lekcje od tej chwili. Zmiana dotyczy tylko nowych zamówień.</div>
+            <div class="form-text">Czas polski. Puste = od razu po nadaniu. Przyszła data = klient widzi kartę z datą, lekcje od tej chwili. Zmiana dotyczy tylko nowych zamówień.</div>
         </div>
         <div class="col-md-3">
             <label class="form-label" for="{{ $formId }}AccessNote">Notatka przy dacie startu</label>
@@ -79,6 +79,7 @@
             <label class="form-label" for="{{ $formId }}AccessExpiresAt">Dostęp do</label>
             <input id="{{ $formId }}AccessExpiresAt" type="datetime-local" name="access_expires_at" class="form-control"
                    value="{{ old('access_expires_at', $accessExpires) }}">
+            <div class="form-text">Czas polski.</div>
         </div>
 
         <div class="col-md-5">
@@ -133,11 +134,13 @@
             <label class="form-label" for="{{ $formId }}PromotionStartsAt">Promocja od</label>
             <input id="{{ $formId }}PromotionStartsAt" type="datetime-local" name="promotion_starts_at" class="form-control"
                    value="{{ old('promotion_starts_at', $promotionStarts) }}">
+            <div class="form-text">Czas polski.</div>
         </div>
         <div class="col-md-4" data-promotion-group>
             <label class="form-label" for="{{ $formId }}PromotionEndsAt">Promocja do</label>
             <input id="{{ $formId }}PromotionEndsAt" type="datetime-local" name="promotion_ends_at" class="form-control"
                    value="{{ old('promotion_ends_at', $promotionEnds) }}">
+            <div class="form-text">Czas polski.</div>
         </div>
         <div class="col-12" data-promotion-group>
             <div class="form-check">

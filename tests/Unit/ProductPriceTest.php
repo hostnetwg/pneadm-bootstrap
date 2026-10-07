@@ -59,12 +59,49 @@ class ProductPriceTest extends TestCase
             'show_promotion_countdown' => true,
         ]);
         $during = CarbonImmutable::parse('2026-09-15 12:00:00', 'UTC');
+        CarbonImmutable::setTestNow($during);
 
-        $this->assertNotNull($price->promotionEndLabel($during));
-        $this->assertTrue($price->shouldShowPromotionCountdown($during));
-        $this->assertNotNull($price->promotionCountdownTargetIso());
+        try {
+            $this->assertNotNull($price->promotionEndLabel($during));
+            $this->assertTrue($price->shouldShowPromotionCountdown($during));
+            $this->assertNotNull($price->promotionCountdownTargetIso());
 
-        $price->show_promotion_countdown = false;
-        $this->assertFalse($price->shouldShowPromotionCountdown($during));
+            $price->show_promotion_countdown = false;
+            $this->assertFalse($price->shouldShowPromotionCountdown($during));
+        } finally {
+            CarbonImmutable::setTestNow();
+        }
+    }
+
+    public function test_utc_timestamp_from_database_is_shown_in_warsaw_time(): void
+    {
+        $price = new ProductPrice;
+        $price->setRawAttributes([
+            'promotion_starts_at' => '2026-10-07 05:47:00',
+            'promotion_ends_at' => '2026-10-07 05:49:00',
+            'access_starts_at' => '2026-11-01 08:00:00',
+            'access_expires_at' => '2026-07-01 07:30:00',
+            'is_promotion' => true,
+            'promotion_price' => 351,
+            'price' => 400,
+        ]);
+
+        $this->assertSame(
+            '2026-10-07T07:47',
+            $price->promotion_starts_at?->timezone('Europe/Warsaw')->format('Y-m-d\TH:i')
+        );
+        $this->assertSame(
+            '2026-10-07T07:49',
+            $price->promotion_ends_at?->timezone('Europe/Warsaw')->format('Y-m-d\TH:i')
+        );
+        $this->assertTrue($price->isPromotionActive(CarbonImmutable::parse('2026-10-07 07:48:00', 'Europe/Warsaw')));
+        $this->assertSame(
+            '2026-11-01T09:00',
+            $price->access_starts_at?->timezone('Europe/Warsaw')->format('Y-m-d\TH:i')
+        );
+        $this->assertSame(
+            '2026-07-01T09:30',
+            $price->access_expires_at?->timezone('Europe/Warsaw')->format('Y-m-d\TH:i')
+        );
     }
 }

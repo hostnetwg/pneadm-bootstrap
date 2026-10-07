@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\UtcImmutableDatetime;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -58,12 +59,12 @@ class ProductPrice extends Model
         'tax_rate' => 'decimal:4',
         'is_promotion' => 'boolean',
         'promotion_price' => 'decimal:2',
-        'promotion_starts_at' => 'immutable_datetime',
-        'promotion_ends_at' => 'immutable_datetime',
+        'promotion_starts_at' => UtcImmutableDatetime::class,
+        'promotion_ends_at' => UtcImmutableDatetime::class,
         'show_promotion_countdown' => 'boolean',
-        'access_starts_at' => 'immutable_datetime',
+        'access_starts_at' => UtcImmutableDatetime::class,
         'access_duration_value' => 'integer',
-        'access_expires_at' => 'immutable_datetime',
+        'access_expires_at' => UtcImmutableDatetime::class,
     ];
 
     public function offer(): BelongsTo

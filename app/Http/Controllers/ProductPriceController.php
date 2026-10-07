@@ -8,6 +8,7 @@ use App\Models\ProductPrice;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 class ProductPriceController extends Controller
 {
@@ -102,8 +103,8 @@ class ProductPriceController extends Controller
             $validated['promotion_ends_at'] = null;
             $validated['show_promotion_countdown'] = false;
         } else {
-            $validated['promotion_starts_at'] = $this->warsawDateToUtc($validated['promotion_starts_at'] ?? null);
-            $validated['promotion_ends_at'] = $this->warsawDateToUtc($validated['promotion_ends_at'] ?? null);
+            $validated['promotion_starts_at'] = $this->warsawDateToUtc($validated['promotion_starts_at'] ?? null, 'promotion_starts_at');
+            $validated['promotion_ends_at'] = $this->warsawDateToUtc($validated['promotion_ends_at'] ?? null, 'promotion_ends_at');
             $validated['show_promotion_countdown'] = (bool) ($validated['show_promotion_countdown'] ?? false)
                 && $validated['promotion_ends_at'] !== null;
         }
@@ -113,13 +114,13 @@ class ProductPriceController extends Controller
             $validated['access_duration_unit'] = null;
         }
 
-        $validated['access_starts_at'] = $this->warsawDateToUtc($validated['access_starts_at'] ?? null);
+        $validated['access_starts_at'] = $this->warsawDateToUtc($validated['access_starts_at'] ?? null, 'access_starts_at');
         $validated['access_note'] = $this->nullableTrim($validated['access_note'] ?? null);
 
         if ($validated['access_policy'] !== ProductPrice::ACCESS_FIXED_UNTIL) {
             $validated['access_expires_at'] = null;
         } else {
-            $validated['access_expires_at'] = $this->warsawDateToUtc($validated['access_expires_at']);
+            $validated['access_expires_at'] = $this->warsawDateToUtc($validated['access_expires_at'], 'access_expires_at');
         }
 
         return $validated;
@@ -149,12 +150,30 @@ class ProductPriceController extends Controller
         return $trimmed !== '' ? $trimmed : null;
     }
 
-    private function warsawDateToUtc(mixed $value): ?CarbonImmutable
+    private function warsawDateToUtc(mixed $value, string $field): ?CarbonImmutable
     {
         if ($value === null || trim((string) $value) === '') {
             return null;
         }
 
-        return CarbonImmutable::parse((string) $value, 'Europe/Warsaw')->utc();
+        try {
+            $parsed = CarbonImmutable::parse(trim((string) $value), 'Europe/Warsaw');
+        } catch (\Throwable) {
+            throw ValidationException::withMessages([
+                $field => 'Podaj poprawną datę i godzinę.',
+            ]);
+        }
+
+        $utc = $parsed->utc();
+        $min = CarbonImmutable::parse('1970-01-01 00:00:01', 'UTC');
+        $max = CarbonImmutable::parse('2038-01-19 03:14:07', 'UTC');
+
+        if ($utc->lt($min) || $utc->gt($max)) {
+            throw ValidationException::withMessages([
+                $field => 'Ta data jest poza zakresem zapisu. Sprawdź rok — kolumna przyjmuje daty do 19.01.2038.',
+            ]);
+        }
+
+        return $utc;
     }
 }

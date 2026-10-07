@@ -180,7 +180,8 @@ Szczegóły provision PNEDU: [FORM_ORDERS_PNEDU_PROVISION.md](./FORM_ORDERS_PNED
 - `pnedu` `ProductCheckoutTest`: katalog pokazuje 30 dni gwarancji, osoba prywatna bez oświadczenia przy natychmiastowym starcie dostaje błąd, przedsprzedaż pomija oświadczenie i zapisuje snapshot startu,
 - `pnedu` `DashboardPendingProductCoursesTest`: enrollment przed datą startu pokazuje „Dostęp od…” i blokuje lekcje,
 - `pnedu` `ProductLegalCheckoutServiceTest` + `ProductAccessExpiryServiceTest` (okres od późniejszej daty: nadanie / start),
-- `pneadm` `OnlineCourseSalesCatalogTest`: domyślna gwarancja 30, zapis `access_starts_at` / `access_note`.
+- `pneadm` `OnlineCourseSalesCatalogTest`: domyślna gwarancja 30, zapis `access_starts_at` / `access_note`,
+- `pneadm` `OnlineCourseSalesCatalogTest` + `ProductPriceTest`: data promocji i start dostępu wracają w formularzu jako czas polski (UTC w bazie); rok poza zakresem `TIMESTAMP` (np. 2926) jest błędem walidacji.
 
 ## Weryfikacja sprzedaży kursów nagranych — 2026-09-12
 

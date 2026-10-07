@@ -1,6 +1,6 @@
 # Polityka stref czasowych — pneadm + pnedu
 
-Jeden dokument kanoniczny dla obu serwisów. Ostatnia aktualizacja: 2026-07-04.
+Jeden dokument kanoniczny dla obu serwisów. Ostatnia aktualizacja: 2026-10-07.
 
 ## Dwa typy pól dat
 
@@ -79,6 +79,14 @@ sail artisan form-orders:normalize-order-dates --scope=pnedu_bug --since=2025-10
 |---------|-------|-------------|
 | `pnedu_order_form` od 2025-10-18 | UI −2 h vs rzeczywistość | `+2 HOUR` |
 | `submission_source IS NULL` | ewentualnie inny offset z importu | **nie automatyzujemy** |
+
+## Ceny kursów nagranych (`product_prices`)
+
+`promotion_starts_at`, `promotion_ends_at`, `access_starts_at`, `access_expires_at` oraz historia Omnibus (`price_offer_histories.effective_from`, `effective_to`, `excluded_at`) to momenty w **UTC** (kolumna `TIMESTAMP`, sesja `+00:00`). Długość dostępu (dni, miesiące, lata) nie jest godziną — liczy się od nadania albo od daty startu.
+
+W formularzu ADM administrator wpisuje **czas polski**. Zapis: `Europe/Warsaw` → UTC. Odczyt: cast `App\Casts\UtcImmutableDatetime` (to samo w `pnedu`), potem wyświetlenie w `Europe/Warsaw`.
+
+Nie czytać tych kolumn castem `datetime` / `immutable_datetime` — Laravel zinterpretuje godzinę UTC jako czas aplikacji i przesunie ją o 1–2 h. Zakres `TIMESTAMP` kończy się 19.01.2038; rok spoza zakresu (np. literówka 2926) wraca jako błąd formularza, nie jako 500.
 
 ## Analityka (`pne_analytics`)
 

@@ -7,6 +7,7 @@ use App\Models\Product;
 use App\Models\ProductOffer;
 use App\Models\ProductPrice;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -93,8 +94,8 @@ class OnlineCourseSalesCatalogTest extends TestCase
             ->where('name', 'Dostęp na 12 miesięcy')
             ->firstOrFail();
         $this->assertSame(
-            '2026-11-01',
-            $createdPrice->access_starts_at?->timezone('Europe/Warsaw')->format('Y-m-d')
+            '2026-11-01T09:00',
+            $createdPrice->access_starts_at?->timezone('Europe/Warsaw')->format('Y-m-d\TH:i')
         );
         $this->assertFalse($createdPrice->isComplimentary());
 
@@ -194,7 +195,59 @@ class OnlineCourseSalesCatalogTest extends TestCase
         $price = ProductPrice::query()->where('name', 'Dostęp promocyjny')->firstOrFail();
         $this->assertTrue($price->is_promotion);
         $this->assertTrue($price->show_promotion_countdown);
-        $this->assertNotNull($price->promotion_ends_at);
+        $this->assertSame(
+            '2026-09-01T00:00',
+            $price->promotion_starts_at?->timezone('Europe/Warsaw')->format('Y-m-d\TH:i')
+        );
+        $this->assertSame(
+            '2026-10-01T17:00',
+            $price->promotion_ends_at?->timezone('Europe/Warsaw')->format('Y-m-d\TH:i')
+        );
+        $this->assertSame('2026-08-31 22:00:00', $price->promotion_starts_at?->utc()->format('Y-m-d H:i:s'));
+        $this->assertTrue($price->isPromotionActive(CarbonImmutable::parse('2026-09-15 12:00:00', 'Europe/Warsaw')));
+    }
+
+    public function test_promotion_end_year_outside_timestamp_range_is_a_validation_error(): void
+    {
+        $admin = User::factory()->create(['is_active' => true]);
+        $course = OnlineCourse::query()->create([
+            'slug' => 'kurs-promocja-rok',
+            'title' => 'Kurs z rokiem poza zakresem',
+            'is_active' => true,
+            'visible_in_dashboard' => true,
+        ]);
+
+        $this->actingAs($admin)
+            ->put(route('online-courses.sales.update', $course), [
+                'product_slug' => 'kurs-promocja-rok',
+                'sales_enabled' => '1',
+                'is_public' => '1',
+                'allow_deferred_invoice' => '1',
+                'allow_payu' => '1',
+                'allow_paynow' => '1',
+            ])
+            ->assertRedirect();
+
+        $this->actingAs($admin)
+            ->from(route('online-courses.sales.edit', $course))
+            ->post(route('online-courses.sales.prices.store', $course), [
+                'name' => 'Promocja ze złym rokiem',
+                'is_active' => '1',
+                'sort_order' => '10',
+                'price' => '199.00',
+                'tax_treatment' => ProductPrice::TAX_EXEMPT,
+                'is_promotion' => '1',
+                'promotion_price' => '149.00',
+                'promotion_starts_at' => '2026-10-07T07:42',
+                'promotion_ends_at' => '2926-10-07T07:45',
+                'access_policy' => ProductPrice::ACCESS_UNLIMITED,
+            ])
+            ->assertRedirect(route('online-courses.sales.edit', $course))
+            ->assertSessionHasErrors('promotion_ends_at');
+
+        $this->assertDatabaseMissing('product_prices', [
+            'name' => 'Promocja ze złym rokiem',
+        ]);
     }
 
     public function test_admin_can_keep_course_in_catalog_with_sales_disabled(): void

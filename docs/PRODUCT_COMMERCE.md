@@ -107,7 +107,7 @@ Aktywna sprzedaż wymaga co najmniej jednego sposobu płatności.
 
 Wariant ceny za jednego uczestnika:
 
-- cena podstawowa i opcjonalna promocja (data końca, omnibus jak przy szkoleniach, opcjonalny licznik `show_promotion_countdown`),
+- cena podstawowa i opcjonalna promocja (data końca w czasie polskim, w bazie UTC; omnibus jak przy szkoleniach, opcjonalny licznik `show_promotion_countdown`),
 - waluta (MVP: PLN),
 - sposób rozliczenia VAT (`exempt` = `ZW`, `standard` = stawka procentowa),
 - reguła dostępu:
