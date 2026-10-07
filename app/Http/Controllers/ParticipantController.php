@@ -817,6 +817,9 @@ class ParticipantController extends Controller
         $customNoticeRecipientCount = $customNoticeMail->recipientCount($course);
         $customNoticeDefaultSubject = $customNoticeMail->defaultSubject($course);
         $customNoticeDefaultBody = $customNoticeMail->defaultBody($course);
+        $customNoticeSampleJoinUrl = $courseLiveMeetingEmailAvailable
+            ? $customNoticeMail->sampleJoinUrl($course)
+            : null;
 
         return view('participants.index', compact(
             'participants',
@@ -852,6 +855,7 @@ class ParticipantController extends Controller
             'customNoticeRecipientCount',
             'customNoticeDefaultSubject',
             'customNoticeDefaultBody',
+            'customNoticeSampleJoinUrl',
         ));
     }
 
@@ -1228,6 +1232,7 @@ class ParticipantController extends Controller
 
         $subject = trim($validated['subject']);
         $body = trim($validated['body']);
+        $includeLiveLink = $request->boolean('include_live_link');
         $blankErrors = [];
         if ($subject === '') {
             $blankErrors['subject'] = 'Podaj temat wiadomości.';
@@ -1239,13 +1244,14 @@ class ParticipantController extends Controller
             throw ValidationException::withMessages($blankErrors);
         }
 
-        $result = $mailService->send($course, $subject, $body, Auth::id());
+        $result = $mailService->send($course, $subject, $body, Auth::id(), $includeLiveLink);
 
         if ($result['sent'] === 0 && $result['failed'] === 0) {
-            return redirect()->route('participants.index', $course)->with(
-                'info',
-                'Nie wysłano wiadomości: brak uczestników z prawidłowym adresem e-mail.'
-            );
+            $info = $result['skipped_no_link'] > 0
+                ? 'Nie wysłano wiadomości: u uczestników brak indywidualnego linku ClickMeeting z tokenem.'
+                : 'Nie wysłano wiadomości: brak uczestników z prawidłowym adresem e-mail.';
+
+            return redirect()->route('participants.index', $course)->with('info', $info);
         }
 
         if ($result['sent'] === 0) {
@@ -1267,6 +1273,9 @@ class ParticipantController extends Controller
         }
         if ($result['skipped_invalid'] > 0) {
             $message .= ' Pominięto '.$result['skipped_invalid'].' nieprawidłowych adresów.';
+        }
+        if ($result['skipped_no_link'] > 0) {
+            $message .= ' Pominięto '.$result['skipped_no_link'].' bez linku ClickMeeting.';
         }
 
         return redirect()->route('participants.index', $course)->with('success', $message);

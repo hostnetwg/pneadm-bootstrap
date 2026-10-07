@@ -5,8 +5,11 @@ namespace Tests\Feature;
 use App\Mail\ParticipantCustomNoticeMail;
 use App\Models\CertificateEmailLog;
 use App\Models\Course;
+use App\Models\CourseOnlineDetails;
 use App\Models\Participant;
+use App\Models\ParticipantLiveAccess;
 use App\Models\User;
+use App\Services\ClickMeetingService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
 use Tests\TestCase;
@@ -135,6 +138,50 @@ class ParticipantCustomNoticeMailTest extends TestCase
         Mail::assertNothingSent();
     }
 
+    public function test_included_live_link_is_each_participants_clickmeeting_token_url(): void
+    {
+        Mail::fake();
+        config(['services.clickmeeting.token' => '']);
+        $user = User::factory()->create();
+        $course = $this->createCourse();
+        CourseOnlineDetails::query()->create([
+            'course_id' => $course->id,
+            'platform' => 'clickmeeting',
+            'clickmeeting_event_id' => '10229999',
+            'meeting_link' => 'https://pnedu.clickmeeting.com/szkolenie-test',
+        ]);
+
+        $anna = $this->addParticipant($course, 'Anna', 'anna@example.test');
+        $bartek = $this->addParticipant($course, 'Bartek', 'bartek@example.test');
+        $bezTokenu = $this->addParticipant($course, 'Cela', 'cela@example.test');
+        $this->addLiveToken($anna, 'TOK-ANNA');
+        $this->addLiveToken($bartek, 'TOK-BARTEK');
+
+        $this->actingAs($user)
+            ->post(route('participants.send-custom-notice', $course), [
+                'subject' => 'Link do spotkania',
+                'body' => "Dzień dobry,\n\nwejście: {link}",
+                'include_live_link' => '1',
+            ])
+            ->assertRedirect(route('participants.index', $course))
+            ->assertSessionHas('success');
+
+        Mail::assertSent(ParticipantCustomNoticeMail::class, 2);
+        Mail::assertSent(ParticipantCustomNoticeMail::class, function (ParticipantCustomNoticeMail $mail) {
+            return $mail->hasTo('anna@example.test')
+                && str_contains($mail->plainBody, 'https://pnedu.clickmeeting.com/szkolenie-test/TOK-ANNA')
+                && ! str_contains($mail->plainBody, 'TOK-BARTEK')
+                && ! str_contains($mail->plainBody, '{link}');
+        });
+        Mail::assertSent(ParticipantCustomNoticeMail::class, function (ParticipantCustomNoticeMail $mail) {
+            return $mail->hasTo('bartek@example.test')
+                && str_contains($mail->plainBody, 'https://pnedu.clickmeeting.com/szkolenie-test/TOK-BARTEK');
+        });
+        Mail::assertNotSent(ParticipantCustomNoticeMail::class, function (ParticipantCustomNoticeMail $mail) use ($bezTokenu) {
+            return $mail->hasTo($bezTokenu->email);
+        });
+    }
+
     private function createCourse(): Course
     {
         $start = now()->addDay();
@@ -160,6 +207,20 @@ class ParticipantCustomNoticeMailTest extends TestCase
             'first_name' => $firstName,
             'last_name' => 'Test',
             'email' => $email,
+        ]);
+    }
+
+    private function addLiveToken(Participant $participant, string $token): void
+    {
+        ParticipantLiveAccess::query()->create([
+            'participant_id' => $participant->id,
+            'course_id' => $participant->course_id,
+            'platform' => 'clickmeeting',
+            'access_type' => ClickMeetingService::ACCESS_TYPE_TOKEN,
+            'token' => $token,
+            'room_url' => 'https://pnedu.clickmeeting.com/szkolenie-test',
+            'status' => 'success',
+            'synced_at' => now(),
         ]);
     }
 }

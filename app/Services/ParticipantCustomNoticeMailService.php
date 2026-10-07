@@ -6,12 +6,21 @@ use App\Mail\ParticipantCustomNoticeMail;
 use App\Models\CertificateEmailLog;
 use App\Models\Course;
 use App\Models\Participant;
+use App\Models\ParticipantLiveAccess;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 
 class ParticipantCustomNoticeMailService
 {
+    /** W treści wiadomości: przy wysyłce zamieniane na adres tej osoby. */
+    public const LINK_PLACEHOLDER = '{link}';
+
+    public function __construct(
+        private readonly ParticipantLiveMeetingLinkMailService $liveMeetingMail,
+        private readonly ClickMeetingService $clickMeeting,
+    ) {}
+
     public function defaultSubject(Course $course): string
     {
         $subject = 'Awaria platformy ClickMeeting — '.$course->plainTitle();
@@ -91,21 +100,92 @@ TXT;
     }
 
     /**
+     * Przykładowy adres z lokalnych danych (bez odpytywania API ClickMeeting).
+     * Do podglądu w panelu. Wysyłka bierze ten sam adres co mail „Link do spotkania na żywo”.
+     */
+    public function sampleJoinUrl(Course $course): ?string
+    {
+        $course->loadMissing('onlineDetails');
+
+        $access = ParticipantLiveAccess::query()
+            ->where('course_id', $course->id)
+            ->where('status', 'success')
+            ->whereNotNull('token')
+            ->where('token', '!=', '')
+            ->orderBy('id')
+            ->first();
+
+        $room = trim((string) ($access?->room_url ?: optional($course->onlineDetails)->meeting_link));
+        if ($room === '') {
+            return null;
+        }
+
+        $token = trim((string) ($access?->token ?? ''));
+
+        return $this->clickMeeting->buildJoinUrl($room, $token !== '' ? $token : null);
+    }
+
+    /**
+     * Adres z tokenem tej osoby — ten sam, który trafia do maila z linkiem do spotkania na żywo.
+     * Przy osadzonym pokoju jest to bezpośredni link ClickMeeting (z tokenem), nie adres pnedu.pl.
+     */
+    public function personalJoinUrl(Course $course, Participant $participant): ?string
+    {
+        $context = $this->liveMeetingMail->resolveLiveContext($participant, $course);
+        if ($context === null) {
+            return null;
+        }
+
+        $direct = trim((string) ($context->directJoinUrl ?? ''));
+        if ($direct !== '') {
+            return $direct;
+        }
+
+        $join = trim((string) ($context->joinUrl ?? ''));
+
+        return $join !== '' ? $join : null;
+    }
+
+    public function bodyWithLinkPlaceholder(string $body): string
+    {
+        if (str_contains($body, self::LINK_PLACEHOLDER)) {
+            return $body;
+        }
+
+        return rtrim($body)."\n\nLink do spotkania:\n".self::LINK_PLACEHOLDER;
+    }
+
+    /**
      * Wysyłka synchroniczna — maile wychodzą w tym żądaniu, bez workera kolejki.
      *
-     * @return array{sent: int, failed: int, skipped_invalid: int, skipped_duplicate: int, first_error: ?string}
+     * @return array{sent: int, failed: int, skipped_invalid: int, skipped_duplicate: int, skipped_no_link: int, first_error: ?string}
      */
-    public function send(Course $course, string $subject, string $body, ?int $createdBy): array
+    public function send(Course $course, string $subject, string $body, ?int $createdBy, bool $includeLiveLink = false): array
     {
         set_time_limit(0);
 
         $selection = $this->recipients($course);
         $sent = 0;
         $failed = 0;
+        $skippedNoLink = 0;
         $firstError = null;
+        $bodyTemplate = $includeLiveLink ? $this->bodyWithLinkPlaceholder($body) : $body;
 
         foreach ($selection['recipients'] as $participant) {
             $email = trim((string) $participant->email);
+            $bodyForParticipant = $bodyTemplate;
+
+            if ($includeLiveLink) {
+                $joinUrl = $this->personalJoinUrl($course, $participant);
+                if ($joinUrl === null) {
+                    $skippedNoLink++;
+
+                    continue;
+                }
+
+                $bodyForParticipant = str_replace(self::LINK_PLACEHOLDER, $joinUrl, $bodyTemplate);
+            }
+
             $log = CertificateEmailLog::create([
                 'course_id' => $course->id,
                 'participant_id' => $participant->id,
@@ -117,11 +197,12 @@ TXT;
                     'subject' => $subject,
                     'manual' => true,
                     'bulk' => true,
+                    'include_live_link' => $includeLiveLink,
                 ],
             ]);
 
             try {
-                Mail::to($email)->send(new ParticipantCustomNoticeMail($course, $body, $subject));
+                Mail::to($email)->send(new ParticipantCustomNoticeMail($course, $bodyForParticipant, $subject));
                 $log->update([
                     'status' => CertificateEmailLog::STATUS_SENT,
                     'sent_at' => now(),
@@ -148,6 +229,7 @@ TXT;
             'failed' => $failed,
             'skipped_invalid' => $selection['skipped_invalid'],
             'skipped_duplicate' => $selection['skipped_duplicate'],
+            'skipped_no_link' => $skippedNoLink,
             'first_error' => $firstError,
         ];
     }

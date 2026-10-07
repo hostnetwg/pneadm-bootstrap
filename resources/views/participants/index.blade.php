@@ -1168,7 +1168,9 @@
         </div>
         @endif
 
-        <div class="modal fade" id="customNoticeModal" tabindex="-1" aria-labelledby="customNoticeModalLabel" aria-hidden="true">
+        <div class="modal fade" id="customNoticeModal" tabindex="-1" aria-labelledby="customNoticeModalLabel" aria-hidden="true"
+             data-sample-link="{{ e($customNoticeSampleJoinUrl ?? '') }}"
+             data-link-placeholder="{{ \App\Services\ParticipantCustomNoticeMailService::LINK_PLACEHOLDER }}">
             <div class="modal-dialog modal-lg modal-dialog-scrollable">
                 <div class="modal-content">
                     <div class="modal-header bg-danger text-white">
@@ -1215,6 +1217,22 @@
                                     @enderror
                                     <div class="form-text">Zwykły tekst. Adresy zaczynające się od http:// lub https:// staną się linkami. Łamanie linii zostaje.</div>
                                 </div>
+                                @if($courseLiveMeetingEmailAvailable ?? false)
+                                    <div class="form-check mt-3">
+                                        <input class="form-check-input" type="checkbox" value="1" id="customNoticeIncludeLink" name="include_live_link" @checked(old('include_live_link'))>
+                                        <label class="form-check-label" for="customNoticeIncludeLink">
+                                            Dołącz link do spotkania ClickMeeting
+                                        </label>
+                                        <div class="form-text">
+                                            Ten sam adres co w mailu „Link do spotkania na żywo”: pokój plus indywidualny token tej osoby.
+                                            W treści wstaw <code>{{ \App\Services\ParticipantCustomNoticeMailService::LINK_PLACEHOLDER }}</code> tam, gdzie ma się pojawić.
+                                            Bez tego znacznika link dołoży się na końcu.
+                                        </div>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary mt-2" id="customNoticeInsertLink">
+                                            Wstaw {{ \App\Services\ParticipantCustomNoticeMailService::LINK_PLACEHOLDER }}
+                                        </button>
+                                    </div>
+                                @endif
                             </div>
                             <div id="customNoticePreview" class="d-none">
                                 <p class="mb-3">
@@ -1229,6 +1247,9 @@
                                 <div>
                                     <div class="form-label fw-bold">Treść</div>
                                     <div class="border rounded p-3 bg-white" id="customNoticePreviewBody" style="white-space:pre-wrap;"></div>
+                                    <p class="small text-muted d-none mt-2 mb-0" id="customNoticePreviewLinkNote">
+                                        W podglądzie jest przykładowy link. Każdy uczestnik dostanie własny adres z jego tokenem ClickMeeting.
+                                    </p>
                                 </div>
                             </div>
                         </div>
@@ -1705,6 +1726,11 @@
             var previewBody = document.getElementById('customNoticePreviewBody');
             var showBtn = document.getElementById('customNoticeShowPreview');
             var backBtn = document.getElementById('customNoticeBackToEdit');
+            var includeLink = document.getElementById('customNoticeIncludeLink');
+            var insertLinkBtn = document.getElementById('customNoticeInsertLink');
+            var previewLinkNote = document.getElementById('customNoticePreviewLinkNote');
+            var linkPlaceholder = modalEl ? (modalEl.getAttribute('data-link-placeholder') || '{link}') : '{link}';
+            var sampleLink = modalEl ? (modalEl.getAttribute('data-sample-link') || '') : '';
             if (!modalEl || !compose || !preview || !subject || !body) return;
 
             function showCompose() {
@@ -1722,12 +1748,36 @@
                     body.reportValidity();
                     return;
                 }
+                var withPersonalLink = includeLink && includeLink.checked;
+                if (withPersonalLink && bodyText.indexOf(linkPlaceholder) === -1) {
+                    bodyText = bodyText.replace(/\s*$/, '') + '\n\nLink do spotkania:\n' + linkPlaceholder;
+                }
+                if (withPersonalLink) {
+                    var replacement = sampleLink !== '' ? sampleLink : '[indywidualny link ClickMeeting z tokenem tej osoby]';
+                    bodyText = bodyText.split(linkPlaceholder).join(replacement);
+                }
                 previewSubject.textContent = subjectText;
                 previewBody.textContent = bodyText;
+                if (previewLinkNote) {
+                    previewLinkNote.classList.toggle('d-none', !withPersonalLink);
+                }
                 compose.classList.add('d-none');
                 composeFooter.classList.add('d-none');
                 preview.classList.remove('d-none');
                 previewFooter.classList.remove('d-none');
+            }
+
+            if (insertLinkBtn) {
+                insertLinkBtn.addEventListener('click', function () {
+                    var start = body.selectionStart || 0;
+                    var end = body.selectionEnd || 0;
+                    var insert = (start > 0 && body.value.charAt(start - 1) !== '\n' ? '\n' : '') + linkPlaceholder;
+                    body.value = body.value.slice(0, start) + insert + body.value.slice(end);
+                    body.focus();
+                    var caret = start + insert.length;
+                    body.selectionStart = body.selectionEnd = caret;
+                    if (includeLink) includeLink.checked = true;
+                });
             }
 
             if (showBtn) showBtn.addEventListener('click', showPreview);
