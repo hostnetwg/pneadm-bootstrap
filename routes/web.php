@@ -634,6 +634,7 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
         Route::post('/{participant}/send-live-meeting-link', [ParticipantController::class, 'sendLiveMeetingLink'])->name('participants.send-live-meeting-link'); // E-mail z linkiem live CM
         Route::post('/{participant}/send-access-expiry-reminder', [ParticipantController::class, 'sendAccessExpiryReminder'])->name('participants.send-access-expiry-reminder'); // Przypomnienie o wygaśnięciu dostępu
         Route::post('/send-live-meeting-links-bulk', [ParticipantController::class, 'sendLiveMeetingLinksBulk'])->name('participants.send-live-meeting-links-bulk'); // Masowa wysyłka linków live CM
+        Route::post('/send-custom-notice', [ParticipantController::class, 'sendCustomNotice'])->name('participants.send-custom-notice'); // Dowolna wiadomość do wszystkich uczestników
         Route::post('/send-access-expiry-reminders-bulk', [ParticipantController::class, 'sendAccessExpiryRemindersBulk'])->name('participants.send-access-expiry-reminders-bulk'); // Masowa wysyłka przypomnień o wygaśnięciu dostępu
         Route::post('/send-certificate-links-bulk', [ParticipantController::class, 'sendCertificateLinksBulk'])->name('participants.send-certificate-links-bulk'); // Masowa wysyłka linków do zaświadczeń
         Route::post('/bulk-access-expires', [ParticipantController::class, 'bulkSetAccessExpires'])->name('participants.bulk-set-access-expires'); // Masowe ustawienie daty wygaśnięcia dostępu

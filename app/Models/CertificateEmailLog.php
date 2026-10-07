@@ -19,6 +19,9 @@ class CertificateEmailLog extends Model
 
     public const TYPE_LIVE_MEETING_LINK = 'live_meeting_link';
 
+    /** Dowolna wiadomość z listy uczestników (temat i treść wpisane w panelu). */
+    public const TYPE_CUSTOM_NOTICE = 'custom_notice';
+
     /** Klucz agregowany (nie zapisywany w DB): lista lub pojedyncze zaświadczenie. */
     public const AGGREGATE_CERTIFICATE_LINK = 'certificate_link';
 

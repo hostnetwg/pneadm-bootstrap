@@ -82,6 +82,9 @@
                     <a href="{{ route('courses.live', $course->id) }}" class="btn btn-success">
                         <i class="fas fa-broadcast-tower me-1"></i> Panel live
                     </a>
+                    <button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#customNoticeModal">
+                        <i class="fas fa-envelope me-1"></i> Wyślij wiadomość do wszystkich
+                    </button>
                     <a href="{{ route('participants.create', $course) }}" class="btn btn-primary">
                         <i class="fas fa-plus me-1"></i> Dodaj uczestnika
                     </a>
@@ -1165,6 +1168,91 @@
         </div>
         @endif
 
+        <div class="modal fade" id="customNoticeModal" tabindex="-1" aria-labelledby="customNoticeModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header bg-danger text-white">
+                        <h5 class="modal-title" id="customNoticeModalLabel">
+                            <i class="fas fa-envelope me-2"></i>Wiadomość do wszystkich uczestników
+                        </h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+                    </div>
+                    <form action="{{ route('participants.send-custom-notice', $course) }}" method="POST" data-loading-submit data-loading-text="Wysyłam…">
+                        @csrf
+                        <div class="modal-body">
+                            <div id="customNoticeCompose">
+                                <p class="mb-3">
+                                    Ta sama wiadomość trafi do uczestników tego szkolenia, którzy mają prawidłowy adres e-mail
+                                    (<strong>{{ (int) ($customNoticeRecipientCount ?? 0) }}</strong>).
+                                    Powtórzony adres dostanie ją raz. Możesz zmienić temat i treść — poniżej jest propozycja na wypadek awarii ClickMeeting.
+                                </p>
+                                @if((int) ($customNoticeRecipientCount ?? 0) < 1)
+                                    <div class="alert alert-warning">Brak uczestników z prawidłowym adresem e-mail. Nie ma do kogo wysłać wiadomości.</div>
+                                @endif
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold" for="customNoticeSubject">Temat</label>
+                                    <input type="text"
+                                           class="form-control @error('subject') is-invalid @enderror"
+                                           id="customNoticeSubject"
+                                           name="subject"
+                                           value="{{ old('subject', $customNoticeDefaultSubject ?? '') }}"
+                                           maxlength="180"
+                                           required>
+                                    @error('subject')
+                                        <div class="invalid-feedback d-block">{{ $message }}</div>
+                                    @enderror
+                                </div>
+                                <div class="mb-0">
+                                    <label class="form-label fw-bold" for="customNoticeBody">Treść wiadomości</label>
+                                    <textarea class="form-control font-monospace @error('body') is-invalid @enderror"
+                                              id="customNoticeBody"
+                                              name="body"
+                                              rows="14"
+                                              maxlength="20000"
+                                              required>{{ old('body', $customNoticeDefaultBody ?? '') }}</textarea>
+                                    @error('body')
+                                        <div class="invalid-feedback d-block">{{ $message }}</div>
+                                    @enderror
+                                    <div class="form-text">Zwykły tekst. Adresy zaczynające się od http:// lub https:// staną się linkami. Łamanie linii zostaje.</div>
+                                </div>
+                            </div>
+                            <div id="customNoticePreview" class="d-none">
+                                <p class="mb-3">
+                                    Taką wiadomość dostanie <strong>{{ (int) ($customNoticeRecipientCount ?? 0) }}</strong>
+                                    {{ (int) ($customNoticeRecipientCount ?? 0) === 1 ? 'osoba' : 'osób' }}.
+                                    Wysyłka idzie od razu, po kolei. Nie zamykaj tej strony, aż pojawi się potwierdzenie.
+                                </p>
+                                <div class="mb-3">
+                                    <div class="form-label fw-bold">Temat</div>
+                                    <div class="border rounded p-2 bg-light" id="customNoticePreviewSubject"></div>
+                                </div>
+                                <div>
+                                    <div class="form-label fw-bold">Treść</div>
+                                    <div class="border rounded p-3 bg-white" id="customNoticePreviewBody" style="white-space:pre-wrap;"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-footer" id="customNoticeComposeFooter">
+                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                                <i class="fas fa-times me-1"></i>Anuluj
+                            </button>
+                            <button type="button" class="btn btn-danger" id="customNoticeShowPreview" @disabled((int) ($customNoticeRecipientCount ?? 0) < 1)>
+                                <i class="fas fa-eye me-1"></i>Podgląd przed wysłaniem
+                            </button>
+                        </div>
+                        <div class="modal-footer d-none" id="customNoticePreviewFooter">
+                            <button type="button" class="btn btn-outline-secondary" id="customNoticeBackToEdit">
+                                <i class="fas fa-pen me-1"></i>Wróć do edycji
+                            </button>
+                            <button type="submit" class="btn btn-danger" data-loading-text="Wysyłam…">
+                                <i class="fas fa-paper-plane me-1"></i>Wyślij teraz
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
         @include('participants.partials.form-confirm-modal')
 
     </div>
@@ -1603,6 +1691,52 @@
                 var activeType = results[0] || results[1] || results[2] || results[3] || results[4];
                 if (activeType) startEmailPolling(alertEl, activeType);
             });
+        })();
+
+        (function customNoticePreview() {
+            var modalEl = document.getElementById('customNoticeModal');
+            var compose = document.getElementById('customNoticeCompose');
+            var preview = document.getElementById('customNoticePreview');
+            var composeFooter = document.getElementById('customNoticeComposeFooter');
+            var previewFooter = document.getElementById('customNoticePreviewFooter');
+            var subject = document.getElementById('customNoticeSubject');
+            var body = document.getElementById('customNoticeBody');
+            var previewSubject = document.getElementById('customNoticePreviewSubject');
+            var previewBody = document.getElementById('customNoticePreviewBody');
+            var showBtn = document.getElementById('customNoticeShowPreview');
+            var backBtn = document.getElementById('customNoticeBackToEdit');
+            if (!modalEl || !compose || !preview || !subject || !body) return;
+
+            function showCompose() {
+                compose.classList.remove('d-none');
+                composeFooter.classList.remove('d-none');
+                preview.classList.add('d-none');
+                previewFooter.classList.add('d-none');
+            }
+
+            function showPreview() {
+                var subjectText = subject.value.trim();
+                var bodyText = body.value.trim();
+                if (subjectText === '' || bodyText === '') {
+                    subject.reportValidity();
+                    body.reportValidity();
+                    return;
+                }
+                previewSubject.textContent = subjectText;
+                previewBody.textContent = bodyText;
+                compose.classList.add('d-none');
+                composeFooter.classList.add('d-none');
+                preview.classList.remove('d-none');
+                previewFooter.classList.remove('d-none');
+            }
+
+            if (showBtn) showBtn.addEventListener('click', showPreview);
+            if (backBtn) backBtn.addEventListener('click', showCompose);
+            modalEl.addEventListener('hidden.bs.modal', showCompose);
+
+            @if($errors->has('subject') || $errors->has('body'))
+            new bootstrap.Modal(modalEl).show();
+            @endif
         })();
 
         document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function(el) {

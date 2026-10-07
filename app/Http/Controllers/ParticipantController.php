@@ -19,6 +19,7 @@ use App\Models\PneduUser;
 use App\Services\Mail\SystemMailDiagnostics;
 use App\Services\ParticipantAccessExpiryReminderService;
 use App\Services\ParticipantAccessExpiryService;
+use App\Services\ParticipantCustomNoticeMailService;
 use App\Services\ParticipantLiveAccessService;
 use App\Services\ParticipantLiveMeetingLinkMailService;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -812,6 +813,11 @@ class ParticipantController extends Controller
             ? $liveMeetingMailService->eligibleParticipantsCount($course, 'unsent')
             : 0;
 
+        $customNoticeMail = app(ParticipantCustomNoticeMailService::class);
+        $customNoticeRecipientCount = $customNoticeMail->recipientCount($course);
+        $customNoticeDefaultSubject = $customNoticeMail->defaultSubject($course);
+        $customNoticeDefaultBody = $customNoticeMail->defaultBody($course);
+
         return view('participants.index', compact(
             'participants',
             'course',
@@ -843,6 +849,9 @@ class ParticipantController extends Controller
             'courseLiveMeetingRequiresToken',
             'courseLiveMeetingEligibleCount',
             'courseLiveMeetingUnsentCount',
+            'customNoticeRecipientCount',
+            'customNoticeDefaultSubject',
+            'customNoticeDefaultBody',
         ));
     }
 
@@ -1200,6 +1209,67 @@ class ParticipantController extends Controller
             'success',
             "Wysłano {$sent} e-maili z linkiem do spotkania na żywo."
         );
+    }
+
+    /**
+     * Dowolna wiadomość (temat i treść z panelu) do wszystkich uczestników kursu z adresem e-mail.
+     */
+    public function sendCustomNotice(Request $request, Course $course, ParticipantCustomNoticeMailService $mailService)
+    {
+        $validated = $request->validate([
+            'subject' => ['required', 'string', 'max:180'],
+            'body' => ['required', 'string', 'max:20000'],
+        ], [
+            'subject.required' => 'Podaj temat wiadomości.',
+            'subject.max' => 'Temat może mieć najwyżej 180 znaków.',
+            'body.required' => 'Podaj treść wiadomości.',
+            'body.max' => 'Treść może mieć najwyżej 20 000 znaków.',
+        ]);
+
+        $subject = trim($validated['subject']);
+        $body = trim($validated['body']);
+        $blankErrors = [];
+        if ($subject === '') {
+            $blankErrors['subject'] = 'Podaj temat wiadomości.';
+        }
+        if ($body === '') {
+            $blankErrors['body'] = 'Podaj treść wiadomości.';
+        }
+        if ($blankErrors !== []) {
+            throw ValidationException::withMessages($blankErrors);
+        }
+
+        $result = $mailService->send($course, $subject, $body, Auth::id());
+
+        if ($result['sent'] === 0 && $result['failed'] === 0) {
+            return redirect()->route('participants.index', $course)->with(
+                'info',
+                'Nie wysłano wiadomości: brak uczestników z prawidłowym adresem e-mail.'
+            );
+        }
+
+        if ($result['sent'] === 0) {
+            return redirect()->route('participants.index', $course)->with(
+                'error',
+                'Nie udało się wysłać wiadomości.'.($result['first_error'] ? ' '.$result['first_error'] : '')
+            );
+        }
+
+        $message = 'Wysłano wiadomość do '.$result['sent'].' '.($result['sent'] === 1 ? 'adresu' : 'adresów').'.';
+        if ($result['failed'] > 0) {
+            $message .= ' Nie udało się wysłać '.$result['failed'].'.';
+            if ($result['first_error']) {
+                $message .= ' Przykładowy błąd: '.$result['first_error'];
+            }
+        }
+        if ($result['skipped_duplicate'] > 0) {
+            $message .= ' Pominięto '.$result['skipped_duplicate'].' powtórzonych adresów.';
+        }
+        if ($result['skipped_invalid'] > 0) {
+            $message .= ' Pominięto '.$result['skipped_invalid'].' nieprawidłowych adresów.';
+        }
+
+        return redirect()->route('participants.index', $course)->with('success', $message);
     }
 
     /**

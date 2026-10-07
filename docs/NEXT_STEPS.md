@@ -1,7 +1,11 @@
 # Następne Kroki
 
-Data utworzenia/aktualizacji: 2026-10-03
+Data utworzenia/aktualizacji: 2026-10-07
 Status: plan roboczy, do potwierdzenia przez właściciela
+
+## Ostatnio (2026-10-07) — Wiadomość do wszystkich uczestników szkolenia
+
+Na liście uczestników (`/courses/{id}/participants`) jest **Wyślij wiadomość do wszystkich**: temat i treść do edycji, podgląd, potem wysyłka od razu na unikalne adresy. Startowa treść dotyczy awarii ClickMeeting. Bez migracji. Kanon: [FORM_ORDERS_PNEDU_PROVISION.md](./FORM_ORDERS_PNEDU_PROVISION.md).
 
 ## Ostatnio (2026-10-04) — Szablony i Tiptap na mailingu głównym (DEC-049)
 

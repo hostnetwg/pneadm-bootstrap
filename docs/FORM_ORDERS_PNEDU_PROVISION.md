@@ -226,6 +226,7 @@ Routes:
   - pokój z tokenami (`access_type = 3`): tylko uczestnicy z tokenem
   - pokój bez tokenu: wszyscy z e-mailem, wspólny `room_url` / `meeting_link`
   - kolejka: `SendLiveMeetingLinkEmailJob`, log `certificate_email_logs.type = live_meeting_link`
+- `POST /courses/{course}/participants/send-custom-notice` — dowolna wiadomość do wszystkich uczestników szkolenia z prawidłowym adresem e-mail (jeden mail na unikalny adres). Na liście uczestników: **Wyślij wiadomość do wszystkich**. Temat i treść są edytowalne; przed wysłaniem jest podgląd. Startowa treść to informacja o awarii ClickMeeting — można ją w całości zastąpić. Wysyłka synchroniczna (bez workera kolejki), poczta systemowa. Log: `certificate_email_logs.type = custom_notice` (w meta tylko temat, bez treści).
 
 ## Cleanup tokenów po szkoleniu
 
