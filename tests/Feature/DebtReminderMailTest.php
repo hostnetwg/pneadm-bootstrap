@@ -69,6 +69,8 @@ class DebtReminderMailTest extends TestCase
             $html
         );
         $response->assertSee('debt-reminder-recipient-checkbox', false);
+        $response->assertSee('id="debtReminderSendTarget"', false);
+        $response->assertSee('name="send_target"', false);
         $response->assertSee('Zamawiający', false);
         $response->assertSee('dluznik@example.test', false);
         $response->assertDontSee('debtReminderRecipientKey', false);
@@ -206,6 +208,31 @@ class DebtReminderMailTest extends TestCase
 
         $response->assertRedirect(route('accounting.collections.show', $case));
         $response->assertSessionHasErrors('recipient_emails');
+        Mail::assertNothingSent();
+    }
+
+    public function test_missing_send_target_shows_polish_validation_message(): void
+    {
+        Mail::fake();
+        [$user, $case] = $this->caseWithOrder();
+
+        $response = $this->actingAs($user)->from(route('accounting.collections.show', $case))->post(
+            route('accounting.collections.send-reminder', $case),
+            [
+                'template' => 'reminder',
+                'subject' => 'Temat',
+                'body' => 'Treść',
+                'recipient_emails' => ['dluznik@example.test'],
+            ]
+        );
+
+        $response->assertRedirect(route('accounting.collections.show', $case));
+        $response->assertSessionHasErrors('send_target');
+        $errors = session('errors');
+        $this->assertNotNull($errors);
+        $message = $errors->first('send_target');
+        $this->assertStringNotContainsString('validation.required', $message);
+        $this->assertStringContainsString('dłużnika', $message);
         Mail::assertNothingSent();
     }
 

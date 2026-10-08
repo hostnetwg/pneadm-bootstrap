@@ -1296,6 +1296,8 @@
                           data-loading-submit
                           data-loading-text="Wysyłam…">
                         @csrf
+                        {{-- Ukryte: Enter / niektóre przeglądarki nie wysyłają name z button[type=submit]. --}}
+                        <input type="hidden" name="send_target" id="debtReminderSendTarget" value="{{ old('send_target', 'recipient') }}">
                         <div class="mb-3">
                             <label class="form-label fw-bold" for="debtReminderTemplate">Szablon</label>
                             <select class="form-select" id="debtReminderTemplate" name="template">
@@ -1467,10 +1469,10 @@
                             <div class="form-text">Opcjonalnie, max 5 MB.</div>
                         </div>
                         <div class="d-flex flex-wrap gap-2">
-                            <button type="submit" name="send_target" value="recipient" class="btn btn-primary" data-loading-text="Wysyłam…">
+                            <button type="submit" class="btn btn-primary debt-reminder-send-btn" data-send-target="recipient" data-loading-text="Wysyłam…">
                                 <i class="bi bi-envelope me-1"></i>Wyślij e-mail do dłużnika
                             </button>
-                            <button type="submit" name="send_target" value="test" class="btn btn-outline-primary" data-loading-text="Wysyłam test…">
+                            <button type="submit" class="btn btn-outline-primary debt-reminder-send-btn" data-send-target="test" data-loading-text="Wysyłam test…">
                                 <i class="bi bi-flask me-1"></i>Wyślij e-mail testowy
                             </button>
                         </div>
@@ -1798,6 +1800,16 @@
                     clearBtn.addEventListener('click', function () {
                         recipientCheckboxes().forEach(function (el) {
                             el.checked = false;
+                        });
+                    });
+                }
+
+                var sendTargetInput = document.getElementById('debtReminderSendTarget');
+                var reminderForm = document.getElementById('formDebtReminder');
+                if (reminderForm && sendTargetInput) {
+                    reminderForm.querySelectorAll('.debt-reminder-send-btn').forEach(function (btn) {
+                        btn.addEventListener('click', function () {
+                            sendTargetInput.value = btn.getAttribute('data-send-target') || 'recipient';
                         });
                     });
                 }

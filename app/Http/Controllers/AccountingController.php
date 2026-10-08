@@ -714,7 +714,28 @@ class AccountingController extends Controller
             $rules['test_email'] = ['required', 'email', 'max:255'];
         }
 
-        $validated = $request->validate($rules);
+        $validated = $request->validate($rules, [
+            'subject.required' => 'Podaj temat wiadomości.',
+            'body.required' => 'Podaj treść wiadomości.',
+            'template.required' => 'Wybierz szablon wiadomości.',
+            'send_target.required' => 'Wybierz, czy wysłać do dłużnika, czy e-mail testowy.',
+            'send_target.in' => 'Wybierz, czy wysłać do dłużnika, czy e-mail testowy.',
+            'test_email.required' => 'Podaj e-mail testowy.',
+            'test_email.email' => 'E-mail testowy ma nieprawidłowy format.',
+            'recipient_email.email' => 'Dodatkowy e-mail ma nieprawidłowy format.',
+            'recipient_emails.*.email' => 'Jeden z zaznaczonych adresów ma nieprawidłowy format.',
+            'attachment.mimes' => 'Załącznik musi być plikiem PDF.',
+            'attachment.max' => 'Załącznik może mieć max 5 MB.',
+        ], [
+            'subject' => 'temat',
+            'body' => 'treść wiadomości',
+            'template' => 'szablon',
+            'send_target' => 'cel wysyłki',
+            'test_email' => 'e-mail testowy',
+            'recipient_email' => 'dodatkowy e-mail',
+            'recipient_emails' => 'odbiorcy',
+            'attachment' => 'załącznik',
+        ]);
         $isTest = $validated['send_target'] === 'test';
 
         if ($isTest) {
