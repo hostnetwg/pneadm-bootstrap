@@ -6,6 +6,7 @@ use App\Models\DebtCase;
 use App\Models\DebtCaseAction;
 use App\Models\FormOrder;
 use App\Models\User;
+use App\Services\DebtReminderTemplateService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
@@ -84,6 +85,29 @@ class DebtReminderSmsTest extends TestCase
         $response->assertSee('Wyślij SMS', false);
         $response->assertSee('+48 501 111 222', false);
         $response->assertSee('0 SMS-ów', false);
+        $response->assertSee('Dodaj nazwę produktu po numerze FV', false);
+        $response->assertSee('debtReminderSmsIncludeTraining', false);
+        $response->assertSee('SZKOLENIE: Szkolenie SMS', false);
+    }
+
+    public function test_sms_training_snippet_shortens_long_title(): void
+    {
+        [, $case] = $this->caseWithOrder([
+            'product_name' => 'Bardzo długi tytuł szkolenia z zarządzania projektami edukacyjnymi i coachingiem',
+        ]);
+
+        $templates = app(DebtReminderTemplateService::class);
+        $snippet = $templates->smsTrainingSnippet($case, 40);
+
+        $this->assertNotNull($snippet);
+        $this->assertStringStartsWith(' SZKOLENIE: ', $snippet);
+        $this->assertStringEndsWith('...', $snippet);
+        $this->assertSame('FV 100/9/2026', $templates->smsInvoiceMarker($case));
+
+        $payload = $templates->buildSms($case, DebtReminderTemplateService::TEMPLATE_REMINDER);
+        $this->assertStringContainsString('FV 100/9/2026 na', $payload['body']);
+        $this->assertStringNotContainsString('SZKOLENIE:', $payload['body']);
+        $this->assertSame($snippet, $payload['training_snippet']);
     }
 
     public function test_real_sms_send_logs_action_and_increments_counter(): void

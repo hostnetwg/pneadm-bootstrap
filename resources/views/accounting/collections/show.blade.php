@@ -1625,8 +1625,14 @@
         </div>
     </div>
 
+    @php
+        $smsTrainingSnippet = $reminderSmsTrainingSnippet ?? null;
+        $smsInvoiceMarker = $reminderSmsInvoiceMarker ?? '';
+    @endphp
     <div class="modal fade" id="debtReminderSmsModal" tabindex="-1" aria-labelledby="debtReminderSmsModalLabel" aria-hidden="true"
-         data-templates='@json($reminderSmsTemplatePayloads ?? [])'>
+         data-templates='@json($reminderSmsTemplatePayloads ?? [])'
+         data-training-snippet='@json($smsTrainingSnippet)'
+         data-invoice-marker='@json($smsInvoiceMarker)'>
         <div class="modal-dialog modal-dialog-scrollable">
             <div class="modal-content">
                 <div class="modal-header bg-primary text-white">
@@ -1668,6 +1674,27 @@
                                     </option>
                                 @endforeach
                             </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <input type="hidden" name="include_sms_training" value="0">
+                            <div class="form-check">
+                                <input class="form-check-input"
+                                       type="checkbox"
+                                       value="1"
+                                       id="debtReminderSmsIncludeTraining"
+                                       name="include_sms_training"
+                                       @checked((string) old('include_sms_training', '0') === '1')
+                                       @disabled($smsTrainingSnippet === null)>
+                                <label class="form-check-label" for="debtReminderSmsIncludeTraining">
+                                    Dodaj nazwę produktu po numerze FV
+                                    @if($smsTrainingSnippet)
+                                        <span class="text-muted d-block small font-monospace">{{ ltrim($smsTrainingSnippet) }}</span>
+                                    @else
+                                        <span class="text-muted d-block small">Brak tytułu szkolenia / produktu na zamówieniu.</span>
+                                    @endif
+                                </label>
+                            </div>
                         </div>
 
                         <div class="mb-3">
@@ -2105,10 +2132,24 @@
                     templates = {};
                 }
 
+                var trainingSnippet = '';
+                var invoiceMarker = '';
+                try {
+                    trainingSnippet = JSON.parse(modalEl.getAttribute('data-training-snippet') || 'null') || '';
+                } catch (e) {
+                    trainingSnippet = '';
+                }
+                try {
+                    invoiceMarker = JSON.parse(modalEl.getAttribute('data-invoice-marker') || '""') || '';
+                } catch (e) {
+                    invoiceMarker = '';
+                }
+
                 var templateSelect = document.getElementById('debtReminderSmsTemplate');
                 var bodyInput = document.getElementById('debtReminderSmsBody');
                 var lengthEl = document.getElementById('debtReminderSmsLength');
                 var partsEl = document.getElementById('debtReminderSmsParts');
+                var trainingCheckbox = document.getElementById('debtReminderSmsIncludeTraining');
                 var keepEdited = {{ old('body') && old('test_phone') !== null ? 'true' : 'false' }};
 
                 function estimateParts(text) {
@@ -2128,12 +2169,49 @@
                     if (partsEl) partsEl.textContent = String(estimateParts(text));
                 }
 
+                function stripTrainingSnippet(text) {
+                    if (!trainingSnippet || !text) {
+                        return text || '';
+                    }
+                    var escaped = trainingSnippet.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                    return text.replace(new RegExp(escaped, 'g'), '');
+                }
+
+                function insertTrainingAfterInvoice(text) {
+                    var base = stripTrainingSnippet(text || '');
+                    if (!trainingSnippet) {
+                        return base;
+                    }
+                    if (!invoiceMarker) {
+                        return base + trainingSnippet;
+                    }
+                    var pos = base.indexOf(invoiceMarker);
+                    if (pos === -1) {
+                        return base + trainingSnippet;
+                    }
+                    var at = pos + invoiceMarker.length;
+                    return base.slice(0, at) + trainingSnippet + base.slice(at);
+                }
+
+                function syncTrainingSnippet() {
+                    if (!bodyInput) {
+                        return;
+                    }
+                    var include = trainingCheckbox && trainingCheckbox.checked && trainingSnippet;
+                    bodyInput.value = include
+                        ? insertTrainingAfterInvoice(bodyInput.value)
+                        : stripTrainingSnippet(bodyInput.value);
+                    updateCounters();
+                }
+
                 function applyTemplate(force) {
                     if (!templateSelect || !bodyInput) return;
                     var payload = templates[templateSelect.value];
                     if (!payload) return;
                     if (force || !bodyInput.value) {
                         bodyInput.value = payload.body || '';
+                        syncTrainingSnippet();
+                        return;
                     }
                     updateCounters();
                 }
@@ -2142,6 +2220,9 @@
                     templateSelect.addEventListener('change', function () {
                         applyTemplate(true);
                     });
+                }
+                if (trainingCheckbox) {
+                    trainingCheckbox.addEventListener('change', syncTrainingSnippet);
                 }
                 if (bodyInput) {
                     bodyInput.addEventListener('input', updateCounters);
@@ -2158,6 +2239,9 @@
                 }
 
                 applyTemplate(!keepEdited);
+                if (keepEdited) {
+                    syncTrainingSnippet();
+                }
                 updateCounters();
 
                 @if($errors->has('test_phone') || ($errors->has('body') && old('test_phone') !== null) || ($errors->has('send_target') && old('test_phone') !== null))

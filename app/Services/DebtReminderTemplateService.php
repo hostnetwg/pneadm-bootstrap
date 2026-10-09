@@ -458,7 +458,50 @@ class DebtReminderTemplateService
     }
 
     /**
-     * @return array{body: string}
+     * Fragment wstawiany po numerze FV w SMS (opcjonalnie, checkbox w modalu).
+     * Przykład: ` SZKOLENIE: Tytuł skrócony...`
+     */
+    public function smsTrainingSnippet(DebtCase $case, int $maxTitleChars = 40): ?string
+    {
+        $order = $case->formOrder;
+        if ($order !== null && ! $order->relationLoaded('course')) {
+            $order->loadMissing('course');
+        }
+
+        $title = trim($this->trainingContext($order)['title']);
+        if ($title === '' || $title === '—') {
+            return null;
+        }
+
+        return ' SZKOLENIE: '.$this->shortenSmsTitle($title, $maxTitleChars);
+    }
+
+    /**
+     * Marker w treści SMS, po którym wstawiamy snippet szkolenia (np. `FV 100/9/2026`).
+     */
+    public function smsInvoiceMarker(DebtCase $case): string
+    {
+        return 'FV '.$this->invoiceNumber($case, $case->formOrder);
+    }
+
+    public function shortenSmsTitle(string $title, int $maxChars = 40): string
+    {
+        $title = trim(preg_replace('/\s+/u', ' ', $title) ?? '');
+        if ($title === '') {
+            return '';
+        }
+
+        if (mb_strlen($title) <= $maxChars) {
+            return $title;
+        }
+
+        $cut = max(1, $maxChars - 3);
+
+        return rtrim(mb_substr($title, 0, $cut)).'...';
+    }
+
+    /**
+     * @return array{body: string, invoice_marker: string, training_snippet: ?string}
      */
     public function buildSms(DebtCase $case, string $template): array
     {
@@ -485,7 +528,11 @@ class DebtReminderTemplateService
             ),
         };
 
-        return ['body' => $body];
+        return [
+            'body' => $body,
+            'invoice_marker' => 'FV '.$invoice,
+            'training_snippet' => $this->smsTrainingSnippet($case),
+        ];
     }
 
     /**

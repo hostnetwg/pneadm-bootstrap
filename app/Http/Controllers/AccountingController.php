@@ -694,6 +694,8 @@ class AccountingController extends Controller
             'reminderSmsTemplatePayloads' => $reminderSmsTemplatePayloads,
             'reminderSmsOrderer' => $reminderTemplates->ordererSmsRecipient($debtCase),
             'reminderSmsTestPhones' => $reminderTemplates->smsTestPhoneOptions(),
+            'reminderSmsTrainingSnippet' => $reminderTemplates->smsTrainingSnippet($debtCase),
+            'reminderSmsInvoiceMarker' => $reminderTemplates->smsInvoiceMarker($debtCase),
             'reminderSmsEnabled' => (bool) config('services.smsapi.enabled', true)
                 && filled(config('services.smsapi.token')),
             'caseHasInvoicePdf' => $debtCase->hasInvoicePdf(),
