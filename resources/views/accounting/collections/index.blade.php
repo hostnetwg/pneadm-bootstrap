@@ -18,6 +18,15 @@
         </div>
     </x-slot>
 
+    <style>
+        /* ~50% większe niż domyślny Bootstrap badge (0.75em → 1.125em). */
+        .debt-reminder-count-badge {
+            font-size: 1.125em;
+            padding: 0.525em 0.975em;
+            line-height: 1.2;
+        }
+    </style>
+
     <div class="py-3">
         <div class="container-fluid px-4">
             @if(session('success'))
@@ -322,7 +331,7 @@
                                     <td>{{ $case->due_date?->format('d.m.Y') ?: '—' }}</td>
                                     <td>{{ $case->next_action_at?->timezone(config('app.timezone'))->format('d.m.Y H:i') ?: '—' }}</td>
                                     <td class="text-center">
-                                        <span class="badge {{ $case->reminderEmailsSentBadgeClass($reminderSentCount) }}"
+                                        <span class="badge debt-reminder-count-badge {{ $case->reminderEmailsSentBadgeClass($reminderSentCount) }}"
                                               title="{{ $case->reminderEmailsSentLabel($reminderSentCount) }} (bez testów). 1=niebieski, 2=żółty, 3=czerwony, 4+=ciemny.">
                                             {{ $reminderSentCount }}
                                         </span>

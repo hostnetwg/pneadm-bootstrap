@@ -8,7 +8,7 @@
                 @php
                     $reminderSentCount = $case->reminderEmailsSentCount();
                 @endphp
-                <span class="badge {{ $case->reminderEmailsSentBadgeClass($reminderSentCount) }}"
+                <span class="badge debt-reminder-count-badge {{ $case->reminderEmailsSentBadgeClass($reminderSentCount) }}"
                       title="Liczba wysłanych e-maili przypomnienia/ponaglenia do dłużnika (bez testów). 1=niebieski, 2=żółty, 3=czerwony, 4+=ciemny.">
                     <i class="bi bi-envelope-check" aria-hidden="true"></i>
                     {{ $case->reminderEmailsSentLabel($reminderSentCount) }}
@@ -1648,6 +1648,12 @@
         }
         .case-fill-bank-search:hover {
             color: var(--bs-primary) !important;
+        }
+        /* ~50% większe niż domyślny Bootstrap badge (0.75em → 1.125em). */
+        .debt-reminder-count-badge {
+            font-size: 1.125em;
+            padding: 0.525em 0.975em;
+            line-height: 1.2;
         }
     </style>
 
