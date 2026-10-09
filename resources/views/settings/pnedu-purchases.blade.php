@@ -197,9 +197,9 @@
 
                 <h5 class="mb-2">Numer konta bankowego Platformy Nowoczesnej Edukacji</h5>
                 <p class="text-muted small mb-3">
-                    Konto do przelewów za szkolenia / faktury. W kolejnym kroku będzie wstawiane do
-                    <strong>e-maili przypominających</strong> (zawsze) oraz opcjonalnie do <strong>SMS-ów</strong>
-                    (checkbox w windykacji). Na razie tylko zapis w ustawieniach.
+                    Konto do przelewów za szkolenia / faktury. Trafia do
+                    <strong>e-maili przypominających</strong> (zawsze, gdy ustawione) oraz do <strong>SMS-ów</strong>
+                    w windykacji (checkbox, domyślnie zaznaczony).
                 </p>
                 <div class="mb-0" style="max-width: 32rem;">
                     <label for="company_bank_account" class="form-label">Numer konta (IBAN PL)</label>

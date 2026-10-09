@@ -284,12 +284,51 @@ class DebtReminderTemplateService
 
     private function bankAccountLine(): string
     {
-        $account = trim((string) config('services.ifirma.bank_account', ''));
+        $account = $this->resolvedCompanyBankAccountDisplay();
         if ($account === '') {
             return '';
         }
 
         return 'Numer konta do przelewu: '.$account;
+    }
+
+    /**
+     * IBAN z Zakupy pnedu.pl; fallback: IFIRMA_BANK_ACCOUNT z .env.
+     */
+    public function resolvedCompanyBankAccountCompact(): ?string
+    {
+        $fromSettings = \App\Models\PaymentDisplayOption::companyBankAccount();
+        if ($fromSettings !== null) {
+            return $fromSettings;
+        }
+
+        return \App\Models\PaymentDisplayOption::normalizeCompanyBankAccount(
+            (string) config('services.ifirma.bank_account', '')
+        );
+    }
+
+    public function resolvedCompanyBankAccountDisplay(): string
+    {
+        $compact = $this->resolvedCompanyBankAccountCompact();
+        if ($compact === null) {
+            return '';
+        }
+
+        return \App\Models\PaymentDisplayOption::formatCompanyBankAccount($compact);
+    }
+
+    /**
+     * Fragment SMS z numerem konta (kompaktowy IBAN — krócej).
+     * Przykład: ` Konto:PL61109010140000071219812874`
+     */
+    public function smsBankSnippet(): ?string
+    {
+        $compact = $this->resolvedCompanyBankAccountCompact();
+        if ($compact === null) {
+            return null;
+        }
+
+        return ' Konto:'.$compact;
     }
 
     /**
@@ -501,7 +540,10 @@ class DebtReminderTemplateService
     }
 
     /**
-     * @return array{body: string, invoice_marker: string, training_snippet: ?string}
+     * Krótkie szablony SMS (bez konta / szkolenia — te wstawia checkbox w UI).
+     * Cel: zmieścić FV + kwotę + termin + opcjonalnie IBAN w 1–2 częściach.
+     *
+     * @return array{body: string, invoice_marker: string, training_snippet: ?string, bank_snippet: ?string}
      */
     public function buildSms(DebtCase $case, string $template): array
     {
@@ -509,22 +551,20 @@ class DebtReminderTemplateService
         $invoice = $this->invoiceNumber($case, $order);
         $amount = $this->amountLabel($case, $order);
         $due = $this->dueDateLabel($case, $order);
-        $contactPhone = \App\Models\DebtCollectionSetting::contactPhone() ?: 'kontakt@pnedu.pl';
 
+        // Bez polskich znaków w bazie — większa szansa na GSM-7 (160 znaków / część).
         $body = match ($template) {
             self::TEMPLATE_DUNNING => sprintf(
-                'PNEDU: ponaglenie — FV %s na %s, termin %s. Prosimy o pilną płatność. Inf.: %s',
+                'PNEDU: ponaglenie FV %s %s zl, term. %s. Pilna wplata.',
                 $invoice,
                 $amount,
-                $due,
-                $contactPhone
+                $due
             ),
             default => sprintf(
-                'PNEDU: przypomnienie o płatności FV %s na %s (termin %s). Inf.: %s',
+                'PNEDU: FV %s %s zl, term. %s. Prosze o wplate.',
                 $invoice,
                 $amount,
-                $due,
-                $contactPhone
+                $due
             ),
         };
 
@@ -532,6 +572,7 @@ class DebtReminderTemplateService
             'body' => $body,
             'invoice_marker' => 'FV '.$invoice,
             'training_snippet' => $this->smsTrainingSnippet($case),
+            'bank_snippet' => $this->smsBankSnippet(),
         ];
     }
 

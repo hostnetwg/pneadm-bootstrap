@@ -13,8 +13,8 @@ Krótki przewodnik po ustawieniach w **pneadm**. Pełna dokumentacja techniczna 
 ### Numer konta bankowego PNE
 
 Pole **`company_bank_account`** (IBAN PL, zapis bez spacji) — konto Platformy Nowoczesnej Edukacji do przelewów.
-Na razie tylko konfiguracja w tym panelu. Plan: e-mail przypomnienia windykacji (zawsze) + SMS (checkbox).
-Odczyt w kodzie: `PaymentDisplayOption::companyBankAccount()` / `formatCompanyBankAccount()`.
+Użycie: e-mail przypomnienia windykacji (**zawsze**, gdy ustawiony) oraz SMS (**checkbox**, domyślnie włączony).
+Odczyt: `PaymentDisplayOption::companyBankAccount()` / `DebtReminderTemplateService::smsBankSnippet()`.
 
 ---
 

@@ -156,7 +156,8 @@ class DebtReminderMailTest extends TestCase
             'search' => (string) $case->id,
         ]));
         $index->assertOk();
-        $index->assertSee('Przypomnienia', false);
+        $index->assertSee('E-mail', false);
+        $index->assertSee('1 przypomnienie', false);
         $fresh = $case->fresh();
         $this->assertSame(1, $fresh->reminderEmailsSentCount());
         $this->assertSame('1 przypomnienie', $fresh->reminderEmailsSentLabel());
