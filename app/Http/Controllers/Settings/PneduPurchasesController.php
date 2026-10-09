@@ -6,8 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\PaymentDisplayOption;
 use App\Services\FunnelSkipService;
 use App\Support\OrderFormVariant;
-use Illuminate\Support\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Schema;
 
 class PneduPurchasesController extends Controller
@@ -163,7 +163,10 @@ class PneduPurchasesController extends Controller
             'developer_online_payment_sandbox_gateway' => 'boolean',
             'default_post_end_access_duration_value' => 'required|integer|min:1|max:999',
             'default_post_end_access_duration_unit' => 'required|in:days,weeks,months,years',
-        ], [], [
+            'company_bank_account' => 'nullable|string|max:64',
+        ], [
+            'company_bank_account.max' => 'Numer konta jest za długi.',
+        ], [
             'show_pay_publigo' => 'Zapłać online (Publigo)',
             'show_pay_online' => 'Zapłać online (PayU / PayNow)',
             'show_deferred_order' => 'Formularz z odroczonym terminem (PNEDU)',
@@ -176,7 +179,20 @@ class PneduPurchasesController extends Controller
             'developer_online_payment_sandbox_gateway' => 'Bramka płatności dla testów deweloperskich',
             'default_post_end_access_duration_value' => 'Domyślny okres dostępu po zakończeniu szkolenia',
             'default_post_end_access_duration_unit' => 'Jednostka domyślnego okresu dostępu po zakończeniu szkolenia',
+            'company_bank_account' => 'Numer konta bankowego PNE',
         ]);
+
+        $normalizedBankAccount = PaymentDisplayOption::normalizeCompanyBankAccount(
+            $validated['company_bank_account'] ?? null
+        );
+        if (filled(trim((string) ($validated['company_bank_account'] ?? ''))) && $normalizedBankAccount === null) {
+            return redirect()
+                ->route('settings.pnedu-purchases.index')
+                ->withInput()
+                ->withErrors([
+                    'company_bank_account' => 'Podaj prawidłowy polski numer konta (26 cyfr, opcjonalnie z prefiksem PL).',
+                ]);
+        }
 
         $options = PaymentDisplayOption::getSettings();
         $autoFillEnabled = $request->boolean('order_form_auto_fill_test_data');
@@ -223,6 +239,7 @@ class PneduPurchasesController extends Controller
             'order_form_auto_fill_test_data_enabled_at' => $autoFillEnabled ? Carbon::now() : null,
             'default_post_end_access_duration_value' => $validated['default_post_end_access_duration_value'],
             'default_post_end_access_duration_unit' => $validated['default_post_end_access_duration_unit'],
+            'company_bank_account' => $normalizedBankAccount,
         ];
 
         if ($this->developersOnlyColumnReady()) {

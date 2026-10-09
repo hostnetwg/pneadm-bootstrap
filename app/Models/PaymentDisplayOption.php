@@ -40,6 +40,7 @@ class PaymentDisplayOption extends Model
         'developer_online_payment_sandbox_gateway',
         'default_post_end_access_duration_value',
         'default_post_end_access_duration_unit',
+        'company_bank_account',
     ];
 
     protected $casts = [
@@ -60,6 +61,58 @@ class PaymentDisplayOption extends Model
     public static function forgetSettingsCache(): void
     {
         Cache::forget(self::SETTINGS_CACHE_KEY);
+    }
+
+    /**
+     * Numer konta PNE (IBAN PL) do przelewów — m.in. przyszłe przypomnienia windykacji.
+     * Zapis bez spacji, np. PL61109010140000071219812874.
+     */
+    public static function companyBankAccount(): ?string
+    {
+        $raw = trim((string) (self::getSettings()->company_bank_account ?? ''));
+
+        return $raw !== '' ? $raw : null;
+    }
+
+    /**
+     * Normalizacja: spacje usuwane, opcjonalny prefiks PL, wynik PL+26 cyfr albo null przy pustym/niepoprawnym.
+     */
+    public static function normalizeCompanyBankAccount(?string $raw): ?string
+    {
+        $raw = trim((string) $raw);
+        if ($raw === '') {
+            return null;
+        }
+
+        $compact = strtoupper(preg_replace('/\s+/u', '', $raw) ?? '');
+        if (str_starts_with($compact, 'PL')) {
+            $digits = substr($compact, 2);
+        } else {
+            $digits = $compact;
+        }
+
+        if (! preg_match('/^\d{26}$/', $digits)) {
+            return null;
+        }
+
+        return 'PL'.$digits;
+    }
+
+    /**
+     * Wyświetlanie: PL XX XXXX XXXX XXXX XXXX XXXX XXXX
+     */
+    public static function formatCompanyBankAccount(?string $stored): string
+    {
+        $compact = self::normalizeCompanyBankAccount($stored);
+        if ($compact === null) {
+            return trim((string) $stored);
+        }
+
+        if (preg_match('/^PL(\d{2})(\d{4})(\d{4})(\d{4})(\d{4})(\d{4})(\d{4})$/', $compact, $m)) {
+            return 'PL '.$m[1].' '.$m[2].' '.$m[3].' '.$m[4].' '.$m[5].' '.$m[6].' '.$m[7];
+        }
+
+        return $compact;
     }
 
     /**

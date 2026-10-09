@@ -10,6 +10,12 @@ Krótki przewodnik po ustawieniach w **pneadm**. Pełna dokumentacja techniczna 
 **URL:** `/settings/pnedu-zakupy`  
 **Tabela:** `payment_display_options` (baza `pneadm`, odczyt przez `pnedu`)
 
+### Numer konta bankowego PNE
+
+Pole **`company_bank_account`** (IBAN PL, zapis bez spacji) — konto Platformy Nowoczesnej Edukacji do przelewów.
+Na razie tylko konfiguracja w tym panelu. Plan: e-mail przypomnienia windykacji (zawsze) + SMS (checkbox).
+Odczyt w kodzie: `PaymentDisplayOption::companyBankAccount()` / `formatCompanyBankAccount()`.
+
 ---
 
 ## Checkboxy wariantów

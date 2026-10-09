@@ -44,9 +44,9 @@ class PneduPurchasesSettingsTest extends TestCase
                 'show_pay_online' => '1',
                 'show_deferred_order' => '1',
                 'show_order_form' => '1',
-            'show_order_form_v2' => '1',
-            'default_signup_order_form_variant' => 'v2',
-            'show_order_form_alt' => '1',
+                'show_order_form_v2' => '1',
+                'default_signup_order_form_variant' => 'v2',
+                'show_order_form_alt' => '1',
                 'default_post_end_access_duration_value' => 2,
                 'default_post_end_access_duration_unit' => 'months',
             ])
@@ -120,5 +120,69 @@ class PneduPurchasesSettingsTest extends TestCase
             ])
             ->assertRedirect(route('settings.pnedu-purchases.index'))
             ->assertSessionHasErrors('default_signup_order_form_variant');
+    }
+
+    public function test_company_bank_account_is_saved_normalized(): void
+    {
+        $user = User::factory()->create(['is_active' => true]);
+        $settings = PaymentDisplayOption::getSettings();
+
+        $this->actingAs($user)
+            ->post(route('settings.pnedu-purchases.store'), [
+                'show_pay_publigo' => '1',
+                'show_pay_online' => '1',
+                'show_deferred_order' => '1',
+                'show_order_form' => '1',
+                'show_order_form_alt' => '1',
+                'default_post_end_access_duration_value' => 2,
+                'default_post_end_access_duration_unit' => 'months',
+                'company_bank_account' => '61 1090 1014 0000 0712 1981 2874',
+            ])
+            ->assertRedirect(route('settings.pnedu-purchases.index'))
+            ->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('payment_display_options', [
+            'id' => $settings->id,
+            'company_bank_account' => 'PL61109010140000071219812874',
+        ]);
+        $this->assertSame(
+            'PL61109010140000071219812874',
+            PaymentDisplayOption::companyBankAccount()
+        );
+        $this->assertSame(
+            'PL 61 1090 1014 0000 0712 1981 2874',
+            PaymentDisplayOption::formatCompanyBankAccount(PaymentDisplayOption::companyBankAccount())
+        );
+    }
+
+    public function test_invalid_company_bank_account_is_rejected(): void
+    {
+        $user = User::factory()->create(['is_active' => true]);
+
+        $this->actingAs($user)
+            ->from(route('settings.pnedu-purchases.index'))
+            ->post(route('settings.pnedu-purchases.store'), [
+                'show_pay_publigo' => '1',
+                'show_pay_online' => '1',
+                'show_deferred_order' => '1',
+                'show_order_form' => '1',
+                'show_order_form_alt' => '1',
+                'default_post_end_access_duration_value' => 2,
+                'default_post_end_access_duration_unit' => 'months',
+                'company_bank_account' => '12345',
+            ])
+            ->assertRedirect(route('settings.pnedu-purchases.index'))
+            ->assertSessionHasErrors('company_bank_account');
+    }
+
+    public function test_settings_page_shows_bank_account_field(): void
+    {
+        $user = User::factory()->create(['is_active' => true]);
+
+        $this->actingAs($user)
+            ->get(route('settings.pnedu-purchases.index'))
+            ->assertOk()
+            ->assertSee('Numer konta bankowego Platformy Nowoczesnej Edukacji', false)
+            ->assertSee('company_bank_account', false);
     }
 }
