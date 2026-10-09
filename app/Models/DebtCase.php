@@ -143,6 +143,22 @@ class DebtCase extends Model
         return $count.' '.$noun;
     }
 
+    /**
+     * Kolor badge liczby przypomnień: 0 szary, 1 niebieski, 2 żółty, 3 czerwony, 4+ ciemnoczerwony.
+     */
+    public function reminderEmailsSentBadgeClass(?int $count = null): string
+    {
+        $count ??= $this->reminderEmailsSentCount();
+
+        return match (true) {
+            $count <= 0 => 'text-bg-light border text-muted',
+            $count === 1 => 'text-bg-primary',
+            $count === 2 => 'text-bg-warning',
+            $count === 3 => 'text-bg-danger',
+            default => 'text-bg-dark',
+        };
+    }
+
     public function contacts(): HasMany
     {
         return $this->hasMany(DebtCaseContact::class);

@@ -29,7 +29,7 @@ Pierwszy etap obejmuje:
   - sortowanie nagłówków tabeli (ikony strzałek): **Sprawa** (`id`), **Zamówienie / faktura** (FV `nr/miesiąc/rok` → rok, potem miesiąc, potem numer), **Termin** (`due_date`); parametry `sort` + `dir`,
   - wyszukiwarka listy: FV/KSeF/nazwa/NIP/e-mail oraz numeryczne ID sprawy / zamówienia (`form_orders.id`),
   - kolumna Status na liście: kolorowe badge (`DebtCase::statusBadgeClass()` — Nowa niebieski, W toku cyan, Obietnica żółty, Sporne czerwony, Wstrzymane szary, Zamknięte zielony),
-  - kolumna **Przypomnienia** na liście oraz badge przy „Wyślij przypomnienie” na karcie: liczba prawdziwych wysyłek e-mail (`debt_case_actions` typu `email` + `outcome=sent`); wysyłki testowe nie liczą się,
+  - kolumna **Przypomnienia** na liście oraz badge przy „Wyślij przypomnienie” na karcie: liczba prawdziwych wysyłek e-mail (`debt_case_actions` typu `email` + `outcome=sent`); wysyłki testowe nie liczą się; kolory badge: **0** szary, **1** niebieski, **2** żółty, **3** czerwony, **4+** ciemny (`DebtCase::reminderEmailsSentBadgeClass()`),
 - tworzenie sprawy z `form_orders.id`,
   - **wymagana wystawiona FV** (`invoice_number` lub `ifirma_invoice_id`) — bez FV backend blokuje; na `/form-orders/{id}` przycisk jest nieaktywny,
   - **modal Bootstrap** przed utworzeniem (zamówienie, form-orders, lookup / lista windykacji — nie natychmiastowy POST),

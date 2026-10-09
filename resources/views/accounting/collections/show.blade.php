@@ -8,8 +8,8 @@
                 @php
                     $reminderSentCount = $case->reminderEmailsSentCount();
                 @endphp
-                <span class="badge {{ $reminderSentCount > 0 ? 'text-bg-info' : 'text-bg-light border text-muted' }}"
-                      title="Liczba wysłanych e-maili przypomnienia/ponaglenia do dłużnika (bez testów)">
+                <span class="badge {{ $case->reminderEmailsSentBadgeClass($reminderSentCount) }}"
+                      title="Liczba wysłanych e-maili przypomnienia/ponaglenia do dłużnika (bez testów). 1=niebieski, 2=żółty, 3=czerwony, 4+=ciemny.">
                     <i class="bi bi-envelope-check" aria-hidden="true"></i>
                     {{ $case->reminderEmailsSentLabel($reminderSentCount) }}
                 </span>

@@ -157,8 +157,14 @@ class DebtReminderMailTest extends TestCase
         ]));
         $index->assertOk();
         $index->assertSee('Przypomnienia', false);
-        $this->assertSame(1, $case->fresh()->reminderEmailsSentCount());
-        $this->assertSame('1 przypomnienie', $case->fresh()->reminderEmailsSentLabel());
+        $fresh = $case->fresh();
+        $this->assertSame(1, $fresh->reminderEmailsSentCount());
+        $this->assertSame('1 przypomnienie', $fresh->reminderEmailsSentLabel());
+        $this->assertSame('text-bg-primary', $fresh->reminderEmailsSentBadgeClass());
+        $this->assertSame('text-bg-warning', $fresh->reminderEmailsSentBadgeClass(2));
+        $this->assertSame('text-bg-danger', $fresh->reminderEmailsSentBadgeClass(3));
+        $this->assertSame('text-bg-dark', $fresh->reminderEmailsSentBadgeClass(4));
+        $this->assertSame('text-bg-light border text-muted', $fresh->reminderEmailsSentBadgeClass(0));
     }
 
     public function test_test_send_does_not_increase_reminder_count(): void

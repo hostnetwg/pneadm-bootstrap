@@ -322,14 +322,10 @@
                                     <td>{{ $case->due_date?->format('d.m.Y') ?: '—' }}</td>
                                     <td>{{ $case->next_action_at?->timezone(config('app.timezone'))->format('d.m.Y H:i') ?: '—' }}</td>
                                     <td class="text-center">
-                                        @if($reminderSentCount > 0)
-                                            <span class="badge text-bg-info"
-                                                  title="{{ $reminderSentCount }} {{ $reminderSentCount === 1 ? 'wysłane przypomnienie' : 'wysłanych przypomnień' }} (bez testów)">
-                                                {{ $reminderSentCount }}
-                                            </span>
-                                        @else
-                                            <span class="text-muted" title="Brak wysłanych przypomnień do dłużnika">0</span>
-                                        @endif
+                                        <span class="badge {{ $case->reminderEmailsSentBadgeClass($reminderSentCount) }}"
+                                              title="{{ $case->reminderEmailsSentLabel($reminderSentCount) }} (bez testów). 1=niebieski, 2=żółty, 3=czerwony, 4+=ciemny.">
+                                            {{ $reminderSentCount }}
+                                        </span>
                                     </td>
                                     <td class="text-end">{{ number_format((float) ($case->amount_gross ?? $order->product_price ?? 0), 2, ',', ' ') }} zł</td>
                                 </tr>
