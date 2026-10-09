@@ -106,6 +106,43 @@ class DebtCase extends Model
         return $this->hasMany(DebtCaseAction::class)->latest('happened_at')->latest('id');
     }
 
+    /**
+     * Prawdziwe e-maile przypomnienia/ponaglenia do dłużnika (bez wysyłek testowych).
+     */
+    public function reminderEmailsSent(): HasMany
+    {
+        return $this->hasMany(DebtCaseAction::class)
+            ->where('action_type', DebtCaseAction::TYPE_EMAIL)
+            ->where('outcome', 'sent');
+    }
+
+    public function reminderEmailsSentCount(): int
+    {
+        if (array_key_exists('reminder_emails_sent_count', $this->attributes)) {
+            return (int) $this->attributes['reminder_emails_sent_count'];
+        }
+
+        return (int) $this->reminderEmailsSent()->count();
+    }
+
+    /**
+     * Etykieta liczby przypomnień po polsku (1 przypomnienie / 2 przypomnienia / 5 przypomnień).
+     */
+    public function reminderEmailsSentLabel(?int $count = null): string
+    {
+        $count ??= $this->reminderEmailsSentCount();
+        $abs = abs($count) % 100;
+        $last = $abs % 10;
+
+        $noun = match (true) {
+            $abs === 1 => 'przypomnienie',
+            $last >= 2 && $last <= 4 && ($abs < 12 || $abs > 14) => 'przypomnienia',
+            default => 'przypomnień',
+        };
+
+        return $count.' '.$noun;
+    }
+
     public function contacts(): HasMany
     {
         return $this->hasMany(DebtCaseContact::class);

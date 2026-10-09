@@ -286,7 +286,8 @@ class AccountingController extends Controller
         $casesQuery = DebtCase::query()
             ->select('debt_cases.*')
             ->leftJoin('form_orders', 'form_orders.id', '=', 'debt_cases.form_order_id')
-            ->with(['formOrder.primaryParticipant', 'assignedTo', 'createdBy']);
+            ->with(['formOrder.primaryParticipant', 'assignedTo', 'createdBy'])
+            ->withCount('reminderEmailsSent');
 
         if ($status === 'active') {
             $casesQuery->active();
@@ -574,7 +575,7 @@ class AccountingController extends Controller
                     ])
                     ->latest('accepted_at');
             },
-        ]);
+        ])->loadCount('reminderEmailsSent');
 
         $profile = $profileService->profileForOrder($debtCase->formOrder);
         $invoiceTarget = $debtCase->invoiceTargetAmount();

@@ -146,6 +146,40 @@ class DebtReminderMailTest extends TestCase
             'outcome' => 'sent',
         ]);
         $this->assertSame(DebtCase::STATUS_IN_PROGRESS, $case->fresh()->status);
+
+        $show = $this->actingAs($user)->get(route('accounting.collections.show', $case));
+        $show->assertOk();
+        $show->assertSee('1 przypomnienie', false);
+
+        $index = $this->actingAs($user)->get(route('accounting.collections.index', [
+            'status' => 'all',
+            'search' => (string) $case->id,
+        ]));
+        $index->assertOk();
+        $index->assertSee('Przypomnienia', false);
+        $this->assertSame(1, $case->fresh()->reminderEmailsSentCount());
+        $this->assertSame('1 przypomnienie', $case->fresh()->reminderEmailsSentLabel());
+    }
+
+    public function test_test_send_does_not_increase_reminder_count(): void
+    {
+        Mail::fake();
+        [$user, $case] = $this->caseWithOrder();
+
+        $this->actingAs($user)->post(route('accounting.collections.send-reminder', $case), [
+            'template' => 'reminder',
+            'subject' => 'Test temat',
+            'body' => 'Treść testowa',
+            'send_target' => 'test',
+            'test_email' => 'tester@example.test',
+            'recipient_emails' => ['dluznik@example.test'],
+        ])->assertRedirect(route('accounting.collections.show', $case));
+
+        $this->assertSame(0, $case->fresh()->reminderEmailsSentCount());
+
+        $show = $this->actingAs($user)->get(route('accounting.collections.show', $case));
+        $show->assertOk();
+        $show->assertSee('0 przypomnień', false);
     }
 
     public function test_real_send_to_multiple_selected_recipients(): void

@@ -4,12 +4,22 @@
             <h2 class="fw-semibold fs-4 text-dark mb-0">
                 Windykacja: sprawa #{{ $case->id }}
             </h2>
-            <button type="button"
-                    class="btn btn-primary btn-sm"
-                    data-bs-toggle="modal"
-                    data-bs-target="#debtReminderModal">
-                <i class="bi bi-envelope"></i> Wyślij przypomnienie
-            </button>
+            <div class="d-flex flex-wrap align-items-center gap-2">
+                @php
+                    $reminderSentCount = $case->reminderEmailsSentCount();
+                @endphp
+                <span class="badge {{ $reminderSentCount > 0 ? 'text-bg-info' : 'text-bg-light border text-muted' }}"
+                      title="Liczba wysłanych e-maili przypomnienia/ponaglenia do dłużnika (bez testów)">
+                    <i class="bi bi-envelope-check" aria-hidden="true"></i>
+                    {{ $case->reminderEmailsSentLabel($reminderSentCount) }}
+                </span>
+                <button type="button"
+                        class="btn btn-primary btn-sm"
+                        data-bs-toggle="modal"
+                        data-bs-target="#debtReminderModal">
+                    <i class="bi bi-envelope"></i> Wyślij przypomnienie
+                </button>
+            </div>
         </div>
     </x-slot>
 

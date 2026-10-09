@@ -247,12 +247,16 @@
                                     </a>
                                 </th>
                                 <th>Następny krok</th>
+                                <th class="text-center" title="Wysłane e-maile przypomnienia/ponaglenia do dłużnika (bez testów)">Przypomnienia</th>
                                 <th class="text-end">Kwota</th>
                             </tr>
                         </thead>
                         <tbody>
                             @forelse($cases as $case)
-                                @php($order = $case->formOrder)
+                                @php
+                                    $order = $case->formOrder;
+                                    $reminderSentCount = $case->reminderEmailsSentCount();
+                                @endphp
                                 <tr>
                                     <td>
                                         <a href="{{ route('accounting.collections.show', $case) }}" class="fw-semibold text-decoration-none">
@@ -317,11 +321,21 @@
                                     </td>
                                     <td>{{ $case->due_date?->format('d.m.Y') ?: '—' }}</td>
                                     <td>{{ $case->next_action_at?->timezone(config('app.timezone'))->format('d.m.Y H:i') ?: '—' }}</td>
+                                    <td class="text-center">
+                                        @if($reminderSentCount > 0)
+                                            <span class="badge text-bg-info"
+                                                  title="{{ $reminderSentCount }} {{ $reminderSentCount === 1 ? 'wysłane przypomnienie' : 'wysłanych przypomnień' }} (bez testów)">
+                                                {{ $reminderSentCount }}
+                                            </span>
+                                        @else
+                                            <span class="text-muted" title="Brak wysłanych przypomnień do dłużnika">0</span>
+                                        @endif
+                                    </td>
                                     <td class="text-end">{{ number_format((float) ($case->amount_gross ?? $order->product_price ?? 0), 2, ',', ' ') }} zł</td>
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="9" class="text-center text-muted py-4">
+                                    <td colspan="10" class="text-center text-muted py-4">
                                         Brak spraw windykacyjnych dla wybranych filtrów.
                                     </td>
                                 </tr>
