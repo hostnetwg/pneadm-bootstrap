@@ -1,14 +1,14 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
-            <h2 class="fw-semibold fs-4 text-dark mb-0">
+        <div class="debt-case-show-header">
+            <h2 class="fw-semibold fs-4 text-dark mb-0 debt-case-show-header__title">
                 Windykacja: sprawa #{{ $case->id }}
             </h2>
-            <div class="d-flex flex-wrap align-items-center gap-2">
-                @php
-                    $reminderSentCount = $case->reminderEmailsSentCount();
-                    $reminderSmsSentCount = $case->reminderSmsSentCount();
-                @endphp
+            @php
+                $reminderSentCount = $case->reminderEmailsSentCount();
+                $reminderSmsSentCount = $case->reminderSmsSentCount();
+            @endphp
+            <div class="d-flex flex-wrap align-items-center justify-content-center gap-2 debt-case-show-header__badges">
                 <span class="badge debt-reminder-count-badge {{ $case->reminderEmailsSentBadgeClass($reminderSentCount) }}"
                       title="Wysłane e-maile przypomnienia (bez testów). 1=niebieski, 2=żółty, 3=czerwony, 4+=ciemny.">
                     <i class="bi bi-envelope-check" aria-hidden="true"></i>
@@ -19,6 +19,8 @@
                     <i class="bi bi-phone" aria-hidden="true"></i>
                     {{ $case->reminderSmsSentLabel($reminderSmsSentCount) }}
                 </span>
+            </div>
+            <div class="d-flex flex-wrap align-items-center justify-content-end gap-2 debt-case-show-header__actions">
                 <button type="button"
                         class="btn btn-primary btn-sm"
                         data-bs-toggle="modal"
@@ -1926,10 +1928,39 @@
         .case-fill-bank-search:hover {
             color: var(--bs-primary) !important;
         }
-        /* ~50% większe niż domyślny Bootstrap badge (0.75em → 1.125em). */
+        /* Nagłówek karty: tytuł | badge na środku | akcje */
+        .debt-case-show-header {
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            align-items: center;
+            gap: 0.5rem 0.75rem;
+        }
+        .debt-case-show-header__title {
+            justify-self: start;
+        }
+        .debt-case-show-header__badges {
+            justify-self: center;
+        }
+        .debt-case-show-header__actions {
+            justify-self: end;
+        }
+        @media (max-width: 767.98px) {
+            .debt-case-show-header {
+                grid-template-columns: 1fr;
+            }
+            .debt-case-show-header__title,
+            .debt-case-show-header__badges,
+            .debt-case-show-header__actions {
+                justify-self: stretch;
+            }
+            .debt-case-show-header__actions {
+                justify-content: flex-start;
+            }
+        }
+        /* Karta sprawy: trochę powyżej domyślnego Bootstrap badge (0.75em), mniejsze niż wcześniejsze 1.125em. */
         .debt-reminder-count-badge {
-            font-size: 1.125em;
-            padding: 0.525em 0.975em;
+            font-size: 0.95em;
+            padding: 0.4em 0.75em;
             line-height: 1.2;
         }
     </style>
