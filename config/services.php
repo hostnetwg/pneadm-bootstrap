@@ -144,4 +144,20 @@ return [
         'timeout' => (int) env('GUS_BIR_TIMEOUT', 10),
     ],
 
+    // SMSAPI.pl — przypomnienia SMS w windykacji (OAuth token z panelu SMSAPI).
+    'smsapi' => [
+        'token' => env('SMSAPI_TOKEN'),
+        'base_url' => rtrim(env('SMSAPI_BASE_URL', 'https://api.smsapi.pl'), '/'),
+        'backup_base_url' => rtrim(env('SMSAPI_BACKUP_BASE_URL', 'https://api2.smsapi.pl'), '/'),
+        // Zarejestrowane pole nadawcy w SMSAPI (np. PNEDU). Puste = bez parametru from (Eco/domyślne).
+        'from' => env('SMSAPI_FROM', ''),
+        'timeout' => (int) env('SMSAPI_TIMEOUT', 20),
+        'enabled' => filter_var(env('SMSAPI_ENABLED', true), FILTER_VALIDATE_BOOLEAN),
+        // Numery do wysyłki testowej (E.164 lub krajowy PL) — CSV.
+        'test_phones' => array_values(array_filter(array_map(
+            static fn (string $phone): string => trim($phone),
+            explode(',', (string) env('SMSAPI_TEST_PHONES', '+48 501 654 274,+48 510 396 579'))
+        ))),
+    ],
+
 ];

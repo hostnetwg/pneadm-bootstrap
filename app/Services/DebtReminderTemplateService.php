@@ -433,4 +433,140 @@ class DebtReminderTemplateService
 
         return $lines;
     }
+
+    /**
+     * Telefon zamawiającego do SMS (MVP: tylko ten numer).
+     *
+     * @return array{phone: string, label: string, digits: string}|null
+     */
+    public function ordererSmsRecipient(DebtCase $case): ?array
+    {
+        $order = $case->formOrder;
+        $raw = trim((string) ($order?->orderer_phone ?? ''));
+        $digits = $this->normalizePhoneToSmsapi($raw);
+        if ($digits === null) {
+            return null;
+        }
+
+        $name = trim((string) ($order?->orderer_name ?? ''));
+
+        return [
+            'phone' => $this->formatPhoneDisplay($digits),
+            'label' => 'Zamawiający'.($name !== '' ? ': '.$name : ''),
+            'digits' => $digits,
+        ];
+    }
+
+    /**
+     * @return array{body: string}
+     */
+    public function buildSms(DebtCase $case, string $template): array
+    {
+        $order = $case->formOrder;
+        $invoice = $this->invoiceNumber($case, $order);
+        $amount = $this->amountLabel($case, $order);
+        $due = $this->dueDateLabel($case, $order);
+        $contactPhone = \App\Models\DebtCollectionSetting::contactPhone() ?: 'kontakt@pnedu.pl';
+
+        $body = match ($template) {
+            self::TEMPLATE_DUNNING => sprintf(
+                'PNEDU: ponaglenie — FV %s na %s, termin %s. Prosimy o pilną płatność. Inf.: %s',
+                $invoice,
+                $amount,
+                $due,
+                $contactPhone
+            ),
+            default => sprintf(
+                'PNEDU: przypomnienie o płatności FV %s na %s (termin %s). Inf.: %s',
+                $invoice,
+                $amount,
+                $due,
+                $contactPhone
+            ),
+        };
+
+        return ['body' => $body];
+    }
+
+    /**
+     * Numery testowe z konfiguracji (do wyboru w UI).
+     *
+     * @return list<array{phone: string, digits: string}>
+     */
+    public function smsTestPhoneOptions(): array
+    {
+        $options = [];
+        foreach ((array) config('services.smsapi.test_phones', []) as $raw) {
+            $digits = $this->normalizePhoneToSmsapi((string) $raw);
+            if ($digits === null) {
+                continue;
+            }
+            $options[] = [
+                'phone' => $this->formatPhoneDisplay($digits),
+                'digits' => $digits,
+            ];
+        }
+
+        return $options;
+    }
+
+    /**
+     * Normalizacja do formatu SMSAPI: 48xxxxxxxxx (bez +).
+     */
+    public function normalizePhoneToSmsapi(?string $raw): ?string
+    {
+        $raw = trim((string) $raw);
+        if ($raw === '') {
+            return null;
+        }
+
+        $digits = preg_replace('/\D+/', '', $raw) ?: '';
+        if ($digits === '') {
+            return null;
+        }
+
+        if (str_starts_with($digits, '0048')) {
+            $digits = substr($digits, 2);
+        }
+
+        if (strlen($digits) === 9) {
+            $digits = '48'.$digits;
+        }
+
+        if (! preg_match('/^48\d{9}$/', $digits)) {
+            return null;
+        }
+
+        return $digits;
+    }
+
+    public function formatPhoneDisplay(string $digitsOrRaw): string
+    {
+        $digits = $this->normalizePhoneToSmsapi($digitsOrRaw) ?? preg_replace('/\D+/', '', $digitsOrRaw);
+        if (is_string($digits) && preg_match('/^48(\d{3})(\d{3})(\d{3})$/', $digits, $m)) {
+            return '+48 '.$m[1].' '.$m[2].' '.$m[3];
+        }
+
+        return trim($digitsOrRaw);
+    }
+
+    /**
+     * Szacunek liczby części SMS (GSM-7 vs UCS-2 z polskimi znakami).
+     */
+    public function estimateSmsParts(string $message): int
+    {
+        $length = mb_strlen($message);
+        if ($length === 0) {
+            return 0;
+        }
+
+        $hasUnicode = (bool) preg_match('/[^\x00-\x7F]/u', $message);
+        if ($hasUnicode) {
+            // UCS-2: 70 / 67
+            return $length <= 70 ? 1 : (int) ceil($length / 67);
+        }
+
+        // GSM-7: 160 / 153
+        return $length <= 160 ? 1 : (int) ceil($length / 153);
+    }
 }

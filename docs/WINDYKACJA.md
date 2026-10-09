@@ -31,7 +31,8 @@ Pierwszy etap obejmuje:
   - sortowanie nagłówków tabeli (ikony strzałek): **Sprawa** (`id`), **Zamówienie / faktura** (FV `nr/miesiąc/rok` → rok, potem miesiąc, potem numer), **Termin** (`due_date`); parametry `sort` + `dir`,
   - wyszukiwarka listy: FV/KSeF/nazwa/NIP/e-mail oraz numeryczne ID sprawy / zamówienia (`form_orders.id`),
   - kolumna Status na liście: kolorowe badge (`DebtCase::statusBadgeClass()` — Nowa niebieski, W toku cyan, Obietnica żółty, Sporne czerwony, Wstrzymane szary, Zamknięte zielony),
-  - kolumna **Przypomnienia** na liście oraz badge przy „Wyślij przypomnienie” na karcie: liczba prawdziwych wysyłek e-mail (`debt_case_actions` typu `email` + `outcome=sent`); wysyłki testowe nie liczą się; kolory badge: **0** szary, **1** niebieski, **2** żółty, **3** czerwony, **4+** ciemny (`DebtCase::reminderEmailsSentBadgeClass()`),
+  - kolumna **E-mail** i **SMS** na liście oraz badge przy przyciskach na karcie: osobne liczniki prawdziwych wysyłek (`email`/`sms` + `outcome=sent`); testy nie liczą się; kolory: **0** szary, **1** niebieski, **2** żółty, **3** czerwony, **4+** ciemny,
+  - **SMS (SMSAPI.pl):** przycisk „Wyślij SMS” → modal (szablon przypomnienie/ponaglenie, edycja treści z licznikiem znaków/części, odbiorca = telefon zamawiającego `orderer_phone`, wysyłka właściwa + test na numery z `SMSAPI_TEST_PHONES`); VIP = ostrzeżenie; historia `action_type=sms`; env: `SMSAPI_TOKEN`, opcjonalnie `SMSAPI_FROM` (nadawca),
 - tworzenie sprawy z `form_orders.id`,
   - **wymagana wystawiona FV** (`invoice_number` lub `ifirma_invoice_id`) — bez FV backend blokuje; na `/form-orders/{id}` przycisk jest nieaktywny,
   - **modal Bootstrap** przed utworzeniem (zamówienie, form-orders, lookup / lista windykacji — nie natychmiastowy POST),
@@ -39,7 +40,8 @@ Pierwszy etap obejmuje:
 - przy tworzeniu sprawy: wyszukiwarka numeru faktury / KSeF z przyciskami „Utwórz sprawę” / „Otwórz sprawę” / „Wstaw ID” (korzysta z `accounting.debtors.lookup`),
 - na `/accounting/debtors`: numer zamówienia nad fakturą oraz skrót do utworzenia/otwarcia sprawy windykacyjnej,
 - historię działań: notatka, e-mail, SMS, telefon, iFirma, obietnica płatności, sporne, wstrzymanie, zamknięcie,
-- **wysyłka e-maila z karty sprawy**: przycisk „Wyślij przypomnienie” → modal (jak linki do prowadzącego) z szablonami przypomnienie/ponaglenie, edycją treści, **checkboxami odbiorców** (zamawiający / uczestnik / kontakty sprawy — domyślnie wszystkie zaznaczone; można odznaczyć; opcjonalnie dodatkowy e-mail), wysyłką właściwą i testową (`send_target` zawsze idzie z ukrytego pola — Enter / druga przeglądarka nie gubi „do dłużnika vs test”), opcjonalnym **linkiem do potwierdzenia zamówienia** (publiczny PDF na pnedu `/orders/{ident}/pdf`, ten sam co po złożeniu zamówienia; **domyślnie odznaczony**; brak `ident` = pomijamy), PDF FV: domyślnie **tylko ze sprawy** gdy wgrany, inaczej **tylko z iFirma** (wzajemnie nie oba naraz jako domyślne) + opcjonalny upload PDF; wpis w historii `email`; VIP / `do_not_auto_dun` = ostrzeżenie, bez blokady; SMS później. Komunikaty walidacji po polsku (`lang/pl/validation.php` + jawne komunikaty w `collectionsSendReminder`),
+- **wysyłka e-maila z karty sprawy**: przycisk „Wyślij e-mail” → modal z szablonami przypomnienie/ponaglenie, edycją treści, **checkboxami odbiorców** (zamawiający / uczestnik / kontakty sprawy — domyślnie wszystkie zaznaczone; można odznaczyć; opcjonalnie dodatkowy e-mail), wysyłką właściwą i testową (`send_target` z ukrytego pola), opcjonalnym **linkiem do potwierdzenia zamówienia** (publiczny PDF na pnedu `/orders/{ident}/pdf`; **domyślnie odznaczony**), PDF FV ze sprawy / iFirma + opcjonalny upload; wpis w historii `email`; VIP / `do_not_auto_dun` = ostrzeżenie, bez blokady. Komunikaty walidacji po polsku,
+
 - **PDF faktury na sprawie**: upload w sekcji „PDF faktury” (`debt_cases.invoice_pdf_*`, dysk `local`); podgląd w modalu iframe + otwarcie w nowej karcie; zastąpienie / usunięcie (modal Bootstrap); na liście spraw ikona PDF obok numeru FV (link do podglądu), gdy plik jest załączony; **przy zamknięciu sprawy** plik i metadane PDF są usuwane z dysku (`DebtCaseObserver`),
 - alternatywne kontakty (dodawanie i usuwanie z karty sprawy),
 - segmentację klienta (`standard`, `risk`, `vip`, `vip_with_overdue`, `manual_review`),
@@ -149,7 +151,7 @@ Przyszły etap może dyskretnie wymuszać płatność online przez ukrycie lub w
 - ~~ewentualne rejestrowanie wpłat w iFirma dopiero po potwierdzeniu operatora~~ — **wdrożone** (modal przy akceptacji importu: „Akceptuj + wpłata w iFirma” / „Tylko lokalnie”),
 - ~~automatyczne zamykanie spraw po matchu~~ — **wdrożone**: po akceptacji z wyciągu **oraz** po „Odśwież status z iFirma” na karcie, gdy iFirma = `oplacone`; nie zamyka `disputed` / już `closed`; zwykłe „Tylko lokalnie” bez potwierdzenia opłaty nie zamyka,
 - ~~magazyn PDF FV na sprawie (pobranie przy utworzeniu + checkbox „załącz FV ze sprawy” przy wysyłce)~~ — **częściowo wdrożone**: ręczny upload + podgląd na karcie sprawy + checkbox „Załącz PDF faktury ze sprawy” przy wysyłce; auto-pobranie z iFirma przy tworzeniu sprawy — później,
-- SMS do dłużnika (ten sam flow co e-mail, inny kanał).
+- ~~SMS do dłużnika (ten sam flow co e-mail, inny kanał)~~ — **MVP wdrożone** (SMSAPI, tylko telefon zamawiającego; status doręczenia / multi-odbiorcy później),
 
 ## Import wyciągu mBank (MVP)
 

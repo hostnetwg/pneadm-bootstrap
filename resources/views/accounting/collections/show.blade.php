@@ -7,17 +7,31 @@
             <div class="d-flex flex-wrap align-items-center gap-2">
                 @php
                     $reminderSentCount = $case->reminderEmailsSentCount();
+                    $reminderSmsSentCount = $case->reminderSmsSentCount();
                 @endphp
                 <span class="badge debt-reminder-count-badge {{ $case->reminderEmailsSentBadgeClass($reminderSentCount) }}"
-                      title="Liczba wysłanych e-maili przypomnienia/ponaglenia do dłużnika (bez testów). 1=niebieski, 2=żółty, 3=czerwony, 4+=ciemny.">
+                      title="Wysłane e-maile przypomnienia (bez testów). 1=niebieski, 2=żółty, 3=czerwony, 4+=ciemny.">
                     <i class="bi bi-envelope-check" aria-hidden="true"></i>
                     {{ $case->reminderEmailsSentLabel($reminderSentCount) }}
+                </span>
+                <span class="badge debt-reminder-count-badge {{ $case->reminderSmsSentBadgeClass($reminderSmsSentCount) }}"
+                      title="Wysłane SMS-y przypomnienia (bez testów). 1=niebieski, 2=żółty, 3=czerwony, 4+=ciemny.">
+                    <i class="bi bi-phone" aria-hidden="true"></i>
+                    {{ $case->reminderSmsSentLabel($reminderSmsSentCount) }}
                 </span>
                 <button type="button"
                         class="btn btn-primary btn-sm"
                         data-bs-toggle="modal"
                         data-bs-target="#debtReminderModal">
-                    <i class="bi bi-envelope"></i> Wyślij przypomnienie
+                    <i class="bi bi-envelope"></i> Wyślij e-mail
+                </button>
+                <button type="button"
+                        class="btn btn-outline-primary btn-sm"
+                        data-bs-toggle="modal"
+                        data-bs-target="#debtReminderSmsModal"
+                        @disabled(!($reminderSmsEnabled ?? false))
+                        title="{{ ($reminderSmsEnabled ?? false) ? 'Wyślij SMS przypomnienia' : 'Brak SMSAPI_TOKEN — skonfiguruj .env' }}">
+                    <i class="bi bi-phone"></i> Wyślij SMS
                 </button>
             </div>
         </div>
@@ -1611,6 +1625,126 @@
         </div>
     </div>
 
+    <div class="modal fade" id="debtReminderSmsModal" tabindex="-1" aria-labelledby="debtReminderSmsModalLabel" aria-hidden="true"
+         data-templates='@json($reminderSmsTemplatePayloads ?? [])'>
+        <div class="modal-dialog modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title" id="debtReminderSmsModalLabel">
+                        <i class="bi bi-phone me-2"></i>Wyślij SMS przypomnienia
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+                </div>
+                <div class="modal-body">
+                    @if($showVipAlert || $case->do_not_auto_dun)
+                        <div class="alert alert-warning small">
+                            @if($showVipAlert)
+                                <div class="fw-semibold mb-1">VIP / lojalny klient — rozważ kontakt osobisty przed SMS-em monitującym.</div>
+                            @endif
+                            @if($case->do_not_auto_dun)
+                                <div>Sprawa ma włączone „Bez automatycznego monitu” — ręczna wysyłka jest nadal możliwa.</div>
+                            @endif
+                        </div>
+                    @endif
+
+                    @unless($reminderSmsEnabled ?? false)
+                        <div class="alert alert-danger small">Brak konfiguracji SMSAPI (SMSAPI_TOKEN) — wysyłka niedostępna.</div>
+                    @endunless
+
+                    <form id="formDebtReminderSms"
+                          method="POST"
+                          action="{{ route('accounting.collections.send-reminder-sms', $case) }}"
+                          data-loading-submit
+                          data-loading-text="Wysyłam SMS…">
+                        @csrf
+                        <input type="hidden" name="send_target" id="debtReminderSmsSendTarget" value="{{ old('send_target', 'recipient') }}">
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold" for="debtReminderSmsTemplate">Szablon</label>
+                            <select class="form-select" id="debtReminderSmsTemplate" name="template">
+                                @foreach(($reminderTemplateLabels ?? []) as $value => $label)
+                                    <option value="{{ $value }}" @selected(old('template', \App\Services\DebtReminderTemplateService::TEMPLATE_REMINDER) === $value)>
+                                        {{ $label }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold" for="debtReminderSmsBody">Treść SMS</label>
+                            <textarea class="form-control font-monospace @error('body') is-invalid @enderror"
+                                      id="debtReminderSmsBody"
+                                      name="body"
+                                      rows="5"
+                                      maxlength="600"
+                                      spellcheck="true"
+                                      required>{{ old('body') }}</textarea>
+                            @error('body')
+                                <div class="invalid-feedback d-block">{{ $message }}</div>
+                            @enderror
+                            <div class="form-text">
+                                <span id="debtReminderSmsLength">0</span> znaków ·
+                                ok. <span id="debtReminderSmsParts">0</span> części SMS
+                                (polskie znaki = krótszy limit na część).
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Odbiorca (zamawiający)</label>
+                            @if($reminderSmsOrderer ?? null)
+                                <div class="border rounded p-2 bg-light small">
+                                    <div class="fw-semibold">{{ $reminderSmsOrderer['label'] }}</div>
+                                    <div>{{ $reminderSmsOrderer['phone'] }}</div>
+                                </div>
+                            @else
+                                <div class="alert alert-warning small mb-0">
+                                    Brak prawidłowego telefonu zamawiającego na zamówieniu — uzupełnij <code>orderer_phone</code>, albo użyj wysyłki testowej.
+                                </div>
+                            @endif
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold" for="debtReminderSmsTestPhone">Numer testowy</label>
+                            <select class="form-select @error('test_phone') is-invalid @enderror"
+                                    id="debtReminderSmsTestPhone"
+                                    name="test_phone">
+                                @foreach(($reminderSmsTestPhones ?? []) as $testPhone)
+                                    <option value="{{ $testPhone['digits'] }}"
+                                        @selected(old('test_phone') === $testPhone['digits'])>
+                                        {{ $testPhone['phone'] }}
+                                    </option>
+                                @endforeach
+                            </select>
+                            @error('test_phone')
+                                <div class="invalid-feedback d-block">{{ $message }}</div>
+                            @enderror
+                        </div>
+
+                        <div class="d-flex flex-wrap gap-2">
+                            <button type="submit"
+                                    class="btn btn-primary debt-reminder-sms-send-btn"
+                                    data-send-target="recipient"
+                                    data-loading-text="Wysyłam…"
+                                    @disabled(!($reminderSmsOrderer ?? null) || !($reminderSmsEnabled ?? false))>
+                                <i class="bi bi-phone me-1"></i>Wyślij SMS do zamawiającego
+                            </button>
+                            <button type="submit"
+                                    class="btn btn-outline-primary debt-reminder-sms-send-btn"
+                                    data-send-target="test"
+                                    data-loading-text="Wysyłam test…"
+                                    @disabled(empty($reminderSmsTestPhones) || !($reminderSmsEnabled ?? false))>
+                                <i class="bi bi-flask me-1"></i>Wyślij SMS testowy
+                            </button>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Zamknij</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="modal fade" id="bankPaymentUnlinkModal" tabindex="-1" aria-labelledby="bankPaymentUnlinkModalLabel" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
@@ -1951,7 +2085,82 @@
                     syncDynamicBodyBlocks();
                 }
 
-                @if($errors->hasAny(['template', 'subject', 'body', 'recipient_email', 'recipient_emails', 'test_email', 'attachment', 'send_target']))
+                @if($errors->hasAny(['template', 'subject', 'body', 'recipient_email', 'recipient_emails', 'test_email', 'attachment', 'send_target']) && old('test_phone') === null)
+                    if (window.bootstrap && window.bootstrap.Modal) {
+                        window.bootstrap.Modal.getOrCreateInstance(modalEl).show();
+                    }
+                @endif
+            })();
+
+            (function initDebtReminderSmsModal() {
+                var modalEl = document.getElementById('debtReminderSmsModal');
+                if (!modalEl) {
+                    return;
+                }
+
+                var templates = {};
+                try {
+                    templates = JSON.parse(modalEl.getAttribute('data-templates') || '{}');
+                } catch (e) {
+                    templates = {};
+                }
+
+                var templateSelect = document.getElementById('debtReminderSmsTemplate');
+                var bodyInput = document.getElementById('debtReminderSmsBody');
+                var lengthEl = document.getElementById('debtReminderSmsLength');
+                var partsEl = document.getElementById('debtReminderSmsParts');
+                var keepEdited = {{ old('body') && old('test_phone') !== null ? 'true' : 'false' }};
+
+                function estimateParts(text) {
+                    var length = (text || '').length;
+                    if (!length) return 0;
+                    var hasUnicode = /[^\u0000-\u007F]/.test(text);
+                    if (hasUnicode) {
+                        return length <= 70 ? 1 : Math.ceil(length / 67);
+                    }
+                    return length <= 160 ? 1 : Math.ceil(length / 153);
+                }
+
+                function updateCounters() {
+                    if (!bodyInput) return;
+                    var text = bodyInput.value || '';
+                    if (lengthEl) lengthEl.textContent = String(text.length);
+                    if (partsEl) partsEl.textContent = String(estimateParts(text));
+                }
+
+                function applyTemplate(force) {
+                    if (!templateSelect || !bodyInput) return;
+                    var payload = templates[templateSelect.value];
+                    if (!payload) return;
+                    if (force || !bodyInput.value) {
+                        bodyInput.value = payload.body || '';
+                    }
+                    updateCounters();
+                }
+
+                if (templateSelect) {
+                    templateSelect.addEventListener('change', function () {
+                        applyTemplate(true);
+                    });
+                }
+                if (bodyInput) {
+                    bodyInput.addEventListener('input', updateCounters);
+                }
+
+                var sendTargetInput = document.getElementById('debtReminderSmsSendTarget');
+                var form = document.getElementById('formDebtReminderSms');
+                if (form && sendTargetInput) {
+                    form.querySelectorAll('.debt-reminder-sms-send-btn').forEach(function (btn) {
+                        btn.addEventListener('click', function () {
+                            sendTargetInput.value = btn.getAttribute('data-send-target') || 'recipient';
+                        });
+                    });
+                }
+
+                applyTemplate(!keepEdited);
+                updateCounters();
+
+                @if($errors->has('test_phone') || ($errors->has('body') && old('test_phone') !== null) || ($errors->has('send_target') && old('test_phone') !== null))
                     if (window.bootstrap && window.bootstrap.Modal) {
                         window.bootstrap.Modal.getOrCreateInstance(modalEl).show();
                     }

@@ -762,6 +762,7 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
             Route::post('/{debtCase}/sync-ifirma', [AccountingController::class, 'collectionsSyncIfirma'])->name('sync-ifirma');
             Route::post('/{debtCase}/refresh-invoice-from-order', [AccountingController::class, 'collectionsRefreshInvoiceFromOrder'])->name('refresh-invoice-from-order');
             Route::post('/{debtCase}/send-reminder', [AccountingController::class, 'collectionsSendReminder'])->name('send-reminder');
+            Route::post('/{debtCase}/send-reminder-sms', [AccountingController::class, 'collectionsSendReminderSms'])->name('send-reminder-sms');
             Route::post('/{debtCase}/invoice-pdf', [AccountingController::class, 'collectionsInvoicePdfUpload'])->name('invoice-pdf.upload');
             Route::get('/{debtCase}/invoice-pdf', [AccountingController::class, 'collectionsInvoicePdfPreview'])->name('invoice-pdf.preview');
             Route::delete('/{debtCase}/invoice-pdf', [AccountingController::class, 'collectionsInvoicePdfDestroy'])->name('invoice-pdf.destroy');

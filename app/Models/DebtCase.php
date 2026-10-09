@@ -160,6 +160,45 @@ class DebtCase extends Model
         };
     }
 
+    /**
+     * Prawdziwe SMS-y przypomnienia/ponaglenia do dłużnika (bez wysyłek testowych).
+     */
+    public function reminderSmsSent(): HasMany
+    {
+        return $this->hasMany(DebtCaseAction::class)
+            ->where('action_type', DebtCaseAction::TYPE_SMS)
+            ->where('outcome', 'sent');
+    }
+
+    public function reminderSmsSentCount(): int
+    {
+        if (array_key_exists('reminder_sms_sent_count', $this->attributes)) {
+            return (int) $this->attributes['reminder_sms_sent_count'];
+        }
+
+        return (int) $this->reminderSmsSent()->count();
+    }
+
+    public function reminderSmsSentLabel(?int $count = null): string
+    {
+        $count ??= $this->reminderSmsSentCount();
+        $abs = abs($count) % 100;
+        $last = $abs % 10;
+
+        $noun = match (true) {
+            $abs === 1 => 'SMS',
+            $last >= 2 && $last <= 4 && ($abs < 12 || $abs > 14) => 'SMS-y',
+            default => 'SMS-ów',
+        };
+
+        return $count.' '.$noun;
+    }
+
+    public function reminderSmsSentBadgeClass(?int $count = null): string
+    {
+        return $this->reminderEmailsSentBadgeClass($count ?? $this->reminderSmsSentCount());
+    }
+
     public function contacts(): HasMany
     {
         return $this->hasMany(DebtCaseContact::class);

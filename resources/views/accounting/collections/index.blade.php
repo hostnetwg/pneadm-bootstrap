@@ -256,7 +256,8 @@
                                     </a>
                                 </th>
                                 <th>Następny krok</th>
-                                <th class="text-center" title="Wysłane e-maile przypomnienia/ponaglenia do dłużnika (bez testów)">Przypomnienia</th>
+                                <th class="text-center" title="Wysłane e-maile przypomnienia (bez testów)">E-mail</th>
+                                <th class="text-center" title="Wysłane SMS-y przypomnienia (bez testów)">SMS</th>
                                 <th class="text-end">Kwota</th>
                             </tr>
                         </thead>
@@ -265,6 +266,7 @@
                                 @php
                                     $order = $case->formOrder;
                                     $reminderSentCount = $case->reminderEmailsSentCount();
+                                    $reminderSmsSentCount = $case->reminderSmsSentCount();
                                     $invoiceDrift = app(\App\Services\DebtCaseInvoiceIdentityService::class)->compare($case);
                                     $listInvoice = $case->invoice_number ?: ($order->invoice_number ?: null);
                                     $listKsef = ($invoiceDrift['invoice_replaced'] ?? false)
@@ -346,11 +348,17 @@
                                             {{ $reminderSentCount }}
                                         </span>
                                     </td>
+                                    <td class="text-center">
+                                        <span class="badge debt-reminder-count-badge {{ $case->reminderSmsSentBadgeClass($reminderSmsSentCount) }}"
+                                              title="{{ $case->reminderSmsSentLabel($reminderSmsSentCount) }} (bez testów). 1=niebieski, 2=żółty, 3=czerwony, 4+=ciemny.">
+                                            {{ $reminderSmsSentCount }}
+                                        </span>
+                                    </td>
                                     <td class="text-end">{{ number_format((float) ($case->amount_gross ?? $order->product_price ?? 0), 2, ',', ' ') }} zł</td>
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="10" class="text-center text-muted py-4">
+                                    <td colspan="11" class="text-center text-muted py-4">
                                         Brak spraw windykacyjnych dla wybranych filtrów.
                                     </td>
                                 </tr>

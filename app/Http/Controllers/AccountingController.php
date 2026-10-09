@@ -20,6 +20,7 @@ use App\Services\DebtCaseInvoiceIdentityService;
 use App\Services\DebtCaseInvoicePdfService;
 use App\Services\DebtCustomerProfileService;
 use App\Services\DebtReminderMailService;
+use App\Services\DebtReminderSmsService;
 use App\Services\DebtReminderTemplateService;
 use App\Services\IfirmaInvoicePaymentRegistrationService;
 use App\Services\IfirmaInvoicePaymentStatusService;
@@ -288,7 +289,7 @@ class AccountingController extends Controller
             ->select('debt_cases.*')
             ->leftJoin('form_orders', 'form_orders.id', '=', 'debt_cases.form_order_id')
             ->with(['formOrder.primaryParticipant', 'assignedTo', 'createdBy'])
-            ->withCount('reminderEmailsSent');
+            ->withCount(['reminderEmailsSent', 'reminderSmsSent']);
 
         if ($status === 'active') {
             $casesQuery->active();
@@ -577,7 +578,7 @@ class AccountingController extends Controller
                     ])
                     ->latest('accepted_at');
             },
-        ])->loadCount('reminderEmailsSent');
+        ])->loadCount(['reminderEmailsSent', 'reminderSmsSent']);
 
         $profile = $profileService->profileForOrder($debtCase->formOrder);
         $invoiceTarget = $debtCase->invoiceTargetAmount();
@@ -642,8 +643,10 @@ class AccountingController extends Controller
 
         $reminderTemplates = app(DebtReminderTemplateService::class);
         $reminderTemplatePayloads = [];
+        $reminderSmsTemplatePayloads = [];
         foreach (array_keys($reminderTemplates->templateLabels()) as $templateKey) {
             $reminderTemplatePayloads[$templateKey] = $reminderTemplates->build($debtCase, $templateKey);
+            $reminderSmsTemplatePayloads[$templateKey] = $reminderTemplates->buildSms($debtCase, $templateKey);
         }
 
         return view('accounting.collections.show', [
@@ -688,6 +691,11 @@ class AccountingController extends Controller
             'reminderCanIncludeOrderConfirmationLink' => $reminderTemplates->canIncludeOrderConfirmationLink($debtCase),
             'reminderOrderConfirmationBodyBlock' => $reminderTemplates->orderConfirmationBodyBlock($debtCase),
             'reminderDefaultTestEmail' => Auth::user()?->email ?: 'waldemar.grabowski@hostnet.pl',
+            'reminderSmsTemplatePayloads' => $reminderSmsTemplatePayloads,
+            'reminderSmsOrderer' => $reminderTemplates->ordererSmsRecipient($debtCase),
+            'reminderSmsTestPhones' => $reminderTemplates->smsTestPhoneOptions(),
+            'reminderSmsEnabled' => (bool) config('services.smsapi.enabled', true)
+                && filled(config('services.smsapi.token')),
             'caseHasInvoicePdf' => $debtCase->hasInvoicePdf(),
             'invoiceDrift' => $invoiceIdentity->compare($debtCase),
             'invoicePresentation' => $invoiceIdentity->presentation($debtCase),
@@ -824,6 +832,77 @@ class AccountingController extends Controller
             return redirect()
                 ->route('accounting.collections.show', $debtCase)
                 ->withInput($request->except('attachment'))
+                ->with('error', $result['message']);
+        }
+
+        return redirect()
+            ->route('accounting.collections.show', $debtCase)
+            ->with('success', $result['message']);
+    }
+
+    public function collectionsSendReminderSms(
+        Request $request,
+        DebtCase $debtCase,
+        DebtReminderSmsService $smsService,
+        DebtReminderTemplateService $templates,
+    ) {
+        $debtCase->load(['formOrder']);
+
+        $testDigits = collect($templates->smsTestPhoneOptions())
+            ->pluck('digits')
+            ->all();
+
+        $rules = [
+            'template' => ['required', 'string', 'in:'.implode(',', array_keys($templates->templateLabels()))],
+            'body' => ['required', 'string', 'max:600'],
+            'send_target' => ['required', 'string', 'in:recipient,test'],
+            'test_phone' => ['nullable', 'string', 'max:32'],
+        ];
+
+        if ($request->input('send_target') === 'test') {
+            $rules['test_phone'] = ['required', 'string', 'max:32'];
+        }
+
+        $validated = $request->validate($rules, [
+            'body.required' => 'Podaj treść SMS.',
+            'body.max' => 'Treść SMS może mieć max 600 znaków.',
+            'send_target.required' => 'Wybierz, czy wysłać do zamawiającego, czy SMS testowy.',
+            'test_phone.required' => 'Wybierz numer testowy.',
+        ]);
+
+        $isTest = $validated['send_target'] === 'test';
+
+        if ($isTest) {
+            $toPhone = (string) $validated['test_phone'];
+            $normalizedTest = $templates->normalizePhoneToSmsapi($toPhone);
+            if ($normalizedTest === null || ! in_array($normalizedTest, $testDigits, true)) {
+                return redirect()
+                    ->route('accounting.collections.show', $debtCase)
+                    ->withInput()
+                    ->withErrors(['test_phone' => 'Wybierz jeden z skonfigurowanych numerów testowych.']);
+            }
+        } else {
+            $orderer = $templates->ordererSmsRecipient($debtCase);
+            if ($orderer === null) {
+                return redirect()
+                    ->route('accounting.collections.show', $debtCase)
+                    ->withInput()
+                    ->withErrors(['body' => 'Brak prawidłowego telefonu zamawiającego na zamówieniu — uzupełnij orderer_phone.']);
+            }
+            $toPhone = $orderer['digits'];
+        }
+
+        $result = $smsService->send(
+            case: $debtCase,
+            toPhone: $toPhone,
+            body: $validated['body'],
+            isTest: $isTest,
+        );
+
+        if (! $result['ok']) {
+            return redirect()
+                ->route('accounting.collections.show', $debtCase)
+                ->withInput()
                 ->with('error', $result['message']);
         }
 
