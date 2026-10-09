@@ -145,6 +145,7 @@ return [
     ],
 
     // SMSAPI.pl — przypomnienia SMS w windykacji (OAuth token z panelu SMSAPI).
+    // Docs: https://www.smsapi.pl/docs/#dokumentacja-sms-api — zob. też docs/WINDYKACJA.md
     'smsapi' => [
         'token' => env('SMSAPI_TOKEN'),
         'base_url' => rtrim(env('SMSAPI_BASE_URL', 'https://api.smsapi.pl'), '/'),

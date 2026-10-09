@@ -6,6 +6,12 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
+/**
+ * Klient HTTP do SMSAPI.pl (pojedynczy SMS).
+ *
+ * Dokumentacja API: https://www.smsapi.pl/docs/#dokumentacja-sms-api
+ * Kontekst windykacji: docs/WINDYKACJA.md (sprawa → przypomnienie SMS).
+ */
 class SmsapiClient
 {
     /**
