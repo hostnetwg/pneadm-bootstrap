@@ -20,7 +20,10 @@ class IfirmaInvoicePaymentRegistrationService
     public function __construct(
         private IfirmaApiService $api,
         private IfirmaInvoicePaymentStatusService $statusService,
-    ) {}
+        private ?DebtCaseInvoiceIdentityService $invoiceIdentity = null,
+    ) {
+        $this->invoiceIdentity ??= new DebtCaseInvoiceIdentityService;
+    }
 
     /**
      * Po akceptacji dopasowania z wyciągu: wpłata w iFirma + sync statusu.
@@ -100,12 +103,12 @@ class IfirmaInvoicePaymentRegistrationService
             ];
         }
 
-        $this->refreshCaseInvoiceDataFromOrder($case, $order);
+        $this->refreshCaseInvoiceDataFromOrder($case, $order, $user);
 
         $snapshot = $this->statusService->fetchPaymentSnapshotForOrder(
             $order,
-            $case->invoice_number ?: null,
-            $case->invoice_date
+            null,
+            $order->invoice_issue_date ?? $case->invoice_date
         );
 
         if (! ($snapshot['success'] ?? false)) {
@@ -126,7 +129,7 @@ class IfirmaInvoicePaymentRegistrationService
             ];
         }
 
-        if ($invoiceId !== '' && (string) ($order->ifirma_invoice_id ?? '') !== $invoiceId) {
+        if ($invoiceId !== '' && trim((string) ($order->ifirma_invoice_id ?? '')) === '') {
             $order->ifirma_invoice_id = $invoiceId;
             $order->save();
         }
@@ -236,12 +239,12 @@ class IfirmaInvoicePaymentRegistrationService
             ];
         }
 
-        $this->refreshCaseInvoiceDataFromOrder($case, $order);
+        $this->refreshCaseInvoiceDataFromOrder($case, $order, $user);
 
         $snapshot = $this->statusService->fetchPaymentSnapshotForOrder(
             $order,
-            $case->invoice_number ?: null,
-            $case->invoice_date
+            null,
+            $order->invoice_issue_date ?? $case->invoice_date
         );
 
         if (! ($snapshot['success'] ?? false)) {
@@ -342,17 +345,18 @@ class IfirmaInvoicePaymentRegistrationService
         return abs($a - $b) <= self::AMOUNT_EPSILON;
     }
 
-    private function refreshCaseInvoiceDataFromOrder(DebtCase $case, FormOrder $order): void
+    private function refreshCaseInvoiceDataFromOrder(DebtCase $case, FormOrder $order, ?User $user = null): void
     {
-        $dirty = false;
+        $case->setRelation('formOrder', $order);
+        $this->invoiceIdentity->alignCaseToOrder($case, $user);
+        $case->refresh();
+        $case->setRelation('formOrder', $order);
 
-        foreach (['invoice_number', 'ksef_number'] as $field) {
-            $value = trim((string) ($order->{$field} ?? ''));
-            if ($value !== '' && (string) ($case->{$field} ?? '') !== $value) {
-                $case->{$field} = $value;
-                $dirty = true;
-            }
+        if ($this->invoiceIdentity->fillBlanksWhenSameInvoice($case)) {
+            $case->save();
         }
+
+        $dirty = false;
 
         if ($order->product_price !== null) {
             $amount = round((float) $order->product_price, 2);

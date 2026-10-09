@@ -1,7 +1,11 @@
 # Następne Kroki
 
-Data utworzenia/aktualizacji: 2026-10-07
+Data utworzenia/aktualizacji: 2026-10-09
 Status: plan roboczy, do potwierdzenia przez właściciela
+
+## Ostatnio (2026-10-09) — Faktura sprawy windykacyjnej a zamówienie
+
+Wejście w sprawę porównuje numer faktury, KSeF i ID iFirma z aktualnym zamówieniem. Przy różnicy jest okno z notatką i przyciskiem aktualizacji. Pusta faktura w zamówieniu (korekta w toku) nie czyści sprawy. „Odśwież status z iFirma” nie przywraca anulowanej faktury. Migracja `2026_10_09_130000_add_ifirma_invoice_id_to_debt_cases_table.php`. Kanon: [WINDYKACJA.md](./WINDYKACJA.md).
 
 ## Ostatnio (2026-10-07) — Wiadomość do wszystkich uczestników szkolenia
 

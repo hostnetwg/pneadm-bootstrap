@@ -16,6 +16,7 @@ use App\Models\RevenueRecord;
 use App\Services\Bank\BankStatementImportService;
 use App\Services\Bank\BankTransactionUnlinkService;
 use App\Services\DebtCaseAutoCloseService;
+use App\Services\DebtCaseInvoiceIdentityService;
 use App\Services\DebtCaseInvoicePdfService;
 use App\Services\DebtCustomerProfileService;
 use App\Services\DebtReminderMailService;
@@ -474,6 +475,7 @@ class AccountingController extends Controller
             'vip_reason' => $profile['vip_reason'],
             'invoice_number' => $order->invoice_number,
             'ksef_number' => $order->ksef_number,
+            'ifirma_invoice_id' => $order->ifirma_invoice_id,
             'amount_gross' => $order->product_price,
             'invoice_date' => $invoiceDate?->toDateString(),
             'due_date' => $dueDate?->toDateString(),
@@ -636,6 +638,8 @@ class AccountingController extends Controller
             return $hydrated;
         });
 
+        $invoiceIdentity = app(DebtCaseInvoiceIdentityService::class);
+
         $reminderTemplates = app(DebtReminderTemplateService::class);
         $reminderTemplatePayloads = [];
         foreach (array_keys($reminderTemplates->templateLabels()) as $templateKey) {
@@ -660,6 +664,7 @@ class AccountingController extends Controller
                     DebtCaseAction::TYPE_CASE_OPENED,
                     DebtCaseAction::TYPE_STATUS_UPDATE,
                     DebtCaseAction::TYPE_IFIRMA_SYNC,
+                    DebtCaseAction::TYPE_INVOICE_IDENTITY,
                     DebtCaseAction::TYPE_BANK_MATCH,
                     DebtCaseAction::TYPE_BANK_UNMATCH,
                     DebtCaseAction::TYPE_BANK_REFUND,
@@ -684,6 +689,8 @@ class AccountingController extends Controller
             'reminderOrderConfirmationBodyBlock' => $reminderTemplates->orderConfirmationBodyBlock($debtCase),
             'reminderDefaultTestEmail' => Auth::user()?->email ?: 'waldemar.grabowski@hostnet.pl',
             'caseHasInvoicePdf' => $debtCase->hasInvoicePdf(),
+            'invoiceDrift' => $invoiceIdentity->compare($debtCase),
+            'invoicePresentation' => $invoiceIdentity->presentation($debtCase),
         ]);
     }
 
@@ -1275,6 +1282,46 @@ class AccountingController extends Controller
         return redirect()
             ->route('accounting.collections.show', $debtCase)
             ->with('success', $message);
+    }
+
+    public function collectionsRefreshInvoiceFromOrder(
+        DebtCase $debtCase,
+        DebtCaseInvoiceIdentityService $invoiceIdentity,
+        IfirmaInvoicePaymentStatusService $paymentStatusService,
+        DebtCaseAutoCloseService $autoClose,
+    ) {
+        $aligned = $invoiceIdentity->alignCaseToOrder($debtCase, Auth::user());
+        if (! ($aligned['success'] ?? false)) {
+            return redirect()
+                ->route('accounting.collections.show', $debtCase)
+                ->with('error', $aligned['message'] ?? 'Nie zaktualizowano danych faktury.');
+        }
+
+        $sync = $paymentStatusService->syncDebtCase($debtCase->fresh(['formOrder']), Auth::user());
+        $message = $aligned['message'];
+
+        if (! ($sync['success'] ?? false)) {
+            return redirect()
+                ->route('accounting.collections.show', $debtCase)
+                ->with('success', $message)
+                ->with('warning', 'Dane faktury zostały przepisane z zamówienia, ale nie udało się odświeżyć statusu z iFirma: '
+                    .($sync['message'] ?? 'nieznany błąd'));
+        }
+
+        $message .= ' '.($sync['message'] ?? '');
+        if (($sync['status'] ?? null) === IfirmaInvoicePaymentStatusService::STATUS_PAID
+            && $autoClose->closeIfFullyPaid(
+                $debtCase->fresh(),
+                Auth::user(),
+                IfirmaInvoicePaymentStatusService::STATUS_PAID,
+                DebtCaseAutoCloseService::CLOSURE_REASON_IFIRMA_SYNC
+            )) {
+            $message .= ' Sprawę zamknięto automatycznie, bo nowa faktura jest opłacona w iFirma.';
+        }
+
+        return redirect()
+            ->route('accounting.collections.show', $debtCase)
+            ->with('success', trim($message));
     }
 
     public function collectionsUpdate(Request $request, DebtCase $debtCase)

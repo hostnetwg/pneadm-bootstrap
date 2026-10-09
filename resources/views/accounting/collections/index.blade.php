@@ -265,6 +265,11 @@
                                 @php
                                     $order = $case->formOrder;
                                     $reminderSentCount = $case->reminderEmailsSentCount();
+                                    $invoiceDrift = app(\App\Services\DebtCaseInvoiceIdentityService::class)->compare($case);
+                                    $listInvoice = $case->invoice_number ?: ($order->invoice_number ?: null);
+                                    $listKsef = ($invoiceDrift['invoice_replaced'] ?? false)
+                                        ? ($case->ksef_number ?: null)
+                                        : ($case->ksef_number ?: ($order->ksef_number ?: null));
                                 @endphp
                                 <tr>
                                     <td>
@@ -278,7 +283,7 @@
                                     <td>
                                         <a href="{{ route('form-orders.show', $order->id) }}" class="text-decoration-none">#{{ $order->id }}</a>
                                         <div class="small text-muted d-flex align-items-center flex-wrap gap-1">
-                                            <span>FV: {{ $case->invoice_number ?: $order->invoice_number ?: '—' }}</span>
+                                            <span>FV: {{ $listInvoice ?: '—' }}</span>
                                             @if($case->hasInvoicePdf())
                                                 <a href="{{ route('accounting.collections.invoice-pdf.preview', $case) }}"
                                                    class="text-danger text-decoration-none"
@@ -292,8 +297,13 @@
                                                 </a>
                                             @endif
                                         </div>
-                                        @if($case->ksef_number || $order->ksef_number)
-                                            <div class="small text-success">KSeF: {{ $case->ksef_number ?: $order->ksef_number }}</div>
+                                        @if($listKsef)
+                                            <div class="small text-success">KSeF: {{ $listKsef }}</div>
+                                        @endif
+                                        @if($invoiceDrift['show_modal'] ?? false)
+                                            <div class="small text-warning">
+                                                {{ ($invoiceDrift['order_invoice_cleared'] ?? false) ? 'Zamówienie bez aktualnej FV' : 'FV w zamówieniu: '.($order->invoice_number ?: '—') }}
+                                            </div>
                                         @endif
                                         @if($case->ifirma_payment_status)
                                             <div class="mt-1">

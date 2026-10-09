@@ -22,6 +22,8 @@ class DebtCaseAction extends Model
 
     public const TYPE_IFIRMA_SYNC = 'ifirma_sync';
 
+    public const TYPE_INVOICE_IDENTITY = 'invoice_identity';
+
     public const TYPE_IFIRMA_PAYMENT = 'ifirma_payment';
 
     public const TYPE_NO_CONTACT = 'no_contact';
@@ -86,6 +88,7 @@ class DebtCaseAction extends Model
             self::TYPE_PHONE => 'Telefon',
             self::TYPE_IFIRMA_REMINDER => 'iFirma',
             self::TYPE_IFIRMA_SYNC => 'Synchronizacja iFirma',
+            self::TYPE_INVOICE_IDENTITY => 'Aktualizacja faktury',
             self::TYPE_IFIRMA_PAYMENT => 'Wpłata w iFirma',
             self::TYPE_NO_CONTACT => 'Brak kontaktu',
             self::TYPE_PAYMENT_PROMISE => 'Obietnica płatności',

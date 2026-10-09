@@ -1094,6 +1094,7 @@ class BankStatementImportService
             'vip_reason' => $profile['vip_reason'],
             'invoice_number' => $order->invoice_number,
             'ksef_number' => $order->ksef_number,
+            'ifirma_invoice_id' => $order->ifirma_invoice_id,
             'amount_gross' => $order->product_price,
             'invoice_date' => $invoiceDate?->toDateString(),
             'due_date' => $dueDate?->toDateString(),

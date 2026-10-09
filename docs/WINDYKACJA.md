@@ -18,6 +18,8 @@ Identyfikatory faktury na `form_orders` (używane przy synchronizacji statusu z 
 - `ksef_number` / `ksef_*` — numer i status KSeF,
 - `ifirma_invoice_id` — wewnętrzny `Identyfikator` / FakturaId dokumentu w iFirma (preferowany klucz do `GET fakturakraj/{id}.json`).
 
+`debt_cases` trzyma kopię tych trzech pól z chwili utworzenia sprawy. Aktualna faktura zamówienia jest źródłem prawdy; kopia na sprawie zmienia się przyciskiem na karcie sprawy.
+
 ## MVP
 
 Pierwszy etap obejmuje:
@@ -95,21 +97,36 @@ oraz nad tabelą linię **Identyfikacja:** (`identitySummary`). Bez osobnych kol
 Endpoint: `POST /accounting/collections/{debtCase}/sync-ifirma`  
 Serwis: `App\Services\IfirmaInvoicePaymentStatusService`
 
-1. Jeśli `form_orders.ifirma_invoice_id` jest ustawione → `GET fakturakraj/{id}.json`.
-2. W przeciwnym razie (**dwukrok**, bo API listy wymaga `dataOd` i **nie filtruje po numerze FV** — [lista faktur](https://api.ifirma.pl/lista-faktur/)):
+1. Jeśli kopia faktury na sprawie różni się od aktualnej faktury zamówienia (albo zamówienie nie ma numeru) → sync się nie wykonuje. Najpierw przycisk na karcie sprawy „Zaktualizuj dane faktury na podstawie zamówienia”. Dzięki temu stary numer ze sprawy nie wraca do zamówienia jako anulowana faktura.
+2. Jeśli `form_orders.ifirma_invoice_id` jest ustawione → `GET fakturakraj/{id}.json`. Zapytanie idzie po fakturze zamówienia, nie po starej kopii ze sprawy.
+3. W przeciwnym razie (**dwukrok**, bo API listy wymaga `dataOd` i **nie filtruje po numerze FV** — [lista faktur](https://api.ifirma.pl/lista-faktur/)):
    1. `GET faktury.json` w kolejnych oknach dat od najciaśniejszego: **miesiąc z numeru FV** → normalny (±14/45 z datami zamówienia) → szeroki (±60/120); przy każdym oknie najpierw filtr `kwotaOd`/`kwotaDo` (gdy znamy kwotę), potem bez; typ krajowy, potem bez typu; dopasowanie po `PelnyNumer` lub numerze KSeF; limit stron listy podniesiony (żeby nie ucinać w środku miesiąca),
    2. po znalezieniu `FakturaId` → `GET fakturakraj/{id}.json` (pewniejsze `Zaplacono` / `WartoscBrutto`); gdy szczegóły padną — fallback do wiersza z listy,
-   3. zapis `ifirma_invoice_id` na zamówieniu na kolejne syncy.
+   3. zapis `ifirma_invoice_id` na zamówieniu na kolejne syncy, tylko gdy zamówienie jeszcze nie ma ID.
    Komunikat błędu rozróżnia „przeszukano całą listę” vs „osiągnięto limit stron” i podpowiada uzupełnienie ID iFirma.
-3. Status wyliczany z `Zaplacono` / `Brutto`|`WartoscBrutto` / `TerminPlatnosci`: `oplacone`, `oplaconeCzesciowo`, `nieoplacone`, `przeterminowane`.
+4. Status wyliczany z `Zaplacono` / `Brutto`|`WartoscBrutto` / `TerminPlatnosci`: `oplacone`, `oplaconeCzesciowo`, `nieoplacone`, `przeterminowane`.
    (Lista faktur zwraca `Brutto`; szczegóły `fakturakraj/{id}` — `WartoscBrutto`.)
-4. Zapis cache na `debt_cases` + wpis historii `ifirma_sync`.
-5. Sync **zawsze nadpisuje** na sprawie `invoice_date` ← `DataWystawienia` oraz `due_date` ← `TerminPlatnosci` (gdy API je zwraca) — nie zostawia szacunku `order_date + delay`.
-6. Te same daty zapisuje też na zamówieniu: `form_orders.invoice_issue_date` / `invoice_due_date` (oraz uzupełnia `ifirma_invoice_id` / `invoice_number` gdy brak).
-7. Na karcie sprawy **„Odśwież status z iFirma”**: gdy sync zwróci `oplacone` i sprawa nie jest `closed`/`disputed` → **auto-zamknięcie** (`DebtCaseAutoCloseService`, powód: po odświeżeniu statusu). Flash: „… Sprawę zamknięto automatycznie.”
-8. **Auto-zamknięcie po akceptacji przelewu z wyciągu** (osobna ścieżka): gdy status iFirma = `oplacone` po **Akceptuj + wpłata w iFirma** albo po **Zaakceptuj jako opłacone w iFirma** / fladze `ifirma_already_paid` — sprawa dostaje `close` + `closed_at`, o ile nie jest już `closed` ani `disputed`. „Tylko lokalnie” bez potwierdzenia pełnej opłaty **nie** zamyka.
+5. Zapis cache na `debt_cases` + wpis historii `ifirma_sync`.
+6. Sync **zawsze nadpisuje** na sprawie `invoice_date` ← `DataWystawienia` oraz `due_date` ← `TerminPlatnosci` (gdy API je zwraca) — nie zostawia szacunku `order_date + delay`.
+7. Te same daty zapisuje też na zamówieniu: `form_orders.invoice_issue_date` / `invoice_due_date` (oraz uzupełnia `ifirma_invoice_id` / `invoice_number` gdy brak). Nie podmienia ID ani numeru, które już są na zamówieniu.
+8. Na karcie sprawy **„Odśwież status z iFirma”**: gdy sync zwróci `oplacone` i sprawa nie jest `closed`/`disputed` → **auto-zamknięcie** (`DebtCaseAutoCloseService`, powód: po odświeżeniu statusu). Flash: „… Sprawę zamknięto automatycznie.”
+9. **Auto-zamknięcie po akceptacji przelewu z wyciągu** (osobna ścieżka): gdy status iFirma = `oplacone` po **Akceptuj + wpłata w iFirma** albo po **Zaakceptuj jako opłacone w iFirma** / fladze `ifirma_already_paid` — sprawa dostaje `close` + `closed_at`, o ile nie jest już `closed` ani `disputed`. „Tylko lokalnie” bez potwierdzenia pełnej opłaty **nie** zamyka.
 
 Daty FV na zamówieniu są też zapisywane **przy wystawianiu** faktury w panelu (`DataWystawienia` / `TerminPlatnosci` z payloadu). Tworzenie sprawy preferuje `invoice_issue_date` / `invoice_due_date`; dopiero gdy brak — szacunek od daty zamówienia/wystawienia + `invoice_payment_delay`.
+
+## Rozjazd numeru faktury po korekcie
+
+Przy utworzeniu sprawy kopiowane są `invoice_number`, `ksef_number` i `ifirma_invoice_id`. Karta sprawy pokazuje tę kopię. Po korekcie anulującej zamówienie dostaje nowy numer i nowe ID (KSeF często chwilę później), a notatka zostaje w `form_orders.notes`.
+
+Wejście na `/accounting/collections/{id}` porównuje kopię ze sprawą z zamówieniem:
+
+- inny niepusty numer FV, inny KSeF albo inne ID → modal Bootstrap z różnicą, notatką zamówienia i przyciskiem **Zaktualizuj dane faktury na podstawie zamówienia**,
+- pusty numer w zamówieniu (korekta w toku) → ten sam modal z notatką, bez przycisku; sprawa nie jest czyszczona,
+- ten sam numer, a na sprawie brakuje tylko KSeF albo ID → bez modalu; „Odśwież status z iFirma” dopisuje brakujące pole.
+
+Aktualizacja przepisuje na sprawę bieżący dokument z zamówienia. Gdy numer FV się zmienił, stary KSeF i stare ID są usuwane, jeśli nowa faktura ich jeszcze nie ma. Potem status i daty są odświeżane z iFirma. PDF na sprawie zostaje — w oknie jest ostrzeżenie, że plik może być ze starej faktury.
+
+Istniejące sprawy, których numer zgadza się z zamówieniem, dostają ID (i brakujący KSeF) z migracji `2026_10_09_130000_add_ifirma_invoice_id_to_debt_cases_table.php`. Tam, gdzie numery już się różnią, stare ID nie było zapisane — modal pokazuje ID z zamówienia.
 
 **Auto-sync przy utworzeniu sprawy:** po `collections.store` (lista windykacji, debtors, form-orders) oraz po utworzeniu sprawy przy akceptacji/ręcznym powiązaniu przelewu z bank-imports (`BankStatementImportService::createDebtCaseFromOrder`) wywoływany jest ten sam sync statusu iFirma (best-effort; przy błędzie API sprawa powstaje, flash `warning`). Przywrócenie soft-deleted sprawy też odświeża status.
 

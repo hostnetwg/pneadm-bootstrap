@@ -536,3 +536,8 @@ i kolejkuje `POST ksef/send` dla nowego ID.
 
 Joby KSeF przenoszą oczekiwany `ifirma_invoice_id`. Opóźniony job starej faktury
 kończy się bez działania, jeżeli zamówienie wskazuje już inny dokument.
+
+Sprawa windykacyjna trzyma własną kopię numeru, KSeF i ID z chwili utworzenia.
+Po korekcie karta sprawy pokazuje okno z różnicą i notatką z zamówienia.
+Dopiero przycisk „Zaktualizuj dane faktury na podstawie zamówienia” przepisuje
+nowy dokument na sprawę. Kanon: [WINDYKACJA.md](./WINDYKACJA.md).

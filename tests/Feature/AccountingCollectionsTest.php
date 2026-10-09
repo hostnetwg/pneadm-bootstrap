@@ -274,6 +274,7 @@ class AccountingCollectionsTest extends TestCase
         $this->assertDatabaseHas('debt_cases', [
             'form_order_id' => $order->id,
             'invoice_number' => '43/7/2026',
+            'ifirma_invoice_id' => '998877',
             'status' => DebtCase::STATUS_OPEN,
             'created_by' => $user->id,
             'assigned_to_id' => $user->id,
@@ -1619,5 +1620,185 @@ class AccountingCollectionsTest extends TestCase
         );
         $response->assertRedirect(route('accounting.collections.show', $case));
         $response->assertSessionHas('success');
+    }
+
+    public function test_collections_show_warns_when_order_invoice_replaced_the_case_copy(): void
+    {
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+            'is_active' => 1,
+        ]);
+        $order = FormOrder::create([
+            'product_name' => 'Szkolenie po korekcie',
+            'product_price' => 365,
+            'order_date' => now()->subDays(10),
+            'invoice_number' => '76/2026',
+            'ksef_number' => null,
+            'ifirma_invoice_id' => '222',
+            'notes' => 'Korekta faktury 76/2026 dla 675/8/2026',
+        ]);
+        $case = DebtCase::create([
+            'form_order_id' => $order->id,
+            'status' => DebtCase::STATUS_OPEN,
+            'invoice_number' => '675/8/2026',
+            'ksef_number' => 'KSEF-OLD',
+            'ifirma_invoice_id' => '111',
+            'amount_gross' => 365,
+            'opened_at' => now(),
+        ]);
+
+        $show = $this->actingAs($user)->get(route('accounting.collections.show', $case));
+
+        $show->assertOk();
+        $show->assertSee('Faktura na sprawie różni się od zamówienia', false);
+        $show->assertSee('Korekta faktury 76/2026 dla 675/8/2026', false);
+        $show->assertSee('Zaktualizuj dane faktury na podstawie zamówienia', false);
+        $show->assertSee('675/8/2026', false);
+        $show->assertSee('76/2026', false);
+        $show->assertSee('ID: 111', false);
+        $show->assertDontSee('ID: 222', false);
+    }
+
+    public function test_refresh_invoice_from_order_copies_current_invoice_and_syncs_ifirma(): void
+    {
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+            'is_active' => 1,
+        ]);
+        $order = FormOrder::create([
+            'product_name' => 'Szkolenie po korekcie',
+            'product_price' => 365,
+            'order_date' => now()->subDays(10),
+            'invoice_number' => '76/2026',
+            'invoice_issue_date' => '2026-10-01',
+            'invoice_due_date' => '2026-10-20',
+            'ifirma_invoice_id' => '222',
+            'notes' => 'Korekta faktury 76/2026 dla 675/8/2026',
+        ]);
+        $case = DebtCase::create([
+            'form_order_id' => $order->id,
+            'status' => DebtCase::STATUS_OPEN,
+            'invoice_number' => '675/8/2026',
+            'ksef_number' => 'KSEF-OLD',
+            'ifirma_invoice_id' => '111',
+            'amount_gross' => 200,
+            'opened_at' => now(),
+        ]);
+
+        $this->partialMock(\App\Services\IfirmaApiService::class, function ($mock) {
+            $mock->shouldReceive('getInvoice')
+                ->once()
+                ->with('222')
+                ->andReturn([
+                    'status' => 'success',
+                    'data' => [
+                        'PelnyNumer' => '76/2026',
+                        'FakturaId' => '222',
+                        'Zaplacono' => 0,
+                        'Brutto' => 365,
+                        'DataWystawienia' => '2026-10-01',
+                        'TerminPlatnosci' => '2026-10-20',
+                    ],
+                ]);
+        });
+
+        $response = $this->actingAs($user)->post(route('accounting.collections.refresh-invoice-from-order', $case));
+
+        $response->assertRedirect(route('accounting.collections.show', $case));
+        $response->assertSessionHas('success');
+        $case->refresh();
+        $order->refresh();
+        $this->assertSame('76/2026', $case->invoice_number);
+        $this->assertNull($case->ksef_number);
+        $this->assertSame('222', $case->ifirma_invoice_id);
+        $this->assertSame('222', $order->ifirma_invoice_id);
+        $this->assertSame('76/2026', $order->invoice_number);
+        $this->assertSame('2026-10-01', $case->invoice_date?->toDateString());
+        $this->assertSame('2026-10-20', $case->due_date?->toDateString());
+        $this->assertDatabaseHas('debt_case_actions', [
+            'debt_case_id' => $case->id,
+            'action_type' => DebtCaseAction::TYPE_INVOICE_IDENTITY,
+            'user_id' => $user->id,
+        ]);
+    }
+
+    public function test_refresh_invoice_from_order_does_nothing_while_order_invoice_is_empty(): void
+    {
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+            'is_active' => 1,
+        ]);
+        $order = FormOrder::create([
+            'product_name' => 'Korekta w toku',
+            'product_price' => 365,
+            'order_date' => now()->subDays(10),
+            'invoice_number' => null,
+            'ifirma_invoice_id' => null,
+            'notes' => 'Korekta faktury 76/2026 dla 675/8/2026',
+        ]);
+        $case = DebtCase::create([
+            'form_order_id' => $order->id,
+            'status' => DebtCase::STATUS_OPEN,
+            'invoice_number' => '675/8/2026',
+            'ksef_number' => 'KSEF-OLD',
+            'ifirma_invoice_id' => '111',
+            'opened_at' => now(),
+        ]);
+
+        $show = $this->actingAs($user)->get(route('accounting.collections.show', $case));
+        $show->assertOk();
+        $show->assertSee('Zamówienie nie ma aktualnej faktury', false);
+        $show->assertSee('Korekta faktury 76/2026 dla 675/8/2026', false);
+        $show->assertDontSee('Zaktualizuj dane faktury na podstawie zamówienia', false);
+
+        $this->partialMock(\App\Services\IfirmaApiService::class, function ($mock) {
+            $mock->shouldNotReceive('getInvoice');
+        });
+
+        $response = $this->actingAs($user)->post(route('accounting.collections.refresh-invoice-from-order', $case));
+
+        $response->assertRedirect(route('accounting.collections.show', $case));
+        $response->assertSessionHas('error');
+        $case->refresh();
+        $this->assertSame('675/8/2026', $case->invoice_number);
+        $this->assertSame('KSEF-OLD', $case->ksef_number);
+        $this->assertSame('111', $case->ifirma_invoice_id);
+    }
+
+    public function test_ifirma_sync_refuses_to_query_a_stale_case_invoice(): void
+    {
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+            'is_active' => 1,
+        ]);
+        $order = FormOrder::create([
+            'product_name' => 'Nowa faktura',
+            'product_price' => 365,
+            'order_date' => now()->subDays(10),
+            'invoice_number' => '76/2026',
+            'ifirma_invoice_id' => '222',
+        ]);
+        $case = DebtCase::create([
+            'form_order_id' => $order->id,
+            'status' => DebtCase::STATUS_OPEN,
+            'invoice_number' => '675/8/2026',
+            'ifirma_invoice_id' => '111',
+            'opened_at' => now(),
+        ]);
+
+        $this->partialMock(\App\Services\IfirmaApiService::class, function ($mock) {
+            $mock->shouldNotReceive('getInvoice');
+        });
+
+        $response = $this->actingAs($user)->post(route('accounting.collections.sync-ifirma', $case));
+
+        $response->assertRedirect(route('accounting.collections.show', $case));
+        $response->assertSessionHasErrors('ifirma_sync');
+        $case->refresh();
+        $order->refresh();
+        $this->assertSame('675/8/2026', $case->invoice_number);
+        $this->assertSame('111', $case->ifirma_invoice_id);
+        $this->assertSame('76/2026', $order->invoice_number);
+        $this->assertSame('222', $order->ifirma_invoice_id);
     }
 }

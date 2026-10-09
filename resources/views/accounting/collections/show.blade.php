@@ -199,17 +199,29 @@
                     <div class="card h-100 case-details-card">
                         <div class="card-header py-2 fw-semibold d-flex flex-wrap align-items-center justify-content-between gap-2">
                             <span>Dane sprawy</span>
+                            <div class="d-flex flex-wrap align-items-center gap-2">
+                                @if($invoiceDrift['show_modal'] ?? false)
+                                    <button type="button"
+                                            class="btn btn-warning btn-sm py-0 px-2"
+                                            data-bs-toggle="modal"
+                                            data-bs-target="#invoiceIdentityDriftModal">
+                                        <i class="bi bi-exclamation-triangle"></i>
+                                        {{ ($invoiceDrift['order_invoice_cleared'] ?? false) ? 'Zamówienie bez aktualnej faktury' : 'Faktura różni się od zamówienia' }}
+                                    </button>
+                                @endif
                             <form method="POST" action="{{ route('accounting.collections.sync-ifirma', $case) }}" class="mb-0" data-loading-submit data-loading-text="Odświeżam…">
                                 @csrf
                                 <button type="submit" class="btn btn-outline-primary btn-sm py-0 px-2" data-loading-text="Odświeżam…">
                                     <i class="bi bi-arrow-repeat"></i> Odśwież status z iFirma
                                 </button>
                             </form>
+                            </div>
                         </div>
                         <div class="card-body p-3">
                             @php
-                                $invoiceNo = $case->invoice_number ?: $order->invoice_number ?: null;
-                                $ksefNo = $case->ksef_number ?: $order->ksef_number ?: null;
+                                $invoiceNo = $invoicePresentation['invoice_number'] ?? ($case->invoice_number ?: null);
+                                $ksefNo = $invoicePresentation['ksef_number'] ?? ($case->ksef_number ?: null);
+                                $ifirmaId = $invoicePresentation['ifirma_invoice_id'] ?? ($case->ifirma_invoice_id ?: null);
                                 $amountGross = (float) ($case->amount_gross ?? $order->product_price ?? 0);
                                 $hasBuyer = filled($order->buyer_name) || filled($order->buyer_address) || filled($order->buyer_city) || filled($order->buyer_nip);
                                 $hasRecipient = filled($order->recipient_name) || filled($order->recipient_address) || filled($order->recipient_city) || filled($order->recipient_nip);
@@ -355,12 +367,12 @@
                                 <div class="col-md-4 col-xl-3">
                                     <div class="border rounded-2 h-100 p-2 text-center">
                                         <div class="text-muted small text-uppercase mb-1 fw-bold" style="letter-spacing: .03em;">Status iFirma</div>
-                                        @if($order->hasIfirmaInvoiceId())
+                                        @if($ifirmaId)
                                             <div class="lh-sm mb-1">
                                                 <code class="user-select-all"
                                                       data-bs-toggle="tooltip"
-                                                      data-bs-title="ID iFirma"
-                                                      title="ID iFirma">ID: {{ $order->ifirma_invoice_id }}</code>
+                                                      data-bs-title="ID iFirma zapisane przy sprawie"
+                                                      title="ID iFirma">ID: {{ $ifirmaId }}</code>
                                             </div>
                                         @endif
                                         @if($case->ifirma_payment_status)
@@ -1176,6 +1188,110 @@
             </div>
         </div>
     </div>
+
+    @if($invoiceDrift['show_modal'] ?? false)
+        <div class="modal fade" id="invoiceIdentityDriftModal" tabindex="-1" aria-labelledby="invoiceIdentityDriftModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header text-bg-warning">
+                        <h5 class="modal-title" id="invoiceIdentityDriftModalLabel">
+                            @if($invoiceDrift['order_invoice_cleared'] ?? false)
+                                Zamówienie nie ma aktualnej faktury
+                            @else
+                                Faktura na sprawie różni się od zamówienia
+                            @endif
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+                    </div>
+                    <div class="modal-body">
+                        @if($invoiceDrift['order_invoice_cleared'] ?? false)
+                            <p class="mb-3">
+                                W zamówieniu
+                                <a href="{{ route('form-orders.show', $order->id) }}">#{{ $order->id }}</a>
+                                numer faktury jest pusty. Sprawa zostaje przy dotychczasowych danych.
+                                Aktualizacja włączy się, gdy w zamówieniu pojawi się nowa faktura.
+                            </p>
+                        @else
+                            <p class="mb-3">
+                                Źródłem bieżącej faktury jest zamówienie
+                                <a href="{{ route('form-orders.show', $order->id) }}">#{{ $order->id }}</a>.
+                                Sprawa ma jeszcze poprzednią kopię. Kolejne przypomnienie użyje numeru ze sprawy.
+                            </p>
+                        @endif
+
+                        <div class="table-responsive mb-3">
+                            <table class="table table-sm align-middle mb-0">
+                                <thead>
+                                    <tr>
+                                        <th></th>
+                                        <th>Sprawa</th>
+                                        <th>Zamówienie</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach($invoiceDrift['fields'] as $field)
+                                        <tr @class(['table-warning' => $field['changed']])>
+                                            <th class="text-nowrap">{{ $field['label'] }}</th>
+                                            <td class="text-break">{{ $field['case'] ?: '—' }}</td>
+                                            <td class="text-break">
+                                                @if($field['key'] === 'ksef_number' && ($invoiceDrift['clears_ksef'] ?? false))
+                                                    brak — nowa faktura nie ma jeszcze numeru KSeF
+                                                @else
+                                                    {{ $field['order'] ?: '—' }}
+                                                @endif
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+
+                        @if($invoiceDrift['notes'] ?? null)
+                            <div class="mb-3">
+                                <div class="small text-uppercase text-muted fw-bold mb-1">Notatka w zamówieniu</div>
+                                <div class="border rounded p-2 bg-light" style="white-space: pre-line;">{{ $invoiceDrift['notes'] }}</div>
+                            </div>
+                        @endif
+
+                        @if($invoiceDrift['clears_ksef'] ?? false)
+                            <div class="alert alert-warning small mb-3">
+                                KSeF na sprawie należy do poprzedniej faktury. Po aktualizacji zostanie usunięty, dopóki nowa faktura nie dostanie numeru KSeF.
+                            </div>
+                        @endif
+
+                        @if(($invoiceDrift['invoice_replaced'] ?? false) && ($caseHasInvoicePdf ?? $case->hasInvoicePdf()))
+                            <div class="alert alert-warning small mb-0">
+                                PDF na sprawie może być ze starej faktury. Po aktualizacji numeru wgraj nowy plik albo usuń obecny.
+                            </div>
+                        @endif
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Zamknij</button>
+                        @if($invoiceDrift['can_update'] ?? false)
+                            <form method="POST"
+                                  action="{{ route('accounting.collections.refresh-invoice-from-order', $case) }}"
+                                  class="mb-0"
+                                  data-loading-submit
+                                  data-loading-text="Aktualizuję…">
+                                @csrf
+                                <button type="submit" class="btn btn-warning" data-loading-text="Aktualizuję…">
+                                    Zaktualizuj dane faktury na podstawie zamówienia
+                                </button>
+                            </form>
+                        @endif
+                    </div>
+                </div>
+            </div>
+        </div>
+        <script>
+            document.addEventListener('DOMContentLoaded', function () {
+                var el = document.getElementById('invoiceIdentityDriftModal');
+                if (el && window.bootstrap) {
+                    window.bootstrap.Modal.getOrCreateInstance(el).show();
+                }
+            });
+        </script>
+    @endif
 
     @if($caseHasInvoicePdf ?? $case->hasInvoicePdf())
     <div class="modal fade" id="caseInvoicePdfPreviewModal" tabindex="-1" aria-labelledby="caseInvoicePdfPreviewModalLabel" aria-hidden="true">

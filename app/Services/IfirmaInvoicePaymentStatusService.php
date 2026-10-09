@@ -30,8 +30,11 @@ class IfirmaInvoicePaymentStatusService
     private const AMOUNT_EPSILON = 0.009;
 
     public function __construct(
-        private IfirmaApiService $api
-    ) {}
+        private IfirmaApiService $api,
+        private ?DebtCaseInvoiceIdentityService $invoiceIdentity = null,
+    ) {
+        $this->invoiceIdentity ??= new DebtCaseInvoiceIdentityService;
+    }
 
     /**
      * @return array{
@@ -53,7 +56,7 @@ class IfirmaInvoicePaymentStatusService
      * Best-effort sync po utworzeniu sprawy — nie przerywa flow gdy iFirma nie odpowie.
      * Gdy wywołane w transakcji DB, sync odpala się po commit (API poza lockiem).
      *
-     * @return array{success: bool, message: string, status?: string}|null  null = zaplanowano po commit
+     * @return array{success: bool, message: string, status?: string}|null null = zaplanowano po commit
      */
     public function syncDebtCaseAfterCreate(DebtCase $case, ?User $user = null): ?array
     {
@@ -107,10 +110,20 @@ class IfirmaInvoicePaymentStatusService
             ];
         }
 
+        $identity = $this->invoiceIdentity->compare($case);
+        if ($identity['can_update'] || $identity['order_invoice_cleared']) {
+            return [
+                'success' => false,
+                'message' => $identity['order_invoice_cleared']
+                    ? 'Zamówienie nie ma aktualnego numeru faktury. Nie odświeżam statusu z iFirma, żeby nie przywrócić anulowanej faktury.'
+                    : 'Dane faktury na sprawie różnią się od zamówienia. Najpierw zaktualizuj je na karcie sprawy.',
+            ];
+        }
+
         $snapshot = $this->fetchPaymentSnapshotForOrder(
             $order,
-            $case->invoice_number ?: null,
-            $case->invoice_date
+            null,
+            $order->invoice_issue_date ?? $case->invoice_date
         );
         if (! ($snapshot['success'] ?? false)) {
             return [
@@ -121,6 +134,8 @@ class IfirmaInvoicePaymentStatusService
 
         $previousStatus = $case->ifirma_payment_status;
         $status = (string) $snapshot['status'];
+
+        $this->invoiceIdentity->fillBlanksWhenSameInvoice($case);
 
         $case->ifirma_payment_status = $status;
         $case->ifirma_synced_at = now();
@@ -147,7 +162,7 @@ class IfirmaInvoicePaymentStatusService
         $orderDirty = false;
         if (! empty($snapshot['invoice_id'])) {
             $invoiceId = (string) $snapshot['invoice_id'];
-            if (empty($order->ifirma_invoice_id) || (string) $order->ifirma_invoice_id !== $invoiceId) {
+            if (trim((string) ($order->ifirma_invoice_id ?? '')) === '') {
                 $order->ifirma_invoice_id = $invoiceId;
                 $orderDirty = true;
             }
