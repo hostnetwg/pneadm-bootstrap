@@ -697,26 +697,15 @@ class DebtReminderTemplateService
     }
 
     /**
-     * Fragment wstawiany po numerze FV w SMS (opcjonalnie, checkbox w modalu).
-     * Przykład: ` SZKOLENIE: Tytuł skrócony...`
+     * @deprecated Skrót tytułu jest w treści SMS; snippet opcjonalny usunięty z UI.
      */
     public function smsTrainingSnippet(DebtCase $case, int $maxTitleChars = 40): ?string
     {
-        $order = $case->formOrder;
-        if ($order !== null && ! $order->relationLoaded('course')) {
-            $order->loadMissing('course');
-        }
-
-        $title = trim($this->trainingContext($order)['title']);
-        if ($title === '' || $title === '—') {
-            return null;
-        }
-
-        return ' SZKOLENIE: '.$this->shortenSmsTitle($title, $maxTitleChars);
+        return null;
     }
 
     /**
-     * Marker w treści SMS, po którym wstawiamy snippet szkolenia (np. `FV 100/9/2026`).
+     * Marker FV w treści SMS (np. pod checkbox nr konta / legacy JS).
      */
     public function smsInvoiceMarker(DebtCase $case): string
     {
@@ -740,7 +729,43 @@ class DebtReminderTemplateService
     }
 
     /**
-     * Szablony SMS. Konto / nazwa szkolenia — checkboxy w UI (konto domyślnie OFF).
+     * Skrót tematu do SMS: 2 pierwsze wyrazy (+ trzeci, gdy drugi to krótki przyimek, np. „na”),
+     * potem „...”. Przykład: „Konkurs na dyrektora...”.
+     */
+    public function smsShortTrainingTitle(string $title, int $wordCount = 2): string
+    {
+        $title = trim(preg_replace('/\s+/u', ' ', $title) ?? '');
+        $title = rtrim($title, " \t.");
+        if ($title === '' || $title === '—') {
+            return '';
+        }
+
+        $words = preg_split('/\s+/u', $title, -1, PREG_SPLIT_NO_EMPTY);
+        if ($words === false || $words === []) {
+            return '';
+        }
+
+        $take = min($wordCount, count($words));
+        $shortPreps = ['na', 'i', 'w', 'o', 'z', 'do', 'od', 'we', 'ze', 'u', 'a', 'oraz', 'dla', 'po'];
+        if (
+            $take >= 2
+            && isset($words[$take - 1], $words[$take])
+            && in_array(mb_strtolower($words[$take - 1]), $shortPreps, true)
+        ) {
+            $take++;
+        }
+
+        $short = implode(' ', array_slice($words, 0, $take));
+        if ($take >= count($words)) {
+            return $short;
+        }
+
+        return $short.'...';
+    }
+
+    /**
+     * Szablony SMS. Nr konta — opcjonalny checkbox w UI (domyślnie OFF).
+     * Skrót tematu szkolenia jest w treści przypomnienia.
      *
      * @return array{body: string, invoice_marker: string, training_snippet: ?string, bank_snippet: ?string}
      */
@@ -758,25 +783,39 @@ class DebtReminderTemplateService
                 $amount,
                 $due
             ),
-            default => $this->reminderSmsBody($case, $invoice, $amount),
+            default => $this->reminderSmsBody($case, $order, $invoice, $amount),
         };
 
         return [
             'body' => $body,
             'invoice_marker' => 'FV '.$invoice,
-            'training_snippet' => $this->smsTrainingSnippet($case),
+            'training_snippet' => null,
             'bank_snippet' => $this->smsBankSnippet(),
         ];
     }
 
-    private function reminderSmsBody(DebtCase $case, string $invoice, string $amount): string
+    private function reminderSmsBody(DebtCase $case, ?FormOrder $order, string $invoice, string $amount): string
     {
-        $parts = [
-            'Platforma Nowoczesnej Edukacji: nie odnotowaliśmy wpłaty '.$amount.' zł za szkolenie, FV '.$invoice.'.',
-        ];
+        if ($order !== null && ! $order->relationLoaded('course')) {
+            $order->loadMissing('course');
+        }
+
+        $shortTitle = $this->smsShortTrainingTitle($this->trainingContext($order)['title']);
+        if ($shortTitle !== '') {
+            $opening = 'Platforma Nowoczesnej Edukacji: nie odnotowaliśmy wpłaty '.$amount.' zł za szkolenie: '.$shortTitle;
+            if (! str_ends_with($shortTitle, '...')) {
+                $opening .= '.';
+            }
+        } else {
+            $opening = 'Platforma Nowoczesnej Edukacji: nie odnotowaliśmy wpłaty '.$amount.' zł za szkolenie.';
+        }
+
+        $parts = [$opening];
 
         if ($this->hasConfirmedInvoiceEmailSent($case)) {
-            $parts[] = 'Fakturę wysłaliśmy e-mailem.';
+            $parts[] = 'Fakturę FV '.$invoice.' wysłaliśmy e-mailem.';
+        } else {
+            $parts[] = 'Dotyczy FV '.$invoice.'.';
         }
 
         $parts[] = 'Prosimy o zapłatę na rachunek z faktury.';

@@ -694,8 +694,6 @@ class AccountingController extends Controller
             'reminderSmsTemplatePayloads' => $reminderSmsTemplatePayloads,
             'reminderSmsOrderer' => $reminderTemplates->ordererSmsRecipient($debtCase),
             'reminderSmsTestPhones' => $reminderTemplates->smsTestPhoneOptions(),
-            'reminderSmsTrainingSnippet' => $reminderTemplates->smsTrainingSnippet($debtCase),
-            'reminderSmsInvoiceMarker' => $reminderTemplates->smsInvoiceMarker($debtCase),
             'reminderSmsBankSnippet' => $reminderTemplates->smsBankSnippet(),
             'reminderSmsCompanionEmails' => $reminderTemplates->companionEmailRecipients($debtCase),
             'reminderSmsCanAttachIfirma' => $reminderTemplates->canAttachIfirmaPdf($debtCase),

@@ -1628,14 +1628,10 @@
     </div>
 
     @php
-        $smsTrainingSnippet = $reminderSmsTrainingSnippet ?? null;
-        $smsInvoiceMarker = $reminderSmsInvoiceMarker ?? '';
         $smsBankSnippet = $reminderSmsBankSnippet ?? null;
     @endphp
     <div class="modal fade" id="debtReminderSmsModal" tabindex="-1" aria-labelledby="debtReminderSmsModalLabel" aria-hidden="true"
          data-templates='@json($reminderSmsTemplatePayloads ?? [])'
-         data-training-snippet='@json($smsTrainingSnippet)'
-         data-invoice-marker='@json($smsInvoiceMarker)'
          data-bank-snippet='@json($smsBankSnippet)'>
         <div class="modal-dialog modal-dialog-scrollable">
             <div class="modal-content">
@@ -1681,24 +1677,6 @@
                         </div>
 
                         <div class="mb-3">
-                            <input type="hidden" name="include_sms_training" value="0">
-                            <div class="form-check mb-2">
-                                <input class="form-check-input"
-                                       type="checkbox"
-                                       value="1"
-                                       id="debtReminderSmsIncludeTraining"
-                                       name="include_sms_training"
-                                       @checked((string) old('include_sms_training', '0') === '1')
-                                       @disabled($smsTrainingSnippet === null)>
-                                <label class="form-check-label" for="debtReminderSmsIncludeTraining">
-                                    Dodaj nazwę produktu po numerze FV
-                                    @if($smsTrainingSnippet)
-                                        <span class="text-muted d-block small font-monospace">{{ ltrim($smsTrainingSnippet) }}</span>
-                                    @else
-                                        <span class="text-muted d-block small">Brak tytułu szkolenia / produktu na zamówieniu.</span>
-                                    @endif
-                                </label>
-                            </div>
                             <input type="hidden" name="include_sms_bank" value="0">
                             <div class="form-check mb-2">
                                 <input class="form-check-input"
@@ -2239,30 +2217,17 @@
                     templates = {};
                 }
 
-                var trainingSnippet = '';
                 var bankSnippet = '';
-                var invoiceMarker = '';
-                try {
-                    trainingSnippet = JSON.parse(modalEl.getAttribute('data-training-snippet') || 'null') || '';
-                } catch (e) {
-                    trainingSnippet = '';
-                }
                 try {
                     bankSnippet = JSON.parse(modalEl.getAttribute('data-bank-snippet') || 'null') || '';
                 } catch (e) {
                     bankSnippet = '';
-                }
-                try {
-                    invoiceMarker = JSON.parse(modalEl.getAttribute('data-invoice-marker') || '""') || '';
-                } catch (e) {
-                    invoiceMarker = '';
                 }
 
                 var templateSelect = document.getElementById('debtReminderSmsTemplate');
                 var bodyInput = document.getElementById('debtReminderSmsBody');
                 var lengthEl = document.getElementById('debtReminderSmsLength');
                 var partsEl = document.getElementById('debtReminderSmsParts');
-                var trainingCheckbox = document.getElementById('debtReminderSmsIncludeTraining');
                 var bankCheckbox = document.getElementById('debtReminderSmsIncludeBank');
                 var keepEdited = {{ old('body') && old('test_phone') !== null ? 'true' : 'false' }};
 
@@ -2294,30 +2259,11 @@
                     return text.replace(new RegExp(escapeRegExp(snippet), 'g'), '');
                 }
 
-                function insertTrainingAfterInvoice(text) {
-                    var base = stripSnippet(text || '', trainingSnippet);
-                    if (!trainingSnippet) {
-                        return base;
-                    }
-                    if (!invoiceMarker) {
-                        return base + trainingSnippet;
-                    }
-                    var pos = base.indexOf(invoiceMarker);
-                    if (pos === -1) {
-                        return base + trainingSnippet;
-                    }
-                    var at = pos + invoiceMarker.length;
-                    return base.slice(0, at) + trainingSnippet + base.slice(at);
-                }
-
                 function syncOptionalSnippets() {
                     if (!bodyInput) {
                         return;
                     }
-                    var text = stripSnippet(stripSnippet(bodyInput.value || '', bankSnippet), trainingSnippet);
-                    if (trainingCheckbox && trainingCheckbox.checked && trainingSnippet) {
-                        text = insertTrainingAfterInvoice(text);
-                    }
+                    var text = stripSnippet(bodyInput.value || '', bankSnippet);
                     if (bankCheckbox && bankCheckbox.checked && bankSnippet) {
                         text = stripSnippet(text, bankSnippet) + bankSnippet;
                     }
@@ -2341,9 +2287,6 @@
                     templateSelect.addEventListener('change', function () {
                         applyTemplate(true);
                     });
-                }
-                if (trainingCheckbox) {
-                    trainingCheckbox.addEventListener('change', syncOptionalSnippets);
                 }
                 if (bankCheckbox) {
                     bankCheckbox.addEventListener('change', syncOptionalSnippets);

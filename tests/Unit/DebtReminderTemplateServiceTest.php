@@ -186,9 +186,28 @@ class DebtReminderTemplateServiceTest extends TestCase
 
         $sms = $service->buildSms($case->fresh(['formOrder', 'bankTransactionMatches.transaction', 'actions']), DebtReminderTemplateService::TEMPLATE_REMINDER);
         $this->assertStringContainsString('265,00 zł', $sms['body']);
-        $this->assertStringContainsString('Fakturę wysłaliśmy e-mailem.', $sms['body']);
+        $this->assertStringContainsString('za szkolenie: Szkolenie saldo', $sms['body']);
+        $this->assertStringContainsString('Fakturę FV 649/9/2026 wysłaliśmy e-mailem.', $sms['body']);
         $this->assertStringContainsString('Kontakt: 501 654 274.', $sms['body']);
         $this->assertStringStartsWith('Platforma Nowoczesnej Edukacji:', $sms['body']);
+    }
+
+    public function test_sms_short_training_title_takes_two_words_and_preposition_extension(): void
+    {
+        $service = app(DebtReminderTemplateService::class);
+
+        $this->assertSame(
+            'Konkurs na dyrektora...',
+            $service->smsShortTrainingTitle('Konkurs na dyrektora szkoły podstawowej w Warszawie')
+        );
+        $this->assertSame(
+            'AI w edukacji',
+            $service->smsShortTrainingTitle('AI w edukacji')
+        );
+        $this->assertSame(
+            'Działalność i protokołowanie...',
+            $service->smsShortTrainingTitle('Działalność i protokołowanie rad pedagogicznych.')
+        );
     }
 
     public function test_reminder_without_training_title_uses_generic_sentence(): void

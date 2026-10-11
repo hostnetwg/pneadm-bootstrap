@@ -94,36 +94,33 @@ class DebtReminderSmsTest extends TestCase
         $response->assertSee('Wyślij SMS', false);
         $response->assertSee('+48 501 111 222', false);
         $response->assertSee('0 SMS-ów', false);
-        $response->assertSee('Dodaj nazwę produktu po numerze FV', false);
-        $response->assertSee('debtReminderSmsIncludeTraining', false);
+        $response->assertDontSee('Dodaj nazwę produktu po numerze FV', false);
+        $response->assertDontSee('debtReminderSmsIncludeTraining', false);
         $response->assertSee('Dodaj nr konta bankowego', false);
         $response->assertSee('debtReminderSmsIncludeBank', false);
         $response->assertSee('Wyślij też e-mail przypomnienia tuż przed SMS', false);
         $response->assertSee('debtReminderSmsAlsoSendEmail', false);
-        $response->assertSee('SZKOLENIE: Szkolenie SMS', false);
+        $response->assertSee('za szkolenie: Szkolenie SMS', false);
     }
 
-    public function test_sms_training_snippet_shortens_long_title(): void
+    public function test_sms_reminder_includes_short_training_title(): void
     {
         [, $case] = $this->caseWithOrder([
             'product_name' => 'Bardzo długi tytuł szkolenia z zarządzania projektami edukacyjnymi i coachingiem',
         ]);
 
         $templates = app(DebtReminderTemplateService::class);
-        $snippet = $templates->smsTrainingSnippet($case, 40);
-
-        $this->assertNotNull($snippet);
-        $this->assertStringStartsWith(' SZKOLENIE: ', $snippet);
-        $this->assertStringEndsWith('...', $snippet);
+        $this->assertNull($templates->smsTrainingSnippet($case, 40));
         $this->assertSame('FV 100/9/2026', $templates->smsInvoiceMarker($case));
 
         $payload = $templates->buildSms($case, DebtReminderTemplateService::TEMPLATE_REMINDER);
-        $this->assertStringContainsString('FV 100/9/2026', $payload['body']);
+        $this->assertStringContainsString('za szkolenie: Bardzo długi...', $payload['body']);
+        $this->assertStringContainsString('Dotyczy FV 100/9/2026.', $payload['body']);
         $this->assertStringContainsString('Platforma Nowoczesnej Edukacji:', $payload['body']);
         $this->assertStringContainsString('Prosimy o zapłatę na rachunek z faktury.', $payload['body']);
         $this->assertStringNotContainsString('SZKOLENIE:', $payload['body']);
         $this->assertStringNotContainsString('Konto:', $payload['body']);
-        $this->assertSame($snippet, $payload['training_snippet']);
+        $this->assertNull($payload['training_snippet']);
     }
 
     public function test_sms_bank_snippet_from_payment_display_options(): void
