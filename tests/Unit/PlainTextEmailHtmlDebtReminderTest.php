@@ -12,7 +12,7 @@ class PlainTextEmailHtmlDebtReminderTest extends TestCase
         $plain = implode("\n", [
             'Dzień dobry,',
             '',
-            'Szkolenie:',
+            'SZKOLENIE:',
             'Temat: AI w edukacji',
             'Termin: 10.10.2026, 09:30',
             'Prowadzący: Anna Nowak',
