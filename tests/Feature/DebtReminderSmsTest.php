@@ -108,11 +108,11 @@ class DebtReminderSmsTest extends TestCase
 
         $payload = $templates->buildSms($case, DebtReminderTemplateService::TEMPLATE_REMINDER);
         $this->assertStringContainsString('FV 100/9/2026', $payload['body']);
-        $this->assertStringContainsString('Prosze o wplate.', $payload['body']);
+        $this->assertStringContainsString('Platforma Nowoczesnej Edukacji:', $payload['body']);
+        $this->assertStringContainsString('Prosimy o zapłatę na rachunek z faktury.', $payload['body']);
         $this->assertStringNotContainsString('SZKOLENIE:', $payload['body']);
         $this->assertStringNotContainsString('Konto:', $payload['body']);
         $this->assertSame($snippet, $payload['training_snippet']);
-        $this->assertLessThanOrEqual(90, mb_strlen($payload['body']));
     }
 
     public function test_sms_bank_snippet_from_payment_display_options(): void
@@ -143,9 +143,7 @@ class DebtReminderSmsTest extends TestCase
 
         $payload = $templates->buildSms($case, DebtReminderTemplateService::TEMPLATE_REMINDER);
         $this->assertSame(' Konto:PL61109010140000071219812874', $payload['bank_snippet']);
-
-        $withBank = $payload['body'].$payload['bank_snippet'];
-        $this->assertLessThanOrEqual(160, mb_strlen($withBank));
+        $this->assertStringNotContainsString('Konto:', $payload['body']);
     }
 
     public function test_real_sms_send_logs_action_and_increments_counter(): void

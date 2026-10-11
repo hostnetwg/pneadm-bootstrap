@@ -3,7 +3,9 @@
 namespace App\Services;
 
 use App\Models\DebtCase;
+use App\Models\DebtCaseAction;
 use App\Models\DebtCaseContact;
+use App\Models\DebtCollectionSetting;
 use App\Models\FormOrder;
 
 class DebtReminderTemplateService
@@ -12,7 +14,16 @@ class DebtReminderTemplateService
 
     public const TEMPLATE_DUNNING = 'dunning';
 
+    /** Zdanie o PDF dla szablonu ponaglenia (bez zmian). */
     public const INVOICE_ATTACHMENT_SENTENCE = 'W załączeniu przesyłamy fakturę.';
+
+    /** Zdanie o PDF dla przypomnienia — bez wcześniejszej wysyłki w historii. */
+    public const INVOICE_ATTACHMENT_SENTENCE_REMINDER = 'Dla wygody załączamy fakturę do tej wiadomości w pliku PDF.';
+
+    /** Zdanie o PDF dla przypomnienia — gdy historia potwierdza wcześniejszą wysyłkę FV. */
+    public const INVOICE_ATTACHMENT_SENTENCE_REMINDER_AGAIN = 'Dla wygody ponownie załączamy ją do tej wiadomości w pliku PDF.';
+
+    public const CONTACT_EMAIL = 'kontakt@pnedu.pl';
 
     /**
      * @return array<string, string>
@@ -26,16 +37,17 @@ class DebtReminderTemplateService
     }
 
     /**
-     * @return array{subject: string, body: string}
+     * @return array{subject: string, body: string, invoice_attachment_sentence: string}
      */
     public function build(DebtCase $case, string $template): array
     {
         $order = $case->formOrder;
         $invoice = $this->invoiceNumber($case, $order);
-        $amount = $this->amountLabel($case, $order);
+        $amount = $this->amountDueLabel($case, $order);
         $due = $this->dueDateLabel($case, $order);
         $bankLine = $this->bankAccountLine();
         $training = $this->trainingContext($order);
+        $hadInvoiceEmail = $this->hasConfirmedInvoiceEmailSent($case);
 
         return match ($template) {
             self::TEMPLATE_DUNNING => [
@@ -44,15 +56,42 @@ class DebtReminderTemplateService
                     $training['title']
                 ),
                 'body' => $this->dunningBody($invoice, $amount, $due, $bankLine, $training),
+                'invoice_attachment_sentence' => self::INVOICE_ATTACHMENT_SENTENCE,
             ],
             default => [
-                'subject' => $this->subjectWithTraining(
-                    'Przypomnienie o płatności — FV '.$invoice,
-                    $training['title']
-                ),
-                'body' => $this->reminderBody($invoice, $amount, $due, $bankLine, $training),
+                'subject' => 'Platforma Nowoczesnej Edukacji — przypomnienie o płatności za fakturę '.$invoice,
+                'body' => $this->reminderBody($invoice, $amount, $due, $training, $hadInvoiceEmail),
+                'invoice_attachment_sentence' => $this->reminderInvoiceAttachmentSentence($hadInvoiceEmail),
             ],
         };
+    }
+
+    public function invoiceAttachmentSentenceForTemplate(string $template, DebtCase $case): string
+    {
+        if ($template === self::TEMPLATE_DUNNING) {
+            return self::INVOICE_ATTACHMENT_SENTENCE;
+        }
+
+        return $this->reminderInvoiceAttachmentSentence($this->hasConfirmedInvoiceEmailSent($case));
+    }
+
+    public function reminderInvoiceAttachmentSentence(bool $hadConfirmedInvoiceEmail): string
+    {
+        return $hadConfirmedInvoiceEmail
+            ? self::INVOICE_ATTACHMENT_SENTENCE_REMINDER_AGAIN
+            : self::INVOICE_ATTACHMENT_SENTENCE_REMINDER;
+    }
+
+    /**
+     * Właściwa wysyłka e-maila z załącznikiem FV (nie test, nie nieudana).
+     */
+    public function hasConfirmedInvoiceEmailSent(DebtCase $case): bool
+    {
+        return $case->actions()
+            ->where('action_type', DebtCaseAction::TYPE_EMAIL)
+            ->where('outcome', 'sent')
+            ->where('note', 'like', '%Załączniki:%')
+            ->exists();
     }
 
     /**
@@ -196,40 +235,75 @@ class DebtReminderTemplateService
 
     /**
      * Zdanie o załączonej FV — gdy faktycznie dołączono PDF faktury (przypomnienie lub ponaglenie).
-     * Usuwa też starą wersję z dopiskiem „(jeśli została dołączona)”.
+     * Usuwa też starsze warianty zdań.
      */
-    public function syncInvoiceAttachmentSentenceInBody(string $body, bool $include): string
-    {
+    public function syncInvoiceAttachmentSentenceInBody(
+        string $body,
+        bool $include,
+        ?string $sentence = null,
+    ): string {
         $stripped = $this->stripInvoiceAttachmentSentence($body);
         if (! $include) {
             return $stripped;
         }
 
-        return $this->insertBlockBeforeSignature($stripped, self::INVOICE_ATTACHMENT_SENTENCE);
+        return $this->insertInvoiceAttachmentSentence(
+            $stripped,
+            $sentence ?? self::INVOICE_ATTACHMENT_SENTENCE
+        );
     }
 
     private function stripInvoiceAttachmentSentence(string $body): string
     {
         $normalized = str_replace(["\r\n", "\r"], "\n", $body);
-        $pattern = '/(?:\n{0,2})W załączeniu przesyłamy fakturę(?: \(jeśli została dołączona\))?\.?/u';
-        $cleaned = preg_replace($pattern, '', $normalized);
+        $patterns = [
+            '/(?:\n{0,2})W załączeniu przesyłamy fakturę(?: \(jeśli została dołączona\))?\.?/u',
+            '/(?:\n{0,2})?Dla wygody ponownie załączamy ją do tej wiadomości w pliku PDF\.?\s*/u',
+            '/(?:\n{0,2})?Dla wygody załączamy fakturę do tej wiadomości w pliku PDF\.?\s*/u',
+        ];
+        $cleaned = $normalized;
+        foreach ($patterns as $pattern) {
+            $next = preg_replace($pattern, '', $cleaned);
+            if (is_string($next)) {
+                $cleaned = $next;
+            }
+        }
 
-        return is_string($cleaned) ? rtrim($cleaned) : rtrim($body);
+        return rtrim(preg_replace('/[ \t]+\n/', "\n", $cleaned) ?? $cleaned);
+    }
+
+    private function insertInvoiceAttachmentSentence(string $body, string $sentence): string
+    {
+        $normalized = str_replace(["\r\n", "\r"], "\n", rtrim($body));
+        $paymentNeedle = 'Prosimy o uregulowanie należności na rachunek wskazany na fakturze.';
+        $pos = mb_strpos($normalized, $paymentNeedle);
+        if ($pos !== false) {
+            $before = rtrim(mb_substr($normalized, 0, $pos));
+            $after = mb_substr($normalized, $pos);
+            $spacer = $before === '' || str_ends_with($before, '.') || str_ends_with($before, "\n")
+                ? ($before !== '' && ! str_ends_with($before, "\n") ? ' ' : '')
+                : ' ';
+
+            return $before.$spacer.$sentence.' '.$after;
+        }
+
+        return $this->insertBlockBeforeSignature($normalized, $sentence);
     }
 
     private function insertBlockBeforeSignature(string $body, string $block): string
     {
         $normalized = str_replace(["\r\n", "\r"], "\n", rtrim($body));
-        $needle = "\nZ poważaniem,";
-        $pos = mb_strrpos($normalized, $needle);
-        if ($pos === false && str_starts_with($normalized, 'Z poważaniem,')) {
+        foreach (["\nPozdrawiam\n", "\nZ poważaniem,"] as $needle) {
+            $pos = mb_strrpos($normalized, $needle);
+            if ($pos !== false) {
+                return rtrim(mb_substr($normalized, 0, $pos))."\n\n".$block."\n\n".ltrim(mb_substr($normalized, $pos), "\n");
+            }
+        }
+        if (str_starts_with($normalized, 'Pozdrawiam') || str_starts_with($normalized, 'Z poważaniem,')) {
             return $block."\n\n".$normalized;
         }
-        if ($pos === false) {
-            return $normalized."\n\n".$block;
-        }
 
-        return rtrim(mb_substr($normalized, 0, $pos))."\n\n".$block."\n\n".ltrim(mb_substr($normalized, $pos), "\n");
+        return $normalized."\n\n".$block;
     }
 
     private function stripOrderConfirmationBlock(string $body, string $url): string
@@ -262,6 +336,19 @@ class DebtReminderTemplateService
         $amount = (float) ($case->amount_gross ?? $order?->product_price ?? 0);
 
         return number_format($amount, 2, ',', ' ');
+    }
+
+    /**
+     * Aktualne saldo do zapłaty (kwota FV minus zaakceptowane wpłaty z wyciągu).
+     */
+    private function amountDueLabel(DebtCase $case, ?FormOrder $order): string
+    {
+        $remaining = $case->remainingBankAllocatableAmount();
+        if ($remaining !== null) {
+            return number_format($remaining, 2, ',', ' ');
+        }
+
+        return $this->amountLabel($case, $order);
     }
 
     private function dueDateLabel(DebtCase $case, ?FormOrder $order): string
@@ -400,28 +487,42 @@ class DebtReminderTemplateService
     /**
      * @param  array{title: string, start: string, instructor: string}  $training
      */
-    private function reminderBody(string $invoice, string $amount, string $due, string $bankLine, array $training): string
-    {
+    private function reminderBody(
+        string $invoice,
+        string $amount,
+        string $due,
+        array $training,
+        bool $hadConfirmedInvoiceEmail,
+    ): string {
+        $title = trim($training['title']);
+        $hasTitle = $title !== '' && $title !== '—';
+
+        $opening = $hasTitle
+            ? 'nie odnotowaliśmy dotychczas wpłaty za szkolenie „'.$title.'”, którego dotyczy faktura nr '.$invoice.'.'
+            : 'nie odnotowaliśmy dotychczas wpłaty za szkolenie, którego dotyczy faktura nr '.$invoice.'.';
+
+        $settlement = $hadConfirmedInvoiceEmail
+            ? 'Fakturę przesłaliśmy wcześniej e-mailem. Prosimy o uregulowanie należności na rachunek wskazany na fakturze.'
+            : 'Prosimy o uregulowanie należności na rachunek wskazany na fakturze.';
+
         $lines = [
             'Dzień dobry,',
             '',
-            'uprzejmie przypominamy o płatności za fakturę '.$invoice,
-            'na kwotę '.$amount.' zł (termin: '.$due.').',
+            $opening,
             '',
-            ...$this->trainingBodyLines($training),
+            'Pozostało do zapłaty: '.$amount.' zł.',
+            'Termin płatności wskazany na fakturze: '.$due.'.',
+            '',
+            $settlement,
+            '',
+            'Jeżeli płatność została już wykonana, prosimy o odpowiedź z datą przelewu — pozwoli nam to sprawdzić i wyjaśnić rozliczenie.',
+            '',
+            'Jeżeli faktura budzi wątpliwości lub wystąpiła przeszkoda w dokonaniu płatności, prosimy o kontakt i wskazanie przewidywanego terminu zapłaty.',
+            '',
+            'Autentyczność wiadomości można potwierdzić, korzystając z danych kontaktowych opublikowanych na naszej stronie pnedu.pl.',
+            '',
+            ...$this->reminderSignatureLines(),
         ];
-
-        if ($bankLine !== '') {
-            $lines[] = $bankLine;
-            $lines[] = '';
-        }
-
-        $lines = array_merge($lines, [
-            'Jeśli przelew został już zlecony — dziękujemy, prosimy o zignorowanie tej wiadomości.',
-            'W razie pytań lub potrzeby potwierdzenia danych do przelewu — prosimy o kontakt.',
-            '',
-            ...$this->signatureLines(),
-        ]);
 
         return implode("\n", $lines);
     }
@@ -462,15 +563,52 @@ class DebtReminderTemplateService
         $lines = [
             'Z poważaniem,',
             'Zespół Platformy Nowoczesnej Edukacji',
-            'kontakt@pnedu.pl',
+            self::CONTACT_EMAIL,
         ];
 
-        $phone = \App\Models\DebtCollectionSetting::contactPhone();
+        $phone = DebtCollectionSetting::contactPhone();
         if ($phone !== null) {
             $lines[] = 'tel. '.$phone;
         }
 
         return $lines;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function reminderSignatureLines(): array
+    {
+        $lines = [
+            'Pozdrawiam',
+            'Waldemar Grabowski',
+            'Platforma Nowoczesnej Edukacji',
+            self::CONTACT_EMAIL,
+        ];
+
+        $phone = DebtCollectionSetting::contactPhone();
+        if ($phone !== null) {
+            $lines[] = 'tel. '.$phone;
+        }
+
+        return $lines;
+    }
+
+    /**
+     * Telefon kontaktowy PNE do SMS (bez prefiksu +48, jak w przykładzie biznesowym).
+     */
+    public function smsContactPhoneLabel(): ?string
+    {
+        $phone = DebtCollectionSetting::contactPhone();
+        if ($phone === null) {
+            return null;
+        }
+
+        $normalized = trim(preg_replace('/\s+/u', ' ', $phone) ?? $phone);
+        $withoutCountry = preg_replace('/^\+?\s*48\s*/u', '', $normalized);
+        $withoutCountry = is_string($withoutCountry) ? trim($withoutCountry) : $normalized;
+
+        return $withoutCountry !== '' ? $withoutCountry : $normalized;
     }
 
     /**
@@ -540,8 +678,7 @@ class DebtReminderTemplateService
     }
 
     /**
-     * Krótkie szablony SMS (bez konta / szkolenia — te wstawia checkbox w UI).
-     * Cel: zmieścić FV + kwotę + termin + opcjonalnie IBAN w 1–2 częściach.
+     * Szablony SMS. Konto / nazwa szkolenia — checkboxy w UI (konto domyślnie OFF).
      *
      * @return array{body: string, invoice_marker: string, training_snippet: ?string, bank_snippet: ?string}
      */
@@ -549,23 +686,17 @@ class DebtReminderTemplateService
     {
         $order = $case->formOrder;
         $invoice = $this->invoiceNumber($case, $order);
-        $amount = $this->amountLabel($case, $order);
+        $amount = $this->amountDueLabel($case, $order);
         $due = $this->dueDateLabel($case, $order);
 
-        // Bez polskich znaków w bazie — większa szansa na GSM-7 (160 znaków / część).
         $body = match ($template) {
             self::TEMPLATE_DUNNING => sprintf(
-                'PNEDU: ponaglenie FV %s %s zl, term. %s. Pilna wplata.',
+                'PNEDU: ponaglenie FV %s %s zł, term. %s. Pilna wpłata.',
                 $invoice,
                 $amount,
                 $due
             ),
-            default => sprintf(
-                'PNEDU: FV %s %s zl, term. %s. Prosze o wplate.',
-                $invoice,
-                $amount,
-                $due
-            ),
+            default => $this->reminderSmsBody($case, $invoice, $amount),
         };
 
         return [
@@ -574,6 +705,26 @@ class DebtReminderTemplateService
             'training_snippet' => $this->smsTrainingSnippet($case),
             'bank_snippet' => $this->smsBankSnippet(),
         ];
+    }
+
+    private function reminderSmsBody(DebtCase $case, string $invoice, string $amount): string
+    {
+        $parts = [
+            'Platforma Nowoczesnej Edukacji: nie odnotowaliśmy wpłaty '.$amount.' zł za szkolenie, FV '.$invoice.'.',
+        ];
+
+        if ($this->hasConfirmedInvoiceEmailSent($case)) {
+            $parts[] = 'Fakturę wysłaliśmy e-mailem.';
+        }
+
+        $parts[] = 'Prosimy o zapłatę na rachunek z faktury.';
+
+        $phone = $this->smsContactPhoneLabel();
+        if ($phone !== null) {
+            $parts[] = 'Kontakt: '.$phone.'.';
+        }
+
+        return implode(' ', $parts);
     }
 
     /**

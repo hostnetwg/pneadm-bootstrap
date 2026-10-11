@@ -812,7 +812,11 @@ class AccountingController extends Controller
 
         $body = $templates->syncInvoiceAttachmentSentenceInBody(
             $validated['body'],
-            $hasInvoiceAttachment
+            $hasInvoiceAttachment,
+            $templates->invoiceAttachmentSentenceForTemplate(
+                (string) $validated['template'],
+                $debtCase
+            )
         );
         $body = $templates->syncOrderConfirmationLinkInBody(
             $body,

@@ -1706,7 +1706,7 @@
                                        value="1"
                                        id="debtReminderSmsIncludeBank"
                                        name="include_sms_bank"
-                                       @checked((string) old('include_sms_bank', $smsBankSnippet ? '1' : '0') === '1')
+                                       @checked((string) old('include_sms_bank', '0') === '1')
                                        @disabled($smsBankSnippet === null)>
                                 <label class="form-check-label" for="debtReminderSmsIncludeBank">
                                     Dodaj nr konta bankowego
@@ -2020,11 +2020,16 @@
                 var attachmentInput = document.getElementById('debtReminderAttachment');
                 var keepEditedContent = {{ old('subject') || old('body') ? 'true' : 'false' }};
                 var orderConfirmationBlock = '';
-                var invoiceAttachmentSentence = @json(\App\Services\DebtReminderTemplateService::INVOICE_ATTACHMENT_SENTENCE);
                 try {
                     orderConfirmationBlock = JSON.parse(modalEl.getAttribute('data-order-confirmation-block') || '""') || '';
                 } catch (e) {
                     orderConfirmationBlock = '';
+                }
+
+                function currentInvoiceAttachmentSentence() {
+                    var payload = templates[templateSelect ? templateSelect.value : ''] || {};
+                    return payload.invoice_attachment_sentence
+                        || @json(\App\Services\DebtReminderTemplateService::INVOICE_ATTACHMENT_SENTENCE);
                 }
 
                 function recipientCheckboxes() {
@@ -2048,21 +2053,40 @@
                     }
                     return text
                         .replace(/\n{0,2}W załączeniu przesyłamy fakturę(?: \(jeśli została dołączona\))?\.?/g, '')
+                        .replace(/\s*Dla wygody ponownie załączamy ją do tej wiadomości w pliku PDF\.?\s*/g, ' ')
+                        .replace(/\s*Dla wygody załączamy fakturę do tej wiadomości w pliku PDF\.?\s*/g, ' ')
+                        .replace(/[ \t]+\n/g, '\n')
                         .replace(/\n{3,}/g, '\n\n')
+                        .replace(/[ \t]{2,}/g, ' ')
                         .replace(/\s+$/, '');
                 }
 
                 function insertBlockBeforeSignature(text, block) {
                     var normalized = (text || '').replace(/\r\n|\r/g, '\n').replace(/\s+$/, '');
-                    var needle = '\nZ poważaniem,';
-                    var pos = normalized.lastIndexOf(needle);
-                    if (pos === -1 && normalized.indexOf('Z poważaniem,') === 0) {
+                    var needles = ['\nPozdrawiam\n', '\nZ poważaniem,'];
+                    for (var i = 0; i < needles.length; i++) {
+                        var pos = normalized.lastIndexOf(needles[i]);
+                        if (pos !== -1) {
+                            return normalized.slice(0, pos).replace(/\s+$/, '') + '\n\n' + block + '\n\n' + normalized.slice(pos + 1).replace(/^\n+/, '');
+                        }
+                    }
+                    if (normalized.indexOf('Pozdrawiam') === 0 || normalized.indexOf('Z poważaniem,') === 0) {
                         return block + '\n\n' + normalized;
                     }
-                    if (pos === -1) {
-                        return normalized + '\n\n' + block;
+                    return normalized + '\n\n' + block;
+                }
+
+                function insertInvoiceAttachmentSentence(text, sentence) {
+                    var normalized = (text || '').replace(/\r\n|\r/g, '\n').replace(/\s+$/, '');
+                    var paymentNeedle = 'Prosimy o uregulowanie należności na rachunek wskazany na fakturze.';
+                    var pos = normalized.indexOf(paymentNeedle);
+                    if (pos !== -1) {
+                        var before = normalized.slice(0, pos).replace(/\s+$/, '');
+                        var after = normalized.slice(pos);
+                        var spacer = before && !/[.\n]$/.test(before) ? ' ' : (before && !/\n$/.test(before) ? ' ' : '');
+                        return before + spacer + sentence + ' ' + after;
                     }
-                    return normalized.slice(0, pos).replace(/\s+$/, '') + '\n\n' + block + '\n\n' + normalized.slice(pos + 1);
+                    return insertBlockBeforeSignature(normalized, sentence);
                 }
 
                 function hasInvoiceAttachmentSelected() {
@@ -2084,7 +2108,7 @@
                     }
                     var base = stripInvoiceAttachmentSentence(stripOrderConfirmationFromBody(bodyInput.value || ''));
                     if (hasInvoiceAttachmentSelected()) {
-                        base = insertBlockBeforeSignature(base, invoiceAttachmentSentence);
+                        base = insertInvoiceAttachmentSentence(base, currentInvoiceAttachmentSentence());
                     }
                     if (orderConfirmationCheckbox && orderConfirmationCheckbox.checked && orderConfirmationBlock) {
                         base = insertBlockBeforeSignature(base, orderConfirmationBlock);

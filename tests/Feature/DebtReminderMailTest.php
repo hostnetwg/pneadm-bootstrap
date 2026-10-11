@@ -426,7 +426,7 @@ class DebtReminderMailTest extends TestCase
         $response = $this->actingAs($user)->post(route('accounting.collections.send-reminder', $case), [
             'template' => 'reminder',
             'subject' => 'Przypomnienie z FV',
-            'body' => "Treść.\n\nZ poważaniem,\nZespół",
+            'body' => "Prosimy o uregulowanie należności na rachunek wskazany na fakturze.\n\nPozdrawiam\nWaldemar Grabowski",
             'send_target' => 'recipient',
             'recipient_emails' => ['dluznik@example.test'],
             'attach_ifirma_pdf' => '1',
@@ -435,7 +435,10 @@ class DebtReminderMailTest extends TestCase
 
         $response->assertRedirect(route('accounting.collections.show', $case));
         Mail::assertSent(DebtReminderMail::class, function (DebtReminderMail $mail) {
-            return str_contains($mail->plainBody, 'W załączeniu przesyłamy fakturę.');
+            return str_contains(
+                $mail->plainBody,
+                'Dla wygody załączamy fakturę do tej wiadomości w pliku PDF. Prosimy o uregulowanie należności na rachunek wskazany na fakturze.'
+            );
         });
     }
 
