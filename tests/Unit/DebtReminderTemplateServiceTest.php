@@ -78,11 +78,16 @@ class DebtReminderTemplateServiceTest extends TestCase
             $reminder['subject']
         );
         $this->assertStringContainsString('nie odnotowaliśmy dotychczas wpłaty za szkolenie „AI w edukacji”', $reminder['body']);
-        $this->assertStringContainsString('Pozostało do zapłaty: 499,50 zł.', $reminder['body']);
-        $this->assertStringContainsString('Termin płatności wskazany na fakturze:', $reminder['body']);
+        $this->assertStringContainsString('Temat: AI w edukacji', $reminder['body']);
+        $this->assertStringContainsString('Prowadzący: Anna Nowak', $reminder['body']);
+        $this->assertStringContainsString('Koszt: 499,50 zł (termin płatności:', $reminder['body']);
+        $this->assertStringContainsString('po terminie', $reminder['body']);
+        $this->assertStringContainsString('Tytuł przelewu: 88/8/2026', $reminder['body']);
+        $this->assertStringContainsString('Nr konta: PL 12 3456 7890 1234 5678 9012 3456', $reminder['body']);
         $this->assertStringContainsString('Prosimy o uregulowanie należności na rachunek wskazany na fakturze.', $reminder['body']);
         $this->assertStringNotContainsString('Fakturę przesłaliśmy wcześniej e-mailem.', $reminder['body']);
         $this->assertStringNotContainsString('Dla wygody', $reminder['body']);
+        $this->assertStringNotContainsString('Pozostało do zapłaty:', $reminder['body']);
         $this->assertStringContainsString("Pozdrawiam\nWaldemar Grabowski", $reminder['body']);
         $this->assertStringContainsString('tel. +48 600 100 200', $reminder['body']);
         $this->assertSame(
@@ -171,7 +176,8 @@ class DebtReminderTemplateServiceTest extends TestCase
         $this->assertTrue($service->hasConfirmedInvoiceEmailSent($case));
 
         $reminder = $service->build($case->fresh(['formOrder', 'bankTransactionMatches.transaction', 'actions']), DebtReminderTemplateService::TEMPLATE_REMINDER);
-        $this->assertStringContainsString('Pozostało do zapłaty: 265,00 zł.', $reminder['body']);
+        $this->assertStringContainsString('Koszt: 265,00 zł (termin płatności:', $reminder['body']);
+        $this->assertStringContainsString('Tytuł przelewu: 649/9/2026', $reminder['body']);
         $this->assertStringContainsString('Fakturę przesłaliśmy wcześniej e-mailem.', $reminder['body']);
         $this->assertSame(
             DebtReminderTemplateService::INVOICE_ATTACHMENT_SENTENCE_REMINDER_AGAIN,

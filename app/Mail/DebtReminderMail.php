@@ -23,7 +23,7 @@ class DebtReminderMail extends Mailable
 
     public function build(): self
     {
-        $htmlBody = PlainTextEmailHtml::linkifyForEmail($this->plainBody);
+        $htmlBody = PlainTextEmailHtml::formatDebtReminderEmailHtml($this->plainBody);
 
         $mail = $this->withSystemMailSettings()
             ->subject($this->subjectLine)

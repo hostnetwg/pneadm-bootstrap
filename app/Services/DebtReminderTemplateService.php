@@ -60,7 +60,7 @@ class DebtReminderTemplateService
             ],
             default => [
                 'subject' => 'Platforma Nowoczesnej Edukacji — przypomnienie o płatności za fakturę '.$invoice,
-                'body' => $this->reminderBody($invoice, $amount, $due, $training, $hadInvoiceEmail),
+                'body' => $this->reminderBody($case, $order, $invoice, $amount, $due, $training, $hadInvoiceEmail),
                 'invoice_attachment_sentence' => $this->reminderInvoiceAttachmentSentence($hadInvoiceEmail),
             ],
         };
@@ -488,6 +488,8 @@ class DebtReminderTemplateService
      * @param  array{title: string, start: string, instructor: string}  $training
      */
     private function reminderBody(
+        DebtCase $case,
+        ?FormOrder $order,
         string $invoice,
         string $amount,
         string $due,
@@ -501,6 +503,16 @@ class DebtReminderTemplateService
             ? 'nie odnotowaliśmy dotychczas wpłaty za szkolenie „'.$title.'”, którego dotyczy faktura nr '.$invoice.'.'
             : 'nie odnotowaliśmy dotychczas wpłaty za szkolenie, którego dotyczy faktura nr '.$invoice.'.';
 
+        $ordererName = trim((string) ($order?->orderer_name ?? ''));
+        $participantName = trim((string) ($order?->display_participant_name ?? ''));
+        $bankAccount = $this->resolvedCompanyBankAccountDisplay();
+        $dueStatus = $this->paymentDueStatusLabel($case, $order);
+
+        $costLine = 'Koszt: '.$amount.' zł (termin płatności: '.$due
+            .($dueStatus !== null ? ' — '.$dueStatus : '')
+            .')';
+
+        // Needle używany też przez syncInvoiceAttachmentSentenceInBody / JS w modalu.
         $settlement = $hadConfirmedInvoiceEmail
             ? 'Fakturę przesłaliśmy wcześniej e-mailem. Prosimy o uregulowanie należności na rachunek wskazany na fakturze.'
             : 'Prosimy o uregulowanie należności na rachunek wskazany na fakturze.';
@@ -510,8 +522,17 @@ class DebtReminderTemplateService
             '',
             $opening,
             '',
-            'Pozostało do zapłaty: '.$amount.' zł.',
-            'Termin płatności wskazany na fakturze: '.$due.'.',
+            'Szkolenie:',
+            'Temat: '.($hasTitle ? $title : '—'),
+            'Termin: '.$training['start'],
+            'Prowadzący: '.$training['instructor'],
+            'Uczestnik: '.($participantName !== '' ? $participantName : '—'),
+            'Zamawiający: '.($ordererName !== '' ? $ordererName : '—'),
+            '',
+            'Dane do przelewu:',
+            $costLine,
+            'Tytuł przelewu: '.$invoice,
+            'Nr konta: '.($bankAccount !== '' ? $bankAccount : '—'),
             '',
             $settlement,
             '',
@@ -525,6 +546,47 @@ class DebtReminderTemplateService
         ];
 
         return implode("\n", $lines);
+    }
+
+    /**
+     * Status terminu płatności względem dziś (do linii Koszt; „po terminie” wyróżniane na czerwono w HTML).
+     */
+    public function paymentDueStatusLabel(DebtCase $case, ?FormOrder $order = null): ?string
+    {
+        $order ??= $case->formOrder;
+        $due = $case->due_date?->copy()->timezone(config('app.timezone'))->startOfDay()
+            ?? $order?->invoice_due_date?->copy()->timezone(config('app.timezone'))->startOfDay();
+        if ($due === null) {
+            return null;
+        }
+
+        $today = now()->timezone(config('app.timezone'))->startOfDay();
+        if ($due->lt($today)) {
+            $days = (int) $due->diffInDays($today);
+
+            return $days.' '.$this->polishDayWord($days).' po terminie';
+        }
+        if ($due->equalTo($today)) {
+            return 'termin dziś';
+        }
+
+        $days = (int) $today->diffInDays($due);
+
+        return 'za '.$days.' '.$this->polishDayWord($days);
+    }
+
+    private function polishDayWord(int $n): string
+    {
+        $mod10 = $n % 10;
+        $mod100 = $n % 100;
+        if ($n === 1) {
+            return 'dzień';
+        }
+        if ($mod10 >= 2 && $mod10 <= 4 && ! ($mod100 >= 12 && $mod100 <= 14)) {
+            return 'dni';
+        }
+
+        return 'dni';
     }
 
     /**

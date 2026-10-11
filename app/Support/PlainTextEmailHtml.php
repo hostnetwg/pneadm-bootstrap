@@ -79,6 +79,76 @@ class PlainTextEmailHtml
     }
 
     /**
+     * HTML przypomnienia o płatności: pogrubione wartości przy Temat/Termin/Prowadzący/
+     * Uczestnik/Zamawiający/Koszt/Tytuł przelewu/Nr konta; fragment „… po terminie” na czerwono.
+     */
+    public static function formatDebtReminderEmailHtml(string $plainBody): string
+    {
+        $lines = preg_split('/\r\n|\r|\n/', $plainBody);
+        if ($lines === false) {
+            return self::linkifyForEmail($plainBody);
+        }
+
+        $out = '';
+        $last = count($lines) - 1;
+        foreach ($lines as $idx => $line) {
+            $formatted = self::debtReminderLabeledLineHtml($line);
+            $out .= $formatted ?? self::linkifyForEmail($line);
+            if ($idx !== $last) {
+                $out .= "\n";
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * Linia etykieta + wartość (pogrubiona); dla Koszt — czerwone „po terminie”.
+     */
+    private static function debtReminderLabeledLineHtml(string $line): ?string
+    {
+        $labels = [
+            'Temat',
+            'Termin',
+            'Prowadzący',
+            'Uczestnik',
+            'Zamawiający',
+            'Tytuł przelewu',
+            'Nr konta',
+        ];
+        $labelAlt = implode('|', array_map(static fn (string $l): string => preg_quote($l, '/'), $labels));
+
+        if (preg_match('/^(\s*)('.$labelAlt.'):( *)(.*)$/u', $line, $m)) {
+            $before = htmlspecialchars($m[1], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+            $prefix = htmlspecialchars($m[2].':'.$m[3], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+            $valueHtml = self::linkifyForEmail($m[4]);
+
+            return $before.$prefix.'<strong style="font-weight:700;">'.$valueHtml.'</strong>';
+        }
+
+        if (preg_match('/^(\s*)(Koszt):( *)(.*)$/u', $line, $m)) {
+            $before = htmlspecialchars($m[1], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+            $prefix = htmlspecialchars($m[2].':'.$m[3], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+            $value = $m[4];
+
+            if (preg_match('/^(.*?)( — )(\d+ (?:dzień|dni) po terminie)(\)?)$/u', $value, $vm)) {
+                $beforeOverdue = self::linkifyForEmail($vm[1].$vm[2]);
+                $overdue = htmlspecialchars($vm[3], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+                $after = htmlspecialchars($vm[4], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+
+                return $before.$prefix
+                    .'<strong style="font-weight:700;">'.$beforeOverdue
+                    .'<span style="color:#dc3545;font-weight:700;">'.$overdue.'</span>'
+                    .$after.'</strong>';
+            }
+
+            return $before.$prefix.'<strong style="font-weight:700;">'.self::linkifyForEmail($value).'</strong>';
+        }
+
+        return null;
+    }
+
+    /**
      * Napis „Termin szkolenia:” albo „Data szkolenia:” (z opcjonalnymi spacjami po dwukropku) bez pogrubienia;
      * wartość po spacjach w &lt;strong&gt; (URL-e w wartości nadal przez {@see linkifyForEmail()}).
      */
