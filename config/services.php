@@ -159,6 +159,11 @@ return [
             static fn (string $phone): string => trim($phone),
             explode(',', (string) env('SMSAPI_TEST_PHONES', '+48 501 654 274,+48 510 396 579'))
         ))),
+        // Mapowanie numer testowy (48xxxxxxxxx) → e-mail testowy przy „Wyślij też e-mail” z okna SMS.
+        'test_phone_emails' => [
+            '48501654274' => env('SMSAPI_TEST_EMAIL_501', 'waldemar.grabowski@hostnet.pl'),
+            '48510396579' => env('SMSAPI_TEST_EMAIL_510', 'luman0599@gmail.com'),
+        ],
     ],
 
 ];

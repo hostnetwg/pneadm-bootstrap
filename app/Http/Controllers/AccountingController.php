@@ -697,6 +697,8 @@ class AccountingController extends Controller
             'reminderSmsTrainingSnippet' => $reminderTemplates->smsTrainingSnippet($debtCase),
             'reminderSmsInvoiceMarker' => $reminderTemplates->smsInvoiceMarker($debtCase),
             'reminderSmsBankSnippet' => $reminderTemplates->smsBankSnippet(),
+            'reminderSmsCompanionEmails' => $reminderTemplates->companionEmailRecipients($debtCase),
+            'reminderSmsCanAttachIfirma' => $reminderTemplates->canAttachIfirmaPdf($debtCase),
             'reminderSmsEnabled' => (bool) config('services.smsapi.enabled', true)
                 && filled(config('services.smsapi.token')),
             'caseHasInvoicePdf' => $debtCase->hasInvoicePdf(),
@@ -851,9 +853,10 @@ class AccountingController extends Controller
         Request $request,
         DebtCase $debtCase,
         DebtReminderSmsService $smsService,
+        DebtReminderMailService $mailService,
         DebtReminderTemplateService $templates,
     ) {
-        $debtCase->load(['formOrder']);
+        $debtCase->load(['formOrder.primaryParticipant', 'contacts']);
 
         $testDigits = collect($templates->smsTestPhoneOptions())
             ->pluck('digits')
@@ -864,6 +867,7 @@ class AccountingController extends Controller
             'body' => ['required', 'string', 'max:600'],
             'send_target' => ['required', 'string', 'in:recipient,test'],
             'test_phone' => ['nullable', 'string', 'max:32'],
+            'also_send_email' => ['nullable', 'boolean'],
         ];
 
         if ($request->input('send_target') === 'test') {
@@ -878,6 +882,7 @@ class AccountingController extends Controller
         ]);
 
         $isTest = $validated['send_target'] === 'test';
+        $alsoSendEmail = $request->boolean('also_send_email');
 
         if ($isTest) {
             $toPhone = (string) $validated['test_phone'];
@@ -888,6 +893,7 @@ class AccountingController extends Controller
                     ->withInput()
                     ->withErrors(['test_phone' => 'Wybierz jeden z skonfigurowanych numerów testowych.']);
             }
+            $toPhone = $normalizedTest;
         } else {
             $orderer = $templates->ordererSmsRecipient($debtCase);
             if ($orderer === null) {
@@ -899,6 +905,39 @@ class AccountingController extends Controller
             $toPhone = $orderer['digits'];
         }
 
+        $emailWarning = null;
+        $emailSuccess = null;
+        if ($alsoSendEmail) {
+            $companion = $templates->buildCompanionReminderEmail(
+                $debtCase,
+                $isTest,
+                $isTest ? $toPhone : null
+            );
+
+            if ($companion['recipients'] === []) {
+                $emailWarning = $isTest
+                    ? 'Nie wysłano e-maila: brak mapowania e-maila dla wybranego numeru testowego.'
+                    : 'Nie wysłano e-maila: brak adresu zamawiającego/uczestnika.';
+            } elseif (! $templates->canAttachIfirmaPdf($debtCase)) {
+                $emailWarning = 'Nie wysłano e-maila: brak ID/numeru faktury do PDF z iFirma.';
+            } else {
+                $emailResult = $mailService->send(
+                    case: $debtCase,
+                    toEmails: $companion['recipients'],
+                    subject: $companion['subject'],
+                    body: $companion['body'],
+                    isTest: $isTest,
+                    attachIfirmaPdf: true,
+                    attachCasePdf: false,
+                );
+                if ($emailResult['ok']) {
+                    $emailSuccess = $emailResult['message'];
+                } else {
+                    $emailWarning = 'E-mail nie wyszedł ('.$emailResult['message'].') — SMS i tak wysłany.';
+                }
+            }
+        }
+
         $result = $smsService->send(
             case: $debtCase,
             toPhone: $toPhone,
@@ -907,15 +946,32 @@ class AccountingController extends Controller
         );
 
         if (! $result['ok']) {
-            return redirect()
+            $redirect = redirect()
                 ->route('accounting.collections.show', $debtCase)
                 ->withInput()
                 ->with('error', $result['message']);
+            if ($emailSuccess !== null) {
+                $redirect->with('warning', 'E-mail wyszedł, ale SMS nie: '.$emailSuccess);
+            } elseif ($emailWarning !== null) {
+                $redirect->with('warning', $emailWarning);
+            }
+
+            return $redirect;
         }
 
-        return redirect()
+        $success = $result['message'];
+        if ($emailSuccess !== null) {
+            $success = $emailSuccess.' '.$success;
+        }
+
+        $redirect = redirect()
             ->route('accounting.collections.show', $debtCase)
-            ->with('success', $result['message']);
+            ->with('success', $success);
+        if ($emailWarning !== null) {
+            $redirect->with('warning', $emailWarning);
+        }
+
+        return $redirect;
     }
 
     public function collectionsInvoicePdfUpload(

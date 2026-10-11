@@ -1700,7 +1700,7 @@
                                 </label>
                             </div>
                             <input type="hidden" name="include_sms_bank" value="0">
-                            <div class="form-check">
+                            <div class="form-check mb-2">
                                 <input class="form-check-input"
                                        type="checkbox"
                                        value="1"
@@ -1718,6 +1718,32 @@
                                             <a href="{{ route('settings.pnedu-purchases.index') }}" target="_blank" rel="noopener">Zakupy pnedu.pl</a>.
                                         </span>
                                     @endif
+                                </label>
+                            </div>
+                            <input type="hidden" name="also_send_email" value="0">
+                            <div class="form-check">
+                                <input class="form-check-input"
+                                       type="checkbox"
+                                       value="1"
+                                       id="debtReminderSmsAlsoSendEmail"
+                                       name="also_send_email"
+                                       @checked((string) old('also_send_email', '1') === '1')>
+                                <label class="form-check-label" for="debtReminderSmsAlsoSendEmail">
+                                    Wyślij też e-mail przypomnienia tuż przed SMS
+                                    <span class="text-muted d-block small">
+                                        Szablon „Przypomnienie o płatności” + PDF FV z iFirma.
+                                        Właściwa wysyłka: zamawiający
+                                        @if(!empty($reminderSmsCompanionEmails))
+                                            ({{ implode(', ', $reminderSmsCompanionEmails) }})
+                                        @else
+                                            <span class="text-warning">— brak e-maili zamawiającego/uczestnika</span>
+                                        @endif.
+                                        Test: e-mail przypisany do wybranego numeru testowego.
+                                        Gdy e-mail się nie uda — SMS i tak wychodzi.
+                                    </span>
+                                    @unless($reminderSmsCanAttachIfirma ?? false)
+                                        <span class="text-warning d-block small">Brak ID/numeru FV do pobrania PDF z iFirma.</span>
+                                    @endunless
                                 </label>
                             </div>
                         </div>
@@ -1764,6 +1790,9 @@
                                     <option value="{{ $testPhone['digits'] }}"
                                         @selected(old('test_phone') === $testPhone['digits'])>
                                         {{ $testPhone['phone'] }}
+                                        @if(!empty($testPhone['email']))
+                                            → {{ $testPhone['email'] }}
+                                        @endif
                                     </option>
                                 @endforeach
                             </select>

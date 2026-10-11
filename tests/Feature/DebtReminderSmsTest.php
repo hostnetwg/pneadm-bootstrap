@@ -2,13 +2,18 @@
 
 namespace Tests\Feature;
 
+use App\Mail\DebtReminderMail;
 use App\Models\DebtCase;
 use App\Models\DebtCaseAction;
 use App\Models\FormOrder;
+use App\Models\FormOrderParticipant;
 use App\Models\User;
 use App\Services\DebtReminderTemplateService;
+use App\Services\IfirmaApiService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Mail;
+use Mockery;
 use Tests\TestCase;
 
 class DebtReminderSmsTest extends TestCase
@@ -27,6 +32,10 @@ class DebtReminderSmsTest extends TestCase
             'services.smsapi.token' => 'test-token',
             'services.smsapi.from' => '',
             'services.smsapi.test_phones' => ['+48 501 654 274', '+48 510 396 579'],
+            'services.smsapi.test_phone_emails' => [
+                '48501654274' => 'waldemar.grabowski@hostnet.pl',
+                '48510396579' => 'luman0599@gmail.com',
+            ],
         ]);
     }
 
@@ -89,6 +98,8 @@ class DebtReminderSmsTest extends TestCase
         $response->assertSee('debtReminderSmsIncludeTraining', false);
         $response->assertSee('Dodaj nr konta bankowego', false);
         $response->assertSee('debtReminderSmsIncludeBank', false);
+        $response->assertSee('Wyślij też e-mail przypomnienia tuż przed SMS', false);
+        $response->assertSee('debtReminderSmsAlsoSendEmail', false);
         $response->assertSee('SZKOLENIE: Szkolenie SMS', false);
     }
 
@@ -235,5 +246,126 @@ class DebtReminderSmsTest extends TestCase
         $response->assertRedirect(route('accounting.collections.show', $case));
         $response->assertSessionHasErrors('body');
         Http::assertNothingSent();
+    }
+
+    public function test_also_send_email_sends_reminder_before_real_sms(): void
+    {
+        Mail::fake();
+        Http::fake([
+            'api.smsapi.pl/*' => Http::response([
+                'count' => 1,
+                'list' => [['id' => 'sms1', 'points' => 0.16, 'number' => '48501111222', 'status' => 'QUEUE']],
+            ], 200),
+        ]);
+
+        $ifirma = Mockery::mock(IfirmaApiService::class);
+        $ifirma->shouldReceive('downloadInvoicePdf')
+            ->once()
+            ->with('1001')
+            ->andReturn(['status' => 'success', 'content' => '%PDF-1.4 fake']);
+        $this->app->instance(IfirmaApiService::class, $ifirma);
+
+        [$user, $case] = $this->caseWithOrder([
+            'ifirma_invoice_id' => 1001,
+            'orderer_email' => 'zamawiajacy@example.test',
+        ]);
+        FormOrderParticipant::create([
+            'form_order_id' => $case->form_order_id,
+            'participant_firstname' => 'Ala',
+            'participant_lastname' => 'Nowak',
+            'participant_email' => 'uczestnik@example.test',
+            'is_primary' => true,
+        ]);
+
+        $this->actingAs($user)->post(route('accounting.collections.send-reminder-sms', $case), [
+            'template' => 'reminder',
+            'body' => 'SMS z e-mailem',
+            'send_target' => 'recipient',
+            'also_send_email' => '1',
+        ])->assertRedirect(route('accounting.collections.show', $case))
+            ->assertSessionHas('success');
+
+        Mail::assertSent(DebtReminderMail::class, function (DebtReminderMail $mail) {
+            return $mail->hasTo('zamawiajacy@example.test')
+                && $mail->hasTo('uczestnik@example.test')
+                && str_contains($mail->plainBody, 'Dla wygody')
+                && count($mail->fileAttachments) === 1;
+        });
+
+        $this->assertSame(1, $case->fresh()->reminderEmailsSentCount());
+        $this->assertSame(1, $case->fresh()->reminderSmsSentCount());
+        $this->assertDatabaseHas('debt_case_actions', [
+            'debt_case_id' => $case->id,
+            'action_type' => DebtCaseAction::TYPE_EMAIL,
+            'outcome' => 'sent',
+        ]);
+    }
+
+    public function test_also_send_email_on_test_sms_maps_phone_to_test_email(): void
+    {
+        Mail::fake();
+        Http::fake([
+            'api.smsapi.pl/*' => Http::response([
+                'count' => 1,
+                'list' => [['id' => 't1', 'points' => 0.16, 'number' => '48501654274', 'status' => 'QUEUE']],
+            ], 200),
+        ]);
+
+        $ifirma = Mockery::mock(IfirmaApiService::class);
+        $ifirma->shouldReceive('downloadInvoicePdf')
+            ->once()
+            ->andReturn(['status' => 'success', 'content' => '%PDF-1.4 fake']);
+        $this->app->instance(IfirmaApiService::class, $ifirma);
+
+        [$user, $case] = $this->caseWithOrder(['ifirma_invoice_id' => 55]);
+
+        $this->actingAs($user)->post(route('accounting.collections.send-reminder-sms', $case), [
+            'template' => 'reminder',
+            'body' => 'SMS test',
+            'send_target' => 'test',
+            'test_phone' => '48501654274',
+            'also_send_email' => '1',
+        ])->assertRedirect(route('accounting.collections.show', $case));
+
+        Mail::assertSent(DebtReminderMail::class, fn (DebtReminderMail $mail) => $mail->hasTo('waldemar.grabowski@hostnet.pl'));
+        $this->assertSame(0, $case->fresh()->reminderEmailsSentCount());
+        $this->assertSame(0, $case->fresh()->reminderSmsSentCount());
+        $this->assertDatabaseHas('debt_case_actions', [
+            'debt_case_id' => $case->id,
+            'action_type' => DebtCaseAction::TYPE_EMAIL,
+            'outcome' => 'test_sent',
+        ]);
+    }
+
+    public function test_also_send_email_failure_still_sends_sms(): void
+    {
+        Mail::fake();
+        Http::fake([
+            'api.smsapi.pl/*' => Http::response([
+                'count' => 1,
+                'list' => [['id' => 'sms2', 'points' => 0.16, 'number' => '48501111222', 'status' => 'QUEUE']],
+            ], 200),
+        ]);
+
+        $ifirma = Mockery::mock(IfirmaApiService::class);
+        $ifirma->shouldReceive('downloadInvoicePdf')
+            ->once()
+            ->andReturn(['status' => 'error', 'message' => 'brak PDF']);
+        $this->app->instance(IfirmaApiService::class, $ifirma);
+
+        [$user, $case] = $this->caseWithOrder(['ifirma_invoice_id' => 77]);
+
+        $this->actingAs($user)->post(route('accounting.collections.send-reminder-sms', $case), [
+            'template' => 'reminder',
+            'body' => 'SMS mimo błędu maila',
+            'send_target' => 'recipient',
+            'also_send_email' => '1',
+        ])->assertRedirect(route('accounting.collections.show', $case))
+            ->assertSessionHas('success')
+            ->assertSessionHas('warning');
+
+        Mail::assertNothingSent();
+        $this->assertSame(0, $case->fresh()->reminderEmailsSentCount());
+        $this->assertSame(1, $case->fresh()->reminderSmsSentCount());
     }
 }

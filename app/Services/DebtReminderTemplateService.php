@@ -730,7 +730,7 @@ class DebtReminderTemplateService
     /**
      * Numery testowe z konfiguracji (do wyboru w UI).
      *
-     * @return list<array{phone: string, digits: string}>
+     * @return list<array{phone: string, digits: string, email: ?string}>
      */
     public function smsTestPhoneOptions(): array
     {
@@ -743,10 +743,70 @@ class DebtReminderTemplateService
             $options[] = [
                 'phone' => $this->formatPhoneDisplay($digits),
                 'digits' => $digits,
+                'email' => $this->testEmailForSmsPhone($digits),
             ];
         }
 
         return $options;
+    }
+
+    public function testEmailForSmsPhone(string $digitsOrRaw): ?string
+    {
+        $digits = $this->normalizePhoneToSmsapi($digitsOrRaw);
+        if ($digits === null) {
+            return null;
+        }
+
+        $map = (array) config('services.smsapi.test_phone_emails', []);
+        $email = trim((string) ($map[$digits] ?? ''));
+
+        return $email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL) ? $email : null;
+    }
+
+    /**
+     * Odbiorcy e-maila towarzyszącego SMS (zamawiający + uczestnik, jeśli różne).
+     *
+     * @return list<string>
+     */
+    public function companionEmailRecipients(DebtCase $case): array
+    {
+        $emails = [];
+        foreach ($this->recipientOptions($case) as $option) {
+            if (! in_array($option['key'], ['orderer', 'participant'], true)) {
+                continue;
+            }
+            $emails[] = $option['email'];
+        }
+
+        return array_values(array_unique($emails));
+    }
+
+    /**
+     * Treść e-maila przypomnienia do wysyłki razem z SMS (z zdaniem o PDF iFirma).
+     *
+     * @return array{subject: string, body: string, recipients: list<string>}
+     */
+    public function buildCompanionReminderEmail(DebtCase $case, bool $isTest, ?string $testPhoneDigits = null): array
+    {
+        $payload = $this->build($case, self::TEMPLATE_REMINDER);
+        $body = $this->syncInvoiceAttachmentSentenceInBody(
+            $payload['body'],
+            true,
+            $payload['invoice_attachment_sentence']
+        );
+
+        if ($isTest) {
+            $email = $testPhoneDigits !== null ? $this->testEmailForSmsPhone($testPhoneDigits) : null;
+            $recipients = $email !== null ? [$email] : [];
+        } else {
+            $recipients = $this->companionEmailRecipients($case);
+        }
+
+        return [
+            'subject' => $payload['subject'],
+            'body' => $body,
+            'recipients' => $recipients,
+        ];
     }
 
     /**
