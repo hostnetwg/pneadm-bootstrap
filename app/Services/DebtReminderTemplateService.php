@@ -536,7 +536,7 @@ class DebtReminderTemplateService
             '',
             $settlement,
             '',
-            'Jeżeli płatność została już wykonana, prosimy o odpowiedź z datą przelewu — pozwoli nam to sprawdzić i wyjaśnić rozliczenie.',
+            'Jeżeli płatność została już wykonana, prosimy o odpowiedź z potwierdzeniem i datą przelewu — pozwoli nam to sprawdzić i wyjaśnić rozliczenie.',
             '',
             'Jeżeli faktura budzi wątpliwości lub wystąpiła przeszkoda w dokonaniu płatności, prosimy o kontakt i wskazanie przewidywanego terminu zapłaty.',
             '',
