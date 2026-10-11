@@ -522,7 +522,7 @@ class DebtReminderTemplateService
             '',
             $opening,
             '',
-            'SZKOLENIE',
+            'SZKOLENIE:',
             'Temat: '.($hasTitle ? $title : '—'),
             'Termin: '.$training['start'],
             'Prowadzący: '.$training['instructor'],

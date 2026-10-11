@@ -108,10 +108,10 @@ class PlainTextEmailHtml
      */
     private static function debtReminderLabeledLineHtml(string $line): ?string
     {
-        if (preg_match('/^(\s*)SZKOLENIE:?(\s*)$/u', $line, $m)) {
+        if (preg_match('/^(\s*)SZKOLENIE:(\s*)$/u', $line, $m)) {
             $before = htmlspecialchars($m[1], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 
-            return $before.'<strong style="font-weight:700;text-decoration:underline;">SZKOLENIE</strong>'
+            return $before.'<strong style="font-weight:700;text-decoration:underline;">SZKOLENIE:</strong>'
                 .htmlspecialchars($m[2], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         }
 

@@ -12,7 +12,7 @@ class PlainTextEmailHtmlDebtReminderTest extends TestCase
         $plain = implode("\n", [
             'Dzień dobry,',
             '',
-            'SZKOLENIE',
+            'SZKOLENIE:',
             'Temat: AI w edukacji',
             'Termin: 10.10.2026, 09:30',
             'Prowadzący: Anna Nowak',
@@ -30,7 +30,7 @@ class PlainTextEmailHtmlDebtReminderTest extends TestCase
         $html = PlainTextEmailHtml::formatDebtReminderEmailHtml($plain);
 
         $this->assertStringContainsString(
-            '<strong style="font-weight:700;text-decoration:underline;">SZKOLENIE</strong>',
+            '<strong style="font-weight:700;text-decoration:underline;">SZKOLENIE:</strong>',
             $html
         );
         $this->assertStringContainsString(
