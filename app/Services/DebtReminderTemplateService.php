@@ -777,12 +777,7 @@ class DebtReminderTemplateService
         $due = $this->dueDateLabel($case, $order);
 
         $body = match ($template) {
-            self::TEMPLATE_DUNNING => sprintf(
-                'PNEDU: ponaglenie FV %s %s zł, term. %s. Pilna wpłata.',
-                $invoice,
-                $amount,
-                $due
-            ),
+            self::TEMPLATE_DUNNING => $this->dunningSmsBody($invoice, $amount, $due),
             default => $this->reminderSmsBody($case, $order, $invoice, $amount),
         };
 
@@ -819,6 +814,22 @@ class DebtReminderTemplateService
         }
 
         $parts[] = 'Prosimy o zapłatę na rachunek z faktury.';
+
+        $phone = $this->smsContactPhoneLabel();
+        if ($phone !== null) {
+            $parts[] = 'Kontakt: '.$phone.'.';
+        }
+
+        return implode(' ', $parts);
+    }
+
+    private function dunningSmsBody(string $invoice, string $amount, string $due): string
+    {
+        $parts = [
+            'Platforma Nowoczesnej Edukacji: ponaglenie — faktura FV '.$invoice
+                .' na '.$amount.' zł pozostaje nieuregulowana (termin płatności '.$due.').',
+            'Prosimy o pilną zapłatę na rachunek wskazany na fakturze.',
+        ];
 
         $phone = $this->smsContactPhoneLabel();
         if ($phone !== null) {

@@ -104,6 +104,15 @@ class DebtReminderTemplateServiceTest extends TestCase
         $this->assertTrue($service->canAttachIfirmaPdf($case));
         $this->assertSame('88_8_2026', $service->ifirmaPdfLookupKey($case));
         $this->assertFalse($service->canIncludeOrderConfirmationLink($case));
+
+        $dunningSms = $service->buildSms($case, DebtReminderTemplateService::TEMPLATE_DUNNING);
+        $this->assertStringStartsWith('Platforma Nowoczesnej Edukacji: ponaglenie —', $dunningSms['body']);
+        $this->assertStringContainsString('FV 88/8/2026', $dunningSms['body']);
+        $this->assertStringContainsString('pozostaje nieuregulowana', $dunningSms['body']);
+        $this->assertStringContainsString('Prosimy o pilną zapłatę na rachunek wskazany na fakturze.', $dunningSms['body']);
+        $this->assertStringContainsString('Kontakt: 600 100 200.', $dunningSms['body']);
+        $this->assertStringNotContainsString('PNEDU: ponaglenie', $dunningSms['body']);
+        $this->assertStringNotContainsString('Pilna wpłata.', $dunningSms['body']);
     }
 
     public function test_reminder_uses_remaining_balance_and_prior_invoice_email(): void
