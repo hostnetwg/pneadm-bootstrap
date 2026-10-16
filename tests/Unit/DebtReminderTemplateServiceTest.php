@@ -74,7 +74,7 @@ class DebtReminderTemplateServiceTest extends TestCase
         $dunning = $service->build($case, DebtReminderTemplateService::TEMPLATE_DUNNING);
 
         $this->assertSame(
-            'Platforma Nowoczesnej Edukacji — przypomnienie o płatności za fakturę 88/8/2026',
+            'Przypomnienie o płatności za fakturę 88/8/2026 — Platforma Nowoczesnej Edukacji',
             $reminder['subject']
         );
         $this->assertStringContainsString('nie odnotowaliśmy dotychczas wpłaty za szkolenie „AI w edukacji”', $reminder['body']);

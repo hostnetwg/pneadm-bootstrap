@@ -59,7 +59,7 @@ class DebtReminderTemplateService
                 'invoice_attachment_sentence' => self::INVOICE_ATTACHMENT_SENTENCE,
             ],
             default => [
-                'subject' => 'Platforma Nowoczesnej Edukacji — przypomnienie o płatności za fakturę '.$invoice,
+                'subject' => 'Przypomnienie o płatności za fakturę '.$invoice.' — Platforma Nowoczesnej Edukacji',
                 'body' => $this->reminderBody($case, $order, $invoice, $amount, $due, $training, $hadInvoiceEmail),
                 'invoice_attachment_sentence' => $this->reminderInvoiceAttachmentSentence($hadInvoiceEmail),
             ],
