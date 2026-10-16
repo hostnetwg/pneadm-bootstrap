@@ -25,6 +25,21 @@
             padding: 0.525em 0.975em;
             line-height: 1.2;
         }
+        .debt-reminder-count-badge.debt-reminder-sent-today {
+            box-shadow: 0 0 0 2px var(--bs-success);
+        }
+        tr.debt-case-contacted-today > td {
+            background-color: rgba(25, 135, 84, 0.08);
+        }
+        .debt-reminder-last-sent {
+            font-size: 0.75rem;
+            line-height: 1.2;
+            margin-top: 0.2rem;
+        }
+        .debt-reminder-last-sent.is-today {
+            color: var(--bs-success);
+            font-weight: 600;
+        }
     </style>
 
     <div class="py-3">
@@ -256,8 +271,8 @@
                                     </a>
                                 </th>
                                 <th>Następny krok</th>
-                                <th class="text-center" title="Wysłane e-maile przypomnienia (bez testów)">E-mail</th>
-                                <th class="text-center" title="Wysłane SMS-y przypomnienia (bez testów)">SMS</th>
+                                <th class="text-center" title="Wysłane e-maile przypomnienia (bez testów). Pod spodem data ostatniej wysyłki; dziś = zielone.">E-mail</th>
+                                <th class="text-center" title="Wysłane SMS-y przypomnienia (bez testów). Pod spodem data ostatniej wysyłki; dziś = zielone.">SMS</th>
                                 <th class="text-end">Kwota</th>
                             </tr>
                         </thead>
@@ -267,13 +282,19 @@
                                     $order = $case->formOrder;
                                     $reminderSentCount = $case->reminderEmailsSentCount();
                                     $reminderSmsSentCount = $case->reminderSmsSentCount();
+                                    $lastEmailAt = $case->lastReminderEmailSentAt();
+                                    $lastSmsAt = $case->lastReminderSmsSentAt();
+                                    $lastEmailLabel = $case->reminderLastSentLabel($lastEmailAt);
+                                    $lastSmsLabel = $case->reminderLastSentLabel($lastSmsAt);
+                                    $emailSentToday = $case->reminderEmailSentToday();
+                                    $smsSentToday = $case->reminderSmsSentToday();
                                     $invoiceDrift = app(\App\Services\DebtCaseInvoiceIdentityService::class)->compare($case);
                                     $listInvoice = $case->invoice_number ?: ($order->invoice_number ?: null);
                                     $listKsef = ($invoiceDrift['invoice_replaced'] ?? false)
                                         ? ($case->ksef_number ?: null)
                                         : ($case->ksef_number ?: ($order->ksef_number ?: null));
                                 @endphp
-                                <tr>
+                                <tr @class(['debt-case-contacted-today' => $case->reminderContactedToday()])>
                                     <td>
                                         <a href="{{ route('accounting.collections.show', $case) }}" class="fw-semibold text-decoration-none">
                                             #{{ $case->id }}
@@ -343,16 +364,36 @@
                                     <td>{{ $case->due_date?->format('d.m.Y') ?: '—' }}</td>
                                     <td>{{ $case->next_action_at?->timezone(config('app.timezone'))->format('d.m.Y H:i') ?: '—' }}</td>
                                     <td class="text-center">
-                                        <span class="badge debt-reminder-count-badge {{ $case->reminderEmailsSentBadgeClass($reminderSentCount) }}"
-                                              title="{{ $case->reminderEmailsSentLabel($reminderSentCount) }} (bez testów). 1=niebieski, 2=żółty, 3=czerwony, 4+=ciemny.">
+                                        <span @class([
+                                                  'badge',
+                                                  'debt-reminder-count-badge',
+                                                  $case->reminderEmailsSentBadgeClass($reminderSentCount),
+                                                  'debt-reminder-sent-today' => $emailSentToday,
+                                              ])
+                                              title="{{ $case->reminderEmailsSentLabel($reminderSentCount) }} (bez testów){{ $lastEmailLabel ? ' · ostatnio: '.$lastEmailLabel : '' }}. 1=niebieski, 2=żółty, 3=czerwony, 4+=ciemny.">
                                             {{ $reminderSentCount }}
                                         </span>
+                                        @if($lastEmailLabel)
+                                            <div @class(['debt-reminder-last-sent', 'text-muted' => ! $emailSentToday, 'is-today' => $emailSentToday])>
+                                                {{ $lastEmailLabel }}
+                                            </div>
+                                        @endif
                                     </td>
                                     <td class="text-center">
-                                        <span class="badge debt-reminder-count-badge {{ $case->reminderSmsSentBadgeClass($reminderSmsSentCount) }}"
-                                              title="{{ $case->reminderSmsSentLabel($reminderSmsSentCount) }} (bez testów). 1=niebieski, 2=żółty, 3=czerwony, 4+=ciemny.">
+                                        <span @class([
+                                                  'badge',
+                                                  'debt-reminder-count-badge',
+                                                  $case->reminderSmsSentBadgeClass($reminderSmsSentCount),
+                                                  'debt-reminder-sent-today' => $smsSentToday,
+                                              ])
+                                              title="{{ $case->reminderSmsSentLabel($reminderSmsSentCount) }} (bez testów){{ $lastSmsLabel ? ' · ostatnio: '.$lastSmsLabel : '' }}. 1=niebieski, 2=żółty, 3=czerwony, 4+=ciemny.">
                                             {{ $reminderSmsSentCount }}
                                         </span>
+                                        @if($lastSmsLabel)
+                                            <div @class(['debt-reminder-last-sent', 'text-muted' => ! $smsSentToday, 'is-today' => $smsSentToday])>
+                                                {{ $lastSmsLabel }}
+                                            </div>
+                                        @endif
                                     </td>
                                     <td class="text-end">{{ number_format((float) ($case->amount_gross ?? $order->product_price ?? 0), 2, ',', ' ') }} zł</td>
                                 </tr>

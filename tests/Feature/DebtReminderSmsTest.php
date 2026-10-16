@@ -183,12 +183,16 @@ class DebtReminderSmsTest extends TestCase
             'outcome' => 'sent',
             'channel' => 'sms',
         ]);
-        $this->assertSame(1, $case->fresh()->reminderSmsSentCount());
-        $this->assertSame(DebtCase::STATUS_IN_PROGRESS, $case->fresh()->status);
+        $fresh = $case->fresh();
+        $this->assertSame(1, $fresh->reminderSmsSentCount());
+        $this->assertTrue($fresh->reminderSmsSentToday());
+        $this->assertNotNull($fresh->lastReminderSmsSentAt());
+        $this->assertSame(DebtCase::STATUS_IN_PROGRESS, $fresh->status);
 
         $show = $this->actingAs($user)->get(route('accounting.collections.show', $case));
         $show->assertOk();
         $show->assertSee('1 SMS', false);
+        $show->assertSee('Ostatnio: dziś', false);
 
         Http::assertSent(function ($request) {
             return str_contains($request->url(), 'sms.do')

@@ -150,6 +150,7 @@ class DebtReminderMailTest extends TestCase
         $show = $this->actingAs($user)->get(route('accounting.collections.show', $case));
         $show->assertOk();
         $show->assertSee('1 przypomnienie', false);
+        $show->assertSee('Ostatnio: dziś', false);
 
         $index = $this->actingAs($user)->get(route('accounting.collections.index', [
             'status' => 'all',
@@ -158,9 +159,14 @@ class DebtReminderMailTest extends TestCase
         $index->assertOk();
         $index->assertSee('E-mail', false);
         $index->assertSee('1 przypomnienie', false);
+        $index->assertSee('debt-case-contacted-today', false);
+        $index->assertSee('dziś', false);
         $fresh = $case->fresh();
         $this->assertSame(1, $fresh->reminderEmailsSentCount());
         $this->assertSame('1 przypomnienie', $fresh->reminderEmailsSentLabel());
+        $this->assertTrue($fresh->reminderEmailSentToday());
+        $this->assertNotNull($fresh->lastReminderEmailSentAt());
+        $this->assertStringStartsWith('dziś ', (string) $fresh->reminderLastSentLabel($fresh->lastReminderEmailSentAt()));
         $this->assertSame('text-bg-primary', $fresh->reminderEmailsSentBadgeClass());
         $this->assertSame('text-bg-warning', $fresh->reminderEmailsSentBadgeClass(2));
         $this->assertSame('text-bg-danger', $fresh->reminderEmailsSentBadgeClass(3));

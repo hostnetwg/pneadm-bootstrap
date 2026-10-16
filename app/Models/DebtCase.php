@@ -199,6 +199,78 @@ class DebtCase extends Model
         return $this->reminderEmailsSentBadgeClass($count ?? $this->reminderSmsSentCount());
     }
 
+    /**
+     * Data ostatniej prawdziwej wysyłki e-mail (z withMax lub zapytania).
+     */
+    public function lastReminderEmailSentAt(): ?\Illuminate\Support\Carbon
+    {
+        return $this->resolveReminderLastSentAt('last_reminder_email_sent_at', $this->reminderEmailsSent());
+    }
+
+    /**
+     * Data ostatniej prawdziwej wysyłki SMS (z withMax lub zapytania).
+     */
+    public function lastReminderSmsSentAt(): ?\Illuminate\Support\Carbon
+    {
+        return $this->resolveReminderLastSentAt('last_reminder_sms_sent_at', $this->reminderSmsSent());
+    }
+
+    public function reminderEmailSentToday(): bool
+    {
+        return $this->reminderTimestampIsToday($this->lastReminderEmailSentAt());
+    }
+
+    public function reminderSmsSentToday(): bool
+    {
+        return $this->reminderTimestampIsToday($this->lastReminderSmsSentAt());
+    }
+
+    /** Czy dziś poszła prawdziwa wysyłka e-mail lub SMS (do wyróżnienia wiersza na liście). */
+    public function reminderContactedToday(): bool
+    {
+        return $this->reminderEmailSentToday() || $this->reminderSmsSentToday();
+    }
+
+    /**
+     * Etykieta ostatniej wysyłki: „dziś 14:32” albo „15.10.2026 14:32”; null gdy brak.
+     */
+    public function reminderLastSentLabel(?\Illuminate\Support\Carbon $at): ?string
+    {
+        if ($at === null) {
+            return null;
+        }
+
+        $local = $at->copy()->timezone(config('app.timezone'));
+        if ($local->isToday()) {
+            return 'dziś '.$local->format('H:i');
+        }
+
+        return $local->format('d.m.Y H:i');
+    }
+
+    /**
+     * @param  \Illuminate\Database\Eloquent\Relations\HasMany<\App\Models\DebtCaseAction, $this>  $relation
+     */
+    private function resolveReminderLastSentAt(string $attributeKey, HasMany $relation): ?\Illuminate\Support\Carbon
+    {
+        if (array_key_exists($attributeKey, $this->attributes) && $this->attributes[$attributeKey] !== null) {
+            return $this->asDateTime($this->attributes[$attributeKey]);
+        }
+
+        $max = $relation->max('happened_at');
+
+        return $max ? $this->asDateTime($max) : null;
+    }
+
+    private function reminderTimestampIsToday(?\Illuminate\Support\Carbon $at): bool
+    {
+        if ($at === null) {
+            return false;
+        }
+
+        return $at->copy()->timezone(config('app.timezone'))->isToday();
+    }
+
     public function contacts(): HasMany
     {
         return $this->hasMany(DebtCaseContact::class);

@@ -7,18 +7,44 @@
             @php
                 $reminderSentCount = $case->reminderEmailsSentCount();
                 $reminderSmsSentCount = $case->reminderSmsSentCount();
+                $lastEmailAt = $case->lastReminderEmailSentAt();
+                $lastSmsAt = $case->lastReminderSmsSentAt();
+                $lastEmailLabel = $case->reminderLastSentLabel($lastEmailAt);
+                $lastSmsLabel = $case->reminderLastSentLabel($lastSmsAt);
+                $emailSentToday = $case->reminderEmailSentToday();
+                $smsSentToday = $case->reminderSmsSentToday();
             @endphp
-            <div class="d-flex flex-wrap align-items-center justify-content-center gap-2 debt-case-show-header__badges">
-                <span class="badge debt-reminder-count-badge {{ $case->reminderEmailsSentBadgeClass($reminderSentCount) }}"
-                      title="Wysłane e-maile przypomnienia (bez testów). 1=niebieski, 2=żółty, 3=czerwony, 4+=ciemny.">
-                    <i class="bi bi-envelope-check" aria-hidden="true"></i>
-                    {{ $case->reminderEmailsSentLabel($reminderSentCount) }}
-                </span>
-                <span class="badge debt-reminder-count-badge {{ $case->reminderSmsSentBadgeClass($reminderSmsSentCount) }}"
-                      title="Wysłane SMS-y przypomnienia (bez testów). 1=niebieski, 2=żółty, 3=czerwony, 4+=ciemny.">
-                    <i class="bi bi-phone" aria-hidden="true"></i>
-                    {{ $case->reminderSmsSentLabel($reminderSmsSentCount) }}
-                </span>
+            <div class="d-flex flex-wrap align-items-center justify-content-center gap-3 debt-case-show-header__badges">
+                <div class="text-center">
+                    <span @class([
+                              'badge',
+                              'debt-reminder-count-badge',
+                              $case->reminderEmailsSentBadgeClass($reminderSentCount),
+                              'debt-reminder-sent-today' => $emailSentToday,
+                          ])
+                          title="Wysłane e-maile przypomnienia (bez testów). 1=niebieski, 2=żółty, 3=czerwony, 4+=ciemny.">
+                        <i class="bi bi-envelope-check" aria-hidden="true"></i>
+                        {{ $case->reminderEmailsSentLabel($reminderSentCount) }}
+                    </span>
+                    <div class="small mt-1 {{ $emailSentToday ? 'text-success fw-semibold' : 'text-muted' }}">
+                        {{ $lastEmailLabel ? 'Ostatnio: '.$lastEmailLabel : 'Brak wysyłki' }}
+                    </div>
+                </div>
+                <div class="text-center">
+                    <span @class([
+                              'badge',
+                              'debt-reminder-count-badge',
+                              $case->reminderSmsSentBadgeClass($reminderSmsSentCount),
+                              'debt-reminder-sent-today' => $smsSentToday,
+                          ])
+                          title="Wysłane SMS-y przypomnienia (bez testów). 1=niebieski, 2=żółty, 3=czerwony, 4+=ciemny.">
+                        <i class="bi bi-phone" aria-hidden="true"></i>
+                        {{ $case->reminderSmsSentLabel($reminderSmsSentCount) }}
+                    </span>
+                    <div class="small mt-1 {{ $smsSentToday ? 'text-success fw-semibold' : 'text-muted' }}">
+                        {{ $lastSmsLabel ? 'Ostatnio: '.$lastSmsLabel : 'Brak wysyłki' }}
+                    </div>
+                </div>
             </div>
             <div class="d-flex flex-wrap align-items-center justify-content-end gap-2 debt-case-show-header__actions">
                 <button type="button"
@@ -1992,6 +2018,9 @@
             font-size: 0.95em;
             padding: 0.4em 0.75em;
             line-height: 1.2;
+        }
+        .debt-reminder-count-badge.debt-reminder-sent-today {
+            box-shadow: 0 0 0 2px var(--bs-success);
         }
     </style>
 
