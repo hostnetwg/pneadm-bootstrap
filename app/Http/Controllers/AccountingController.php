@@ -689,6 +689,7 @@ class AccountingController extends Controller
             'bankAfterOrderDate' => true,
             'reminderTemplateLabels' => $reminderTemplates->templateLabels(),
             'reminderTemplatePayloads' => $reminderTemplatePayloads,
+            'reminderDefaultTemplate' => $reminderTemplates->defaultTemplateForCase($debtCase),
             'reminderRecipientOptions' => $reminderTemplates->recipientOptions($debtCase),
             'reminderCanAttachIfirmaPdf' => $reminderTemplates->canAttachIfirmaPdf($debtCase),
             'reminderCanAttachCasePdf' => $debtCase->hasInvoicePdf(),

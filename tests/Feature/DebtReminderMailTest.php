@@ -69,6 +69,7 @@ class DebtReminderMailTest extends TestCase
             $html
         );
         $response->assertSee('debt-reminder-recipient-checkbox', false);
+        $response->assertSee('VIP — uprzejme zapytanie o płatność', false);
         $response->assertSee('id="debtReminderSendTarget"', false);
         $response->assertSee('name="send_target"', false);
         $response->assertSee('Zamawiający', false);

@@ -1470,11 +1470,16 @@
                             <label class="form-label fw-bold" for="debtReminderTemplate">Szablon</label>
                             <select class="form-select" id="debtReminderTemplate" name="template">
                                 @foreach(($reminderTemplateLabels ?? []) as $value => $label)
-                                    <option value="{{ $value }}" @selected(old('template', \App\Services\DebtReminderTemplateService::TEMPLATE_REMINDER) === $value)>
+                                    <option value="{{ $value }}" @selected(old('template', $reminderDefaultTemplate ?? \App\Services\DebtReminderTemplateService::TEMPLATE_REMINDER) === $value)>
                                         {{ $label }}
                                     </option>
                                 @endforeach
                             </select>
+                            @if($case->isVip())
+                                <div class="form-text text-warning">
+                                    Sprawa VIP — domyślnie wybrany szablon uprzejmy (możesz zmienić).
+                                </div>
+                            @endif
                         </div>
                         <div class="mb-3">
                             <label class="form-label fw-bold" for="debtReminderSubject">Temat</label>
@@ -1695,11 +1700,16 @@
                             <label class="form-label fw-bold" for="debtReminderSmsTemplate">Szablon</label>
                             <select class="form-select" id="debtReminderSmsTemplate" name="template">
                                 @foreach(($reminderTemplateLabels ?? []) as $value => $label)
-                                    <option value="{{ $value }}" @selected(old('template', \App\Services\DebtReminderTemplateService::TEMPLATE_REMINDER) === $value)>
+                                    <option value="{{ $value }}" @selected(old('template', $reminderDefaultTemplate ?? \App\Services\DebtReminderTemplateService::TEMPLATE_REMINDER) === $value)>
                                         {{ $label }}
                                     </option>
                                 @endforeach
                             </select>
+                            @if($case->isVip())
+                                <div class="form-text text-warning">
+                                    Sprawa VIP — domyślnie wybrany szablon uprzejmy (możesz zmienić).
+                                </div>
+                            @endif
                         </div>
 
                         <div class="mb-3">

@@ -117,6 +117,56 @@ class DebtReminderTemplateServiceTest extends TestCase
         $this->assertStringNotContainsString('Pilna wpłata.', $dunningSms['body']);
     }
 
+    public function test_vip_soft_email_and_sms_are_diplomatic(): void
+    {
+        $order = FormOrder::create([
+            'product_name' => 'Konkurs na dyrektora szkoły',
+            'product_price' => 365,
+            'order_date' => now()->subDays(20),
+            'invoice_number' => '588/9/2026',
+            'orderer_name' => 'Agnieszka Karpiel',
+            'orderer_email' => 'vip@example.test',
+        ]);
+        $case = DebtCase::create([
+            'form_order_id' => $order->id,
+            'status' => DebtCase::STATUS_OPEN,
+            'invoice_number' => '588/9/2026',
+            'amount_gross' => 365,
+            'due_date' => now()->subDays(10)->toDateString(),
+            'opened_at' => now(),
+            'customer_segment' => DebtCase::SEGMENT_VIP,
+            'manual_vip' => true,
+        ]);
+        $case->setRelation('formOrder', $order);
+
+        DebtCollectionSetting::query()->updateOrCreate(
+            ['id' => DebtCollectionSetting::SINGLETON_ID],
+            ['contact_phone' => '501 654 274']
+        );
+        DebtCollectionSetting::forgetSettingsCache();
+
+        $service = app(DebtReminderTemplateService::class);
+        $this->assertSame(DebtReminderTemplateService::TEMPLATE_VIP, $service->defaultTemplateForCase($case));
+
+        $mail = $service->build($case, DebtReminderTemplateService::TEMPLATE_VIP);
+        $this->assertStringStartsWith('Prośba o potwierdzenie płatności — FV 588/9/2026', $mail['subject']);
+        $this->assertStringContainsString('nie możemy obecnie zidentyfikować wpłaty', $mail['body']);
+        $this->assertStringContainsString('uprzejma prośba o krótkie potwierdzenie', $mail['body']);
+        $this->assertStringContainsString('Jeśli przelew został już zlecony', $mail['body']);
+        $this->assertStringContainsString('Z góry dziękuję za współpracę.', $mail['body']);
+        $this->assertStringContainsString('Tytuł przelewu: 588/9/2026', $mail['body']);
+        $this->assertStringNotContainsString('nie odnotowaliśmy dotychczas wpłaty', $mail['body']);
+        $this->assertStringNotContainsString('po terminie', $mail['body']);
+        $this->assertStringNotContainsString('ponaglenie', mb_strtolower($mail['body']));
+
+        $sms = $service->buildSms($case, DebtReminderTemplateService::TEMPLATE_VIP);
+        $this->assertStringContainsString('uprzejma prośba o potwierdzenie płatności', $sms['body']);
+        $this->assertStringContainsString('Nie możemy zidentyfikować wpłaty', $sms['body']);
+        $this->assertStringContainsString('Kontakt: 501 654 274.', $sms['body']);
+        $this->assertStringNotContainsString('ponaglenie', mb_strtolower($sms['body']));
+        $this->assertStringNotContainsString('Pilna wpłata', $sms['body']);
+    }
+
     public function test_reminder_uses_remaining_balance_and_prior_invoice_email(): void
     {
         $user = User::factory()->create(['is_active' => true]);

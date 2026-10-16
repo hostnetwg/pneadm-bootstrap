@@ -14,6 +14,9 @@ class DebtReminderTemplateService
 
     public const TEMPLATE_DUNNING = 'dunning';
 
+    /** Uprzejme zapytanie o płatność — dla klientów VIP. */
+    public const TEMPLATE_VIP = 'vip_soft';
+
     /** Zdanie o PDF dla szablonu ponaglenia (bez zmian). */
     public const INVOICE_ATTACHMENT_SENTENCE = 'W załączeniu przesyłamy fakturę.';
 
@@ -32,8 +35,17 @@ class DebtReminderTemplateService
     {
         return [
             self::TEMPLATE_REMINDER => 'Przypomnienie o płatności',
+            self::TEMPLATE_VIP => 'VIP — uprzejme zapytanie o płatność',
             self::TEMPLATE_DUNNING => 'Ponaglenie (formalniejsze)',
         ];
+    }
+
+    /**
+     * Domyślny szablon w modalu: VIP → uprzejme zapytanie, inaczej przypomnienie.
+     */
+    public function defaultTemplateForCase(DebtCase $case): string
+    {
+        return $case->isVip() ? self::TEMPLATE_VIP : self::TEMPLATE_REMINDER;
     }
 
     /**
@@ -57,6 +69,11 @@ class DebtReminderTemplateService
                 ),
                 'body' => $this->dunningBody($invoice, $amount, $due, $bankLine, $training),
                 'invoice_attachment_sentence' => self::INVOICE_ATTACHMENT_SENTENCE,
+            ],
+            self::TEMPLATE_VIP => [
+                'subject' => 'Prośba o potwierdzenie płatności — FV '.$invoice.' — Platforma Nowoczesnej Edukacji',
+                'body' => $this->vipSoftBody($order, $invoice, $amount, $due, $training, $hadInvoiceEmail),
+                'invoice_attachment_sentence' => $this->reminderInvoiceAttachmentSentence($hadInvoiceEmail),
             ],
             default => [
                 'subject' => 'Przypomnienie o płatności za fakturę '.$invoice.' — Platforma Nowoczesnej Edukacji',
@@ -549,6 +566,70 @@ class DebtReminderTemplateService
     }
 
     /**
+     * Dyplomatyczna treść dla VIP: prośba o potwierdzenie, bez tonu monitu.
+     *
+     * @param  array{title: string, start: string, instructor: string}  $training
+     */
+    private function vipSoftBody(
+        ?FormOrder $order,
+        string $invoice,
+        string $amount,
+        string $due,
+        array $training,
+        bool $hadConfirmedInvoiceEmail,
+    ): string {
+        $title = trim($training['title']);
+        $hasTitle = $title !== '' && $title !== '—';
+
+        $opening = $hasTitle
+            ? 'piszę w sprawie faktury nr '.$invoice.' dotyczącej szkolenia „'.$title.'”.'
+            : 'piszę w sprawie faktury nr '.$invoice.'.';
+
+        $ordererName = trim((string) ($order?->orderer_name ?? ''));
+        $participantName = trim((string) ($order?->display_participant_name ?? ''));
+        $bankAccount = $this->resolvedCompanyBankAccountDisplay();
+
+        $costLine = 'Koszt: '.$amount.' zł (termin płatności: '.$due.')';
+
+        // Needle jak w przypomnieniu — sync zdania o PDF w modalu / backendzie.
+        $settlement = $hadConfirmedInvoiceEmail
+            ? 'Fakturę przesłaliśmy wcześniej e-mailem. Prosimy o uregulowanie należności na rachunek wskazany na fakturze.'
+            : 'Prosimy o uregulowanie należności na rachunek wskazany na fakturze.';
+
+        $lines = [
+            'Dzień dobry,',
+            '',
+            $opening,
+            '',
+            'W naszych systemach nie możemy obecnie zidentyfikować wpłaty odpowiadającej tej fakturze — stąd uprzejma prośba o krótkie potwierdzenie.',
+            '',
+            'SZKOLENIE:',
+            'Temat: '.($hasTitle ? $title : '—'),
+            'Termin: '.$training['start'],
+            'Prowadzący: '.$training['instructor'],
+            'Uczestnik: '.($participantName !== '' ? $participantName : '—'),
+            'Zamawiający: '.($ordererName !== '' ? $ordererName : '—'),
+            '',
+            'Dane do przelewu:',
+            $costLine,
+            'Tytuł przelewu: '.$invoice,
+            'Nr konta: '.($bankAccount !== '' ? $bankAccount : '—'),
+            '',
+            $settlement,
+            '',
+            'Jeśli przelew został już zlecony, wystarczy odpowiedź z potwierdzeniem i datą — dzięki temu szybko dopasujemy wpłatę i domkniemy rozliczenie.',
+            '',
+            'Jeżeli faktura lub kwota budzą wątpliwości, prosimy o kontakt — chętnie pomożemy.',
+            '',
+            'Z góry dziękuję za współpracę.',
+            '',
+            ...$this->reminderSignatureLines(),
+        ];
+
+        return implode("\n", $lines);
+    }
+
+    /**
      * Status terminu płatności względem dziś (do linii Koszt; „po terminie” wyróżniane na czerwono w HTML).
      */
     public function paymentDueStatusLabel(DebtCase $case, ?FormOrder $order = null): ?string
@@ -778,6 +859,7 @@ class DebtReminderTemplateService
 
         $body = match ($template) {
             self::TEMPLATE_DUNNING => $this->dunningSmsBody($case, $invoice, $amount, $due),
+            self::TEMPLATE_VIP => $this->vipSoftSmsBody($case, $order, $invoice, $amount),
             default => $this->reminderSmsBody($case, $order, $invoice, $amount),
         };
 
@@ -837,6 +919,33 @@ class DebtReminderTemplateService
         }
 
         $parts[] = 'Prosimy o pilną zapłatę na rachunek wskazany na fakturze.';
+
+        $phone = $this->smsContactPhoneLabel();
+        if ($phone !== null) {
+            $parts[] = 'Kontakt: '.$phone.'.';
+        }
+
+        return implode(' ', $parts);
+    }
+
+    private function vipSoftSmsBody(DebtCase $case, ?FormOrder $order, string $invoice, string $amount): string
+    {
+        if ($order !== null && ! $order->relationLoaded('course')) {
+            $order->loadMissing('course');
+        }
+
+        $shortTitle = $this->smsShortTrainingTitle($this->trainingContext($order)['title']);
+        $opening = 'Platforma Nowoczesnej Edukacji: uprzejma prośba o potwierdzenie płatności '
+            .$amount.' zł za FV '.$invoice;
+        if ($shortTitle !== '') {
+            $opening .= ' ('.$shortTitle.')';
+        }
+        $opening .= '.';
+
+        $parts = [
+            $opening,
+            'Nie możemy zidentyfikować wpłaty — prosimy o krótką odpowiedź z datą przelewu.',
+        ];
 
         $phone = $this->smsContactPhoneLabel();
         if ($phone !== null) {
