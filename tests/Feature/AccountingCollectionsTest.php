@@ -227,6 +227,37 @@ class AccountingCollectionsTest extends TestCase
         $all->assertSee('200/8/2026');
     }
 
+    public function test_collections_index_shows_overdue_days_under_due_date(): void
+    {
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+            'is_active' => 1,
+        ]);
+
+        $order = FormOrder::create([
+            'product_name' => 'Po terminie',
+            'product_price' => 100,
+            'order_date' => now()->subDays(20),
+            'invoice_number' => '301/8/2026',
+        ]);
+        DebtCase::create([
+            'form_order_id' => $order->id,
+            'status' => DebtCase::STATUS_OPEN,
+            'invoice_number' => '301/8/2026',
+            'due_date' => now()->subDays(5)->toDateString(),
+            'opened_at' => now(),
+        ]);
+
+        $response = $this->actingAs($user)->get(route('accounting.collections.index', [
+            'status' => 'all',
+            'search' => '301/8/2026',
+        ]));
+
+        $response->assertOk();
+        $response->assertSee('po terminie', false);
+        $response->assertSee('text-danger', false);
+    }
+
     public function test_user_can_create_debt_case_from_form_order(): void
     {
         $user = User::factory()->create([

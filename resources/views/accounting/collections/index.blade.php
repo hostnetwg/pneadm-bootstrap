@@ -361,7 +361,19 @@
                                             <div class="small text-muted">utworzył: {{ $case->createdBy->name }}</div>
                                         @endif
                                     </td>
-                                    <td>{{ $case->due_date?->format('d.m.Y') ?: '—' }}</td>
+                                    <td>
+                                        <div>{{ $case->due_date?->format('d.m.Y') ?: '—' }}</div>
+                                        @php
+                                            $dueStatusLabel = app(\App\Services\DebtReminderTemplateService::class)
+                                                ->paymentDueStatusLabel($case, $order);
+                                            $dueOverdueLabel = ($dueStatusLabel !== null && str_contains($dueStatusLabel, 'po terminie'))
+                                                ? $dueStatusLabel
+                                                : null;
+                                        @endphp
+                                        @if($dueOverdueLabel)
+                                            <div class="small text-danger fw-semibold">{{ $dueOverdueLabel }}</div>
+                                        @endif
+                                    </td>
                                     <td>{{ $case->next_action_at?->timezone(config('app.timezone'))->format('d.m.Y H:i') ?: '—' }}</td>
                                     <td class="text-center">
                                         <span @class([
