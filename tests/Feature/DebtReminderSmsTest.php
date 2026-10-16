@@ -98,6 +98,8 @@ class DebtReminderSmsTest extends TestCase
         $response->assertDontSee('debtReminderSmsIncludeTraining', false);
         $response->assertSee('Dodaj nr konta bankowego', false);
         $response->assertSee('debtReminderSmsIncludeBank', false);
+        $response->assertSee('Bez polskich znaków (tańszy SMS)', false);
+        $response->assertSee('debtReminderSmsStripDiacritics', false);
         $response->assertSee('Wyślij też e-mail przypomnienia tuż przed SMS', false);
         $response->assertSee('debtReminderSmsAlsoSendEmail', false);
         $response->assertSee('za szkolenie: Szkolenie SMS', false);
@@ -199,6 +201,47 @@ class DebtReminderSmsTest extends TestCase
                 && $request['to'] === '48501111222'
                 && str_contains((string) $request['message'], 'FV 100/9/2026');
         });
+    }
+
+    public function test_strip_sms_diacritics_sends_gsm_friendly_body(): void
+    {
+        Http::fake([
+            'api.smsapi.pl/*' => Http::response([
+                'count' => 1,
+                'list' => [
+                    ['id' => 'ascii1', 'points' => 0.16, 'number' => '48501111222', 'status' => 'QUEUE'],
+                ],
+            ], 200),
+        ]);
+
+        [$user, $case] = $this->caseWithOrder();
+
+        $this->actingAs($user)->post(route('accounting.collections.send-reminder-sms', $case), [
+            'template' => 'reminder',
+            'body' => 'nie odnotowaliśmy wpłaty — prosimy o zapłatę',
+            'send_target' => 'recipient',
+            'strip_sms_diacritics' => '1',
+            'also_send_email' => '0',
+        ])->assertRedirect(route('accounting.collections.show', $case));
+
+        Http::assertSent(function ($request) {
+            $message = (string) ($request['message'] ?? '');
+
+            return str_contains($request->url(), 'sms.do')
+                && $message === 'nie odnotowalismy wplaty - prosimy o zaplate';
+        });
+
+        $this->assertDatabaseHas('debt_case_actions', [
+            'debt_case_id' => $case->id,
+            'action_type' => DebtCaseAction::TYPE_SMS,
+            'outcome' => 'sent',
+        ]);
+        $note = (string) DebtCaseAction::query()
+            ->where('debt_case_id', $case->id)
+            ->where('action_type', DebtCaseAction::TYPE_SMS)
+            ->where('outcome', 'sent')
+            ->value('note');
+        $this->assertStringContainsString('nie odnotowalismy wplaty - prosimy o zaplate', $note);
     }
 
     public function test_test_sms_does_not_increase_counter(): void

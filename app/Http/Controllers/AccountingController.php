@@ -870,6 +870,7 @@ class AccountingController extends Controller
             'send_target' => ['required', 'string', 'in:recipient,test'],
             'test_phone' => ['nullable', 'string', 'max:32'],
             'also_send_email' => ['nullable', 'boolean'],
+            'strip_sms_diacritics' => ['nullable', 'boolean'],
         ];
 
         if ($request->input('send_target') === 'test') {
@@ -885,6 +886,9 @@ class AccountingController extends Controller
 
         $isTest = $validated['send_target'] === 'test';
         $alsoSendEmail = $request->boolean('also_send_email');
+        $smsBody = $request->boolean('strip_sms_diacritics')
+            ? $templates->toGsmFriendlySms($validated['body'])
+            : $validated['body'];
 
         if ($isTest) {
             $toPhone = (string) $validated['test_phone'];
@@ -943,7 +947,7 @@ class AccountingController extends Controller
         $result = $smsService->send(
             case: $debtCase,
             toPhone: $toPhone,
-            body: $validated['body'],
+            body: $smsBody,
             isTest: $isTest,
         );
 

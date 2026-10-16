@@ -1724,6 +1724,22 @@
                                     @endif
                                 </label>
                             </div>
+                            <input type="hidden" name="strip_sms_diacritics" value="0">
+                            <div class="form-check mb-2">
+                                <input class="form-check-input"
+                                       type="checkbox"
+                                       value="1"
+                                       id="debtReminderSmsStripDiacritics"
+                                       name="strip_sms_diacritics"
+                                       @checked((string) old('strip_sms_diacritics', '0') === '1')>
+                                <label class="form-check-label" for="debtReminderSmsStripDiacritics">
+                                    Bez polskich znaków (tańszy SMS)
+                                    <span class="text-muted d-block small">
+                                        Zamienia ą→a, ę→e, ł→l itd. oraz myślniki/cudzysłowy — SMS może iść w limicie 160 znaków na część zamiast 70.
+                                        Odznaczenie przywraca poprzednią treść. E-mail towarzyszący bez zmian.
+                                    </span>
+                                </label>
+                            </div>
                             <input type="hidden" name="also_send_email" value="0">
                             <div class="form-check">
                                 <input class="form-check-input"
@@ -1767,7 +1783,7 @@
                             <div class="form-text">
                                 <span id="debtReminderSmsLength">0</span> znaków ·
                                 ok. <span id="debtReminderSmsParts">0</span> części SMS
-                                (polskie znaki = krótszy limit na część).
+                                (<span id="debtReminderSmsEncodingHint">(polskie znaki = limit 70/67 na część)</span>.
                             </div>
                         </div>
 
@@ -2257,8 +2273,25 @@
                 var bodyInput = document.getElementById('debtReminderSmsBody');
                 var lengthEl = document.getElementById('debtReminderSmsLength');
                 var partsEl = document.getElementById('debtReminderSmsParts');
+                var encodingHintEl = document.getElementById('debtReminderSmsEncodingHint');
                 var bankCheckbox = document.getElementById('debtReminderSmsIncludeBank');
+                var asciiCheckbox = document.getElementById('debtReminderSmsStripDiacritics');
                 var keepEdited = {{ old('body') && old('test_phone') !== null ? 'true' : 'false' }};
+                var bodyBeforeAscii = null;
+
+                function toGsmFriendly(text) {
+                    var map = {
+                        'ą': 'a', 'Ą': 'A', 'ć': 'c', 'Ć': 'C', 'ę': 'e', 'Ę': 'E',
+                        'ł': 'l', 'Ł': 'L', 'ń': 'n', 'Ń': 'N', 'ó': 'o', 'Ó': 'O',
+                        'ś': 's', 'Ś': 'S', 'ź': 'z', 'Ź': 'Z', 'ż': 'z', 'Ż': 'Z',
+                        '—': '-', '–': '-', '−': '-',
+                        '„': '"', '”': '"', '“': '"', '«': '"', '»': '"',
+                        '…': '...', '×': 'x', '\u00A0': ' '
+                    };
+                    return String(text || '').replace(/[ąĄćĆęĘłŁńŃóÓśŚźŹżŻ—–−„”“«»…×\u00A0]/g, function (ch) {
+                        return map[ch] || ch;
+                    });
+                }
 
                 function estimateParts(text) {
                     var length = (text || '').length;
@@ -2273,8 +2306,14 @@
                 function updateCounters() {
                     if (!bodyInput) return;
                     var text = bodyInput.value || '';
+                    var hasUnicode = /[^\u0000-\u007F]/.test(text);
                     if (lengthEl) lengthEl.textContent = String(text.length);
                     if (partsEl) partsEl.textContent = String(estimateParts(text));
+                    if (encodingHintEl) {
+                        encodingHintEl.textContent = hasUnicode
+                            ? '(polskie/Unicode = limit 70/67 na część)'
+                            : '(GSM = limit 160/153 na część)';
+                    }
                 }
 
                 function escapeRegExp(value) {
@@ -2292,11 +2331,20 @@
                     if (!bodyInput) {
                         return;
                     }
-                    var text = stripSnippet(bodyInput.value || '', bankSnippet);
+                    var source = (asciiCheckbox && asciiCheckbox.checked && bodyBeforeAscii !== null)
+                        ? bodyBeforeAscii
+                        : (bodyInput.value || '');
+                    var text = stripSnippet(source, bankSnippet);
                     if (bankCheckbox && bankCheckbox.checked && bankSnippet) {
                         text = stripSnippet(text, bankSnippet) + bankSnippet;
                     }
-                    bodyInput.value = text;
+                    if (asciiCheckbox && asciiCheckbox.checked) {
+                        bodyBeforeAscii = text;
+                        bodyInput.value = toGsmFriendly(text);
+                    } else {
+                        bodyBeforeAscii = null;
+                        bodyInput.value = text;
+                    }
                     updateCounters();
                 }
 
@@ -2305,6 +2353,7 @@
                     var payload = templates[templateSelect.value];
                     if (!payload) return;
                     if (force || !bodyInput.value) {
+                        bodyBeforeAscii = null;
                         bodyInput.value = payload.body || '';
                         syncOptionalSnippets();
                         return;
@@ -2319,6 +2368,24 @@
                 }
                 if (bankCheckbox) {
                     bankCheckbox.addEventListener('change', syncOptionalSnippets);
+                }
+                if (asciiCheckbox) {
+                    asciiCheckbox.addEventListener('change', function () {
+                        if (!bodyInput) {
+                            return;
+                        }
+                        if (asciiCheckbox.checked) {
+                            bodyBeforeAscii = bodyInput.value || '';
+                            bodyInput.value = toGsmFriendly(bodyBeforeAscii);
+                            updateCounters();
+                        } else if (bodyBeforeAscii !== null) {
+                            bodyInput.value = bodyBeforeAscii;
+                            bodyBeforeAscii = null;
+                            updateCounters();
+                        } else {
+                            updateCounters();
+                        }
+                    });
                 }
                 if (bodyInput) {
                     bodyInput.addEventListener('input', updateCounters);

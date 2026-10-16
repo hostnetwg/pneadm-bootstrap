@@ -210,6 +210,26 @@ class DebtReminderTemplateServiceTest extends TestCase
         );
     }
 
+    public function test_to_gsm_friendly_sms_strips_polish_and_lowers_part_count(): void
+    {
+        $service = app(DebtReminderTemplateService::class);
+        $withDiacritics = 'Platforma Nowoczesnej Edukacji: nie odnotowaliśmy wpłaty 365,00 zł za szkolenie: '
+            .'Konkurs na dyrektora... Fakturę FV 649/9/2026 wysłaliśmy e-mailem. '
+            .'Prosimy o zapłatę na rachunek z faktury. Kontakt: 501 654 274.';
+        $friendly = $service->toGsmFriendlySms($withDiacritics);
+
+        $this->assertStringContainsString('nie odnotowalismy wplaty', $friendly);
+        $this->assertStringContainsString('Fakture FV 649/9/2026 wyslalismy e-mailem.', $friendly);
+        $this->assertStringNotContainsString('ą', $friendly);
+        $this->assertStringNotContainsString('ł', $friendly);
+        $this->assertGreaterThan(
+            $service->estimateSmsParts($friendly),
+            $service->estimateSmsParts($withDiacritics)
+        );
+        $this->assertSame(2, $service->estimateSmsParts($friendly));
+        $this->assertGreaterThanOrEqual(3, $service->estimateSmsParts($withDiacritics));
+    }
+
     public function test_reminder_without_training_title_uses_generic_sentence(): void
     {
         $order = FormOrder::create([

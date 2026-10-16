@@ -969,4 +969,31 @@ class DebtReminderTemplateService
         // GSM-7: 160 / 153
         return $length <= 160 ? 1 : (int) ceil($length / 153);
     }
+
+    /**
+     * Transliteracja polskich znaków i typowych „smart” znaków do ASCII,
+     * żeby SMS mógł iść w GSM-7 (160/153 zamiast 70/67 znaków na część).
+     */
+    public function toGsmFriendlySms(string $message): string
+    {
+        $map = [
+            'ą' => 'a', 'Ą' => 'A',
+            'ć' => 'c', 'Ć' => 'C',
+            'ę' => 'e', 'Ę' => 'E',
+            'ł' => 'l', 'Ł' => 'L',
+            'ń' => 'n', 'Ń' => 'N',
+            'ó' => 'o', 'Ó' => 'O',
+            'ś' => 's', 'Ś' => 'S',
+            'ź' => 'z', 'Ź' => 'Z',
+            'ż' => 'z', 'Ż' => 'Z',
+            '—' => '-', '–' => '-', '−' => '-',
+            '„' => '"', '”' => '"', '“' => '"',
+            '«' => '"', '»' => '"',
+            '…' => '...',
+            '×' => 'x',
+            "\u{00A0}" => ' ',
+        ];
+
+        return strtr($message, $map);
+    }
 }
