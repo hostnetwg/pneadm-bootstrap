@@ -109,6 +109,8 @@ class DebtReminderTemplateServiceTest extends TestCase
         $this->assertStringStartsWith('Platforma Nowoczesnej Edukacji: ponaglenie —', $dunningSms['body']);
         $this->assertStringContainsString('FV 88/8/2026', $dunningSms['body']);
         $this->assertStringContainsString('pozostaje nieuregulowana', $dunningSms['body']);
+        $this->assertStringContainsString('Wysłaliśmy e-mail z fakturą.', $dunningSms['body']);
+        $this->assertStringNotContainsString('Ponownie wysłaliśmy e-mail z fakturą.', $dunningSms['body']);
         $this->assertStringContainsString('Prosimy o pilną zapłatę na rachunek wskazany na fakturze.', $dunningSms['body']);
         $this->assertStringContainsString('Kontakt: 600 100 200.', $dunningSms['body']);
         $this->assertStringNotContainsString('PNEDU: ponaglenie', $dunningSms['body']);
@@ -193,12 +195,16 @@ class DebtReminderTemplateServiceTest extends TestCase
             $reminder['invoice_attachment_sentence']
         );
 
-        $sms = $service->buildSms($case->fresh(['formOrder', 'bankTransactionMatches.transaction', 'actions']), DebtReminderTemplateService::TEMPLATE_REMINDER);
+        $fresh = $case->fresh(['formOrder', 'bankTransactionMatches.transaction', 'actions']);
+        $sms = $service->buildSms($fresh, DebtReminderTemplateService::TEMPLATE_REMINDER);
         $this->assertStringContainsString('265,00 zł', $sms['body']);
         $this->assertStringContainsString('za szkolenie: Szkolenie saldo', $sms['body']);
         $this->assertStringContainsString('Fakturę FV 649/9/2026 wysłaliśmy e-mailem.', $sms['body']);
         $this->assertStringContainsString('Kontakt: 501 654 274.', $sms['body']);
         $this->assertStringStartsWith('Platforma Nowoczesnej Edukacji:', $sms['body']);
+
+        $dunningSms = $service->buildSms($fresh, DebtReminderTemplateService::TEMPLATE_DUNNING);
+        $this->assertStringContainsString('Ponownie wysłaliśmy e-mail z fakturą.', $dunningSms['body']);
     }
 
     public function test_sms_short_training_title_takes_two_words_and_preposition_extension(): void
