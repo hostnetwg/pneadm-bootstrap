@@ -8,6 +8,7 @@ use App\Services\ClosedTrainingCaseService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class ClosedTrainingCaseController extends Controller
@@ -60,6 +61,10 @@ class ClosedTrainingCaseController extends Controller
             'contact_email' => 'nullable|email|max:255',
             'contact_phone' => 'nullable|string|max:50',
             'institution' => 'nullable|string|max:255',
+            'institution_type' => ['required', Rule::in(array_keys(ClosedTrainingCase::institutionTypeOptions()))],
+            'institution_type_other' => ['nullable', 'string', 'max:255', Rule::requiredIf(
+                fn () => $request->input('institution_type') === ClosedTrainingCase::INSTITUTION_OTHER
+            )],
             'preferred_format' => ['nullable', Rule::in(array_keys(ClosedTrainingCase::formatOptions()))],
             'message' => 'required|string|max:3000',
             'assignee_user_id' => ['nullable', 'integer', Rule::exists('users', 'id')],
@@ -68,8 +73,13 @@ class ClosedTrainingCaseController extends Controller
         ], [
             'topic.required' => 'Podaj temat szkolenia.',
             'contact_name.required' => 'Podaj osobę kontaktową.',
+            'institution_type.required' => 'Wybierz rodzaj placówki.',
+            'institution_type.in' => 'Wybierz rodzaj placówki.',
+            'institution_type_other.required' => 'Podaj rodzaj placówki.',
             'message.required' => 'Opisz, czego dotyczy sprawa.',
         ]);
+
+        $data = $this->normalizeInstitutionType($data);
 
         $case = ClosedTrainingCase::query()->create([
             'source' => ClosedTrainingCase::SOURCE_MANUAL,
@@ -80,6 +90,8 @@ class ClosedTrainingCaseController extends Controller
             'contact_email' => $data['contact_email'] ?? null,
             'contact_phone' => $data['contact_phone'] ?? null,
             'institution' => $data['institution'] ?? null,
+            'institution_type' => $data['institution_type'],
+            'institution_type_other' => $data['institution_type_other'] ?? null,
             'message' => $data['message'],
             'assignee_user_id' => $data['assignee_user_id'] ?? null,
             'next_action' => $this->blankToNull($data['next_action'] ?? null),
@@ -145,6 +157,23 @@ class ClosedTrainingCaseController extends Controller
             ->where('is_active', true)
             ->orderBy('name')
             ->get(['id', 'name']);
+    }
+
+    private function normalizeInstitutionType(array $data): array
+    {
+        if (($data['institution_type'] ?? null) === ClosedTrainingCase::INSTITUTION_OTHER) {
+            $detail = trim((string) ($data['institution_type_other'] ?? ''));
+            if ($detail === '') {
+                throw ValidationException::withMessages([
+                    'institution_type_other' => 'Podaj rodzaj placówki.',
+                ]);
+            }
+            $data['institution_type_other'] = $detail;
+        } else {
+            $data['institution_type_other'] = null;
+        }
+
+        return $data;
     }
 
     private function blankToNull(?string $value): ?string

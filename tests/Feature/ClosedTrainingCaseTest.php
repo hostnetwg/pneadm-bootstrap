@@ -28,6 +28,8 @@ class ClosedTrainingCaseTest extends TestCase
                 'contact_name' => 'Osoba kontaktowa',
                 'contact_email' => 'szkola@example.com',
                 'institution' => 'Przykładowa placówka',
+                'institution_type' => ClosedTrainingCase::INSTITUTION_PRIMARY,
+                'institution_type_other' => 'Poradnia, która nie powinna zostać',
                 'preferred_format' => ClosedTrainingCase::FORMAT_ONLINE,
                 'message' => 'Telefon: prośba o termin w listopadzie.',
                 'next_action' => 'Oddzwonić i potwierdzić potrzeby.',
@@ -41,11 +43,18 @@ class ClosedTrainingCaseTest extends TestCase
         $this->assertSame(ClosedTrainingCase::STATUS_NEW, $case->status);
         $this->assertNull($case->consent_at);
         $this->assertSame('Oddzwonić i potwierdzić potrzeby.', $case->next_action);
+        $this->assertSame(ClosedTrainingCase::INSTITUTION_PRIMARY, $case->institution_type);
+        $this->assertNull($case->institution_type_other);
 
         $this->actingAs($user)
             ->get(route('closed-training-cases.show', $case))
             ->assertOk()
             ->assertSee('Temat szkolenia')
+            ->assertSee('Rodzaj placówki')
+            ->assertSee('Szkoła podstawowa')
+            ->assertSee('Nazwa szkoły / placówki')
+            ->assertSee('Przykładowa placówka')
+            ->assertDontSee('Poradnia, która nie powinna zostać')
             ->assertSee('Szkolenie rady przykładowej')
             ->assertSee('Telefon: prośba o termin w listopadzie.')
             ->assertSee('Oddzwonić i potwierdzić potrzeby.')
@@ -98,6 +107,7 @@ class ClosedTrainingCaseTest extends TestCase
             ->assertSee('Temat szkolenia')
             ->assertSee('Nie podano')
             ->assertSee('Proszę o kontakt, temat doprecyzujemy telefonicznie.')
+            ->assertSee('Rodzaj placówki')
             ->assertDontSee('(temat nie określony)');
 
         $this->actingAs($user)
@@ -105,5 +115,46 @@ class ClosedTrainingCaseTest extends TestCase
             ->assertOk()
             ->assertSee('Nie podano')
             ->assertDontSee('(temat nie określony)');
+    }
+
+    public function test_manual_case_stores_other_institution_type_only_with_detail(): void
+    {
+        $user = User::factory()->create(['is_active' => true]);
+
+        $this->actingAs($user)
+            ->post(route('closed-training-cases.store'), [
+                'topic' => 'Szkolenie bez rodzaju',
+                'contact_name' => 'Osoba kontaktowa',
+                'message' => 'Telefon.',
+            ])
+            ->assertSessionHasErrors(['institution_type']);
+
+        $this->actingAs($user)
+            ->post(route('closed-training-cases.store'), [
+                'topic' => 'Szkolenie dla poradni',
+                'contact_name' => 'Osoba kontaktowa',
+                'message' => 'Telefon w sprawie poradni.',
+                'institution_type' => ClosedTrainingCase::INSTITUTION_OTHER,
+            ])
+            ->assertSessionHasErrors(['institution_type_other']);
+
+        $this->actingAs($user)
+            ->post(route('closed-training-cases.store'), [
+                'topic' => 'Szkolenie dla poradni',
+                'contact_name' => 'Osoba kontaktowa',
+                'message' => 'Telefon w sprawie poradni.',
+                'institution_type' => ClosedTrainingCase::INSTITUTION_OTHER,
+                'institution_type_other' => 'Poradnia psychologiczno-pedagogiczna',
+            ])
+            ->assertRedirect();
+
+        $case = ClosedTrainingCase::query()->where('topic', 'Szkolenie dla poradni')->first();
+        $this->assertNotNull($case);
+        $this->assertNull($case->institution);
+
+        $this->actingAs($user)
+            ->get(route('closed-training-cases.show', $case))
+            ->assertOk()
+            ->assertSee('Inna — Poradnia psychologiczno-pedagogiczna');
     }
 }

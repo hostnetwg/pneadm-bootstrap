@@ -43,7 +43,9 @@
                             <dl class="row mb-0">
                                 <dt class="col-sm-4">Osoba</dt>
                                 <dd class="col-sm-8">{{ $case->contact_name }}</dd>
-                                <dt class="col-sm-4">Placówka</dt>
+                                <dt class="col-sm-4">Rodzaj placówki</dt>
+                                <dd class="col-sm-8">{{ $case->institutionTypeLabel() }}</dd>
+                                <dt class="col-sm-4">Nazwa szkoły / placówki</dt>
                                 <dd class="col-sm-8">{{ $case->institution ?: '—' }}</dd>
                                 <dt class="col-sm-4">E-mail</dt>
                                 <dd class="col-sm-8">{{ $case->contact_email ?: '—' }}</dd>
