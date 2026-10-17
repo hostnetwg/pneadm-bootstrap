@@ -159,9 +159,11 @@ Na stronie głównej sekcja „Zamów szkolenie dla rady pedagogicznej”:
 
 ## Kontynuacja Po MVP
 
+Kierunek „zapytanie → sprawa w ADM” jest opisany jako etap 1 przedsięwzięcia PNE Operations: [operations-os/README.md](./operations-os/README.md). Ten plik zostaje kanonem samych ofert.
+
 Kolejne etapy powinny być wdrażane osobno:
 
-1. Zapis zapytań w bazie i lista zapytań w `pneadm`.
+1. Zapis zapytań w bazie i lista zapytań w `pneadm`. Szczegóły etapu: [operations-os/ROADMAP.md](./operations-os/ROADMAP.md).
 2. ~~Wyróżnianie wybranych ofert na stronie głównej.~~ **Wdrożone** (`featured_on_homepage` + lazy karuzela AJAX).
 3. ~~Tworzenie rekordu `courses` na podstawie oferty.~~ **Wdrożone lokalnie** (prefill + `training_offer_id` + kopiowanie grafiki przy zapisie).
 4. Analityka wejść i zapytań ofertowych.

@@ -513,7 +513,9 @@ Zakres wdrożony lokalnie (do deploy prod):
 
 Dalsze kroki:
 
-1. Dodać zapis zapytań w bazie i panel obsługi zapytań w `pneadm`, jeśli będzie potrzebny.
+Kanon kolejności, zanim powstanie kod spraw: [operations-os/README.md](./operations-os/README.md).
+
+1. Dodać zapis zapytań w bazie i panel obsługi zapytań w `pneadm`, jeśli będzie potrzebny. Zakres proponowanego etapu 1: [operations-os/ROADMAP.md](./operations-os/ROADMAP.md).
 2. ~~Dodać możliwość wyróżniania wybranych ofert na stronie głównej.~~ **Wdrożone lokalnie** (`featured_on_homepage`).
 3. Dodać analitykę wejść i zapytań ofertowych.
 

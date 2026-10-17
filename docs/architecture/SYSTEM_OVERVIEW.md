@@ -172,6 +172,8 @@ Krótka historia wersji obu aplikacji jest w `CHANGELOG.md` (każde repo osobno)
 
 To nie są rekordy `courses`. Rekord `courses` nadal oznacza konkretne szkolenie z terminem, uczestnikami, zamówieniami i certyfikatami. Mapowanie przyszłego kopiowania oferty do `courses` opisuje `docs/TRAINING_OFFERS.md`.
 
+Planowany, jeszcze niezaimplementowany system spraw operacyjnych (zapytanie o szkolenie zamknięte ≠ `courses`) opisuje [operations-os/CURRENT.md](../operations-os/CURRENT.md). To nie jest moduł w kodzie.
+
 ## Moduły Biznesowe
 
 | Moduł | Główne tabele | Główna aplikacja |

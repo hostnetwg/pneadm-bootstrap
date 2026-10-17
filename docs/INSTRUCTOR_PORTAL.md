@@ -4,6 +4,8 @@ Data: 2026-09-19
 Status: **plan na później**, bez wdrożenia  
 Powiązane: [LIVE_EMBED_RESOURCE_BAR.md](./LIVE_EMBED_RESOURCE_BAR.md), [DASHBOARD_LIVE_EMBED.md](../pnedu/docs/DASHBOARD_LIVE_EMBED.md)
 
+Miejsce w szerszej kolejności (konto trenera dopiero po karcie sprawy w ADM, bez dostępu do panelu): [operations-os/ROADMAP.md](./operations-os/ROADMAP.md). Ten dokument zostaje kanonem samego portalu.
+
 ## Po co
 
 Dziś prowadzący dostaje mailem linki z ADM („Prześlij linki prowadzącemu”) i wchodzi do ClickMeeting jak gość/prezenter. Nie ma konta na pnedu.pl związanego z tabelą `instructors`.
