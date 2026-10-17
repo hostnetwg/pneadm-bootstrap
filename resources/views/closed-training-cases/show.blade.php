@@ -6,7 +6,41 @@
         </div>
     </x-slot>
 
-    <div class="py-3">
+    <style>
+        main.main-content:has(.ctc-show) > .bg-white {
+            background-color: #d5dee8 !important;
+        }
+
+        .ctc-show .card,
+        .ctc-show .list-group-item {
+            background-color: #e6edf4;
+            border-color: #c3ceda;
+            color: #1c2430;
+        }
+
+        .ctc-show .card-header {
+            background-color: #d5dee8;
+            border-color: #c3ceda;
+            color: #1c2430;
+        }
+
+        .ctc-show .form-control,
+        .ctc-show .form-select {
+            background-color: #fff;
+            color: #1c2430;
+            border-color: #7f93a8;
+        }
+
+        .ctc-show .form-control:focus,
+        .ctc-show .form-select:focus {
+            background-color: #fff;
+            color: #1c2430;
+            border-color: #0d6efd;
+            box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.16);
+        }
+    </style>
+
+    <div class="py-3 ctc-show">
         <div class="container-fluid px-4">
             @if(session('success'))
                 <div class="alert alert-success">{{ session('success') }}</div>
@@ -30,7 +64,7 @@
                     </div>
 
                     <div class="card mb-4">
-                        <div class="card-header bg-white fw-semibold">Kontakt szkoły</div>
+                        <div class="card-header fw-semibold">Kontakt szkoły</div>
                         <div class="card-body">
                             <dl class="row mb-0">
                                 <dt class="col-sm-4">Osoba</dt>
@@ -60,14 +94,14 @@
                     </div>
 
                     <div class="card mb-4">
-                        <div class="card-header bg-white fw-semibold">Wiadomość</div>
+                        <div class="card-header fw-semibold">Wiadomość</div>
                         <div class="card-body">
                             <p class="mb-0" style="white-space: pre-wrap;">{{ $case->message }}</p>
                         </div>
                     </div>
 
                     <div class="card">
-                        <div class="card-header bg-white fw-semibold">Historia</div>
+                        <div class="card-header fw-semibold">Historia</div>
                         <ul class="list-group list-group-flush">
                             @foreach($case->events->sortByDesc('happened_at') as $event)
                                 <li class="list-group-item">
@@ -88,7 +122,7 @@
                     <form method="POST" action="{{ route('closed-training-cases.update', $case) }}" class="card mb-4">
                         @csrf
                         @method('PUT')
-                        <div class="card-header bg-white fw-semibold">Obsługa</div>
+                        <div class="card-header fw-semibold">Obsługa</div>
                         <div class="card-body">
                             <div class="mb-3">
                                 <label for="status" class="form-label">Status</label>
@@ -125,7 +159,7 @@
 
                     <form method="POST" action="{{ route('closed-training-cases.notes.store', $case) }}" class="card">
                         @csrf
-                        <div class="card-header bg-white fw-semibold">Notatka</div>
+                        <div class="card-header fw-semibold">Notatka</div>
                         <div class="card-body">
                             <textarea name="body" rows="4" class="form-control @error('body') is-invalid @enderror" placeholder="Ustalenie z rozmowy, bez zmiany statusu.">{{ old('body') }}</textarea>
                             @error('body')<div class="invalid-feedback">{{ $message }}</div>@enderror
