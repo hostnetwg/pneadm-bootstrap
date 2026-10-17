@@ -117,6 +117,17 @@ class ClosedTrainingCase extends Model
         };
     }
 
+    public function trainingTopicLabel(): string
+    {
+        $topic = trim((string) $this->topic);
+
+        if ($topic === '' || $topic === '(temat nie określony)') {
+            return 'Nie podano';
+        }
+
+        return $topic;
+    }
+
     public function preferredFormatLabel(): string
     {
         if ($this->preferred_format === null || $this->preferred_format === '') {

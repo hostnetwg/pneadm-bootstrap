@@ -14,7 +14,7 @@
                     <p class="text-muted">Dla telefonu albo maila, który nie przeszedł przez formularz na pnedu.pl.</p>
 
                     <div class="mb-3">
-                        <label for="topic" class="form-label">Temat <span class="text-danger">*</span></label>
+                        <label for="topic" class="form-label">Temat szkolenia <span class="text-danger">*</span></label>
                         <input type="text" name="topic" id="topic" value="{{ old('topic') }}" class="form-control @error('topic') is-invalid @enderror" required>
                         @error('topic')<div class="invalid-feedback">{{ $message }}</div>@enderror
                     </div>

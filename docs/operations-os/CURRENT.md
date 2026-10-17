@@ -22,7 +22,7 @@ Jeden: Waldemar sprawdza lokalnie listę `Sprawy szkoleń zamkniętych` i formul
 
 - Katalog ofert bez terminu `training_offers` w bazie `pneadm`, CRUD w ADM, publikacja na pnedu.pl. Kanon: [TRAINING_OFFERS.md](../TRAINING_OFFERS.md).
 - Publiczne trasy pnedu: lista, strona oferty, formularz ogólny i formularz oferty. Oba zapisują `closed_training_cases` w `pneadm`, potem wysyłają `TrainingOfferInquiryMail`. Gdy mail padnie, sprawa zostaje.
-- W ADM, menu `Szkolenia → Sprawy szkoleń zamkniętych`: lista, ręczny wpis, karta ze statusem (Nowa / W toku / Oczekuje / Zamknięta), opiekunem, następnym działaniem i historią. Bez ceny, trenera, briefu i bez tworzenia `courses`.
+- W ADM, menu `Szkolenia → Sprawy szkoleń zamkniętych`: lista, ręczny wpis, karta ze statusem (Nowa / W toku / Oczekuje / Zamknięta), opiekunem, następnym działaniem i historią. Temat szkolenia jest osobno od wiadomości klienta: formularz ogólny zapisuje wpisane pole, formularz oferty zapisuje tytuł oferty z chwili zapytania. Pusty temat pokazuje się jako „Nie podano”. Bez ceny, trenera, briefu i bez tworzenia `courses`.
 - Z oferty w ADM można otworzyć formularz nowego `courses` z prefill i zapisać `courses.training_offer_id`. Zapis szkolenia jest ręczny (daty są wymagane). To osobna ścieżka, nie konwersja sprawy.
 - Trenerzy są rekordami `instructors` w `pneadm`. Nie mają konta ani relacji do `users`.
 - Konta pnedu.pl (`pnedu.users`) to konta uczestników: imię, nazwisko, e-mail, hasło. Nie ma ról.

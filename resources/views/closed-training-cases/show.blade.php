@@ -1,7 +1,7 @@
 <x-app-layout>
     <x-slot name="header">
         <div class="d-flex justify-content-between align-items-center gap-3">
-            <h2 class="fw-semibold fs-4 text-dark mb-0">{{ $case->topic }}</h2>
+            <h2 class="fw-semibold fs-4 text-dark mb-0">{{ $case->trainingTopicLabel() }}</h2>
             <a href="{{ route('closed-training-cases.index') }}" class="btn btn-outline-secondary">Lista spraw</a>
         </div>
     </x-slot>
@@ -15,6 +15,13 @@
 
             <div class="row g-4">
                 <div class="col-lg-7">
+                    <div class="card mb-4">
+                        <div class="card-header fw-semibold">Temat szkolenia</div>
+                        <div class="card-body">
+                            <p class="fs-5 fw-bold mb-0">{{ $case->trainingTopicLabel() }}</p>
+                        </div>
+                    </div>
+
                     <div class="card mb-4">
                         <div class="card-body">
                             <div class="d-flex flex-wrap gap-2 align-items-center mb-3">

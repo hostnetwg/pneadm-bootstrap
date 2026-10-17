@@ -42,7 +42,7 @@
                     <table class="table table-hover align-middle mb-0">
                         <thead>
                             <tr>
-                                <th>Temat</th>
+                                <th>Temat szkolenia</th>
                                 <th>Placówka</th>
                                 <th>Status</th>
                                 <th>Opiekun</th>
@@ -53,7 +53,7 @@
                             @forelse($cases as $case)
                                 <tr>
                                     <td>
-                                        <a href="{{ route('closed-training-cases.show', $case) }}">{{ $case->topic }}</a>
+                                        <a href="{{ route('closed-training-cases.show', $case) }}">{{ $case->trainingTopicLabel() }}</a>
                                         <div class="small text-muted">{{ $case->sourceLabel() }}</div>
                                     </td>
                                     <td>

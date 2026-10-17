@@ -45,7 +45,9 @@ class ClosedTrainingCaseTest extends TestCase
         $this->actingAs($user)
             ->get(route('closed-training-cases.show', $case))
             ->assertOk()
+            ->assertSee('Temat szkolenia')
             ->assertSee('Szkolenie rady przykładowej')
+            ->assertSee('Telefon: prośba o termin w listopadzie.')
             ->assertSee('Oddzwonić i potwierdzić potrzeby.')
             ->assertSee('Sprawa wpisana ręcznie w panelu.');
 
@@ -76,5 +78,32 @@ class ClosedTrainingCaseTest extends TestCase
             ->assertOk()
             ->assertSee('Szkolenie rady przykładowej')
             ->assertSee('Oczekuje');
+    }
+
+    public function test_case_without_a_given_topic_shows_a_neutral_label(): void
+    {
+        $user = User::factory()->create(['is_active' => true]);
+        $case = ClosedTrainingCase::query()->create([
+            'source' => ClosedTrainingCase::SOURCE_GENERAL_FORM,
+            'status' => ClosedTrainingCase::STATUS_NEW,
+            'topic' => '(temat nie określony)',
+            'contact_name' => 'Osoba bez tematu',
+            'message' => 'Proszę o kontakt, temat doprecyzujemy telefonicznie.',
+            'consent_at' => now(),
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('closed-training-cases.show', $case))
+            ->assertOk()
+            ->assertSee('Temat szkolenia')
+            ->assertSee('Nie podano')
+            ->assertSee('Proszę o kontakt, temat doprecyzujemy telefonicznie.')
+            ->assertDontSee('(temat nie określony)');
+
+        $this->actingAs($user)
+            ->get(route('closed-training-cases.index'))
+            ->assertOk()
+            ->assertSee('Nie podano')
+            ->assertDontSee('(temat nie określony)');
     }
 }
