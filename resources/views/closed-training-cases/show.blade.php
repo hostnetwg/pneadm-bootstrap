@@ -6,42 +6,9 @@
         </div>
     </x-slot>
 
-    <style>
-        main.main-content:has(.ctc-show) > .bg-white {
-            background-color: #d5dee8 !important;
-        }
+    @include('growth-os.partials.readable-styles')
 
-        .ctc-show .card,
-        .ctc-show .list-group-item {
-            background-color: #e6edf4;
-            border-color: #c3ceda;
-            color: #1c2430;
-        }
-
-        .ctc-show .card-header {
-            background-color: #d5dee8;
-            border-color: #c3ceda;
-            color: #1c2430;
-        }
-
-        .ctc-show .form-control,
-        .ctc-show .form-select {
-            background-color: #fff;
-            color: #1c2430;
-            border-color: #7f93a8;
-        }
-
-        .ctc-show .form-control:focus,
-        .ctc-show .form-select:focus {
-            background-color: #fff;
-            color: #1c2430;
-            border-color: #0d6efd;
-            box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.16);
-        }
-    </style>
-
-    <div class="py-3 ctc-show">
-        <div class="container-fluid px-4">
+    <div class="container-fluid growth-readable">
             @if(session('success'))
                 <div class="alert alert-success">{{ session('success') }}</div>
             @endif
@@ -52,14 +19,14 @@
                         <div class="card-body">
                             <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
                                 <span class="badge {{ $case->statusBadgeClass() }}">{{ $case->statusLabel() }}</span>
-                                <span class="text-muted small">{{ $case->sourceLabel() }}</span>
+                                <span class="text-secondary small">{{ $case->sourceLabel() }}</span>
                             </div>
-                            <h3 class="h6 text-uppercase text-muted">Następne działanie</h3>
+                            <h3 class="h6 text-uppercase text-secondary">Następne działanie</h3>
                             <p class="fs-5 mb-1 {{ $case->nextActionIsOverdue() ? 'text-danger' : '' }}">{{ $case->next_action ?: 'Nie ustawiono.' }}</p>
                             @if($case->next_action_at)
-                                <p class="mb-0 {{ $case->nextActionIsOverdue() ? 'text-danger' : 'text-muted' }}">Do {{ $case->formatLocal($case->next_action_at) }}</p>
+                                <p class="mb-0 {{ $case->nextActionIsOverdue() ? 'text-danger' : 'text-secondary' }}">Do {{ $case->formatLocal($case->next_action_at) }}</p>
                             @endif
-                            <p class="mt-3 mb-0 text-muted">Opiekun: {{ $case->assignee?->name ?: 'nieprzypisany' }}</p>
+                            <p class="mt-3 mb-0 text-secondary">Opiekun: {{ $case->assignee?->name ?: 'nieprzypisany' }}</p>
                         </div>
                     </div>
 
@@ -107,7 +74,7 @@
                                 <li class="list-group-item">
                                     <div class="d-flex justify-content-between gap-3">
                                         <strong>{{ $event->typeLabel() }}</strong>
-                                        <span class="text-muted small">{{ $case->formatLocal($event->happened_at) }} · {{ $event->user?->name ?: 'pnedu.pl' }}</span>
+                                        <span class="text-secondary small">{{ $case->formatLocal($event->happened_at) }} · {{ $event->user?->name ?: 'pnedu.pl' }}</span>
                                     </div>
                                     @if($event->body)
                                         <p class="mb-0 mt-1" style="white-space: pre-wrap;">{{ $event->body }}</p>
@@ -168,6 +135,5 @@
                     </form>
                 </div>
             </div>
-        </div>
     </div>
 </x-app-layout>
