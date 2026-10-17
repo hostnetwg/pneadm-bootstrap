@@ -3,26 +3,27 @@
 Ostatnia weryfikacja: 2026-10-17  
 Repozytoria (lokalne `main`, bez weryfikacji produkcji):
 
-- `pneadm`: zachowanie aplikacji jak w `ec69ddcc` (2026-10-17). Kanon spraw, łącznie z decyzjami po konsultacji, jest w `docs/operations-os/`.
-- `pnedu` `51328d8` (2026-10-17; wskaźnik do kanonu). Zachowanie formularza jak w `7a3cc87c`.
+- `pneadm`: etap 1 jest w lokalnym kodzie, jeszcze bez commita. Ostatni commit na GitHubie to `c4abbad` (sama dokumentacja).
+- `pnedu`: zapis sprawy jest w lokalnym kodzie, jeszcze bez commita. Ostatni commit na GitHubie to `51328d8`.
 
 ## Bieżący etap
 
-**Etap 0.** Analiza, kanon i konsultacja są opisane. W kodzie nie ma tabeli spraw, listy zapytań ani portalu trenera. Cztery pytania z konsultacji są rozstrzygnięte w [DECISIONS.md](./DECISIONS.md) (DEC-OPS-006, 007, 009, 010, 011). To decyzje, nie funkcje.
+**Etap 1 w kodzie lokalnym.** Formularz pnedu zapisuje sprawę szkolenia zamkniętego, a ADM ma listę i kartę. Nie ma tego na produkcji. Nie ma portalu trenera ani silnika procesów.
 
 ## Aktualny blocker
 
-Zakres etapu 1 jest przyjęty. Kodu nie ma. Czeka na osobne polecenie Waldemara, żeby zacząć implementację.
+Migracja `2026_10_17_160000_create_closed_training_cases_tables` jest na lokalnej bazie `pneadm`. Produkcja jej nie ma. Kod nie jest jeszcze w commicie.
 
 ## Rekomendowany następny krok
 
-Jeden: przygotować implementację etapu 1 jako konkretną sprawę szkolenia zamkniętego (krótki status, opiekun, następne działanie, historia, e-mail jako powiadomienie). Bez pola `type`, portalu, briefu i silnika procesów. Kodu nie ma, dopóki Waldemar nie każe go pisać.
+Jeden: Waldemar sprawdza lokalnie listę `Sprawy szkoleń zamkniętych` i formularz na pnedu.pl. Wdrożenie na produkcję dopiero po jego zgodzie na commit, push i deploy.
 
 ## Co działa
 
 - Katalog ofert bez terminu `training_offers` w bazie `pneadm`, CRUD w ADM, publikacja na pnedu.pl. Kanon: [TRAINING_OFFERS.md](../TRAINING_OFFERS.md).
-- Publiczne trasy pnedu: lista, strona oferty, formularz ogólny i formularz oferty. Oba kończą się synchronicznym e-mailem `TrainingOfferInquiryMail`. Zapytanie nie jest zapisywane w bazie.
-- Z oferty w ADM można otworzyć formularz nowego `courses` z prefill i zapisać `courses.training_offer_id`. Zapis szkolenia jest ręczny (daty są wymagane). Kod jest na `main` w `pneadm`. Dokumenty [TRAINING_OFFERS.md](../TRAINING_OFFERS.md) i [NEXT_STEPS.md](../NEXT_STEPS.md) nadal opisują ten moduł jako wdrożony lokalnie, do deployu. W tym etapie nie sprawdzano, czy migracje są już na produkcji.
+- Publiczne trasy pnedu: lista, strona oferty, formularz ogólny i formularz oferty. Oba zapisują `closed_training_cases` w `pneadm`, potem wysyłają `TrainingOfferInquiryMail`. Gdy mail padnie, sprawa zostaje.
+- W ADM, menu `Szkolenia → Sprawy szkoleń zamkniętych`: lista, ręczny wpis, karta ze statusem (Nowa / W toku / Oczekuje / Zamknięta), opiekunem, następnym działaniem i historią. Bez ceny, trenera, briefu i bez tworzenia `courses`.
+- Z oferty w ADM można otworzyć formularz nowego `courses` z prefill i zapisać `courses.training_offer_id`. Zapis szkolenia jest ręczny (daty są wymagane). To osobna ścieżka, nie konwersja sprawy.
 - Trenerzy są rekordami `instructors` w `pneadm`. Nie mają konta ani relacji do `users`.
 - Konta pnedu.pl (`pnedu.users`) to konta uczestników: imię, nazwisko, e-mail, hasło. Nie ma ról.
 - Konta ADM (`pneadm.users`) mają jedną rolę (`super_admin`, `admin`, `manager`, `user`) i uprawnienia.
@@ -32,9 +33,6 @@ Jeden: przygotować implementację etapu 1 jako konkretną sprawę szkolenia zam
 
 ## Czego nie ma
 
-- Rekordu zapytania o szkolenie zamknięte.
-- Karty sprawy, statusu sprawy, następnego działania i opiekuna sprawy.
-- Historii ustaleń ze szkołą i trenerem (poza skrzynką e-mail i notatkami ludzi).
 - Tabeli szkół / placówek. Placówka na formularzu to zwykły tekst.
 - Powiązania `Instructor` ↔ użytkownik pnedu lub ADM.
 - Portalu trenera i roli trenera.

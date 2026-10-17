@@ -41,16 +41,18 @@ Publiczne widoki ofert używają struktury dopasowanej do szkoleń bez terminu. 
 
 Uwaga redakcyjna: w publicznym katalogu nie należy używać grafik z datą, QR kodem lub komunikatem „Zapisz się”, jeśli oferta nie ma ustalonego terminu. Takie materiały mogą sugerować archiwalne wydarzenie zamiast aktualnej oferty dla placówki.
 
-Formularz zapytania w MVP:
+Formularz zapytania:
 
 - działa tylko dla ofert aktywnych i opublikowanych na `pnedu`,
-- wysyła e-mail z kontekstem oferty i danymi kontaktowymi,
-- nie zapisuje zapytań w bazie,
-- nie dodaje panelu obsługi zapytań w `pneadm`.
+- zapisuje sprawę szkolenia zamkniętego w `pneadm` (`closed_training_cases`) i dopiero potem wysyła e-mail jako powiadomienie,
+- obsługa jest na liście i karcie w ADM: `Szkolenia → Sprawy szkoleń zamkniętych`,
+- nie tworzy rekordu `courses`.
+
+Kanon sprawy: [operations-os/CURRENT.md](./operations-os/CURRENT.md).
 
 Poza MVP pozostają:
 
-- zapis zapytań w bazie i panel obsługi w `pneadm`,
+- zapis zapytań w bazie i panel obsługi w `pneadm` — wdrożone lokalnie jako sprawa szkolenia zamkniętego, bez pola `type` i bez tworzenia `courses`,
 - analityka leadów i zdarzeń na ofertach.
 
 Wyróżnianie na stronie głównej (`featured_on_homepage`) i tworzenie `courses` z oferty — wdrożone (patrz niżej / kontynuacja).
@@ -144,7 +146,7 @@ pnedu
     -> ogólny formularz zapytania GET/POST /szkolenia-rad-pedagogicznych/zapytanie
     -> szczegóły /szkolenia-rad-pedagogicznych/{slug}
     -> formularz POST /szkolenia-rad-pedagogicznych/{slug}/zapytanie
-    -> oba formularze wysyłają e-mail (TrainingOfferInquiryMail), bez zapisu w bazie
+    -> oba formularze zapisują sprawę w pneadm, potem wysyłają e-mail (TrainingOfferInquiryMail)
 ```
 
 ## Karuzela wyróżnionych ofert (pnedu — wdrożone)
@@ -163,7 +165,7 @@ Kierunek „zapytanie → sprawa w ADM” jest opisany jako etap 1 przedsięwzi�
 
 Kolejne etapy powinny być wdrażane osobno:
 
-1. Zapis zapytań w bazie i lista zapytań w `pneadm`. Szczegóły etapu: [operations-os/ROADMAP.md](./operations-os/ROADMAP.md).
+1. ~~Zapis zapytań w bazie i lista zapytań w `pneadm`.~~ **Wdrożone lokalnie** jako sprawa szkolenia zamkniętego. Kanon: [operations-os/CURRENT.md](./operations-os/CURRENT.md).
 2. ~~Wyróżnianie wybranych ofert na stronie głównej.~~ **Wdrożone** (`featured_on_homepage` + lazy karuzela AJAX).
 3. ~~Tworzenie rekordu `courses` na podstawie oferty.~~ **Wdrożone lokalnie** (prefill + `training_offer_id` + kopiowanie grafiki przy zapisie).
 4. Analityka wejść i zapytań ofertowych.
