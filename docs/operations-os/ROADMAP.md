@@ -1,6 +1,6 @@
 # PNE Operations — roadmapa
 
-Status: propozycja po analizie kodu (2026-10-17). Kolejność konsultanta jest co do zasady dobra. Jedna zmiana: pełny portal trenera nie blokuje negocjacji w ADM.
+Status: kolejność po konsultacji 2026-10-17. Etap 1 jest przyjęty (DEC-OPS-002, DEC-OPS-009, DEC-OPS-010). Dalsza kolejność etapów 2–8 pozostaje propozycją (DEC-OPS-005).
 
 ## Zasada cięcia
 
@@ -8,17 +8,17 @@ Każdy etap da się wdrożyć i użyć bez następnego. Nie ma big-banga. Nie za
 
 ## Etapy
 
-### 0. Analiza i dokumentacja — ten etap
+### 0. Analiza i dokumentacja
 
-Kanon w `docs/operations-os/`. Bez tabel i bez UI.
+Kanon w `docs/operations-os/`. Bez tabel i bez UI. Konsultacja czterech pytań jest zamknięta.
 
-### 1. Zapytanie staje się sprawą
+### 1. Zapytanie staje się sprawą szkolenia zamkniętego
 
-Formularz pnedu (ogólny i z oferty) zapisuje rekord w `pneadm`, potem wysyła dotychczasowy e-mail jako powiadomienie.
+Formularz pnedu (ogólny i z oferty) zapisuje konkretną sprawę w `pneadm`, potem wysyła dotychczasowy e-mail jako powiadomienie. Bez pola `type` i bez wspólnej tabeli na inne procesy.
 
-W ADM: lista i karta. Na karcie: status, opiekun (`pneadm.users`), następne działanie (tekst + termin), notatka i historia zdarzeń. Ręczny wpis sprawy bez formularza — w tym samym etapie, bo telefon i tak omija stronę.
+W ADM: lista i karta. Na karcie: krótki status (nie krok negocjacji), opiekun (`pneadm.users`), następne działanie (tekst + termin), notatka i historia zdarzeń. Ręczny wpis sprawy bez formularza — w tym samym etapie, bo telefon i tak omija stronę.
 
-Poza etapem: cena, terminy negocjacji, trener jako aktor, tworzenie `courses`, portal.
+Poza etapem: cena, terminy negocjacji, trener jako aktor, brief, tworzenie `courses`, portal, silnik procesów.
 
 ### 2. Negocjacja po stronie PNE
 
@@ -26,15 +26,15 @@ Nadal tylko ADM. PNE zapisuje wskazanego trenera, propozycje terminów, ustaleni
 
 To oddaje największą ulgę pamięci zanim powstanie konto trenera. Waldemar i tak dziś przenosi odpowiedź trenera z maila.
 
-### 3. Cienkie konto trenera
+### 3. Powiązanie konta trenera
 
-Warunek przed pokazaniem trenerowi czegokolwiek. Osobna zdolność na pnedu.pl, powiązanie jawne z `instructors`, najmniej uprawnień. Bez kalendarza, materiałów, ankiet i propozycji tematów — to osobny, większy kawałek (etap 5 poniżej).
+Warunek przed pokazaniem trenerowi czegokolwiek. Jawne powiązanie konta pnedu z rekordem `instructors`, włączane i odbierane przez PNE (DEC-OPS-006). Bez flagi „jest trenerem” jako jedynego uprawnienia. Bez kalendarza, materiałów, ankiet i propozycji tematów — to osobny, większy kawałek (etap 5 poniżej).
 
 Bez tego etapu 4 nie startuje.
 
-### 4. Trener odpowiada w sprawie
+### 4. Trener odpowiada na brief
 
-PNE klika „zapytaj trenera”. Trener widzi tylko tę sprawę i odsyła: zainteresowanie, wynagrodzenie, terminy, komentarz. Wpis ląduje w historii tej samej sprawy.
+PNE porządkuje potrzeby i przekazuje brief, nie kartę sprawy (DEC-OPS-007). Trener odsyła: zainteresowanie, wynagrodzenie, terminy, komentarz. Wpis ląduje w historii tej samej sprawy po stronie ADM. Surowe pole `message` z formularza nie idzie do trenera.
 
 ### 5. Reszta portalu trenera
 
@@ -42,11 +42,11 @@ Kalendarz własnych szkoleń, linki do materiałów, wyniki własnych ankiet, pr
 
 ### 6. Mechanizm procesu — dopiero z doświadczenia
 
-`ProcessTemplate`, instancja, kroki, assignee, termin, link do instrukcji, historia. Instancja wskazuje istniejący obiekt (`subject_type` + `subject_id`): najpierw sprawę szkolenia zamkniętego. Ten sam zaczep obejmuje później `debt_cases`, bez przenoszenia windykacji do nowej tabeli i bez obowiązku procesu przy każdej fakturze. Growth OS zostaje osobną domeną treści.
+`ProcessTemplate`, instancja, kroki, assignee, termin, link do instrukcji, historia — tylko jeśli codzienna praca na sprawach szkolenia zamkniętego pokaże, że sama karta już nie wystarcza (DEC-OPS-011). Instancja wskazuje istniejący obiekt (`subject_type` + `subject_id`): sprawę szkolenia zamkniętego, a nie nową wspólną tabelę spraw. Ten sam zaczep może później objąć `debt_cases`, bez przenoszenia windykacji i bez obowiązku procesu przy każdej fakturze. Growth OS zostaje osobną domeną treści. Webinar, jeśli dojdzie, jest osobnym obiektem albo osobnym wskazaniem, nie wartością `type` na sprawie szkolenia.
 
 ### 7. Drugi proces: webinar otwarty
 
-Ten sam mechanizm, inny szablon. Checklisty Growth OS zostają przy przygotowaniu treści. Operations przejmuje organizację konkretnego webinaru jako szkolenia, jeśli Waldemar tak zdecyduje po etapie 6. Nie scalamy domen „przy okazji”.
+Osobny obiekt albo wskazanie procesu, jeśli etap 6 w ogóle powstanie po praktyce. Nie jest wartością `type` na sprawie szkolenia zamkniętego. Checklisty Growth OS zostają przy przygotowaniu treści. Nie scalamy domen przy okazji.
 
 ### 8. Kolejne procesy firmy
 
@@ -56,6 +56,6 @@ Faktury, obsługa po szkoleniu, inne — każdy jako szablon, gdy ból jest powt
 
 Konsultant miał: (1) zapis sprawy, (2) negocjacja w ADM, (3) pełny portal, (4) trener w sprawie, (5) silnik procesów.
 
-Rekomendacja: zostawić 1 i 2, rozciąć portal. Cienkie konto jest warunkiem wpuszczenia trenera do sprawy. Kalendarz, materiały i ankiety nie są warunkiem pierwszej ulgi operacyjnej i opóźniłyby pętlę szkoła–PNE–trener.
+Rekomendacja: zostawić 1 i 2, rozciąć portal. Powiązanie konta jest warunkiem przekazania briefu, nie pełnej karty. Kalendarz, materiały i ankiety nie są warunkiem pierwszej ulgi operacyjnej.
 
-Silnik procesów zostaje na końcu, po jednym przerobionym procesie ręcznym. To jest zgodne z YAGNI i z tym, że w kodzie nie ma nic, na czym dałoby się bezpiecznie „dokleić BPM”.
+Silnik procesów zostaje na końcu i tylko wtedy, gdy jeden ręczny przebieg spraw szkolenia zamkniętego pokaże powtarzalną robotę. W kodzie nie ma nic, na czym dałoby się bezpiecznie dokleić BPM.

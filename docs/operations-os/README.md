@@ -5,7 +5,7 @@ Status: etap 0 — analiza i dokumentacja. Brak implementacji.
 
 PNE Operations to przedsięwzięcie, w którym `adm.pnedu.pl` ma stopniowo stać się wewnętrznym systemem operacyjnym firmy. Celem jest obsługa powtarzalnych spraw bez polegania na pamięci konkretnych osób.
 
-Nazwa katalogu `operations-os` jest domem dokumentacji. Nie jest nazwą modułu w kodzie i nie oznacza, że budujemy silnik procesów. Pierwszy realny obiekt to **sprawa** (zapytanie o szkolenie zamknięte), nie uniwersalny BPM.
+Nazwa katalogu `operations-os` jest domem dokumentacji. Nie jest nazwą modułu w kodzie i nie oznacza, że budujemy silnik procesów. Pierwszy realny obiekt to **sprawa szkolenia zamkniętego**, nie uniwersalna sprawa z polem typu i nie BPM. Zasada: najpierw praktyka, potem abstrakcja (DEC-OPS-011).
 
 ## Źródło prawdy
 

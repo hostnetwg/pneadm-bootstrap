@@ -101,21 +101,21 @@ Współdzielony hosting, PHP 8.2 pod `/opt/alt/php82/usr/bin/php`, brak Supervis
 
 Dla sprawy: jeden zapis SQL z pnedu do `pneadm` w żądaniu formularza (wzorzec zamówienia), potem e-mail. Źródłem prawdy jest wiersz, nie mail. HTTP z tokenem zostawiamy na akcje, które musi wykonać druga aplikacja (dziś: cache, certyfikaty). Nie synchronizujemy dwóch kopii sprawy.
 
-## Rekomendowany model
+## Ustalenia po konsultacji (2026-10-17)
 
-Sprawa w `pneadm` z `type=closed_training`, statusem, opiekunem, następnym działaniem i tabelą zdarzeń. Opcjonalne FK: oferta, później kurs, później trener. Szczegóły: [ARCHITECTURE.md](./ARCHITECTURE.md).
+Waldemar przyjął rekomendacje ChatGPT. Pytania poniżej są zamknięte. Szczegóły: [DECISIONS.md](./DECISIONS.md).
 
-Alternatywa węższa: tabela wyłącznie „zapytanie rady pedagogicznej”, bez pola `type`. Mniej abstrakcji na etap 1, drugi proces (webinar) doda drugą tabelę albo migrację typu. Rekomendacja zostaje przy jednym rekordzie z typem, bez szablonu procesu.
+1. Bez pola `type` na etapie 1. Obiekt to sprawa szkolenia zamkniętego (DEC-OPS-009).
+2. Konto trenera to jawne powiązanie z `instructors`, nie flaga przy `pnedu.users` (DEC-OPS-006).
+3. Trener dostaje brief przygotowany przez PNE, nie pełną kartę i nie surowe `message` (DEC-OPS-007).
+4. Status jest krótki i nie jest krokiem negocjacji. Sytuację niesie następne działanie, termin i historia (DEC-OPS-010).
 
-Alternatywa odrzucona: `growth_tasks` albo `debt_cases` jako wspólny silnik.
+Nowych pytań do konsultanta nie ma. Schematu SQL ta konsultacja nie otwiera.
 
-Windykacja zostaje przy fakturze. Późniejsze spięcie to instancja procesu z `subject_type` + `subject_id`, nie scalenie tabel. Opis: [ARCHITECTURE.md](./ARCHITECTURE.md) („Jak to się później łączy z windykacją”) i DEC-OPS-008.
+## Model po tych ustaleniach
 
-## Pytania do konsultanta
+Sprawa szkolenia zamkniętego w `pneadm`, bez pola `type`: krótki status, opiekun, następne działanie, historia. Opcjonalne wskazanie oferty. Kurs i trener później, świadomie. Szczegóły: [ARCHITECTURE.md](./ARCHITECTURE.md).
 
-1. Czy pole `type` od pierwszej tabeli jest tańsze niż tabela tylko na rady, skoro drugi proces ma przyjść dużo później?
-2. Czy cienkie konto trenera (etap 3) powinno być nową flagą przy `pnedu.users`, czy osobnym modelem dostępu, skoro to samo konto może być uczestnikiem szkoleń?
-3. Które pola sprawy trener może zobaczyć w etapie 4, żeby odpowiedzieć na termin i cenę, bez dostępu do pełnych danych szkoły?
-4. Czy status sprawy na etapie 1 ma być krótkim słownikiem (nowa / w toku / czekamy / zamknięta), czy od razu słownikiem zbliżonym do kroków negocjacji?
+Odrzucone: generyczna sprawa z `type=closed_training`, flaga `is_instructor`, pełna karta sprawy dla trenera, `growth_tasks` albo `debt_cases` jako wspólny silnik.
 
-Oczekiwany wynik konsultacji: opinia o tych czterech punktach i o ryzyku, nie projekt schematu SQL.
+Windykacja zostaje przy fakturze. Późniejsze spięcie to instancja procesu z `subject_type` + `subject_id`, nie scalenie tabel (DEC-OPS-008).

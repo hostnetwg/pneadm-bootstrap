@@ -2,7 +2,7 @@
 
 Statusy: **Proposed** (rekomendacja Cursora, czeka na Waldemara), **Accepted**, **Superseded**.
 
-Przyjęte są DEC-OPS-002 i DEC-OPS-008. Nazwa przedsięwzięcia (DEC-OPS-001) jedzie razem z dokumentacją jako robocza. Pozostałe pozycje czekają. Kodu etapu 1 jeszcze nie ma: najpierw ta dokumentacja ma być na GitHubie dla konsultacji.
+Przyjęte: DEC-OPS-002, DEC-OPS-006, DEC-OPS-007, DEC-OPS-008, DEC-OPS-009, DEC-OPS-010, DEC-OPS-011. Nazwa przedsięwzięcia (DEC-OPS-001) zostaje robocza. DEC-OPS-003, DEC-OPS-004 i DEC-OPS-005 czekają. Kodu etapu 1 nadal nie ma.
 
 ## DEC-OPS-001 — Nazwa przedsięwzięcia
 
@@ -17,7 +17,7 @@ Przyjęte są DEC-OPS-002 i DEC-OPS-008. Nazwa przedsięwzięcia (DEC-OPS-001) j
 - Data: 2026-10-17
 - Treść: pierwszy wdrożeniowy etap to formularz pnedu → rekord w `pneadm` → lista i karta w ADM (status, opiekun, następne działanie, historia). E-mail zostaje powiadomieniem. Bez portalu trenera i bez silnika kroków.
 - Uzasadnienie: dziś zapytanie znika w skrzynce. To jest luka opisana w [TRAINING_OFFERS.md](../TRAINING_OFFERS.md) jako kolejny etap.
-- Przyjęcie: Waldemar zaakceptował ten zakres 2026-10-17. Implementacja startuje po publikacji tej dokumentacji.
+- Przyjęcie: Waldemar zaakceptował ten zakres 2026-10-17. Po konsultacji doprecyzowany przez DEC-OPS-009 i DEC-OPS-010: obiekt to sprawa szkolenia zamkniętego, status jest krótki. Implementacja czeka na osobną zgodę i na publikację tej aktualizacji.
 
 ## DEC-OPS-003 — Sprawa nie jest szkoleniem
 
@@ -45,19 +45,45 @@ Przyjęte są DEC-OPS-002 i DEC-OPS-008. Nazwa przedsięwzięcia (DEC-OPS-001) j
 
 - Status: Proposed
 - Data: 2026-10-17
-- Treść: po karcie sprawy dochodzi negocjacja prowadzona przez PNE (etap 2). Konto trenera jest cienkie i powstaje tuż przed pokazaniem mu sprawy (etapy 3–4). Kalendarz, materiały i ankiety trenera są późniejsze.
-- Uzasadnienie: ulga pamięci nie wymaga konta trenera. Pokazanie danych trenerowi wymaga najmniejszych uprawnień, których na pnedu jeszcze nie ma.
+- Treść: po karcie sprawy dochodzi negocjacja prowadzona przez PNE (etap 2). Konto trenera powstaje tuż przed przekazaniem mu briefu (etapy 3–4, DEC-OPS-006 i DEC-OPS-007). Kalendarz, materiały i ankiety trenera są późniejsze.
+- Uzasadnienie: ulga pamięci nie wymaga konta trenera. Pokazanie danych trenerowi wymaga najmniejszych uprawnień, których na pnedu jeszcze nie ma. Kolejność etapów nie jest jeszcze osobno przyjęta.
 
-## DEC-OPS-006 — Tożsamość trenera jawna, nie po samym e-mailu
+## DEC-OPS-006 — Jawne powiązanie konta trenera, nie flaga i nie sam e-mail
 
-- Status: Proposed
+- Status: Accepted
 - Data: 2026-10-17
-- Treść: gdy powstanie konto trenera, powiązanie z `instructors` ustawia operator. Sam `instructors.email` może podpowiedzieć kandydata, nie zakłada konta i nie loguje.
-- Uzasadnienie: e-mail trenera nie jest normalizowany i nie ma klucza do `pnedu.users`. Automatyczne spięcie pomyli konta uczestników i współdzielone skrzynki. Zgodne z zastrzeżeniem w [INSTRUCTOR_PORTAL.md](../INSTRUCTOR_PORTAL.md).
+- Treść: przyszłe konto trenera na pnedu.pl nie opiera się na fladze w rodzaju `is_instructor`. Ta sama osoba może być użytkownikiem portalu, uczestnikiem i trenerem. Powiązanie konta pnedu z konkretnym rekordem `instructors` ustawia PNE. Da się je włączyć i odebrać niezależnie od zwykłego konta uczestnika. E-mail może tylko podpowiedzieć kandydata. Nie jest źródłem autoryzacji ani automatycznego powiązania.
+- Uzasadnienie: `instructors.email` nie jest normalizowany i nie ma klucza do `pnedu.users`. Automatyczne spięcie pomyli konta uczestników i współdzielone skrzynki. Konsultacja 2026-10-17, przyjęte przez Waldemara. Modelu bazy i RBAC jeszcze nie projektujemy.
+- Przyjęcie: Waldemar, 2026-10-17.
 
-## DEC-OPS-007 — Zgoda i minimalizacja
+## DEC-OPS-007 — Zgoda, minimalizacja i brief dla trenera
 
-- Status: Proposed
+- Status: Accepted
 - Data: 2026-10-17
-- Treść: zapis zapytania przechowuje treść zgody z formularza (czas). Trener nie dostaje pełnego rekordu kontaktowego szkoły, dopóki osobna decyzja nie określi, które pola są mu potrzebne do odpowiedzi.
-- Uzasadnienie: formularz zbiera dane osobowe wyłącznie „w celu obsługi zapytania”. Portal trenera jest późniejszy i węższy.
+- Treść: zapis zapytania przechowuje fakt i czas zgody z formularza. Trener nie dostaje pełnej karty sprawy z ADM. Dostaje brief przygotowany przez PNE, tylko z tym, czego potrzebuje do odpowiedzi: temat, oczekiwania, grupa odbiorców, orientacyjna liczba uczestników, online albo stacjonarnie, oczekiwany czas, preferowany termin lub zakres, preferowane godziny, miejscowość albo rejon przy szkoleniu stacjonarnym, ewentualnie wskazanie istniejącej oferty PNE. Domyślnie nie widzi nazwiska, telefonu, e-maila, dokładnego adresu, pełnej nazwy placówki, notatek wewnętrznych, historii korespondencji PNE ze szkołą, ceny dla klienta, marży, innych danych finansowych i innych spraw tego klienta. Surowe pole `message` z formularza publicznego nie jest mu przekazywane automatycznie. Przepływ: zapytanie klienta, potem PNE porządkuje potrzeby, potem brief, potem odpowiedź trenera.
+- Uzasadnienie: formularz zbiera dane osobowe w celu obsługi zapytania przez PNE. Wiadomość może zawierać dane, których trener nie potrzebuje. Konsultacja 2026-10-17, przyjęte przez Waldemara.
+- Przyjęcie: Waldemar, 2026-10-17.
+
+## DEC-OPS-009 — Etap 1 bez generycznego pola typu
+
+- Status: Accepted
+- Data: 2026-10-17
+- Treść: pierwszy obiekt nie jest ogólną sprawą operacyjną z polem `type`. Jest konkretną sprawą zapytania o szkolenie zamknięte. Webinar, windykacja i to zapytanie nie są wariantami jednej tabeli. Wspólny mechanizm, gdy powstanie, łączy je przez `subject_type` + `subject_id` (DEC-OPS-008).
+- Uzasadnienie: dziś jest jeden rzeczywisty typ takiej sprawy. Pole `type` niczego nie upraszcza, a abstrakcja przed drugim prawdziwym przypadkiem jest przedwczesna. Konsultacja 2026-10-17, przyjęte przez Waldemara.
+- Przyjęcie: Waldemar, 2026-10-17.
+
+## DEC-OPS-010 — Krótki status, osobno od następnego działania
+
+- Status: Accepted
+- Data: 2026-10-17
+- Treść: status etapu 1 nie odtwarza kroków negocjacji. Słownik jest krótki i ogólny, w rodzaju: nowa, w toku, oczekuje, zamknięta. Nazwy na ekranie można doprecyzować przy implementacji. Status nie jest krokiem procesu. Bieżąca sytuacja wynika z następnego działania, jego terminu i historii. Przykład: status „oczekuje”, a następne działanie „jeżeli trener nie odpowie do 21.10, skontaktować się ponownie”. Nie dodajemy teraz statusów typu „czekamy na trenera” albo „szkoła analizuje”. Osobne pole „na kogo czekamy” dochodzi tylko wtedy, gdy praktyka pokaże taką potrzebę.
+- Uzasadnienie: kilkanaście statusów zbudowałoby ukryty workflow. Konsultacja 2026-10-17, przyjęte przez Waldemara.
+- Przyjęcie: Waldemar, 2026-10-17.
+
+## DEC-OPS-011 — Najpierw praktyka, potem abstrakcja
+
+- Status: Accepted
+- Data: 2026-10-17
+- Treść: PNE Operations ma być proste. Kolejność: realny problem, najmniejsze rozwiązanie, codzienne użycie, obserwacja, dopiero potem kolejna funkcja albo abstrakcja. Nie budujemy BPM na zapas i nie tworzymy generycznych modeli tylko dlatego, że kiedyś mogą się przydać. Rozbudowa wynika z praktyki Waldemara, Łukasza i trenerów.
+- Uzasadnienie: Waldemar potwierdził tę zasadę po konsultacji 2026-10-17.
+- Przyjęcie: Waldemar, 2026-10-17.

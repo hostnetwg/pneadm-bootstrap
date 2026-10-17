@@ -1,13 +1,13 @@
 # PNE Operations — architektura
 
-Status: rekomendacja techniczna etapu 0, oparta o kod z 2026-10-17. Decyzje biznesowe są w [DECISIONS.md](./DECISIONS.md) i mają status Proposed, dopóki Waldemar ich nie przyjmie.
+Status: zasady domenowe po konsultacji 2026-10-17. Przyjęte decyzje: [DECISIONS.md](./DECISIONS.md). To nie jest schemat SQL.
 
 ## Granice
 
 | Domena | Gdzie żyje | Rola w Operations |
 |---|---|---|
 | Oferta bez terminu | `pneadm.training_offers` | Katalog. Sprawa może wskazać ofertę. Oferta nie jest sprawą. |
-| Sprawa / zapytanie | jeszcze nie istnieje | Potrzeba klienta, negocjacja, status, następny krok. |
+| Sprawa szkolenia zamkniętego | jeszcze nie istnieje | Zapytanie i negocjacja z konkretną placówką. Nie jest ofertą, kursem ani sprawą windykacji. |
 | Szkolenie | `pneadm.courses` | Potwierdzony termin, uczestnicy, ClickMeeting, zaświadczenia, zamówienia. |
 | Trener | `pneadm.instructors` | Rekord biznesowy. Dziś bez konta. |
 | Uczestnik | `pnedu.users` + `participants` | Konto na froncie. To nie jest pracownik PNE ani trener. |
@@ -15,7 +15,7 @@ Status: rekomendacja techniczna etapu 0, oparta o kod z 2026-10-17. Decyzje bizn
 | Windykacja | `debt_cases` | Wzorzec UX sprawy. Inna domena, inne tabele. |
 | Growth OS | `growth_*` | Przygotowanie treści i webinaru marketingowego. Inna domena. |
 
-`pnedu.pl` przyjmuje zapytanie od szkoły i w przyszłości pokaże trenerowi tylko jego wycinek. `adm.pnedu.pl` jest miejscem pracy PNE i źródłem prawdy sprawy.
+`pnedu.pl` przyjmuje zapytanie od szkoły. `adm.pnedu.pl` jest miejscem pracy PNE i źródłem prawdy sprawy. Trener, gdy kiedyś odpowie, dostaje brief przygotowany przez PNE, nie kartę sprawy.
 
 ## Zapytanie nie jest kursem
 
@@ -29,32 +29,25 @@ Rekomendacja: sprawa dostaje opcjonalne `training_offer_id` i, dopiero po ludzki
 
 ## Proces później, nie teraz
 
-Na etapie 1–2 wystarczy sprawa ze statusem i następnym działaniem. Szablon procesu (`ProcessTemplate` → instancja → kroki) wchodzi dopiero po realnych sprawach, jako osobne tabele. Logika kroków nie może siedzieć w kontrolerze formularza publicznego.
+Na etapie 1–2 wystarczy sprawa szkolenia zamkniętego ze statusem i następnym działaniem. Szablon procesu wchodzi dopiero po realnych sprawach i tylko wtedy, gdy praktyka pokaże powtarzalny przebieg. Do tego czasu proces jest kierunkiem, nie projektem tabel. Logika kroków nie może siedzieć w kontrolerze formularza publicznego.
 
-Status sprawy i następne działanie są niezależne. Przykład: status „czekamy na trenera”, a następne działanie „jeśli do 20.10 nie ma odpowiedzi, zadzwonić ponownie”.
+Status i następne działanie są niezależne (DEC-OPS-010). Status jest krótki, na przykład „oczekuje”. Następne działanie niesie treść: „jeżeli trener nie odpowie do 21.10, skontaktować się ponownie”. Status nie nazywa kroku negocjacji.
 
-## Rekomendowany model minimalny (jeszcze nie w kodzie)
+## Sprawa szkolenia zamkniętego (jeszcze nie w kodzie)
 
-Jedna sprawa operacyjna z polem typu, nie silnik BPM i nie osobna tabela wyłącznie na rady pedagogiczne.
+Na etapie 1 istnieje jeden konkretny obiekt: sprawa zapytania o szkolenie zamknięte (DEC-OPS-009). Nie ma pola `type` i nie ma wspólnej tabeli „spraw operacyjnych”. Drugi przypadek, gdy naprawdę się pojawi, dostanie własny obiekt albo — później — instancję procesu wskazującą istniejący obiekt. Tego schematu teraz nie rysujemy.
 
-**Sprawa**
+Sens obiektu, bez projektu kolumn:
 
-- `type` — na start tylko `closed_training`. Kolejne typy dochodzą, gdy pojawi się drugi proces.
-- `source` — formularz oferty, formularz ogólny, wpis ręczny w ADM.
-- `training_offer_id` — null, gdy szkoła nie weszła z konkretnej oferty.
-- `course_id` — null do momentu świadomego powiązania.
-- `instructor_id` — null, dopóki PNE kogoś nie wskaże.
-- `status` — krótki słownik obsługi, nie krok BPM.
-- `assignee_user_id` — `pneadm.users`.
-- `next_action` (tekst) i `next_action_at`.
-- snapshot kontaktu z formularza: imię i nazwisko, e-mail, telefon, placówka (tekst), temat, forma, wiadomość.
-- zgoda RODO: fakt i czas. Dziś checkbox jest wymagany, ale nigdzie nie jest zapisywany.
+- źródło: formularz oferty, formularz ogólny albo wpis ręczny w ADM,
+- opcjonalne wskazanie oferty, a kurs dopiero po świadomej decyzji człowieka,
+- trener wskazany przez PNE dopiero w późniejszym etapie, nie jako konto,
+- krótki status, opiekun z `pneadm.users`, tekst i termin następnego działania,
+- snapshot kontaktu ze szkoły zostaje po stronie PNE,
+- zgoda: fakt i czas,
+- osobna historia zdarzeń pisana przez operatora ADM.
 
-**Zdarzenie sprawy** (osobna tabela)
-
-- kto (operator ADM, później trener), kiedy, rodzaj (notatka, zmiana statusu, odpowiedź trenera, odpowiedź szkoły), treść.
-
-Pola ceny, terminów i wielokrotnych rund negocjacji należą do etapu 2, nie do pierwszej migracji. Nie ma dziś tabeli szkół — placówka zostaje tekstem, dopóki powtarzalność klientów nie wymusi katalogu.
+Pola ceny, terminów i rund negocjacji należą do etapu 2. Nie ma dziś tabeli szkół — placówka zostaje tekstem, dopóki powtarzalność klientów nie wymusi katalogu.
 
 ### Odrzucone na ten moment
 
@@ -62,7 +55,7 @@ Pola ceny, terminów i wielokrotnych rund negocjacji należą do etapu 2, nie do
 - Rozszerzanie `courses`. Szkolenie powstaje po uzgodnieniu.
 - `growth_tasks` jako globalna lista zadań. Zadanie należy do `growth_campaigns` i jest checklistą webinaru.
 - `debt_cases` jako wspólna sprawa. Sprawa windykacji jest 1:1 z `form_orders` i niesie fakturę, KSeF i iFirma.
-- Jedna polimorficzna tabela „na wszystko”.
+- Jedna tabela spraw z polem `type` albo jedna polimorficzna tabela „na wszystko”.
 
 Wzorzec do skopiowania, nie do współdzielenia tabel: `debt_cases.next_action_at` + `assigned_to_id` + `debt_case_actions`. Z Growth OS warto później podejrzeć checklistę względem daty (`GrowthOperationalTasks`), gdy dojdzie proces webinaru. Nie współdzielimy tabel ani kontrolerów.
 
@@ -117,9 +110,9 @@ Na pnedu nie ma ról. Middleware to `auth` i `verified`. Wpuszczenie trenera w t
 
 Role ADM (`CheckPermission`, `users.role_id`) nie nadają się jako konto trenera. Trener nie dostaje logowania do `adm.pnedu.pl`.
 
-`instructors.email` jest unikalny, ale nie jest normalizowany do małych liter i nie ma klucza do `pnedu.users`. E-mail konta uczestnika jest normalizowany (`NormalizesUserEmail`, `email_unique_slot`). Automatyczne łączenie po adresie pomyli wielkość liter, współdzieloną skrzynkę, zmianę adresu i trenera, który jest też uczestnikiem. Docelowo: jawne `instructors` → id konta pnedu, ustawiane przez PNE. E-mail może tylko podpowiedzieć dopasowanie.
+`instructors.email` jest unikalny, ale nie jest normalizowany do małych liter i nie ma klucza do `pnedu.users`. E-mail konta uczestnika jest normalizowany (`NormalizesUserEmail`, `email_unique_slot`). Automatyczne łączenie po adresie pomyli wielkość liter, współdzieloną skrzynkę, zmianę adresu i trenera, który jest też uczestnikiem. Docelowo obowiązuje DEC-OPS-006: jawne powiązanie konta pnedu z rekordem `instructors`, włączane i odbierane przez PNE, niezależnie od roli uczestnika. E-mail tylko podpowiada kandydata. Flaga przy użytkowniku nie wystarcza.
 
-Trener w przyszłości widzi wyłącznie własne `courses.instructor_id` i sprawy, do których PNE go dopuści. Nie widzi bazy klientów, cudzych szkoleń, zamówień, faktur, windykacji ani notatek wewnętrznych PNE.
+Trener nie ogląda karty sprawy. Widzi brief opisany w DEC-OPS-007 oraz, w dalszym portalu, własne szkolenia (`courses.instructor_id`). Nie widzi bazy klientów, cudzych szkoleń, zamówień, faktur, windykacji ani notatek wewnętrznych PNE.
 
 Ankieta natywna kopiuje `courses.instructor_id` do `surveys.instructor_id` (`NativeSurveyProvisioner`). Przy jednym prowadzącym na szkoleniu da się pokazać trenerowi wyniki jego kursów. Szkolenie ma jednego `instructor_id`, nie listę prowadzących.
 
@@ -142,6 +135,12 @@ Skutek dla spraw:
 - brak dodatkowego HTTP pnedu → pneadm przy każdym formularzu,
 - załączniki, jeśli kiedyś powstaną, lądują tam, skąd czyta ADM (`pneadm` storage), nie na dysku frontu.
 
+## Brief dla trenera
+
+Gdy dojdzie etap odpowiedzi trenera, PNE nie udostępnia mu karty sprawy. Przygotowuje brief (DEC-OPS-007): temat, oczekiwania, odbiorcy, orientacyjna liczba uczestników, forma, czas, preferowany termin lub zakres, godziny, miejscowość albo rejon przy szkoleniu stacjonarnym, ewentualnie istniejąca oferta.
+
+Poza briefem zostają dane kontaktowe szkoły, surowe `message` z formularza, notatki i korespondencja wewnętrzna, cena dla klienta, marża i inne sprawy tego klienta. Odpowiedź trenera wraca do historii sprawy po stronie ADM.
+
 ## Bezpieczeństwo danych
 
-Formularz zbiera imię, e-mail, telefon, nazwę placówki i treść. To dane osobowe. Etap 1 ma zapisać zgodę i nie pokazywać tych danych trenerowi. W dokumentacji i przykładach nie używamy prawdziwych zgłoszeń.
+Formularz zbiera imię, e-mail, telefon, nazwę placówki i treść. To dane osobowe. Etap 1 zapisuje zgodę i trzyma te dane w ADM. Trener ich nie dostaje. W dokumentacji i przykładach nie używamy prawdziwych zgłoszeń.

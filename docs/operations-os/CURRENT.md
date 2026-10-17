@@ -3,12 +3,20 @@
 Ostatnia weryfikacja: 2026-10-17  
 Repozytoria (lokalne `main`, bez weryfikacji produkcji):
 
-- `pneadm` `ec69ddcce2c273625b9d128038cf1cf294aac09f` (2026-10-17)
-- `pnedu` `7a3cc87c7f1b6be849d11ae253dce6b52c45e8ff` (2026-10-07)
+- `pneadm`: zachowanie aplikacji jak w `ec69ddcc` (2026-10-17). Kanon spraw, łącznie z decyzjami po konsultacji, jest w `docs/operations-os/`.
+- `pnedu` `51328d8` (2026-10-17; wskaźnik do kanonu). Zachowanie formularza jak w `7a3cc87c`.
 
 ## Bieżący etap
 
-**Etap 0.** Analiza kodu i kanon dokumentacji. Nie ma tabeli spraw, listy zapytań ani portalu trenera.
+**Etap 0.** Analiza, kanon i konsultacja są opisane. W kodzie nie ma tabeli spraw, listy zapytań ani portalu trenera. Cztery pytania z konsultacji są rozstrzygnięte w [DECISIONS.md](./DECISIONS.md) (DEC-OPS-006, 007, 009, 010, 011). To decyzje, nie funkcje.
+
+## Aktualny blocker
+
+Zakres etapu 1 jest przyjęty. Kodu nie ma. Czeka na osobne polecenie Waldemara, żeby zacząć implementację.
+
+## Rekomendowany następny krok
+
+Jeden: przygotować implementację etapu 1 jako konkretną sprawę szkolenia zamkniętego (krótki status, opiekun, następne działanie, historia, e-mail jako powiadomienie). Bez pola `type`, portalu, briefu i silnika procesów. Kodu nie ma, dopóki Waldemar nie każe go pisać.
 
 ## Co działa
 
@@ -32,11 +40,3 @@ Repozytoria (lokalne `main`, bez weryfikacji produkcji):
 - Portalu trenera i roli trenera.
 - Szablonu procesu, instancji procesu i SOP w systemie.
 - Zadań operacyjnych poza Growth OS i poza działaniami windykacji.
-
-## Aktualny blocker
-
-Decyzja o zakresie etapu 1 jest przyjęta (DEC-OPS-002, 2026-10-17). Kodu jeszcze nie ma. Blokuje start implementacji tylko tyle, że ta dokumentacja ma najpierw trafić na GitHub pod konsultację.
-
-## Rekomendowany następny krok
-
-Po publikacji dokumentacji: zapisać zapytanie z pnedu w bazie `pneadm` i pokazać je w ADM jako kartę sprawy (status, opiekun, następne działanie, notatka / historia). E-mail zostaje powiadomieniem. Szczegóły: [ROADMAP.md](./ROADMAP.md) etap 1. Windykacja zostaje osobnym obiektem (DEC-OPS-008).

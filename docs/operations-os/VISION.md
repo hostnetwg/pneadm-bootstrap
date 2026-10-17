@@ -32,6 +32,10 @@ sprawa / obiekt biznesowy
 
 Firma ma dać się zastąpić w operacjach: odejście jednej osoby nie zabiera wiedzy o otwartych sprawach.
 
+## Zasada rozwoju
+
+System ma być prosty (DEC-OPS-011). Najpierw realny problem, potem najmniejsze rozwiązanie, potem codzienne użycie, potem obserwacja. Kolejna funkcja albo abstrakcja dochodzi dopiero z praktyki Waldemara, Łukasza i trenerów. Nie budujemy narzędzia pod potrzeby, których jeszcze nie ma.
+
 ## Pierwszy proces: szkolenie zamknięte
 
 Dyrektor szkoły pyta o szkolenie. PNE ustala potrzeby, pyta trenera (czy chce, za ile, kiedy), wraca do szkoły. Wymiana może iść kilka razy. Dopiero po uzgodnieniu powstaje konkretne szkolenie.
@@ -52,23 +56,21 @@ Późniejsze funkcje trenera:
 - wyniki ankiet własnych szkoleń,
 - odpowiedź na sprawę szkolenia zamkniętego: zainteresowanie, wynagrodzenie, terminy, komentarz.
 
-Odpowiedź wraca do tej samej sprawy. Trener widzi tylko swoje sprawy i swoje szkolenia.
+Odpowiedź wraca do tej samej sprawy po stronie PNE. Trener nie dostaje karty sprawy. Dostaje brief przygotowany przez PNE (DEC-OPS-007) i widzi tylko własne szkolenia.
 
-## Procesy, nie jeden silnik na zapas
+## Procesy są kierunkiem, nie projektem na teraz
 
-Sprawa i proces to dwa pojęcia. Sprawa może dostać instancję procesu, gdy powtórzy się realny przebieg.
+Sprawa i proces to dwa pojęcia. Sprawa szkolenia zamkniętego jest pierwszym konkretnym obiektem. Windykacja i późniejszy webinar zostają własnymi obiektami. Wspólna warstwa, jeśli powstanie po praktyce, tylko wskazuje istniejący obiekt (`subject_type` + `subject_id`). Nie jest przesądzonym silnikiem do zbudowania z góry.
 
-Pierwszy proces do nauczenia systemu: obsługa szkolenia zamkniętego. Drugi, później, na tym samym mechanizmie: organizacja webinaru otwartego (propozycja tematu, decyzja PNE, ClickMeeting, szkolenie, materiały, promocja, live, ankieta, nagranie, follow-up, rozliczenie).
-
-Model nie może być zaszyty wyłącznie pod rady pedagogiczne. Jednocześnie nie budujemy ogólnego BPM, zanim jeden proces nie przejdzie przez prawdziwe sprawy.
+Pierwszy przebieg do nauczenia się w pracy: obsługa szkolenia zamkniętego, na początku ręcznie, na karcie sprawy. Organizacja webinaru otwartego może być drugim przypadkiem, gdy pierwszy już działa. Jej kształt ma wyniknąć z tego doświadczenia, nie z modelu wymyślonego wcześniej.
 
 Krytyczne decyzje (cena, wybór trenera, potwierdzenie szkoły, utworzenie szkolenia) zostają przy człowieku.
 
 ## Czego świadomie nie robimy na początku
 
 - Wielkiego silnika procesów „na zapas”.
-- Jednej tabeli na wszystkie byty firmy.
-- Dawania trenerom panelu ADM.
+- Jednej tabeli na wszystkie byty firmy i pola `type` „na później”.
+- Dawania trenerom panelu ADM albo pełnej karty sprawy.
 - Zastępowania Growth OS albo wciągania operacji firmy do Growth OS.
 - Automatycznego tworzenia `courses` z zapytania.
-- Automatycznego zakładania konta trenera z samego adresu e-mail.
+- Automatycznego zakładania konta trenera z samego adresu e-mail albo z flagi przy koncie uczestnika.
