@@ -1,22 +1,24 @@
 # PNE Operations — stan faktyczny
 
-Ostatnia weryfikacja: 2026-10-17  
-Repozytoria (lokalne `main`, bez weryfikacji produkcji):
+Ostatnia weryfikacja kodu: 2026-10-18  
+Repozytoria (`main` na GitHubie):
 
-- `pneadm`: etap 1 jest w lokalnym kodzie, jeszcze bez commita. Ostatni commit na GitHubie to `c4abbad` (sama dokumentacja).
-- `pnedu`: zapis sprawy jest w lokalnym kodzie, jeszcze bez commita. Ostatni commit na GitHubie to `51328d8`.
+- `pneadm`: `dec38ea` — karta sprawy, poprawki danych zapytania i niezmienny oryginał.
+- `pnedu`: `43c9bfc` — formularz zapisuje sprawę razem z oryginałem.
+
+Ten plik nie sprawdza serwera produkcyjnego. Wdrożenie jest ręczne, po `git pull` na SeoHost.
 
 ## Bieżący etap
 
-**Etap 1 w kodzie lokalnym.** Formularz pnedu zapisuje sprawę szkolenia zamkniętego, a ADM ma listę i kartę. Nie ma tego na produkcji. Nie ma portalu trenera ani silnika procesów.
+**Etap 1 jest w kodzie na GitHubie.** Formularz pnedu zapisuje sprawę szkolenia zamkniętego, a ADM ma listę i kartę. Nie ma portalu trenera ani silnika procesów. Etap 2 nie jest rozpoczęty.
 
 ## Aktualny blocker
 
-Migracja `2026_10_17_160000_create_closed_training_cases_tables` jest na lokalnej bazie `pneadm`. Produkcja jej nie ma. Kod nie jest jeszcze w commicie.
+Brak blokera w kodzie. Ostatnia migracja to `2026_10_18_180000_add_submitted_payload_to_closed_training_cases` w `pneadm`.
 
 ## Rekomendowany następny krok
 
-Jeden: Waldemar sprawdza lokalnie listę `Sprawy szkoleń zamkniętych` i formularz na pnedu.pl. Wdrożenie na produkcję dopiero po jego zgodzie na commit, push i deploy.
+Codzienne użycie karty sprawy. Nowa funkcja albo etap 2 dopiero po osobnej decyzji Waldemara.
 
 ## Co działa
 

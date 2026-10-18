@@ -33,7 +33,7 @@ Na etapie 1–2 wystarczy sprawa szkolenia zamkniętego ze statusem i następnym
 
 Status i następne działanie są niezależne (DEC-OPS-010). Status jest krótki, na przykład „oczekuje”. Następne działanie niesie treść: „jeżeli trener nie odpowie do 21.10, skontaktować się ponownie”. Status nie nazywa kroku negocjacji.
 
-## Sprawa szkolenia zamkniętego (jeszcze nie w kodzie)
+## Sprawa szkolenia zamkniętego
 
 Na etapie 1 istnieje jeden konkretny obiekt: sprawa zapytania o szkolenie zamknięte (DEC-OPS-009). Nie ma pola `type` i nie ma wspólnej tabeli „spraw operacyjnych”. Drugi przypadek, gdy naprawdę się pojawi, dostanie własny obiekt albo — później — instancję procesu wskazującą istniejący obiekt. Tego schematu teraz nie rysujemy.
 
@@ -43,7 +43,7 @@ Sens obiektu, bez projektu kolumn:
 - opcjonalne wskazanie oferty, a kurs dopiero po świadomej decyzji człowieka,
 - trener wskazany przez PNE dopiero w późniejszym etapie, nie jako konto,
 - krótki status, opiekun z `pneadm.users`, tekst i termin następnego działania,
-- snapshot kontaktu ze szkoły zostaje po stronie PNE,
+- dane zapytania można poprawić na karcie; niezmienna kopia oryginału zostaje przy sprawie,
 - zgoda: fakt i czas,
 - osobna historia zdarzeń pisana przez operatora ADM.
 

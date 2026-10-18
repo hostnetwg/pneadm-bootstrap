@@ -14,11 +14,11 @@ Kanon w `docs/operations-os/`. Bez tabel i bez UI. Konsultacja czterech pytań j
 
 ### 1. Zapytanie staje się sprawą szkolenia zamkniętego
 
-W kodzie lokalnie (2026-10-17). Produkcja wymaga migracji w `pneadm` i deployu obu aplikacji.
+W kodzie na GitHubie (2026-10-18, `pneadm` `dec38ea`, `pnedu` `43c9bfc`). Produkcja: ręczny deploy obu aplikacji i migracje w `pneadm`.
 
-Formularz pnedu (ogólny i z oferty) zapisuje konkretną sprawę w `pneadm`, potem wysyła dotychczasowy e-mail jako powiadomienie. Bez pola `type` i bez wspólnej tabeli na inne procesy.
+Formularz pnedu (ogólny i z oferty) zapisuje konkretną sprawę w `pneadm`, potem wysyła dotychczasowy e-mail jako powiadomienie. Formularz wymaga rodzaju placówki. Nazwa szkoły zostaje opcjonalna. Bez pola `type` i bez wspólnej tabeli na inne procesy.
 
-W ADM: lista i karta. Na karcie: krótki status (nie krok negocjacji), opiekun (`pneadm.users`), następne działanie (tekst + termin), notatka i historia zdarzeń. Ręczny wpis sprawy bez formularza — w tym samym etapie, bo telefon i tak omija stronę.
+W ADM: lista i karta. Na karcie: krótki status (nie krok negocjacji), opiekun (`pneadm.users`), następne działanie (tekst + termin), notatka i historia zdarzeń. Można poprawić dane zapytania (osoba, e-mail, telefon, nazwa szkoły, rodzaj placówki, forma, powiązana oferta). Osobno zostaje niezmienny oryginał z formularza albo z ręcznego wpisu. Ręczny wpis sprawy bez formularza jest w tym samym etapie, bo telefon i tak omija stronę.
 
 Poza etapem: cena, terminy negocjacji, trener jako aktor, brief, tworzenie `courses`, portal, silnik procesów.
 

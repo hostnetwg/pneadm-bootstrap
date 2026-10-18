@@ -146,7 +146,7 @@ pnedu
     -> ogólny formularz zapytania GET/POST /szkolenia-rad-pedagogicznych/zapytanie
     -> szczegóły /szkolenia-rad-pedagogicznych/{slug}
     -> formularz POST /szkolenia-rad-pedagogicznych/{slug}/zapytanie
-    -> oba formularze zapisują sprawę w pneadm, potem wysyłają e-mail (TrainingOfferInquiryMail)
+    -> oba formularze zapisują sprawę w pneadm (z rodzajem placówki i kopią oryginału), potem wysyłają e-mail (TrainingOfferInquiryMail)
 ```
 
 ## Karuzela wyróżnionych ofert (pnedu — wdrożone)
@@ -165,7 +165,7 @@ Kierunek „zapytanie → sprawa w ADM” jest opisany jako etap 1 przedsięwzi�
 
 Kolejne etapy powinny być wdrażane osobno:
 
-1. ~~Zapis zapytań w bazie i lista zapytań w `pneadm`.~~ **Wdrożone lokalnie** jako sprawa szkolenia zamkniętego. Kanon: [operations-os/CURRENT.md](./operations-os/CURRENT.md).
+1. ~~Zapis zapytań w bazie i lista zapytań w `pneadm`.~~ **Wdrożone w kodzie na GitHubie** jako sprawa szkolenia zamkniętego. Kanon: [operations-os/CURRENT.md](./operations-os/CURRENT.md).
 2. ~~Wyróżnianie wybranych ofert na stronie głównej.~~ **Wdrożone** (`featured_on_homepage` + lazy karuzela AJAX).
 3. ~~Tworzenie rekordu `courses` na podstawie oferty.~~ **Wdrożone lokalnie** (prefill + `training_offer_id` + kopiowanie grafiki przy zapisie).
 4. Analityka wejść i zapytań ofertowych.
