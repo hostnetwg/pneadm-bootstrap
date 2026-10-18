@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Mail\ClosedTrainingCaseSchoolMail;
 use App\Models\ClosedTrainingCase;
+use App\Models\ClosedTrainingCaseEvent;
 use App\Models\TrainingOffer;
 use App\Models\User;
 use App\Services\ClosedTrainingCaseService;
@@ -241,6 +242,39 @@ class ClosedTrainingCaseController extends Controller
             ->with('success', 'Notatka została dodana.');
     }
 
+    public function updateEvent(
+        Request $request,
+        ClosedTrainingCase $closedTrainingCase,
+        ClosedTrainingCaseEvent $event,
+    ): RedirectResponse {
+        $this->ensureEventBelongsToCase($closedTrainingCase, $event);
+
+        $max = $event->event_type === ClosedTrainingCaseEvent::TYPE_EMAIL_SENT ? 20000 : 3000;
+
+        $data = $request->validate([
+            'body' => "nullable|string|max:{$max}",
+        ]);
+
+        $this->cases->updateEvent($event, trim((string) ($data['body'] ?? '')));
+
+        return redirect()
+            ->route('closed-training-cases.show', $closedTrainingCase)
+            ->with('success', 'Wpis historii został zapisany.');
+    }
+
+    public function destroyEvent(
+        ClosedTrainingCase $closedTrainingCase,
+        ClosedTrainingCaseEvent $event,
+    ): RedirectResponse {
+        $this->ensureEventBelongsToCase($closedTrainingCase, $event);
+
+        $this->cases->deleteEvent($event);
+
+        return redirect()
+            ->route('closed-training-cases.show', $closedTrainingCase)
+            ->with('success', 'Wpis historii został usunięty.');
+    }
+
     public function sendEmail(Request $request, ClosedTrainingCase $closedTrainingCase): RedirectResponse
     {
         if (! $closedTrainingCase->hasContactEmail()) {
@@ -367,6 +401,13 @@ class ClosedTrainingCaseController extends Controller
         }
 
         return $data;
+    }
+
+    private function ensureEventBelongsToCase(ClosedTrainingCase $case, ClosedTrainingCaseEvent $event): void
+    {
+        if ((int) $event->closed_training_case_id !== (int) $case->id) {
+            abort(404);
+        }
     }
 
     private function blankToNull(?string $value): ?string

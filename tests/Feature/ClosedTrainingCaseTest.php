@@ -450,4 +450,69 @@ class ClosedTrainingCaseTest extends TestCase
         Mail::assertNothingSent();
         $this->assertFalse($case->events()->where('event_type', ClosedTrainingCaseEvent::TYPE_EMAIL_SENT)->exists());
     }
+
+    public function test_operator_can_edit_and_delete_history_events(): void
+    {
+        $user = User::factory()->create(['is_active' => true]);
+        $case = ClosedTrainingCase::query()->create([
+            'source' => ClosedTrainingCase::SOURCE_MANUAL,
+            'status' => ClosedTrainingCase::STATUS_NEW,
+            'topic' => 'Sprawa z historią',
+            'contact_name' => 'Osoba',
+            'contact_email' => 'szkola@example.com',
+            'message' => 'Treść.',
+        ]);
+
+        $note = $case->events()->create([
+            'user_id' => $user->id,
+            'event_type' => ClosedTrainingCaseEvent::TYPE_NOTE,
+            'body' => 'Stara notatka.',
+            'happened_at' => now(),
+        ]);
+
+        $otherCase = ClosedTrainingCase::query()->create([
+            'source' => ClosedTrainingCase::SOURCE_MANUAL,
+            'status' => ClosedTrainingCase::STATUS_NEW,
+            'topic' => 'Inna sprawa',
+            'contact_name' => 'Inna osoba',
+            'message' => 'Inna treść.',
+        ]);
+        $foreignNote = $otherCase->events()->create([
+            'user_id' => $user->id,
+            'event_type' => ClosedTrainingCaseEvent::TYPE_NOTE,
+            'body' => 'Cudzy wpis.',
+            'happened_at' => now(),
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('closed-training-cases.show', $case))
+            ->assertOk()
+            ->assertSee('Edytuj')
+            ->assertSee('Usuń')
+            ->assertSee('Stara notatka.');
+
+        $this->actingAs($user)
+            ->put(route('closed-training-cases.events.update', [$case, $note]), [
+                'body' => 'Poprawiona notatka.',
+            ])
+            ->assertRedirect(route('closed-training-cases.show', $case))
+            ->assertSessionHas('success', 'Wpis historii został zapisany.');
+
+        $note->refresh();
+        $this->assertSame('Poprawiona notatka.', $note->body);
+
+        $this->actingAs($user)
+            ->put(route('closed-training-cases.events.update', [$case, $foreignNote]), [
+                'body' => 'Nie powinno przejść.',
+            ])
+            ->assertNotFound();
+
+        $this->actingAs($user)
+            ->delete(route('closed-training-cases.events.destroy', [$case, $note]))
+            ->assertRedirect(route('closed-training-cases.show', $case))
+            ->assertSessionHas('success', 'Wpis historii został usunięty.');
+
+        $this->assertDatabaseMissing('closed_training_case_events', ['id' => $note->id]);
+        $this->assertDatabaseHas('closed_training_case_events', ['id' => $foreignNote->id]);
+    }
 }

@@ -29,6 +29,26 @@ class ClosedTrainingCaseService
         ]);
     }
 
+    public function updateEvent(ClosedTrainingCaseEvent $event, string $body): ClosedTrainingCaseEvent
+    {
+        if ($event->event_type === ClosedTrainingCaseEvent::TYPE_EMAIL_SENT) {
+            $parts = preg_split("/\n\n/", $body, 2);
+            $meta = trim((string) ($parts[0] ?? ''));
+            $html = ClosedTrainingCase::sanitizeSchoolEmailHtml((string) ($parts[1] ?? ''));
+            $body = $html === '' ? $meta : $meta."\n\n".$html;
+        }
+
+        $event->body = $body === '' ? null : $body;
+        $event->save();
+
+        return $event;
+    }
+
+    public function deleteEvent(ClosedTrainingCaseEvent $event): void
+    {
+        $event->delete();
+    }
+
     public function recordSchoolEmailSent(
         ClosedTrainingCase $case,
         User $user,

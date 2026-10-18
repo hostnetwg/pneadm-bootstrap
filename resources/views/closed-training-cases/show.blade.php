@@ -169,17 +169,40 @@
                         <ul class="list-group list-group-flush">
                             @foreach($case->events->sortByDesc('happened_at') as $event)
                                 <li class="list-group-item">
-                                    <div class="d-flex justify-content-between gap-3">
-                                        <strong>{{ $event->typeLabel() }}</strong>
-                                        <span class="text-secondary small">{{ $case->formatLocal($event->happened_at) }} · {{ $event->user?->name ?: 'pnedu.pl' }}</span>
+                                    <div class="d-flex justify-content-between gap-3 align-items-start">
+                                        <div>
+                                            <strong>{{ $event->typeLabel() }}</strong>
+                                            <div class="text-secondary small">{{ $case->formatLocal($event->happened_at) }} · {{ $event->user?->name ?: 'pnedu.pl' }}</div>
+                                        </div>
+                                        <script type="application/json" id="closed-training-case-event-body-{{ $event->id }}">@json($event->body ?? '')</script>
+                                        <div class="btn-group btn-group-sm">
+                                            <button type="button"
+                                                class="btn btn-outline-secondary"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#closedTrainingCaseEventEditModal"
+                                                data-event-update-url="{{ route('closed-training-cases.events.update', [$case, $event]) }}"
+                                                data-event-label="{{ $event->typeLabel() }}"
+                                                data-event-body-id="closed-training-case-event-body-{{ $event->id }}"
+                                                data-event-is-email="{{ $event->event_type === \App\Models\ClosedTrainingCaseEvent::TYPE_EMAIL_SENT ? '1' : '0' }}">
+                                                Edytuj
+                                            </button>
+                                            <button type="button"
+                                                class="btn btn-outline-danger"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#closedTrainingCaseEventDeleteModal"
+                                                data-event-delete-url="{{ route('closed-training-cases.events.destroy', [$case, $event]) }}"
+                                                data-event-label="{{ $event->typeLabel() }} · {{ $case->formatLocal($event->happened_at) }}">
+                                                Usuń
+                                            </button>
+                                        </div>
                                     </div>
                                     @if($event->event_type === \App\Models\ClosedTrainingCaseEvent::TYPE_EMAIL_SENT)
-                                        <p class="mb-0 mt-1" style="white-space: pre-wrap;">{{ $event->schoolEmailMeta() }}</p>
+                                        <p class="mb-0 mt-2" style="white-space: pre-wrap;">{{ $event->schoolEmailMeta() }}</p>
                                         @if($event->schoolEmailHtml())
                                             <div class="border rounded p-2 mt-2 bg-white small">{!! $event->schoolEmailHtml() !!}</div>
                                         @endif
                                     @elseif($event->body)
-                                        <p class="mb-0 mt-1" style="white-space: pre-wrap;">{{ $event->body }}</p>
+                                        <p class="mb-0 mt-2" style="white-space: pre-wrap;">{{ $event->body }}</p>
                                     @endif
                                 </li>
                             @endforeach
@@ -251,34 +274,6 @@
                                     </div>
                                     <button type="submit" class="btn btn-primary">Wyślij e-mail</button>
                                 </form>
-                                <script src="https://cdn.jsdelivr.net/npm/tinymce@6.8.6/tinymce.min.js" referrerpolicy="origin" crossorigin="anonymous"></script>
-                                <script>
-                                    (function () {
-                                        const form = document.getElementById('closed-training-case-email-form');
-                                        if (!form || !window.tinymce) {
-                                            return;
-                                        }
-
-                                        window.tinymce.init({
-                                            selector: '#email_body',
-                                            height: 320,
-                                            menubar: false,
-                                            branding: false,
-                                            plugins: 'link lists autoresize',
-                                            toolbar: 'undo redo | bold italic underline | bullist numlist | link unlink | removeformat',
-                                            relative_urls: false,
-                                            convert_urls: false,
-                                            browser_spellcheck: true,
-                                            autoresize_bottom_margin: 16,
-                                            extended_valid_elements: 'p[style],table[cellpadding|cellspacing|border|style|role],tr,td[align|style],th[align|style],a[href|target|rel]',
-                                            content_style: 'body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; font-size: 15px; line-height: 1.6; } p { margin: 0 0 0.75em; } table { border-collapse: collapse; margin: 0; } td { vertical-align: top; padding: 0; }',
-                                        });
-
-                                        form.addEventListener('submit', function () {
-                                            window.tinymce.triggerSave();
-                                        });
-                                    })();
-                                </script>
                             @else
                                 <p class="mb-0 text-secondary">Brak poprawnego adresu e-mail w sprawie. Uzupełnij go w danych zapytania, żeby wysłać wiadomość.</p>
                             @endif
@@ -297,4 +292,185 @@
                 </div>
             </div>
     </div>
+
+    <div class="modal fade" id="closedTrainingCaseEventEditModal" tabindex="-1" aria-labelledby="closedTrainingCaseEventEditModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <form method="POST" action="#" id="closedTrainingCaseEventEditForm">
+                    @csrf
+                    @method('PUT')
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="closedTrainingCaseEventEditModalLabel">Edytuj wpis historii</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="text-secondary small mb-2" id="closedTrainingCaseEventEditType">—</p>
+                        <div class="mb-3 d-none" id="closedTrainingCaseEventEditMetaWrap">
+                            <label for="closedTrainingCaseEventEditMeta" class="form-label">Nagłówek e-maila</label>
+                            <textarea id="closedTrainingCaseEventEditMeta" class="form-control" rows="4" readonly></textarea>
+                        </div>
+                        <label for="closedTrainingCaseEventEditBody" class="form-label">Treść</label>
+                        <textarea name="body" id="closedTrainingCaseEventEditBody" rows="10" class="form-control"></textarea>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Anuluj</button>
+                        <button type="submit" class="btn btn-primary">Zapisz</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="closedTrainingCaseEventDeleteModal" tabindex="-1" aria-labelledby="closedTrainingCaseEventDeleteModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form method="POST" action="#" id="closedTrainingCaseEventDeleteForm">
+                    @csrf
+                    @method('DELETE')
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="closedTrainingCaseEventDeleteModalLabel">Usuń wpis historii</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="mb-2">Czy na pewno usunąć ten wpis z historii?</p>
+                        <div class="border rounded p-2 bg-light small fw-semibold" id="closedTrainingCaseEventDeleteSummary">—</div>
+                        <div class="alert alert-warning small mt-3 mb-0">
+                            Tej operacji nie da się cofnąć. Usunięcie wpisu o e-mailu nie cofa wysłanej wiadomości.
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Anuluj</button>
+                        <button type="submit" class="btn btn-danger">Usuń</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/tinymce@6.8.6/tinymce.min.js" referrerpolicy="origin" crossorigin="anonymous"></script>
+    <script>
+        (function () {
+            const tinyOptions = {
+                menubar: false,
+                branding: false,
+                plugins: 'link lists autoresize',
+                toolbar: 'undo redo | bold italic underline | bullist numlist | link unlink | removeformat',
+                relative_urls: false,
+                convert_urls: false,
+                browser_spellcheck: true,
+                autoresize_bottom_margin: 16,
+                extended_valid_elements: 'p[style],table[cellpadding|cellspacing|border|style|role],tr,td[align|style],th[align|style],a[href|target|rel]',
+                content_style: 'body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; font-size: 15px; line-height: 1.6; } p { margin: 0 0 0.75em; } table { border-collapse: collapse; margin: 0; } td { vertical-align: top; padding: 0; }',
+            };
+
+            const sendForm = document.getElementById('closed-training-case-email-form');
+            if (sendForm && window.tinymce) {
+                window.tinymce.init(Object.assign({
+                    selector: '#email_body',
+                    height: 320,
+                }, tinyOptions));
+                sendForm.addEventListener('submit', function () {
+                    window.tinymce.triggerSave();
+                });
+            }
+
+            function readEventBody(button) {
+                const bodyId = button.getAttribute('data-event-body-id');
+                const holder = bodyId ? document.getElementById(bodyId) : null;
+                if (!holder) {
+                    return '';
+                }
+                try {
+                    return JSON.parse(holder.textContent || '""');
+                } catch (error) {
+                    return holder.textContent || '';
+                }
+            }
+
+            function destroyEditEditor() {
+                if (!window.tinymce) {
+                    return;
+                }
+                const editor = window.tinymce.get('closedTrainingCaseEventEditBody');
+                if (editor) {
+                    editor.remove();
+                }
+            }
+
+            const editModal = document.getElementById('closedTrainingCaseEventEditModal');
+            const editForm = document.getElementById('closedTrainingCaseEventEditForm');
+            const editType = document.getElementById('closedTrainingCaseEventEditType');
+            const editBody = document.getElementById('closedTrainingCaseEventEditBody');
+            const editMetaWrap = document.getElementById('closedTrainingCaseEventEditMetaWrap');
+            const editMeta = document.getElementById('closedTrainingCaseEventEditMeta');
+            let editingEmail = false;
+
+            if (editModal && editForm && editType && editBody && editMetaWrap && editMeta) {
+                editModal.addEventListener('show.bs.modal', function (event) {
+                    const button = event.relatedTarget;
+                    if (!button) {
+                        return;
+                    }
+
+                    destroyEditEditor();
+                    editingEmail = button.getAttribute('data-event-is-email') === '1';
+                    editForm.action = button.getAttribute('data-event-update-url') || '#';
+                    editType.textContent = button.getAttribute('data-event-label') || '—';
+
+                    const rawBody = readEventBody(button);
+                    if (editingEmail) {
+                        const parts = rawBody.split(/\n\n/);
+                        editMeta.value = parts[0] || '';
+                        editBody.value = parts.slice(1).join('\n\n');
+                        editMetaWrap.classList.remove('d-none');
+                    } else {
+                        editMeta.value = '';
+                        editBody.value = rawBody;
+                        editMetaWrap.classList.add('d-none');
+                    }
+                });
+
+                editModal.addEventListener('shown.bs.modal', function () {
+                    if (!editingEmail || !window.tinymce) {
+                        return;
+                    }
+                    destroyEditEditor();
+                    window.tinymce.init(Object.assign({
+                        selector: '#closedTrainingCaseEventEditBody',
+                        height: 280,
+                    }, tinyOptions));
+                });
+
+                editModal.addEventListener('hidden.bs.modal', function () {
+                    destroyEditEditor();
+                    editingEmail = false;
+                });
+
+                editForm.addEventListener('submit', function () {
+                    if (window.tinymce) {
+                        window.tinymce.triggerSave();
+                    }
+                    if (editingEmail) {
+                        const meta = (editMeta.value || '').trim();
+                        const html = (editBody.value || '').trim();
+                        editBody.value = html === '' ? meta : meta + '\n\n' + html;
+                    }
+                });
+            }
+
+            const deleteModal = document.getElementById('closedTrainingCaseEventDeleteModal');
+            const deleteForm = document.getElementById('closedTrainingCaseEventDeleteForm');
+            const deleteSummary = document.getElementById('closedTrainingCaseEventDeleteSummary');
+            if (deleteModal && deleteForm && deleteSummary) {
+                deleteModal.addEventListener('show.bs.modal', function (event) {
+                    const button = event.relatedTarget;
+                    if (!button) {
+                        return;
+                    }
+                    deleteForm.action = button.getAttribute('data-event-delete-url') || '#';
+                    deleteSummary.textContent = button.getAttribute('data-event-label') || '—';
+                });
+            }
+        })();
+    </script>
 </x-app-layout>
