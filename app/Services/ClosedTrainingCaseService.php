@@ -76,6 +76,44 @@ class ClosedTrainingCaseService
     }
 
     /**
+     * @param  array{contact_name: string, contact_email: ?string, contact_phone: ?string, institution: ?string}  $attributes
+     */
+    public function updateContact(ClosedTrainingCase $case, array $attributes, User $user): void
+    {
+        $before = [
+            'contact_name' => $case->contact_name,
+            'contact_email' => $case->contact_email,
+            'contact_phone' => $case->contact_phone,
+            'institution' => $case->institution,
+        ];
+
+        $case->contact_name = $attributes['contact_name'];
+        $case->contact_email = $attributes['contact_email'];
+        $case->contact_phone = $attributes['contact_phone'];
+        $case->institution = $attributes['institution'];
+
+        $after = [
+            'contact_name' => $case->contact_name,
+            'contact_email' => $case->contact_email,
+            'contact_phone' => $case->contact_phone,
+            'institution' => $case->institution,
+        ];
+
+        if ($before === $after) {
+            return;
+        }
+
+        $case->save();
+
+        $case->events()->create([
+            'user_id' => $user->id,
+            'event_type' => ClosedTrainingCaseEvent::TYPE_UPDATED,
+            'body' => $this->contactChangeSummary($before, $case),
+            'happened_at' => now(),
+        ]);
+    }
+
+    /**
      * @param  array{status: string, assignee_user_id: ?int, next_action: ?string, next_action_at: ?string}  $before
      */
     private function changeSummary(array $before, ClosedTrainingCase $case): string
@@ -102,5 +140,38 @@ class ClosedTrainingCaseService
         }
 
         return implode(' ', $parts);
+    }
+
+    /**
+     * @param  array{contact_name: string, contact_email: ?string, contact_phone: ?string, institution: ?string}  $before
+     */
+    private function contactChangeSummary(array $before, ClosedTrainingCase $case): string
+    {
+        $parts = [];
+
+        if ($before['contact_name'] !== $case->contact_name) {
+            $parts[] = 'Osoba: '.$before['contact_name'].' → '.$case->contact_name.'.';
+        }
+
+        if ($before['contact_email'] !== $case->contact_email) {
+            $parts[] = 'E-mail: '.$this->contactValue($before['contact_email']).' → '.$this->contactValue($case->contact_email).'.';
+        }
+
+        if ($before['contact_phone'] !== $case->contact_phone) {
+            $parts[] = 'Telefon: '.$this->contactValue($before['contact_phone']).' → '.$this->contactValue($case->contact_phone).'.';
+        }
+
+        if ($before['institution'] !== $case->institution) {
+            $parts[] = 'Nazwa szkoły / placówki: '.$this->contactValue($before['institution']).' → '.$this->contactValue($case->institution).'.';
+        }
+
+        return 'Dane kontaktu. '.implode(' ', $parts);
+    }
+
+    private function contactValue(?string $value): string
+    {
+        $value = trim((string) $value);
+
+        return $value === '' ? 'brak' : $value;
     }
 }

@@ -40,17 +40,34 @@
                     <div class="card mb-4">
                         <div class="card-header fw-semibold">Kontakt szkoły</div>
                         <div class="card-body">
+                            <form method="POST" action="{{ route('closed-training-cases.contact.update', $case) }}" class="mb-4">
+                                @csrf
+                                @method('PUT')
+                                <div class="mb-3">
+                                    <label for="contact_name" class="form-label">Osoba</label>
+                                    <input type="text" name="contact_name" id="contact_name" value="{{ old('contact_name', $case->contact_name) }}" required maxlength="255" class="form-control @error('contact_name') is-invalid @enderror">
+                                    @error('contact_name')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                </div>
+                                <div class="mb-3">
+                                    <label for="contact_email" class="form-label">E-mail</label>
+                                    <input type="email" name="contact_email" id="contact_email" value="{{ old('contact_email', $case->contact_email) }}" maxlength="255" class="form-control @error('contact_email') is-invalid @enderror">
+                                    @error('contact_email')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                </div>
+                                <div class="mb-3">
+                                    <label for="contact_phone" class="form-label">Telefon</label>
+                                    <input type="text" name="contact_phone" id="contact_phone" value="{{ old('contact_phone', $case->contact_phone) }}" maxlength="50" class="form-control @error('contact_phone') is-invalid @enderror">
+                                    @error('contact_phone')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                </div>
+                                <div class="mb-3">
+                                    <label for="institution" class="form-label">Nazwa szkoły / placówki (opcjonalnie)</label>
+                                    <input type="text" name="institution" id="institution" value="{{ old('institution', $case->institution) }}" maxlength="255" class="form-control @error('institution') is-invalid @enderror">
+                                    @error('institution')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                </div>
+                                <button type="submit" class="btn btn-primary">Zapisz dane kontaktu</button>
+                            </form>
                             <dl class="row mb-0">
-                                <dt class="col-sm-4">Osoba</dt>
-                                <dd class="col-sm-8">{{ $case->contact_name }}</dd>
                                 <dt class="col-sm-4">Rodzaj placówki</dt>
                                 <dd class="col-sm-8">{{ $case->institutionTypeLabel() }}</dd>
-                                <dt class="col-sm-4">Nazwa szkoły / placówki</dt>
-                                <dd class="col-sm-8">{{ $case->institution ?: '—' }}</dd>
-                                <dt class="col-sm-4">E-mail</dt>
-                                <dd class="col-sm-8">{{ $case->contact_email ?: '—' }}</dd>
-                                <dt class="col-sm-4">Telefon</dt>
-                                <dd class="col-sm-8">{{ $case->contact_phone ?: '—' }}</dd>
                                 <dt class="col-sm-4">Forma</dt>
                                 <dd class="col-sm-8">{{ $case->preferredFormatLabel() }}</dd>
                                 <dt class="col-sm-4">Oferta</dt>

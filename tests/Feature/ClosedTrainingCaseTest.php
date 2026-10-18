@@ -79,7 +79,50 @@ class ClosedTrainingCaseTest extends TestCase
             ])
             ->assertRedirect(route('closed-training-cases.show', $case));
 
-        $this->assertSame(3, $case->events()->count());
+        $this->actingAs($user)
+            ->put(route('closed-training-cases.contact.update', $case), [
+                'contact_name' => 'Osoba poprawiona',
+                'contact_email' => 'poprawiony@example.com',
+                'contact_phone' => '500600700',
+                'institution' => 'Poprawiona nazwa placówki',
+            ])
+            ->assertRedirect(route('closed-training-cases.show', $case))
+            ->assertSessionHas('success', 'Zapisano dane kontaktu.');
+
+        $case->refresh();
+        $this->assertSame('Osoba poprawiona', $case->contact_name);
+        $this->assertSame('poprawiony@example.com', $case->contact_email);
+        $this->assertSame('500600700', $case->contact_phone);
+        $this->assertSame('Poprawiona nazwa placówki', $case->institution);
+        $this->assertSame(ClosedTrainingCase::STATUS_WAITING, $case->status);
+
+        $contactEvent = $case->events()->where('body', 'like', 'Dane kontaktu.%')->first();
+        $this->assertNotNull($contactEvent);
+        $this->assertStringContainsString('szkola@example.com → poprawiony@example.com', $contactEvent->body);
+        $this->assertStringContainsString('Osoba: Osoba kontaktowa → Osoba poprawiona', $contactEvent->body);
+
+        $this->actingAs($user)
+            ->put(route('closed-training-cases.contact.update', $case), [
+                'contact_name' => '',
+                'contact_email' => 'nie-email',
+            ])
+            ->assertSessionHasErrors(['contact_name', 'contact_email']);
+
+        $this->actingAs($user)
+            ->put(route('closed-training-cases.contact.update', $case), [
+                'contact_name' => 'Osoba poprawiona',
+                'contact_email' => '',
+                'contact_phone' => '',
+                'institution' => '',
+            ])
+            ->assertRedirect(route('closed-training-cases.show', $case));
+
+        $case->refresh();
+        $this->assertNull($case->contact_email);
+        $this->assertNull($case->contact_phone);
+        $this->assertNull($case->institution);
+
+        $this->assertSame(5, $case->events()->count());
         $this->assertTrue($case->events()->where('event_type', ClosedTrainingCaseEvent::TYPE_NOTE)->exists());
 
         $this->actingAs($user)

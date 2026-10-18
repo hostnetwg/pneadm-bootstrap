@@ -136,6 +136,37 @@ class ClosedTrainingCaseController extends Controller
             ->with('success', 'Zapisano obsługę sprawy.');
     }
 
+    public function updateContact(Request $request, ClosedTrainingCase $closedTrainingCase): RedirectResponse
+    {
+        $request->merge([
+            'contact_name' => trim((string) $request->input('contact_name')),
+            'contact_email' => $this->blankToNull($request->input('contact_email')),
+            'contact_phone' => $this->blankToNull($request->input('contact_phone')),
+            'institution' => $this->blankToNull($request->input('institution')),
+        ]);
+
+        $data = $request->validate([
+            'contact_name' => 'required|string|max:255',
+            'contact_email' => 'nullable|email|max:255',
+            'contact_phone' => 'nullable|string|max:50',
+            'institution' => 'nullable|string|max:255',
+        ], [
+            'contact_name.required' => 'Podaj osobę kontaktową.',
+            'contact_email.email' => 'Podaj poprawny adres e-mail.',
+        ]);
+
+        $this->cases->updateContact($closedTrainingCase, [
+            'contact_name' => $data['contact_name'],
+            'contact_email' => $data['contact_email'] ?? null,
+            'contact_phone' => $data['contact_phone'] ?? null,
+            'institution' => $data['institution'] ?? null,
+        ], $request->user());
+
+        return redirect()
+            ->route('closed-training-cases.show', $closedTrainingCase)
+            ->with('success', 'Zapisano dane kontaktu.');
+    }
+
     public function storeNote(Request $request, ClosedTrainingCase $closedTrainingCase): RedirectResponse
     {
         $data = $request->validate([
