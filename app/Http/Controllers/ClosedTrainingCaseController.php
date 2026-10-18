@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\ClosedTrainingCase;
+use App\Models\TrainingOffer;
 use App\Models\User;
 use App\Services\ClosedTrainingCaseService;
 use Illuminate\Http\RedirectResponse;
@@ -93,6 +94,17 @@ class ClosedTrainingCaseController extends Controller
             'institution_type' => $data['institution_type'],
             'institution_type_other' => $data['institution_type_other'] ?? null,
             'message' => $data['message'],
+            'submitted_payload' => ClosedTrainingCase::submittedSnapshot([
+                'contact_name' => $data['contact_name'],
+                'contact_email' => $data['contact_email'] ?? null,
+                'contact_phone' => $data['contact_phone'] ?? null,
+                'institution' => $data['institution'] ?? null,
+                'institution_type' => $data['institution_type'],
+                'institution_type_other' => $data['institution_type_other'] ?? null,
+                'preferred_format' => $data['preferred_format'] ?? null,
+                'topic' => $data['topic'],
+                'message' => $data['message'],
+            ]),
             'assignee_user_id' => $data['assignee_user_id'] ?? null,
             'next_action' => $this->blankToNull($data['next_action'] ?? null),
             'next_action_at' => $data['next_action_at'] ?? null,
@@ -112,6 +124,7 @@ class ClosedTrainingCaseController extends Controller
         return view('closed-training-cases.show', [
             'case' => $closedTrainingCase,
             'users' => $this->activeUsers(),
+            'offers' => $this->offersForCase($closedTrainingCase),
         ]);
     }
 
@@ -145,26 +158,69 @@ class ClosedTrainingCaseController extends Controller
             'institution' => $this->blankToNull($request->input('institution')),
         ]);
 
+        if ($request->exists('institution_type')) {
+            $request->merge([
+                'institution_type' => $this->blankToNull($request->input('institution_type')),
+            ]);
+        }
+
+        if ($request->exists('preferred_format')) {
+            $request->merge([
+                'preferred_format' => $this->blankToNull($request->input('preferred_format')),
+            ]);
+        }
+
         $data = $request->validate([
             'contact_name' => 'required|string|max:255',
             'contact_email' => 'nullable|email|max:255',
             'contact_phone' => 'nullable|string|max:50',
             'institution' => 'nullable|string|max:255',
+            'institution_type' => ['nullable', Rule::in(array_keys(ClosedTrainingCase::institutionTypeOptions()))],
+            'institution_type_other' => ['nullable', 'string', 'max:255', Rule::requiredIf(
+                fn () => $request->input('institution_type') === ClosedTrainingCase::INSTITUTION_OTHER
+            )],
+            'preferred_format' => ['nullable', Rule::in(array_keys(ClosedTrainingCase::formatOptions()))],
+            'training_offer_id' => ['nullable', 'integer', Rule::exists('training_offers', 'id')],
         ], [
             'contact_name.required' => 'Podaj osobę kontaktową.',
             'contact_email.email' => 'Podaj poprawny adres e-mail.',
+            'institution_type.in' => 'Wybierz rodzaj placówki.',
+            'institution_type_other.required' => 'Podaj rodzaj placówki.',
+            'preferred_format.in' => 'Wybierz formę szkolenia.',
+            'training_offer_id.exists' => 'Wybierz ofertę z katalogu.',
         ]);
+
+        if ($request->exists('institution_type')) {
+            $typeData = $this->normalizeInstitutionType([
+                'institution_type' => $data['institution_type'] ?? null,
+                'institution_type_other' => $data['institution_type_other'] ?? null,
+            ]);
+        } else {
+            $typeData = [
+                'institution_type' => $closedTrainingCase->institution_type,
+                'institution_type_other' => $closedTrainingCase->institution_type_other,
+            ];
+        }
+
+        $offerData = $this->inquiryOfferAttributes($request, $closedTrainingCase);
 
         $this->cases->updateContact($closedTrainingCase, [
             'contact_name' => $data['contact_name'],
             'contact_email' => $data['contact_email'] ?? null,
             'contact_phone' => $data['contact_phone'] ?? null,
             'institution' => $data['institution'] ?? null,
+            'institution_type' => $typeData['institution_type'],
+            'institution_type_other' => $typeData['institution_type_other'],
+            'preferred_format' => $request->exists('preferred_format')
+                ? ($data['preferred_format'] ?? null)
+                : $closedTrainingCase->preferred_format,
+            'training_offer_id' => $offerData['training_offer_id'],
+            'offer_url' => $offerData['offer_url'],
         ], $request->user());
 
         return redirect()
             ->route('closed-training-cases.show', $closedTrainingCase)
-            ->with('success', 'Zapisano dane kontaktu.');
+            ->with('success', 'Zapisano dane zapytania.');
     }
 
     public function storeNote(Request $request, ClosedTrainingCase $closedTrainingCase): RedirectResponse
@@ -180,6 +236,56 @@ class ClosedTrainingCaseController extends Controller
         return redirect()
             ->route('closed-training-cases.show', $closedTrainingCase)
             ->with('success', 'Notatka została dodana.');
+    }
+
+    /**
+     * @return array{training_offer_id: ?int, offer_url: ?string}
+     */
+    private function inquiryOfferAttributes(Request $request, ClosedTrainingCase $case): array
+    {
+        if (! $request->exists('training_offer_id')) {
+            return [
+                'training_offer_id' => $case->training_offer_id,
+                'offer_url' => $case->offer_url,
+            ];
+        }
+
+        $offerId = $this->blankToNull($request->input('training_offer_id'));
+        if ($offerId === null) {
+            return [
+                'training_offer_id' => null,
+                'offer_url' => null,
+            ];
+        }
+
+        if ((int) $offerId === (int) $case->training_offer_id) {
+            return [
+                'training_offer_id' => $case->training_offer_id,
+                'offer_url' => $case->offer_url,
+            ];
+        }
+
+        $offer = TrainingOffer::query()->findOrFail((int) $offerId);
+        $base = rtrim((string) config('services.pnedu_frontend_url', 'https://pnedu.pl'), '/');
+
+        return [
+            'training_offer_id' => $offer->id,
+            'offer_url' => $base.'/szkolenia-rad-pedagogicznych/'.$offer->slug,
+        ];
+    }
+
+    private function offersForCase(ClosedTrainingCase $case)
+    {
+        $offers = TrainingOffer::query()->orderBy('title')->get(['id', 'title']);
+
+        if ($case->training_offer_id && ! $offers->contains('id', $case->training_offer_id)) {
+            $current = TrainingOffer::withTrashed()->find($case->training_offer_id, ['id', 'title']);
+            if ($current) {
+                $offers->prepend($current);
+            }
+        }
+
+        return $offers;
     }
 
     private function activeUsers()

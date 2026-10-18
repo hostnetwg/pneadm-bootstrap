@@ -59,6 +59,7 @@ class ClosedTrainingCase extends Model
         'institution_type',
         'institution_type_other',
         'message',
+        'submitted_payload',
         'consent_at',
         'next_action',
         'next_action_at',
@@ -69,6 +70,7 @@ class ClosedTrainingCase extends Model
         'consent_at' => 'datetime',
         'next_action_at' => 'datetime',
         'closed_at' => 'datetime',
+        'submitted_payload' => 'array',
     ];
 
     public function trainingOffer(): BelongsTo
@@ -160,6 +162,62 @@ class ClosedTrainingCase extends Model
         };
     }
 
+    /**
+     * @param  array{contact_name: string, contact_email?: ?string, contact_phone?: ?string, institution?: ?string, institution_type?: ?string, institution_type_other?: ?string, preferred_format?: ?string, training_offer_id?: ?int, offer_title?: ?string, topic: string, message: string}  $fields
+     * @return array<string, mixed>
+     */
+    public static function submittedSnapshot(array $fields): array
+    {
+        return [
+            'contact_name' => $fields['contact_name'],
+            'contact_email' => $fields['contact_email'] ?? null,
+            'contact_phone' => $fields['contact_phone'] ?? null,
+            'institution' => $fields['institution'] ?? null,
+            'institution_type' => $fields['institution_type'] ?? null,
+            'institution_type_other' => $fields['institution_type_other'] ?? null,
+            'preferred_format' => $fields['preferred_format'] ?? null,
+            'training_offer_id' => $fields['training_offer_id'] ?? null,
+            'offer_title' => $fields['offer_title'] ?? null,
+            'topic' => $fields['topic'],
+            'message' => $fields['message'],
+        ];
+    }
+
+    public function originalSubmissionHeading(): string
+    {
+        return $this->source === self::SOURCE_MANUAL ? 'Oryginał wpisu' : 'Oryginał z formularza';
+    }
+
+    /**
+     * @return array<string, string>|null
+     */
+    public function originalSubmissionRows(): ?array
+    {
+        $payload = $this->submitted_payload;
+        if (! is_array($payload) || ! array_key_exists('contact_name', $payload)) {
+            return null;
+        }
+
+        $topic = trim((string) ($payload['topic'] ?? ''));
+        if ($topic === '' || $topic === '(temat nie określony)') {
+            $topic = 'Nie podano';
+        }
+
+        $offerTitle = trim((string) ($payload['offer_title'] ?? ''));
+
+        return [
+            'Osoba' => $this->originalText($payload['contact_name'] ?? null),
+            'E-mail' => $this->originalText($payload['contact_email'] ?? null),
+            'Telefon' => $this->originalText($payload['contact_phone'] ?? null),
+            'Nazwa szkoły / placówki' => $this->originalText($payload['institution'] ?? null),
+            'Rodzaj placówki' => self::formatInstitutionType($payload['institution_type'] ?? null, $payload['institution_type_other'] ?? null),
+            'Forma' => $this->originalFormat($payload['preferred_format'] ?? null),
+            'Oferta' => $offerTitle === '' ? 'Brak powiązania z ofertą' : $offerTitle,
+            'Temat szkolenia' => $topic,
+            'Wiadomość' => $this->originalText($payload['message'] ?? null),
+        ];
+    }
+
     public function trainingTopicLabel(): string
     {
         $topic = trim((string) $this->topic);
@@ -192,6 +250,22 @@ class ClosedTrainingCase extends Model
         }
 
         return $this->next_action_at->lt(now());
+    }
+
+    private function originalText(?string $value): string
+    {
+        $value = trim((string) $value);
+
+        return $value === '' ? '—' : $value;
+    }
+
+    private function originalFormat(?string $format): string
+    {
+        if ($format === null || $format === '') {
+            return 'Nie wybrano';
+        }
+
+        return self::formatOptions()[$format] ?? $format;
     }
 
     public function formatLocal(?Carbon $moment, string $format = 'd.m.Y H:i'): ?string

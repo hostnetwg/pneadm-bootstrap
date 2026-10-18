@@ -76,7 +76,7 @@ class ClosedTrainingCaseService
     }
 
     /**
-     * @param  array{contact_name: string, contact_email: ?string, contact_phone: ?string, institution: ?string}  $attributes
+     * @param  array{contact_name: string, contact_email: ?string, contact_phone: ?string, institution: ?string, institution_type: ?string, institution_type_other: ?string, preferred_format: ?string, training_offer_id: ?int, offer_url: ?string}  $attributes
      */
     public function updateContact(ClosedTrainingCase $case, array $attributes, User $user): void
     {
@@ -85,25 +85,63 @@ class ClosedTrainingCaseService
             'contact_email' => $case->contact_email,
             'contact_phone' => $case->contact_phone,
             'institution' => $case->institution,
+            'institution_type' => $case->institution_type,
+            'institution_type_other' => $case->institution_type_other,
+            'preferred_format' => $case->preferred_format,
+            'training_offer_id' => $case->training_offer_id,
+            'offer_url' => $case->offer_url,
+            'institution_type_label' => $case->institutionTypeLabel(),
+            'format_label' => $case->preferredFormatLabel(),
+            'offer_label' => $case->trainingOffer?->title ?: 'brak',
         ];
 
         $case->contact_name = $attributes['contact_name'];
         $case->contact_email = $attributes['contact_email'];
         $case->contact_phone = $attributes['contact_phone'];
         $case->institution = $attributes['institution'];
+        $case->institution_type = $attributes['institution_type'];
+        $case->institution_type_other = $attributes['institution_type_other'];
+        $case->preferred_format = $attributes['preferred_format'];
+        $case->training_offer_id = $attributes['training_offer_id'];
+        $case->offer_url = $attributes['offer_url'];
 
         $after = [
             'contact_name' => $case->contact_name,
             'contact_email' => $case->contact_email,
             'contact_phone' => $case->contact_phone,
             'institution' => $case->institution,
+            'institution_type' => $case->institution_type,
+            'institution_type_other' => $case->institution_type_other,
+            'preferred_format' => $case->preferred_format,
+            'training_offer_id' => $case->training_offer_id,
+            'offer_url' => $case->offer_url,
         ];
 
-        if ($before === $after) {
+        $unchanged = true;
+        foreach ([
+            'contact_name',
+            'contact_email',
+            'contact_phone',
+            'institution',
+            'institution_type',
+            'institution_type_other',
+            'preferred_format',
+            'training_offer_id',
+            'offer_url',
+        ] as $field) {
+            if ((string) $before[$field] !== (string) $after[$field]) {
+                $unchanged = false;
+                break;
+            }
+        }
+
+        if ($unchanged) {
             return;
         }
 
         $case->save();
+        $case->unsetRelation('trainingOffer');
+        $case->load('trainingOffer');
 
         $case->events()->create([
             'user_id' => $user->id,
@@ -143,7 +181,7 @@ class ClosedTrainingCaseService
     }
 
     /**
-     * @param  array{contact_name: string, contact_email: ?string, contact_phone: ?string, institution: ?string}  $before
+     * @param  array{contact_name: string, contact_email: ?string, contact_phone: ?string, institution: ?string, institution_type_label: string, format_label: string, offer_label: string}  $before
      */
     private function contactChangeSummary(array $before, ClosedTrainingCase $case): string
     {
@@ -165,7 +203,20 @@ class ClosedTrainingCaseService
             $parts[] = 'Nazwa szkoły / placówki: '.$this->contactValue($before['institution']).' → '.$this->contactValue($case->institution).'.';
         }
 
-        return 'Dane kontaktu. '.implode(' ', $parts);
+        if ($before['institution_type_label'] !== $case->institutionTypeLabel()) {
+            $parts[] = 'Rodzaj placówki: '.$before['institution_type_label'].' → '.$case->institutionTypeLabel().'.';
+        }
+
+        if ($before['format_label'] !== $case->preferredFormatLabel()) {
+            $parts[] = 'Forma: '.$before['format_label'].' → '.$case->preferredFormatLabel().'.';
+        }
+
+        $offerLabel = $case->trainingOffer?->title ?: 'brak';
+        if ($before['offer_label'] !== $offerLabel) {
+            $parts[] = 'Oferta: '.$before['offer_label'].' → '.$offerLabel.'.';
+        }
+
+        return 'Dane zapytania. '.implode(' ', $parts);
     }
 
     private function contactValue(?string $value): string

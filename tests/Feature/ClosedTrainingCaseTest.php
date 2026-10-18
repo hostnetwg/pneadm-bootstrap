@@ -4,7 +4,9 @@ namespace Tests\Feature;
 
 use App\Models\ClosedTrainingCase;
 use App\Models\ClosedTrainingCaseEvent;
+use App\Models\TrainingOffer;
 use App\Models\User;
+use App\Services\ClosedTrainingSubmissionBackfill;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -87,16 +89,25 @@ class ClosedTrainingCaseTest extends TestCase
                 'institution' => 'Poprawiona nazwa placówki',
             ])
             ->assertRedirect(route('closed-training-cases.show', $case))
-            ->assertSessionHas('success', 'Zapisano dane kontaktu.');
+            ->assertSessionHas('success', 'Zapisano dane zapytania.');
 
         $case->refresh();
         $this->assertSame('Osoba poprawiona', $case->contact_name);
         $this->assertSame('poprawiony@example.com', $case->contact_email);
+        $this->assertSame('szkola@example.com', $case->submitted_payload['contact_email']);
+        $this->assertSame('Osoba kontaktowa', $case->submitted_payload['contact_name']);
+
+        $this->actingAs($user)
+            ->get(route('closed-training-cases.show', $case))
+            ->assertOk()
+            ->assertSee('Oryginał wpisu')
+            ->assertSee('szkola@example.com')
+            ->assertSee('poprawiony@example.com');
         $this->assertSame('500600700', $case->contact_phone);
         $this->assertSame('Poprawiona nazwa placówki', $case->institution);
         $this->assertSame(ClosedTrainingCase::STATUS_WAITING, $case->status);
 
-        $contactEvent = $case->events()->where('body', 'like', 'Dane kontaktu.%')->first();
+        $contactEvent = $case->events()->where('body', 'like', 'Dane zapytania.%')->first();
         $this->assertNotNull($contactEvent);
         $this->assertStringContainsString('szkola@example.com → poprawiony@example.com', $contactEvent->body);
         $this->assertStringContainsString('Osoba: Osoba kontaktowa → Osoba poprawiona', $contactEvent->body);
@@ -121,8 +132,66 @@ class ClosedTrainingCaseTest extends TestCase
         $this->assertNull($case->contact_email);
         $this->assertNull($case->contact_phone);
         $this->assertNull($case->institution);
+        $this->assertSame(ClosedTrainingCase::INSTITUTION_PRIMARY, $case->institution_type);
+        $this->assertSame(ClosedTrainingCase::FORMAT_ONLINE, $case->preferred_format);
+        $this->assertSame('Szkolenie rady przykładowej', $case->topic);
 
-        $this->assertSame(5, $case->events()->count());
+        $offer = TrainingOffer::query()->create([
+            'title' => 'Oferta do powiązania',
+            'slug' => 'oferta-do-powiazania',
+        ]);
+
+        $this->actingAs($user)
+            ->put(route('closed-training-cases.contact.update', $case), [
+                'contact_name' => 'Osoba poprawiona',
+                'institution_type' => ClosedTrainingCase::INSTITUTION_PRIMARY,
+                'institution_type_other' => 'Ten tekst nie może zostać',
+                'preferred_format' => ClosedTrainingCase::FORMAT_ONSITE,
+                'training_offer_id' => $offer->id,
+            ])
+            ->assertRedirect(route('closed-training-cases.show', $case));
+
+        $case->refresh();
+        $this->assertSame(ClosedTrainingCase::INSTITUTION_PRIMARY, $case->institution_type);
+        $this->assertNull($case->institution_type_other);
+        $this->assertSame(ClosedTrainingCase::FORMAT_ONSITE, $case->preferred_format);
+        $this->assertSame($offer->id, $case->training_offer_id);
+        $this->assertSame('Szkolenie rady przykładowej', $case->topic);
+
+        $offerEvent = $case->events()->reorder()->where('body', 'like', '%Oferta: brak → Oferta do powiązania%')->first();
+        $this->assertNotNull($offerEvent);
+        $this->assertStringContainsString('Forma: Online → Stacjonarnie', $offerEvent->body);
+        $this->assertStringContainsString('Oferta: brak → Oferta do powiązania', $offerEvent->body);
+        $this->assertStringNotContainsString('Ten tekst nie może zostać', $offerEvent->body);
+
+        $this->actingAs($user)
+            ->put(route('closed-training-cases.contact.update', $case), [
+                'contact_name' => 'Osoba poprawiona',
+                'institution_type' => ClosedTrainingCase::INSTITUTION_OTHER,
+                'preferred_format' => ClosedTrainingCase::FORMAT_ONSITE,
+                'training_offer_id' => $offer->id,
+            ])
+            ->assertSessionHasErrors(['institution_type_other']);
+
+        $this->actingAs($user)
+            ->put(route('closed-training-cases.contact.update', $case), [
+                'contact_name' => 'Osoba poprawiona',
+                'institution_type' => ClosedTrainingCase::INSTITUTION_OTHER,
+                'institution_type_other' => 'Poradnia psychologiczno-pedagogiczna',
+                'preferred_format' => '',
+                'training_offer_id' => '',
+            ])
+            ->assertRedirect(route('closed-training-cases.show', $case));
+
+        $case->refresh();
+        $this->assertSame(ClosedTrainingCase::INSTITUTION_OTHER, $case->institution_type);
+        $this->assertSame('Poradnia psychologiczno-pedagogiczna', $case->institution_type_other);
+        $this->assertNull($case->preferred_format);
+        $this->assertNull($case->training_offer_id);
+        $this->assertNull($case->offer_url);
+        $this->assertSame('Szkolenie rady przykładowej', $case->topic);
+
+        $this->assertSame(7, $case->events()->count());
         $this->assertTrue($case->events()->where('event_type', ClosedTrainingCaseEvent::TYPE_NOTE)->exists());
 
         $this->actingAs($user)
@@ -151,6 +220,8 @@ class ClosedTrainingCaseTest extends TestCase
             ->assertSee('Nie podano')
             ->assertSee('Proszę o kontakt, temat doprecyzujemy telefonicznie.')
             ->assertSee('Rodzaj placówki')
+            ->assertSee('Oryginał z formularza')
+            ->assertSee('Oryginał nie został zapisany.')
             ->assertDontSee('(temat nie określony)');
 
         $this->actingAs($user)
@@ -198,6 +269,49 @@ class ClosedTrainingCaseTest extends TestCase
         $this->actingAs($user)
             ->get(route('closed-training-cases.show', $case))
             ->assertOk()
-            ->assertSee('Inna — Poradnia psychologiczno-pedagogiczna');
+            ->assertSee('Poradnia psychologiczno-pedagogiczna')
+            ->assertSee('Inna')
+            ->assertSee('Oryginał wpisu');
+    }
+
+    public function test_backfill_copies_untouched_cases_and_skips_already_corrected_ones(): void
+    {
+        $user = User::factory()->create(['is_active' => true]);
+
+        $untouched = ClosedTrainingCase::query()->create([
+            'source' => ClosedTrainingCase::SOURCE_GENERAL_FORM,
+            'status' => ClosedTrainingCase::STATUS_NEW,
+            'topic' => 'Temat sprzed kopii',
+            'contact_name' => 'Osoba niepoprawiana',
+            'contact_email' => 'oryginal@example.com',
+            'message' => 'Treść z formularza.',
+            'preferred_format' => ClosedTrainingCase::FORMAT_ONLINE,
+        ]);
+
+        $corrected = ClosedTrainingCase::query()->create([
+            'source' => ClosedTrainingCase::SOURCE_OFFER_FORM,
+            'status' => ClosedTrainingCase::STATUS_NEW,
+            'topic' => 'Temat już poprawiany',
+            'contact_name' => 'Osoba po poprawce',
+            'contact_email' => 'nowy@example.com',
+            'message' => 'Treść po poprawce.',
+        ]);
+        $corrected->events()->create([
+            'user_id' => $user->id,
+            'event_type' => ClosedTrainingCaseEvent::TYPE_UPDATED,
+            'body' => 'Dane zapytania. E-mail: stary@example.com → nowy@example.com.',
+            'happened_at' => now(),
+        ]);
+
+        $copied = app(ClosedTrainingSubmissionBackfill::class)->backfillUntouched();
+
+        $untouched->refresh();
+        $corrected->refresh();
+
+        $this->assertSame(1, $copied);
+        $this->assertSame('oryginal@example.com', $untouched->submitted_payload['contact_email']);
+        $this->assertSame('Temat sprzed kopii', $untouched->submitted_payload['topic']);
+        $this->assertSame(ClosedTrainingCase::FORMAT_ONLINE, $untouched->submitted_payload['preferred_format']);
+        $this->assertNull($corrected->submitted_payload);
     }
 }

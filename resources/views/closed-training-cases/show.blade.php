@@ -63,26 +63,94 @@
                                     <input type="text" name="institution" id="institution" value="{{ old('institution', $case->institution) }}" maxlength="255" class="form-control @error('institution') is-invalid @enderror">
                                     @error('institution')<div class="invalid-feedback">{{ $message }}</div>@enderror
                                 </div>
-                                <button type="submit" class="btn btn-primary">Zapisz dane kontaktu</button>
+                                <div class="mb-3">
+                                    <label for="institution_type" class="form-label">Rodzaj placówki</label>
+                                    <select name="institution_type" id="institution_type" class="form-select @error('institution_type') is-invalid @enderror">
+                                        <option value="">Wybierz rodzaj placówki…</option>
+                                        @foreach(\App\Models\ClosedTrainingCase::institutionTypeOptions() as $value => $label)
+                                            <option value="{{ $value }}" @selected(old('institution_type', $case->institution_type) === $value)>{{ $label }}</option>
+                                        @endforeach
+                                    </select>
+                                    @error('institution_type')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                </div>
+                                <div class="mb-3" id="institution_type_other_wrap" @if(old('institution_type', $case->institution_type) !== \App\Models\ClosedTrainingCase::INSTITUTION_OTHER) hidden @endif>
+                                    <label for="institution_type_other" class="form-label">Jaki rodzaj placówki?</label>
+                                    <input type="text" name="institution_type_other" id="institution_type_other" value="{{ old('institution_type_other', $case->institution_type_other) }}" maxlength="255" class="form-control @error('institution_type_other') is-invalid @enderror" placeholder="np. poradnia psychologiczno-pedagogiczna" @disabled(old('institution_type', $case->institution_type) !== \App\Models\ClosedTrainingCase::INSTITUTION_OTHER)>
+                                    @error('institution_type_other')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                </div>
+                                <div class="mb-3">
+                                    <label for="preferred_format" class="form-label">Forma</label>
+                                    <select name="preferred_format" id="preferred_format" class="form-select @error('preferred_format') is-invalid @enderror">
+                                        <option value="">Nie wybrano</option>
+                                        @foreach(\App\Models\ClosedTrainingCase::formatOptions() as $value => $label)
+                                            <option value="{{ $value }}" @selected(old('preferred_format', $case->preferred_format) === $value)>{{ $label }}</option>
+                                        @endforeach
+                                    </select>
+                                    @error('preferred_format')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                </div>
+                                <div class="mb-3">
+                                    <label for="training_offer_id" class="form-label">Oferta</label>
+                                    <select name="training_offer_id" id="training_offer_id" class="form-select @error('training_offer_id') is-invalid @enderror">
+                                        <option value="">Brak powiązania z ofertą</option>
+                                        @foreach($offers as $offer)
+                                            <option value="{{ $offer->id }}" @selected((string) old('training_offer_id', $case->training_offer_id) === (string) $offer->id)>{{ $offer->title }}</option>
+                                        @endforeach
+                                    </select>
+                                    <div class="form-text">Oferta z katalogu, której dotyczyło zapytanie. Temat szkolenia zostaje bez zmian.</div>
+                                    @error('training_offer_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                    @if($case->trainingOffer)
+                                        <a href="{{ route('training-offers.show', $case->trainingOffer) }}" class="small">Otwórz ofertę w panelu</a>
+                                    @elseif($case->offer_url)
+                                        <a href="{{ $case->offer_url }}" class="small" target="_blank" rel="noopener">Strona oferty</a>
+                                    @endif
+                                </div>
+                                <script>
+                                    (function () {
+                                        const select = document.getElementById('institution_type');
+                                        const wrap = document.getElementById('institution_type_other_wrap');
+                                        const input = document.getElementById('institution_type_other');
+                                        if (!select || !wrap || !input) {
+                                            return;
+                                        }
+
+                                        const sync = function () {
+                                            const other = select.value === 'other';
+                                            wrap.hidden = !other;
+                                            input.required = other;
+                                            input.disabled = !other;
+                                        };
+
+                                        select.addEventListener('change', function () {
+                                            if (select.value !== 'other') {
+                                                input.value = '';
+                                            }
+                                            sync();
+                                        });
+                                        sync();
+                                    })();
+                                </script>
+                                <button type="submit" class="btn btn-primary">Zapisz dane zapytania</button>
                             </form>
                             <dl class="row mb-0">
-                                <dt class="col-sm-4">Rodzaj placówki</dt>
-                                <dd class="col-sm-8">{{ $case->institutionTypeLabel() }}</dd>
-                                <dt class="col-sm-4">Forma</dt>
-                                <dd class="col-sm-8">{{ $case->preferredFormatLabel() }}</dd>
-                                <dt class="col-sm-4">Oferta</dt>
-                                <dd class="col-sm-8">
-                                    @if($case->trainingOffer)
-                                        <a href="{{ route('training-offers.show', $case->trainingOffer) }}">{{ $case->trainingOffer->title }}</a>
-                                    @elseif($case->offer_url)
-                                        <a href="{{ $case->offer_url }}" target="_blank" rel="noopener">Strona oferty</a>
-                                    @else
-                                        —
-                                    @endif
-                                </dd>
                                 <dt class="col-sm-4">Zgoda z formularza</dt>
                                 <dd class="col-sm-8">{{ $case->consent_at ? $case->formatLocal($case->consent_at) : 'Brak (wpis ręczny albo inny kanał)' }}</dd>
                             </dl>
+                        </div>
+                    </div>
+
+                    <div class="card mb-4">
+                        <div class="card-header fw-semibold">{{ $case->originalSubmissionHeading() }}</div>
+                        <div class="card-body">
+                            @if($originalRows = $case->originalSubmissionRows())
+                                <dl class="row mb-0">
+                                    @foreach($originalRows as $label => $value)
+                                        <dt class="col-sm-4">{{ $label }}</dt>
+                                        <dd class="col-sm-8" @if($label === 'Wiadomość') style="white-space: pre-wrap;" @endif>{{ $value }}</dd>
+                                    @endforeach
+                                </dl>
+                            @else
+                                <p class="mb-0">Oryginał nie został zapisany.</p>
+                            @endif
                         </div>
                     </div>
 
