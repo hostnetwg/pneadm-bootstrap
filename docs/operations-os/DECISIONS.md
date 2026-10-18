@@ -2,7 +2,7 @@
 
 Statusy: **Proposed** (rekomendacja Cursora, czeka na Waldemara), **Accepted**, **Superseded**.
 
-Przyjęte: DEC-OPS-002, DEC-OPS-006, DEC-OPS-007, DEC-OPS-008, DEC-OPS-009, DEC-OPS-010, DEC-OPS-011. Nazwa przedsięwzięcia (DEC-OPS-001) zostaje robocza. DEC-OPS-003, DEC-OPS-004 i DEC-OPS-005 czekają. Kodu etapu 1 nadal nie ma.
+Przyjęte: DEC-OPS-002, DEC-OPS-006, DEC-OPS-007, DEC-OPS-008, DEC-OPS-009, DEC-OPS-010, DEC-OPS-011, DEC-OPS-012. Nazwa przedsięwzięcia (DEC-OPS-001) zostaje robocza. DEC-OPS-003, DEC-OPS-004 i DEC-OPS-005 czekają. Etap 1 jest w kodzie.
 
 ## DEC-OPS-001 — Nazwa przedsięwzięcia
 
@@ -87,3 +87,11 @@ Przyjęte: DEC-OPS-002, DEC-OPS-006, DEC-OPS-007, DEC-OPS-008, DEC-OPS-009, DEC-
 - Treść: PNE Operations ma być proste. Kolejność: realny problem, najmniejsze rozwiązanie, codzienne użycie, obserwacja, dopiero potem kolejna funkcja albo abstrakcja. Nie budujemy BPM na zapas i nie tworzymy generycznych modeli tylko dlatego, że kiedyś mogą się przydać. Rozbudowa wynika z praktyki Waldemara, Łukasza i trenerów.
 - Uzasadnienie: Waldemar potwierdził tę zasadę po konsultacji 2026-10-17.
 - Przyjęcie: Waldemar, 2026-10-17.
+
+## DEC-OPS-012 — E-mail do szkoły z karty sprawy
+
+- Status: Accepted
+- Data: 2026-10-18
+- Treść: z karty sprawy szkolenia zamkniętego można wysłać e-mail wyłącznie na aktualny adres kontaktowy sprawy. From: `info@system.pnedu.pl`, Reply-To: `kontakt@pnedu.pl`, nazwa: Platforma Nowoczesnej Edukacji. Temat zawiera identyfikator `[SZ-{id}]`. Po udanej wysyłce pełna treść ląduje w historii. Błąd wysyłki nie tworzy wpisu „wysłano” i nie zmienia statusu ani następnego działania. ADM nie odbiera poczty. Odpowiedzi szkoły czyta się w skrzynce `kontakt@pnedu.pl` i w razie potrzeby dopisuje ręcznie. Bez CC, BCC, załączników, szablonów, wysyłki do trenera i automatycznego workflow.
+- Uzasadnienie: korespondencja ma zostać przy sprawie, bez budowania skrzynki w ADM. From zostaje jak w pozostałych mailach systemowych panelu, żeby nie psuć dostarczalności.
+- Przyjęcie: Waldemar, 2026-10-18 (From `info@system.pnedu.pl`).

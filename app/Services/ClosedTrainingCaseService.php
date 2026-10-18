@@ -29,6 +29,21 @@ class ClosedTrainingCaseService
         ]);
     }
 
+    public function recordSchoolEmailSent(
+        ClosedTrainingCase $case,
+        User $user,
+        string $toEmail,
+        string $subject,
+        string $body,
+    ): ClosedTrainingCaseEvent {
+        return $case->events()->create([
+            'user_id' => $user->id,
+            'event_type' => ClosedTrainingCaseEvent::TYPE_EMAIL_SENT,
+            'body' => "E-mail wysłany do szkoły\nDo: {$toEmail}\nTemat: {$subject}\n\n{$body}",
+            'happened_at' => now(),
+        ]);
+    }
+
     /**
      * @param  array{status: string, assignee_user_id: ?int, next_action: ?string, next_action_at: ?string}  $attributes
      */
@@ -147,6 +162,16 @@ class ClosedTrainingCaseService
             'user_id' => $user->id,
             'event_type' => ClosedTrainingCaseEvent::TYPE_UPDATED,
             'body' => $this->contactChangeSummary($before, $case),
+            'happened_at' => now(),
+        ]);
+    }
+
+    public function recordSchoolEmail(ClosedTrainingCase $case, User $user, string $recipient, string $subject, string $body): ClosedTrainingCaseEvent
+    {
+        return $case->events()->create([
+            'user_id' => $user->id,
+            'event_type' => ClosedTrainingCaseEvent::TYPE_EMAIL_SENT,
+            'body' => "E-mail wysłany do szkoły.\nDo: {$recipient}\nTemat: {$subject}\n\n{$body}",
             'happened_at' => now(),
         ]);
     }

@@ -2,12 +2,15 @@
 
 namespace Tests\Feature;
 
+use App\Mail\ClosedTrainingCaseSchoolMail;
 use App\Models\ClosedTrainingCase;
 use App\Models\ClosedTrainingCaseEvent;
 use App\Models\TrainingOffer;
 use App\Models\User;
 use App\Services\ClosedTrainingSubmissionBackfill;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Mail;
+use Mockery;
 use Tests\TestCase;
 
 class ClosedTrainingCaseTest extends TestCase
@@ -313,5 +316,138 @@ class ClosedTrainingCaseTest extends TestCase
         $this->assertSame('Temat sprzed kopii', $untouched->submitted_payload['topic']);
         $this->assertSame(ClosedTrainingCase::FORMAT_ONLINE, $untouched->submitted_payload['preferred_format']);
         $this->assertNull($corrected->submitted_payload);
+    }
+
+    public function test_operator_can_email_the_school_from_the_case_card(): void
+    {
+        Mail::fake();
+
+        $user = User::factory()->create(['is_active' => true, 'name' => 'Operator Mail']);
+        $case = ClosedTrainingCase::query()->create([
+            'source' => ClosedTrainingCase::SOURCE_MANUAL,
+            'status' => ClosedTrainingCase::STATUS_IN_PROGRESS,
+            'topic' => 'Temat do kontaktu',
+            'contact_name' => 'Osoba szkoły',
+            'contact_email' => 'szkola@example.com',
+            'message' => 'Prośba o kontakt.',
+            'next_action' => 'Oddzwonić jutro.',
+            'assignee_user_id' => $user->id,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('closed-training-cases.show', $case))
+            ->assertOk()
+            ->assertSee('Wyślij e-mail')
+            ->assertSee('szkola@example.com')
+            ->assertSee($case->defaultSchoolEmailSubject())
+            ->assertSee('Z wyrazami szacunku:')
+            ->assertSee('Waldemar Grabowski')
+            ->assertSee('pnedu.pl')
+            ->assertSee('tinymce', false);
+
+        $htmlBody = '<p>Dzień dobry,<br>proszę o propozycję terminu.</p>'.ClosedTrainingCase::defaultSchoolEmailBodyHtml();
+
+        $this->actingAs($user)
+            ->post(route('closed-training-cases.email.send', $case), [
+                'email_subject' => 'Ustalenie terminu',
+                'email_body' => $htmlBody,
+            ])
+            ->assertRedirect(route('closed-training-cases.show', $case))
+            ->assertSessionHas('success');
+
+        Mail::assertSent(ClosedTrainingCaseSchoolMail::class, function (ClosedTrainingCaseSchoolMail $mail) use ($case) {
+            $mail->build();
+
+            return $mail->hasTo('szkola@example.com')
+                && $mail->subjectLine === '[SZ-'.$case->id.'] Ustalenie terminu'
+                && str_contains($mail->htmlBody, 'proszę o propozycję terminu.')
+                && str_contains($mail->htmlBody, 'href="https://pnedu.pl"')
+                && $mail->from[0]['address'] === config('mail.system.from_address')
+                && $mail->replyTo[0]['address'] === config('mail.system.reply_to_address');
+        });
+
+        $case->refresh();
+        $this->assertSame(ClosedTrainingCase::STATUS_IN_PROGRESS, $case->status);
+        $this->assertSame('Oddzwonić jutro.', $case->next_action);
+        $this->assertSame($user->id, $case->assignee_user_id);
+
+        $event = $case->events()->where('event_type', ClosedTrainingCaseEvent::TYPE_EMAIL_SENT)->first();
+        $this->assertNotNull($event);
+        $this->assertSame($user->id, $event->user_id);
+        $this->assertStringContainsString('E-mail wysłany do szkoły', $event->body);
+        $this->assertStringContainsString('Do: szkola@example.com', $event->body);
+        $this->assertStringContainsString('[SZ-'.$case->id.'] Ustalenie terminu', $event->body);
+        $this->assertStringContainsString('proszę o propozycję terminu.', $event->body);
+        $this->assertStringContainsString('href="https://pnedu.pl"', $event->body);
+
+        $this->actingAs($user)
+            ->get(route('closed-training-cases.show', $case))
+            ->assertOk()
+            ->assertSee('E-mail do szkoły')
+            ->assertSee('E-mail wysłany do szkoły')
+            ->assertSee('proszę o propozycję terminu.', false);
+    }
+
+    public function test_school_email_failure_does_not_write_history_or_change_handling(): void
+    {
+        $user = User::factory()->create(['is_active' => true]);
+        $case = ClosedTrainingCase::query()->create([
+            'source' => ClosedTrainingCase::SOURCE_MANUAL,
+            'status' => ClosedTrainingCase::STATUS_WAITING,
+            'topic' => 'Temat bez wysyłki',
+            'contact_name' => 'Osoba szkoły',
+            'contact_email' => 'szkola@example.com',
+            'message' => 'Treść.',
+            'next_action' => 'Czekamy na odpowiedź.',
+        ]);
+
+        $pending = Mockery::mock();
+        $pending->shouldReceive('send')->once()->andThrow(new \RuntimeException('smtp down'));
+        Mail::shouldReceive('to')->once()->with('szkola@example.com')->andReturn($pending);
+
+        $this->actingAs($user)
+            ->post(route('closed-training-cases.email.send', $case), [
+                'email_subject' => 'Próba',
+                'email_body' => 'Treść próby.',
+            ])
+            ->assertRedirect(route('closed-training-cases.show', $case))
+            ->assertSessionHas('error');
+
+        $case->refresh();
+        $this->assertSame(ClosedTrainingCase::STATUS_WAITING, $case->status);
+        $this->assertSame('Czekamy na odpowiedź.', $case->next_action);
+        $this->assertFalse($case->events()->where('event_type', ClosedTrainingCaseEvent::TYPE_EMAIL_SENT)->exists());
+        $this->assertSame(0, $case->events()->count());
+    }
+
+    public function test_case_without_email_cannot_send_school_mail(): void
+    {
+        Mail::fake();
+
+        $user = User::factory()->create(['is_active' => true]);
+        $case = ClosedTrainingCase::query()->create([
+            'source' => ClosedTrainingCase::SOURCE_MANUAL,
+            'status' => ClosedTrainingCase::STATUS_NEW,
+            'topic' => 'Bez e-maila',
+            'contact_name' => 'Osoba telefon',
+            'message' => 'Tylko telefon.',
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('closed-training-cases.show', $case))
+            ->assertOk()
+            ->assertSee('Brak poprawnego adresu e-mail')
+            ->assertDontSee('name="email_body"', false);
+
+        $this->actingAs($user)
+            ->post(route('closed-training-cases.email.send', $case), [
+                'email_subject' => 'Nie powinno wyjść',
+                'email_body' => 'Treść.',
+            ])
+            ->assertRedirect(route('closed-training-cases.show', $case))
+            ->assertSessionHas('error');
+
+        Mail::assertNothingSent();
+        $this->assertFalse($case->events()->where('event_type', ClosedTrainingCaseEvent::TYPE_EMAIL_SENT)->exists());
     }
 }

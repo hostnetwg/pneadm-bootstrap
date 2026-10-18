@@ -2,12 +2,15 @@
 
 namespace App\Http\Controllers;
 
+use App\Mail\ClosedTrainingCaseSchoolMail;
 use App\Models\ClosedTrainingCase;
 use App\Models\TrainingOffer;
 use App\Models\User;
 use App\Services\ClosedTrainingCaseService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -236,6 +239,59 @@ class ClosedTrainingCaseController extends Controller
         return redirect()
             ->route('closed-training-cases.show', $closedTrainingCase)
             ->with('success', 'Notatka została dodana.');
+    }
+
+    public function sendEmail(Request $request, ClosedTrainingCase $closedTrainingCase): RedirectResponse
+    {
+        if (! $closedTrainingCase->hasContactEmail()) {
+            return redirect()
+                ->route('closed-training-cases.show', $closedTrainingCase)
+                ->with('error', 'Sprawa nie ma poprawnego adresu e-mail. Uzupełnij go w danych zapytania.');
+        }
+
+        $data = $request->validate([
+            'email_subject' => 'required|string|max:255',
+            'email_body' => 'required|string|max:20000',
+        ], [
+            'email_subject.required' => 'Podaj temat wiadomości.',
+            'email_body.required' => 'Wpisz treść wiadomości.',
+        ]);
+
+        $toEmail = trim((string) $closedTrainingCase->contact_email);
+        $subject = $closedTrainingCase->withCaseReferenceInSubject($data['email_subject']);
+        $body = ClosedTrainingCase::sanitizeSchoolEmailHtml($data['email_body']);
+
+        if ($body === '' || trim(strip_tags($body)) === '') {
+            throw ValidationException::withMessages([
+                'email_body' => 'Wpisz treść wiadomości.',
+            ]);
+        }
+
+        try {
+            Mail::to($toEmail)->send(new ClosedTrainingCaseSchoolMail($body, $subject));
+        } catch (\Throwable $exception) {
+            Log::warning('Closed training case school email failed', [
+                'case_id' => $closedTrainingCase->id,
+                'message' => $exception->getMessage(),
+            ]);
+
+            return redirect()
+                ->route('closed-training-cases.show', $closedTrainingCase)
+                ->withInput()
+                ->with('error', 'Nie udało się wysłać e-maila. Sprawa i historia nie zostały zmienione.');
+        }
+
+        $this->cases->recordSchoolEmailSent(
+            $closedTrainingCase,
+            $request->user(),
+            $toEmail,
+            $subject,
+            $body,
+        );
+
+        return redirect()
+            ->route('closed-training-cases.show', $closedTrainingCase)
+            ->with('success', 'E-mail został wysłany do '.$toEmail.'.');
     }
 
     /**

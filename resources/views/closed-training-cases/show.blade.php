@@ -12,6 +12,9 @@
             @if(session('success'))
                 <div class="alert alert-success">{{ session('success') }}</div>
             @endif
+            @if(session('error'))
+                <div class="alert alert-danger">{{ session('error') }}</div>
+            @endif
 
             <div class="row g-4">
                 <div class="col-lg-7">
@@ -170,7 +173,12 @@
                                         <strong>{{ $event->typeLabel() }}</strong>
                                         <span class="text-secondary small">{{ $case->formatLocal($event->happened_at) }} · {{ $event->user?->name ?: 'pnedu.pl' }}</span>
                                     </div>
-                                    @if($event->body)
+                                    @if($event->event_type === \App\Models\ClosedTrainingCaseEvent::TYPE_EMAIL_SENT)
+                                        <p class="mb-0 mt-1" style="white-space: pre-wrap;">{{ $event->schoolEmailMeta() }}</p>
+                                        @if($event->schoolEmailHtml())
+                                            <div class="border rounded p-2 mt-2 bg-white small">{!! $event->schoolEmailHtml() !!}</div>
+                                        @endif
+                                    @elseif($event->body)
                                         <p class="mb-0 mt-1" style="white-space: pre-wrap;">{{ $event->body }}</p>
                                     @endif
                                 </li>
@@ -217,6 +225,65 @@
                             <button type="submit" class="btn btn-primary">Zapisz obsługę</button>
                         </div>
                     </form>
+
+                    <div class="card mb-4">
+                        <div class="card-header fw-semibold">Wyślij e-mail</div>
+                        <div class="card-body">
+                            @if($case->hasContactEmail())
+                                <form method="POST" action="{{ route('closed-training-cases.email.send', $case) }}" id="closed-training-case-email-form">
+                                    @csrf
+                                    <div class="mb-3">
+                                        <label class="form-label">Do</label>
+                                        <input type="text" class="form-control" value="{{ $case->contact_email }}" readonly>
+                                        <div class="form-text">Adres z danych zapytania. Odpowiedź przyjdzie na kontakt@pnedu.pl.</div>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="email_subject" class="form-label">Temat</label>
+                                        <input type="text" name="email_subject" id="email_subject" value="{{ old('email_subject', $case->defaultSchoolEmailSubject()) }}" maxlength="255" required class="form-control @error('email_subject') is-invalid @enderror">
+                                        @error('email_subject')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                        <div class="form-text">Identyfikator {{ $case->referenceCode() }} zostanie dopisany, jeśli go usuniesz.</div>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="email_body" class="form-label">Treść</label>
+                                        <textarea name="email_body" id="email_body" rows="12" class="form-control @error('email_body') is-invalid @enderror">{!! \App\Models\ClosedTrainingCase::sanitizeSchoolEmailHtml((string) old('email_body', \App\Models\ClosedTrainingCase::defaultSchoolEmailBodyHtml())) !!}</textarea>
+                                        @error('email_body')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                        <div class="form-text">Stopka jest już w treści. Możesz ją edytować.</div>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary">Wyślij e-mail</button>
+                                </form>
+                                <script src="https://cdn.jsdelivr.net/npm/tinymce@6.8.6/tinymce.min.js" referrerpolicy="origin" crossorigin="anonymous"></script>
+                                <script>
+                                    (function () {
+                                        const form = document.getElementById('closed-training-case-email-form');
+                                        if (!form || !window.tinymce) {
+                                            return;
+                                        }
+
+                                        window.tinymce.init({
+                                            selector: '#email_body',
+                                            height: 320,
+                                            menubar: false,
+                                            branding: false,
+                                            plugins: 'link lists autoresize',
+                                            toolbar: 'undo redo | bold italic underline | bullist numlist | link unlink | removeformat',
+                                            relative_urls: false,
+                                            convert_urls: false,
+                                            browser_spellcheck: true,
+                                            autoresize_bottom_margin: 16,
+                                            extended_valid_elements: 'p[style],table[cellpadding|cellspacing|border|style|role],tr,td[align|style],th[align|style],a[href|target|rel]',
+                                            content_style: 'body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; font-size: 15px; line-height: 1.6; } p { margin: 0 0 0.75em; } table { border-collapse: collapse; margin: 0; } td { vertical-align: top; padding: 0; }',
+                                        });
+
+                                        form.addEventListener('submit', function () {
+                                            window.tinymce.triggerSave();
+                                        });
+                                    })();
+                                </script>
+                            @else
+                                <p class="mb-0 text-secondary">Brak poprawnego adresu e-mail w sprawie. Uzupełnij go w danych zapytania, żeby wysłać wiadomość.</p>
+                            @endif
+                        </div>
+                    </div>
 
                     <form method="POST" action="{{ route('closed-training-cases.notes.store', $case) }}" class="card">
                         @csrf

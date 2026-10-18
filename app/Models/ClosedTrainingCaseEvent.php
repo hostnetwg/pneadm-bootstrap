@@ -13,6 +13,8 @@ class ClosedTrainingCaseEvent extends Model
 
     public const TYPE_UPDATED = 'updated';
 
+    public const TYPE_EMAIL_SENT = 'email_sent';
+
     protected $fillable = [
         'closed_training_case_id',
         'user_id',
@@ -41,7 +43,30 @@ class ClosedTrainingCaseEvent extends Model
             self::TYPE_CREATED => 'Założenie',
             self::TYPE_NOTE => 'Notatka',
             self::TYPE_UPDATED => 'Zmiana',
+            self::TYPE_EMAIL_SENT => 'E-mail do szkoły',
             default => $this->event_type,
         };
+    }
+
+    public function schoolEmailMeta(): ?string
+    {
+        if ($this->event_type !== self::TYPE_EMAIL_SENT) {
+            return null;
+        }
+
+        $parts = preg_split("/\n\n/", (string) $this->body, 2);
+
+        return $parts[0] ?? null;
+    }
+
+    public function schoolEmailHtml(): ?string
+    {
+        if ($this->event_type !== self::TYPE_EMAIL_SENT) {
+            return null;
+        }
+
+        $parts = preg_split("/\n\n/", (string) $this->body, 2);
+
+        return isset($parts[1]) ? ClosedTrainingCase::sanitizeSchoolEmailHtml($parts[1]) : null;
     }
 }

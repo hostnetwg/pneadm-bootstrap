@@ -218,6 +218,32 @@ class ClosedTrainingCase extends Model
         ];
     }
 
+    public function schoolEmailAddress(): ?string
+    {
+        $email = trim((string) $this->contact_email);
+
+        return filter_var($email, FILTER_VALIDATE_EMAIL) ? $email : null;
+    }
+
+    public static function emailReference(int $id): string
+    {
+        return '[SZ-'.$id.']';
+    }
+
+    public static function emailSubjectWithReference(int $id, string $subject): string
+    {
+        $subject = trim($subject);
+        $reference = self::emailReference($id);
+        if ($subject === '') {
+            return $reference;
+        }
+        if (str_contains($subject, $reference)) {
+            return $subject;
+        }
+
+        return $reference.' '.$subject;
+    }
+
     public function trainingTopicLabel(): string
     {
         $topic = trim((string) $this->topic);
@@ -227,6 +253,78 @@ class ClosedTrainingCase extends Model
         }
 
         return $topic;
+    }
+
+    public function referenceCode(): string
+    {
+        return 'SZ-'.$this->id;
+    }
+
+    public function hasContactEmail(): bool
+    {
+        $email = trim((string) $this->contact_email);
+
+        return $email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL) !== false;
+    }
+
+    public function defaultSchoolEmailSubject(): string
+    {
+        $topic = $this->trainingTopicLabel();
+        if ($topic === 'Nie podano') {
+            $topic = 'Szkolenie dla rady pedagogicznej';
+        }
+
+        return '['.$this->referenceCode().'] '.$topic;
+    }
+
+    public function withCaseReferenceInSubject(string $subject): string
+    {
+        $subject = trim($subject);
+        $marker = '['.$this->referenceCode().']';
+
+        if (str_starts_with($subject, $marker)) {
+            return $subject;
+        }
+
+        $subject = preg_replace('/^\[SZ-\d+\]\s*/u', '', $subject) ?? $subject;
+        $subject = trim($subject);
+
+        return $subject === '' ? $marker : $marker.' '.$subject;
+    }
+
+    public static function defaultSchoolEmailBodyHtml(): string
+    {
+        return '<p><br></p>'
+            .'<p style="margin:0;">Z wyrazami szacunku:<br>'
+            .'Waldemar Grabowski<br>'
+            .'tel. 501 654 274<br>'
+            .'Akredytowany Niepubliczny Ośrodek Doskonalenia Nauczycieli</p>'
+            .'<table cellpadding="0" cellspacing="0" border="0" role="presentation" style="border-collapse:collapse;margin:0;">'
+            .'<tr><td align="center" style="text-align:center;padding:0;margin:0;line-height:1.6;">'
+            .'&quot;Platforma Nowoczesnej Edukacji&quot;<br>'
+            .'<a href="https://pnedu.pl">pnedu.pl</a>'
+            .'</td></tr></table>';
+    }
+
+    public static function sanitizeSchoolEmailHtml(string $html): string
+    {
+        $html = strip_tags($html,
+            '<p><br><br/><strong><b><em><i><u><ul><ol><li><a><div><span><hr><hr/>'
+            .'<blockquote><h1><h2><h3><h4><table><tr><td><th><tbody><thead>');
+
+        $html = preg_replace_callback(
+            '/<a\b([^>]*)>/iu',
+            function (array $matches): string {
+                if (! preg_match('/href\s*=\s*([\'"])(https?:\/\/[^\'"\s]+)\1/iu', $matches[1], $href)) {
+                    return '<a>';
+                }
+
+                return '<a href="'.htmlspecialchars($href[2], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8').'">';
+            },
+            $html
+        ) ?? $html;
+
+        return trim($html);
     }
 
     public function institutionTypeLabel(): string
