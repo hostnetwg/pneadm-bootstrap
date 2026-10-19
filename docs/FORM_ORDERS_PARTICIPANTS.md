@@ -27,6 +27,7 @@
 - **Dodawanie i edycja wielu uczestników** na create/edit — ten sam układ co publiczny formularz (imię, nazwisko, e-mail, „Dodaj kolejnego uczestnika”). Limit: `config/form_orders.php` → `max_participants` (domyślnie 50).
 - Cena na create/edit: `product_price` = kwota całkowita; JS mnoży cenę jednostkową × liczbę osób. Serwer zapisuje listę przez `FormOrderAdminParticipantService` → `FormOrderParticipant::syncManyFromFormOrder()` (dopasowanie po e-mailu zachowuje `participant_id`).
 - Duplikat e-maila **w ramach jednego zamówienia** jest blokowany. Panel nie blokuje e-maili już zapisanych na szkoleniu (obsługa ręczna).
+- Walidacja e-maila: `email:filter` (wymaga TLD w domenie; odrzuca np. `user@gminakrzeszowice`). Ta sama reguła na create/update ADM oraz na publicznym formularzu pnedu.
 - Klonowanie zamówienia (`?clone_from=`) kopiuje **wszystkich** uczestników, nie tylko głównego.
 - Karta **STATUS ZAMÓWIENIA** (prawa kolumna, nad „Wystaw fakturę iFirma”): checklista uczestników na szkoleniu (PNEDU) i faktury. Gdy brakuje któregoś kroku, a zamówienie **nie** jest anulowane ani zamknięte legacy — wyraźne **Nieprzetworzone**. Anulowane/zamknięte nie dostają tej flagi. Partial AJAX: `GET /form-orders/{id}/operational-status`.
 - Sekcja **Formularz zamówienia na PNEDU**: link edycji + **Pobierz PDF zamówienia** (`GET /form-orders/{id}/pdf`) — ten sam PDF co po złożeniu na pnedu.pl.

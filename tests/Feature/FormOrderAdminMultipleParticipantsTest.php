@@ -81,6 +81,41 @@ class FormOrderAdminMultipleParticipantsTest extends TestCase
             ->assertSessionHasErrors('participants.1.email');
     }
 
+    public function test_store_rejects_email_without_tld(): void
+    {
+        $this->actingAsAdmin()
+            ->from(route('form-orders.create'))
+            ->post(route('form-orders.store'), $this->validPayload([
+                'orderer_email' => 'spnowagora@gminakrzeszowice',
+                'participants' => [
+                    ['first_name' => 'Anna', 'last_name' => 'Kowalska', 'email' => 'spnowagora@gminakrzeszowice'],
+                ],
+            ]))
+            ->assertRedirect(route('form-orders.create'))
+            ->assertSessionHasErrors(['orderer_email', 'participants.0.email']);
+    }
+
+    public function test_update_rejects_email_without_tld(): void
+    {
+        $order = $this->createOrderWithParticipants([
+            ['first_name' => 'Anna', 'last_name' => 'Kowalska', 'email' => 'anna@example.test', 'is_primary' => true],
+        ]);
+
+        $this->actingAsAdmin()
+            ->from(route('form-orders.edit', $order->id))
+            ->put(route('form-orders.update', $order->id), array_merge($this->validPayload([
+                'orderer_email' => 'spnowagora@gminakrzeszowice',
+                'participants' => [
+                    ['first_name' => 'Anna', 'last_name' => 'Kowalska', 'email' => 'spnowagora@gminakrzeszowice'],
+                ],
+            ]), [
+                'from_edit_page' => '1',
+                'course_id' => $this->courseId,
+            ]))
+            ->assertRedirect(route('form-orders.edit', $order->id))
+            ->assertSessionHasErrors(['orderer_email', 'participants.0.email']);
+    }
+
     public function test_edit_form_shows_all_participants(): void
     {
         $order = $this->createOrderWithParticipants([

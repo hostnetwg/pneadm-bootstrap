@@ -33,7 +33,8 @@ class FormOrderAdminParticipantService
             'participants' => ['nullable', 'array', 'min:1', 'max:'.$max],
             'participants.*.first_name' => ['required_with:participants', 'string', 'max:100'],
             'participants.*.last_name' => ['required_with:participants', 'string', 'max:100'],
-            'participants.*.email' => ['required_with:participants', 'email', 'max:255'],
+            // email:filter wymaga domeny z TLD (odrzuca np. user@gminakrzeszowice).
+            'participants.*.email' => ['required_with:participants', 'email:filter', 'max:255'],
             'participant_firstname' => ['required_without:participants', 'nullable', 'string', 'max:100'],
             'participant_lastname' => ['required_without:participants', 'nullable', 'string', 'max:100'],
             'participant_email' => ['required_without:participants', 'nullable', 'email', 'max:255'],
@@ -53,7 +54,7 @@ class FormOrderAdminParticipantService
             'participants.*.first_name.required_with' => 'Imię uczestnika jest wymagane.',
             'participants.*.last_name.required_with' => 'Nazwisko uczestnika jest wymagane.',
             'participants.*.email.required_with' => 'E-mail uczestnika jest wymagany.',
-            'participants.*.email.email' => 'Podaj prawidłowy adres e-mail uczestnika.',
+            'participants.*.email.email' => 'Podaj prawidłowy adres e-mail uczestnika (z domeną, np. nazwa@szkola.pl).',
             'participant_firstname.required_without' => 'Imię uczestnika jest wymagane.',
             'participant_lastname.required_without' => 'Nazwisko uczestnika jest wymagane.',
             'participant_email.required_without' => 'E-mail uczestnika jest wymagany.',

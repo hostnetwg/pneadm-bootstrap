@@ -777,7 +777,7 @@ class FormOrdersController extends Controller
                 // Dane zamawiającego
                 'orderer_name' => 'required|string|max:255',
                 'orderer_phone' => 'required|string|max:20',
-                'orderer_email' => 'required|email|max:255',
+                'orderer_email' => 'required|email:filter|max:255',
 
                 // Dane nabywcy
                 'buyer_name' => 'required|string|max:255',
@@ -1191,6 +1191,7 @@ class FormOrdersController extends Controller
                     'catalog_product_id' => $zamowienie->isProductOrder()
                         ? 'required|integer|exists:products,id'
                         : 'nullable|integer|exists:products,id',
+                    'orderer_email' => 'required|email:filter|max:255',
                     'ksef_entity_source' => 'nullable|string|in:'.implode(',', FormOrder::KSEF_ENTITY_SOURCES),
                     'ksef_additional_entity_role' => 'nullable|string|in:'.implode(',', FormOrder::KSEF_ADDITIONAL_ENTITY_ROLES),
                     'ksef_additional_entity_id_type' => 'nullable|string|in:'.implode(',', FormOrder::KSEF_ADDITIONAL_ENTITY_ID_TYPES),
@@ -1199,6 +1200,7 @@ class FormOrdersController extends Controller
                 ], $participantService->validationRules()), array_merge($participantService->validationMessages(), [
                     'catalog_product_id.required' => 'Wybierz kurs online z listy.',
                     'catalog_product_id.exists' => 'Wybrany kurs online nie istnieje w katalogu.',
+                    'orderer_email.email' => 'Podaj prawidłowy adres e-mail (z domeną, np. nazwa@szkola.pl).',
                 ]));
 
                 $participantRows = $participantService->parseFromRequest($request);
