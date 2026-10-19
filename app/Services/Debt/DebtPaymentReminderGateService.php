@@ -6,6 +6,7 @@ use App\Models\BankStatementImport;
 use App\Models\BankTransaction;
 use App\Models\DebtPaymentReminderCampaign;
 use App\Services\Bank\BankStatementCoverageService;
+use Illuminate\Support\Facades\Schema;
 
 class DebtPaymentReminderGateService
 {
@@ -29,15 +30,22 @@ class DebtPaymentReminderGateService
         $gaps = $this->coverage->detectGaps();
         $coveragePeriod = $this->coverage->mergedCoveragePeriod();
         $pendingReview = (int) BankTransaction::query()->pendingOperatorReview()->count();
-        $activeCampaign = DebtPaymentReminderCampaign::query()
-            ->whereIn('status', [
-                DebtPaymentReminderCampaign::STATUS_PENDING,
-                DebtPaymentReminderCampaign::STATUS_PROCESSING,
-            ])
-            ->exists();
+        $tablesReady = Schema::hasTable('debt_payment_reminder_campaigns')
+            && Schema::hasTable('debt_payment_reminder_campaign_items');
+        $activeCampaign = false;
+        if ($tablesReady) {
+            $activeCampaign = DebtPaymentReminderCampaign::query()
+                ->whereIn('status', [
+                    DebtPaymentReminderCampaign::STATUS_PENDING,
+                    DebtPaymentReminderCampaign::STATUS_PROCESSING,
+                ])
+                ->exists();
+        }
 
         $blockReason = null;
-        if ($coveragePeriod === null) {
+        if (! $tablesReady) {
+            $blockReason = 'Brak tabel kampanii — uruchom migrację na serwerze.';
+        } elseif ($coveragePeriod === null) {
             $blockReason = 'Brak zaimportowanych wyciągów z polem „Za okres”.';
         } elseif ($gaps !== []) {
             $blockReason = 'Uzupełnij luki w okresach wyciągów.';
