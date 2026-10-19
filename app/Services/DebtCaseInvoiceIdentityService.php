@@ -9,10 +9,10 @@ use App\Models\User;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Porównuje kopię faktury na sprawie windykacyjnej z aktualną fakturą zamówienia.
+ * Porównuje kopię faktury / kwoty / tematu na sprawie windykacyjnej z zamówieniem.
  *
- * Zamówienie jest źródłem prawdy dla bieżącego dokumentu. Puste pola zamówienia
- * nie kasują sprawy — to stan w trakcie korekty, zanim powstanie nowa faktura.
+ * Zamówienie jest źródłem prawdy. Puste pola zamówienia nie kasują sprawy —
+ * to stan w trakcie korekty, zanim powstanie nowa faktura.
  */
 class DebtCaseInvoiceIdentityService
 {
@@ -22,6 +22,7 @@ class DebtCaseInvoiceIdentityService
      *     can_update: bool,
      *     order_invoice_cleared: bool,
      *     invoice_replaced: bool,
+     *     commercial_changed: bool,
      *     clears_ksef: bool,
      *     notes: string|null,
      *     fields: list<array{
@@ -48,6 +49,11 @@ class DebtCaseInvoiceIdentityService
         $caseId = $this->token($case->ifirma_invoice_id);
         $orderId = $this->token($order?->ifirma_invoice_id);
 
+        $caseAmount = $this->money($case->amount_gross);
+        $orderAmount = $this->money($order?->product_price);
+        $caseProduct = $this->token($case->product_name);
+        $orderProduct = $this->token($order?->product_name);
+
         $invoiceReplaced = $caseInvoice !== null
             && $orderInvoice !== null
             && $caseInvoice !== $orderInvoice;
@@ -65,9 +71,19 @@ class DebtCaseInvoiceIdentityService
             && $caseId !== null
             && $orderId !== $caseId;
 
+        $amountChanged = $caseAmount !== null
+            && $orderAmount !== null
+            && $caseAmount !== $orderAmount;
+        $productChanged = $caseProduct !== null
+            && $orderProduct !== null
+            && $caseProduct !== $orderProduct;
+        $commercialChanged = $amountChanged || $productChanged;
+
         $documentChanged = $invoiceReplaced || $idConflict;
         $writeKsef = $documentChanged || $ksefConflict;
         $writeId = $invoiceReplaced || $idConflict;
+        $writeAmount = $amountChanged || ($invoiceReplaced && $orderAmount !== null);
+        $writeProduct = $productChanged || ($invoiceReplaced && $orderProduct !== null);
 
         $fields = [
             $this->field(
@@ -94,9 +110,25 @@ class DebtCaseInvoiceIdentityService
                 $writeId && ($caseId !== $orderId),
                 $writeId ? $orderId : null,
             ),
+            $this->field(
+                'amount_gross',
+                'Kwota brutto',
+                $this->formatMoney($caseAmount),
+                $this->formatMoney($orderAmount),
+                $writeAmount,
+                $writeAmount ? $orderAmount : null,
+            ),
+            $this->field(
+                'product_name',
+                'Temat szkolenia',
+                $caseProduct,
+                $orderProduct,
+                $writeProduct,
+                $writeProduct ? $orderProduct : null,
+            ),
         ];
 
-        $canUpdate = $invoiceReplaced || $ksefConflict || $idConflict;
+        $canUpdate = $invoiceReplaced || $ksefConflict || $idConflict || $commercialChanged;
 
         $notes = trim((string) ($order?->notes ?? ''));
 
@@ -105,6 +137,7 @@ class DebtCaseInvoiceIdentityService
             'can_update' => $canUpdate,
             'order_invoice_cleared' => $orderCleared,
             'invoice_replaced' => $invoiceReplaced,
+            'commercial_changed' => $commercialChanged,
             'clears_ksef' => $writeKsef && $orderKsef === null && $caseKsef !== null,
             'notes' => $notes !== '' ? $notes : null,
             'fields' => $fields,
@@ -116,7 +149,13 @@ class DebtCaseInvoiceIdentityService
      * Przy tym samym numerze FV brakujące KSeF i ID uzupełnia zamówienie.
      * Przy innym numerze karta zostaje przy kopii ze sprawy.
      *
-     * @return array{invoice_number: string|null, ksef_number: string|null, ifirma_invoice_id: string|null}
+     * @return array{
+     *     invoice_number: string|null,
+     *     ksef_number: string|null,
+     *     ifirma_invoice_id: string|null,
+     *     amount_gross: string|null,
+     *     product_name: string|null
+     * }
      */
     public function presentation(DebtCase $case): array
     {
@@ -135,10 +174,17 @@ class DebtCaseInvoiceIdentityService
 
         $mayUseOrder = $sameInvoice || $caseMissingInvoice;
 
+        $caseAmount = $this->money($case->amount_gross);
+        $orderAmount = $this->money($order?->product_price);
+        $caseProduct = $this->token($case->product_name);
+        $orderProduct = $this->token($order?->product_name);
+
         return [
             'invoice_number' => $caseInvoice ?? $orderInvoice,
             'ksef_number' => $mayUseOrder ? ($caseKsef ?? $orderKsef) : $caseKsef,
             'ifirma_invoice_id' => $mayUseOrder ? ($caseId ?? $orderId) : $caseId,
+            'amount_gross' => $caseAmount ?? $orderAmount,
+            'product_name' => $caseProduct ?? $orderProduct,
         ];
     }
 
@@ -169,7 +215,7 @@ class DebtCaseInvoiceIdentityService
                     'changed' => false,
                     'message' => $before['order_invoice_cleared']
                         ? 'Zamówienie nie ma aktualnego numeru faktury. Dane sprawy zostały bez zmian.'
-                        : 'Dane faktury na sprawie zgadzają się z zamówieniem.',
+                        : 'Dane sprawy zgadzają się z zamówieniem.',
                 ];
             }
 
@@ -181,9 +227,6 @@ class DebtCaseInvoiceIdentityService
             }
 
             if ($before['invoice_replaced']) {
-                if ($order->product_price !== null) {
-                    $locked->amount_gross = $order->product_price;
-                }
                 if ($order->invoice_issue_date !== null) {
                     $locked->invoice_date = $order->invoice_issue_date->toDateString();
                 }
@@ -213,13 +256,13 @@ class DebtCaseInvoiceIdentityService
             return [
                 'success' => true,
                 'changed' => true,
-                'message' => 'Zaktualizowano dane faktury na podstawie zamówienia.',
+                'message' => 'Zaktualizowano dane sprawy na podstawie zamówienia.',
             ];
         });
     }
 
     /**
-     * Dopisz brakujący numer, KSeF albo ID, gdy to ten sam dokument co w zamówieniu.
+     * Dopisz brakujący numer, KSeF, ID, kwotę albo temat, gdy to ten sam dokument co w zamówieniu.
      * Nie rusza sprawy, która ma już inny numer faktury.
      */
     public function fillBlanksWhenSameInvoice(DebtCase $case): bool
@@ -249,6 +292,14 @@ class DebtCaseInvoiceIdentityService
             $case->ifirma_invoice_id = $id;
             $dirty = true;
         }
+        if ($this->money($case->amount_gross) === null && ($amount = $this->money($order->product_price)) !== null) {
+            $case->amount_gross = $amount;
+            $dirty = true;
+        }
+        if ($this->token($case->product_name) === null && ($product = $this->token($order->product_name)) !== null) {
+            $case->product_name = $product;
+            $dirty = true;
+        }
 
         return $dirty;
     }
@@ -260,13 +311,15 @@ class DebtCaseInvoiceIdentityService
      */
     private function historyNote(array $compare, FormOrder $order): string
     {
-        $parts = ['Zaktualizowano dane faktury na podstawie zamówienia #'.$order->id.'.'];
+        $parts = ['Zaktualizowano dane sprawy na podstawie zamówienia #'.$order->id.'.'];
         foreach ($compare['fields'] as $field) {
             if (! $field['will_write']) {
                 continue;
             }
             $from = $field['case'] ?? 'brak';
-            $to = $field['apply'] ?? 'brak';
+            $to = $field['apply'] !== null
+                ? ($field['key'] === 'amount_gross' ? ($this->formatMoney($field['apply']) ?? $field['apply']) : $field['apply'])
+                : 'brak';
             $parts[] = $field['label'].': '.$from.' → '.$to.'.';
         }
 
@@ -303,6 +356,24 @@ class DebtCaseInvoiceIdentityService
             'apply' => $willWrite ? $apply : null,
             'will_clear' => $willWrite && $apply === null && $caseValue !== null,
         ];
+    }
+
+    private function money(mixed $value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        return number_format(round((float) $value, 2), 2, '.', '');
+    }
+
+    private function formatMoney(?string $normalized): ?string
+    {
+        if ($normalized === null) {
+            return null;
+        }
+
+        return number_format((float) $normalized, 2, ',', ' ').' zł';
     }
 
     private function invoice(mixed $value): ?string

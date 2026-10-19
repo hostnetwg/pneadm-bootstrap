@@ -58,7 +58,7 @@ class DebtReminderTemplateService
         $amount = $this->amountDueLabel($case, $order);
         $due = $this->dueDateLabel($case, $order);
         $bankLine = $this->bankAccountLine();
-        $training = $this->trainingContext($order);
+        $training = $this->trainingContext($order, $case->product_name);
         $hadInvoiceEmail = $this->hasConfirmedInvoiceEmailSent($case);
 
         return match ($template) {
@@ -438,16 +438,17 @@ class DebtReminderTemplateService
     /**
      * @return array{title: string, start: string, instructor: string}
      */
-    private function trainingContext(?FormOrder $order): array
+    private function trainingContext(?FormOrder $order, ?string $productNameOverride = null): array
     {
         $course = $order?->course;
         if ($course !== null && ! $course->relationLoaded('instructor')) {
             $course->loadMissing('instructor');
         }
 
+        $productName = trim((string) ($productNameOverride ?: $order?->product_name ?: ''));
         $title = $course
-            ? $course->plainTitle((string) ($order->product_name ?: 'Szkolenie'))
-            : trim((string) ($order?->product_name ?? ''));
+            ? $course->plainTitle((string) ($productName !== '' ? $productName : 'Szkolenie'))
+            : $productName;
         if ($title === '') {
             $title = '—';
         }
@@ -877,7 +878,7 @@ class DebtReminderTemplateService
             $order->loadMissing('course');
         }
 
-        $shortTitle = $this->smsShortTrainingTitle($this->trainingContext($order)['title']);
+        $shortTitle = $this->smsShortTrainingTitle($this->trainingContext($order, $case->product_name)['title']);
         if ($shortTitle !== '') {
             $opening = 'Platforma Nowoczesnej Edukacji: nie odnotowaliśmy wpłaty '.$amount.' zł za szkolenie: '.$shortTitle;
             if (! str_ends_with($shortTitle, '...')) {
@@ -934,7 +935,7 @@ class DebtReminderTemplateService
             $order->loadMissing('course');
         }
 
-        $shortTitle = $this->smsShortTrainingTitle($this->trainingContext($order)['title']);
+        $shortTitle = $this->smsShortTrainingTitle($this->trainingContext($order, $case->product_name)['title']);
         $opening = 'Platforma Nowoczesnej Edukacji: uprzejma prośba o potwierdzenie płatności '
             .$amount.' zł za FV '.$invoice;
         if ($shortTitle !== '') {

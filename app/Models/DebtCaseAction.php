@@ -88,7 +88,7 @@ class DebtCaseAction extends Model
             self::TYPE_PHONE => 'Telefon',
             self::TYPE_IFIRMA_REMINDER => 'iFirma',
             self::TYPE_IFIRMA_SYNC => 'Synchronizacja iFirma',
-            self::TYPE_INVOICE_IDENTITY => 'Aktualizacja faktury',
+            self::TYPE_INVOICE_IDENTITY => 'Aktualizacja z zamówienia',
             self::TYPE_IFIRMA_PAYMENT => 'Wpłata w iFirma',
             self::TYPE_NO_CONTACT => 'Brak kontaktu',
             self::TYPE_PAYMENT_PROMISE => 'Obietnica płatności',

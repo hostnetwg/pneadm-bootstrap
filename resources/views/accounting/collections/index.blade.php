@@ -331,7 +331,15 @@
                                         @endif
                                         @if($invoiceDrift['show_modal'] ?? false)
                                             <div class="small text-warning">
-                                                {{ ($invoiceDrift['order_invoice_cleared'] ?? false) ? 'Zamówienie bez aktualnej FV' : 'FV w zamówieniu: '.($order->invoice_number ?: '—') }}
+                                                @if($invoiceDrift['order_invoice_cleared'] ?? false)
+                                                    Zamówienie bez aktualnej FV
+                                                @elseif($invoiceDrift['invoice_replaced'] ?? false)
+                                                    FV w zamówieniu: {{ $order->invoice_number ?: '—' }}
+                                                @elseif($invoiceDrift['commercial_changed'] ?? false)
+                                                    Kwota/temat różni się od zamówienia
+                                                @else
+                                                    Dane różnią się od zamówienia
+                                                @endif
                                             </div>
                                         @endif
                                         @if($case->ifirma_payment_status)

@@ -57,6 +57,7 @@ class DebtCase extends Model
         'ksef_number',
         'ifirma_invoice_id',
         'amount_gross',
+        'product_name',
         'invoice_date',
         'due_date',
         'ifirma_payment_status',

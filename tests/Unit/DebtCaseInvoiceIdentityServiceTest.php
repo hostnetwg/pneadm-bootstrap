@@ -182,9 +182,48 @@ class DebtCaseInvoiceIdentityServiceTest extends TestCase
             'ksef_number' => $caseKsef,
             'ifirma_invoice_id' => $caseId,
             'amount_gross' => 100,
+            'product_name' => 'Szkolenie',
             'opened_at' => now(),
         ]);
 
         return [$case, $order];
+    }
+
+    public function test_changed_amount_opens_drift_modal_and_can_be_aligned(): void
+    {
+        [$case, $order] = $this->pair('10/8/2026', '10/8/2026', 'KSEF-1', 'KSEF-1', '100', '100');
+        $order->product_price = 480;
+        $order->save();
+
+        $compare = app(DebtCaseInvoiceIdentityService::class)->compare($case);
+        $this->assertTrue($compare['show_modal']);
+        $this->assertTrue($compare['can_update']);
+        $this->assertTrue($compare['commercial_changed']);
+        $this->assertFalse($compare['invoice_replaced']);
+
+        $result = app(DebtCaseInvoiceIdentityService::class)->alignCaseToOrder($case);
+        $this->assertTrue($result['success']);
+        $case->refresh();
+        $this->assertSame('480.00', $case->amount_gross);
+        $this->assertSame('10/8/2026', $case->invoice_number);
+        $this->assertSame('Szkolenie', $case->product_name);
+    }
+
+    public function test_changed_product_name_opens_drift_modal_and_can_be_aligned(): void
+    {
+        [$case, $order] = $this->pair('10/8/2026', '10/8/2026', 'KSEF-1', 'KSEF-1', '100', '100');
+        $order->product_name = 'Nowe szkolenie o AI';
+        $order->save();
+
+        $compare = app(DebtCaseInvoiceIdentityService::class)->compare($case);
+        $this->assertTrue($compare['show_modal']);
+        $this->assertTrue($compare['can_update']);
+        $this->assertTrue($compare['commercial_changed']);
+
+        $result = app(DebtCaseInvoiceIdentityService::class)->alignCaseToOrder($case);
+        $this->assertTrue($result['success']);
+        $case->refresh();
+        $this->assertSame('Nowe szkolenie o AI', $case->product_name);
+        $this->assertSame('100.00', $case->amount_gross);
     }
 }

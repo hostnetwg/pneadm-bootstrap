@@ -118,17 +118,18 @@ Serwis: `App\Services\IfirmaInvoicePaymentStatusService`
 
 Daty FV na zamówieniu są też zapisywane **przy wystawianiu** faktury w panelu (`DataWystawienia` / `TerminPlatnosci` z payloadu). Tworzenie sprawy preferuje `invoice_issue_date` / `invoice_due_date`; dopiero gdy brak — szacunek od daty zamówienia/wystawienia + `invoice_payment_delay`.
 
-## Rozjazd numeru faktury po korekcie
+## Rozjazd faktury / kwoty / tematu po zmianie w zamówieniu
 
-Przy utworzeniu sprawy kopiowane są `invoice_number`, `ksef_number` i `ifirma_invoice_id`. Karta sprawy pokazuje tę kopię. Po korekcie anulującej zamówienie dostaje nowy numer i nowe ID (KSeF często chwilę później), a notatka zostaje w `form_orders.notes`.
+Przy utworzeniu sprawy kopiowane są `invoice_number`, `ksef_number`, `ifirma_invoice_id`, `amount_gross` (z `product_price`) oraz `product_name` (temat szkolenia). Karta sprawy i przypomnienia pokazują tę kopię. Po korekcie anulującej zamówienie dostaje nowy numer i nowe ID (KSeF często chwilę później), a notatka zostaje w `form_orders.notes`. To samo dotyczy zmiany ceny albo tematu w zamówieniu.
 
-Wejście na `/accounting/collections/{id}` porównuje kopię ze sprawą z zamówieniem:
+Wejście na `/accounting/collections/{id}` porównuje kopię ze sprawą z zamówieniem (`DebtCaseInvoiceIdentityService`):
 
-- inny niepusty numer FV, inny KSeF albo inne ID → modal Bootstrap z różnicą, notatką zamówienia i przyciskiem **Zaktualizuj dane faktury na podstawie zamówienia**,
+- inny niepusty numer FV, inny KSeF albo inne ID → modal Bootstrap z różnicą, notatką zamówienia i przyciskiem **Zaktualizuj dane sprawy na podstawie zamówienia**,
+- inna kwota brutto albo inny temat szkolenia (przy tej samej FV) → ten sam modal (etykieta „Kwota lub temat…”),
 - pusty numer w zamówieniu (korekta w toku) → ten sam modal z notatką, bez przycisku; sprawa nie jest czyszczona,
-- ten sam numer, a na sprawie brakuje tylko KSeF albo ID → bez modalu; „Odśwież status z iFirma” dopisuje brakujące pole.
+- ten sam numer, a na sprawie brakuje tylko KSeF / ID / kwoty / tematu → bez modalu; brakujące pola można uzupełnić przy syncu / `fillBlanksWhenSameInvoice`.
 
-Aktualizacja przepisuje na sprawę bieżący dokument z zamówienia. Gdy numer FV się zmienił, stary KSeF i stare ID są usuwane, jeśli nowa faktura ich jeszcze nie ma. Potem status i daty są odświeżane z iFirma. PDF na sprawie zostaje — w oknie jest ostrzeżenie, że plik może być ze starej faktury.
+Aktualizacja przepisuje na sprawę bieżące dane z zamówienia. Gdy numer FV się zmienił, stary KSeF i stare ID są usuwane, jeśli nowa faktura ich jeszcze nie ma; aktualizowane są też daty FV/terminu gdy są w zamówieniu. Potem status jest odświeżany z iFirma. PDF na sprawie zostaje — w oknie jest ostrzeżenie, że plik może być ze starej faktury.
 
 Istniejące sprawy, których numer zgadza się z zamówieniem, dostają ID (i brakujący KSeF) z migracji `2026_10_09_130000_add_ifirma_invoice_id_to_debt_cases_table.php`. Tam, gdzie numery już się różnią, stare ID nie było zapisane — modal pokazuje ID z zamówienia.
 

@@ -87,9 +87,11 @@
     @php
         $order = $case->formOrder;
         $course = $order?->course;
+        $productNameForTitle = $invoicePresentation['product_name']
+            ?? ($case->product_name ?: ($order->product_name ?? null));
         $courseTitle = $course
-            ? $course->plainTitle((string) ($order->product_name ?: 'Szkolenie'))
-            : (string) ($order->product_name ?: '—');
+            ? $course->plainTitle((string) ($productNameForTitle ?: 'Szkolenie'))
+            : (string) ($productNameForTitle ?: '—');
         $courseDateTime = $course?->start_date
             ? $course->start_date->timezone(config('app.timezone'))->format('d.m.Y H:i')
             : null;
@@ -267,7 +269,15 @@
                                             data-bs-toggle="modal"
                                             data-bs-target="#invoiceIdentityDriftModal">
                                         <i class="bi bi-exclamation-triangle"></i>
-                                        {{ ($invoiceDrift['order_invoice_cleared'] ?? false) ? 'Zamówienie bez aktualnej faktury' : 'Faktura różni się od zamówienia' }}
+                                        @if($invoiceDrift['order_invoice_cleared'] ?? false)
+                                            Zamówienie bez aktualnej faktury
+                                        @elseif($invoiceDrift['invoice_replaced'] ?? false)
+                                            Faktura różni się od zamówienia
+                                        @elseif($invoiceDrift['commercial_changed'] ?? false)
+                                            Kwota lub temat różni się od zamówienia
+                                        @else
+                                            Dane różnią się od zamówienia
+                                        @endif
                                     </button>
                                 @endif
                             <form method="POST" action="{{ route('accounting.collections.sync-ifirma', $case) }}" class="mb-0" data-loading-submit data-loading-text="Odświeżam…">
@@ -283,7 +293,7 @@
                                 $invoiceNo = $invoicePresentation['invoice_number'] ?? ($case->invoice_number ?: null);
                                 $ksefNo = $invoicePresentation['ksef_number'] ?? ($case->ksef_number ?: null);
                                 $ifirmaId = $invoicePresentation['ifirma_invoice_id'] ?? ($case->ifirma_invoice_id ?: null);
-                                $amountGross = (float) ($case->amount_gross ?? $order->product_price ?? 0);
+                                $amountGross = (float) ($invoicePresentation['amount_gross'] ?? $case->amount_gross ?? $order->product_price ?? 0);
                                 $hasBuyer = filled($order->buyer_name) || filled($order->buyer_address) || filled($order->buyer_city) || filled($order->buyer_nip);
                                 $hasRecipient = filled($order->recipient_name) || filled($order->recipient_address) || filled($order->recipient_city) || filled($order->recipient_nip);
                                 $dueDate = $case->due_date?->copy()->startOfDay();
@@ -1257,8 +1267,12 @@
                         <h5 class="modal-title" id="invoiceIdentityDriftModalLabel">
                             @if($invoiceDrift['order_invoice_cleared'] ?? false)
                                 Zamówienie nie ma aktualnej faktury
-                            @else
+                            @elseif($invoiceDrift['invoice_replaced'] ?? false)
                                 Faktura na sprawie różni się od zamówienia
+                            @elseif($invoiceDrift['commercial_changed'] ?? false)
+                                Kwota lub temat szkolenia różni się od zamówienia
+                            @else
+                                Dane sprawy różnią się od zamówienia
                             @endif
                         </h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Zamknij"></button>
@@ -1273,9 +1287,9 @@
                             </p>
                         @else
                             <p class="mb-3">
-                                Źródłem bieżącej faktury jest zamówienie
+                                Źródłem bieżących danych (faktura, kwota, temat szkolenia) jest zamówienie
                                 <a href="{{ route('form-orders.show', $order->id) }}">#{{ $order->id }}</a>.
-                                Sprawa ma jeszcze poprzednią kopię. Kolejne przypomnienie użyje numeru ze sprawy.
+                                Sprawa ma jeszcze poprzednią kopię. Przypomnienia użyją danych ze sprawy, dopóki ich nie zaktualizujesz.
                             </p>
                         @endif
 
@@ -1335,7 +1349,7 @@
                                   data-loading-text="Aktualizuję…">
                                 @csrf
                                 <button type="submit" class="btn btn-warning" data-loading-text="Aktualizuję…">
-                                    Zaktualizuj dane faktury na podstawie zamówienia
+                                    Zaktualizuj dane sprawy na podstawie zamówienia
                                 </button>
                             </form>
                         @endif

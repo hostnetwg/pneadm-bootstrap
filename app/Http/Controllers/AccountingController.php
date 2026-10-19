@@ -481,6 +481,7 @@ class AccountingController extends Controller
             'ksef_number' => $order->ksef_number,
             'ifirma_invoice_id' => $order->ifirma_invoice_id,
             'amount_gross' => $order->product_price,
+            'product_name' => $order->product_name,
             'invoice_date' => $invoiceDate?->toDateString(),
             'due_date' => $dueDate?->toDateString(),
             'opened_at' => now(),
