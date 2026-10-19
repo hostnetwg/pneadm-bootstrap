@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\DebtCase;
 use App\Models\DebtCaseAction;
+use App\Models\User;
 use App\Services\Sms\SmsapiClient;
 use Illuminate\Support\Facades\Auth;
 
@@ -22,6 +23,7 @@ class DebtReminderSmsService
         string $toPhone,
         string $body,
         bool $isTest,
+        ?User $actor = null,
     ): array {
         $normalized = $this->templates->normalizePhoneToSmsapi($toPhone);
         if ($normalized === null) {
@@ -55,7 +57,7 @@ class DebtReminderSmsService
         }
 
         $displayPhone = $this->templates->formatPhoneDisplay($normalized);
-        $this->logAction($case, $displayPhone, $message, $isTest, $result['message_id'] ?? null);
+        $this->logAction($case, $displayPhone, $message, $isTest, $result['message_id'] ?? null, $actor);
 
         $partsHint = $this->templates->estimateSmsParts($message);
         $suffix = $partsHint > 1
@@ -76,7 +78,9 @@ class DebtReminderSmsService
         string $body,
         bool $isTest,
         ?string $messageId,
+        ?User $actor = null,
     ): void {
+        $userId = $actor?->id ?? Auth::id();
         $parts = [
             $isTest ? '[TEST]' : '[WYSYŁKA]',
             'Do: '.$toLabel,
@@ -87,7 +91,7 @@ class DebtReminderSmsService
         }
 
         $case->actions()->create([
-            'user_id' => Auth::id(),
+            'user_id' => $userId,
             'action_type' => DebtCaseAction::TYPE_SMS,
             'channel' => 'sms',
             'outcome' => $isTest ? 'test_sent' : 'sent',
@@ -97,7 +101,7 @@ class DebtReminderSmsService
 
         if (! $isTest) {
             $case->update([
-                'assigned_to_id' => Auth::id(),
+                'assigned_to_id' => $userId,
                 'last_action_at' => now(),
                 'status' => $case->status === DebtCase::STATUS_OPEN
                     ? DebtCase::STATUS_IN_PROGRESS

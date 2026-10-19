@@ -59,6 +59,56 @@
                 </div>
             @endif
 
+            @php
+                $paymentReminderGateState = $paymentReminderGateState ?? [
+                    'allowed' => false,
+                    'block_reason' => null,
+                    'coverage_period' => null,
+                    'last_import_at' => null,
+                    'pending_review_count' => 0,
+                ];
+            @endphp
+            <div class="card mb-4">
+                <div class="card-body d-flex flex-wrap align-items-start justify-content-between gap-3">
+                    <div>
+                        <div class="fw-semibold mb-1">Przypomnienia o zaległych płatnościach</div>
+                        <div class="small text-muted mb-0">
+                            @if(!empty($paymentReminderGateState['coverage_period']))
+                                Pokrycie wyciągami:
+                                {{ $paymentReminderGateState['coverage_period']['from'] }}
+                                → {{ $paymentReminderGateState['coverage_period']['to'] }}
+                                <span class="mx-1">·</span>
+                            @endif
+                            @if(!empty($paymentReminderGateState['last_import_at']))
+                                Ostatni import: {{ $paymentReminderGateState['last_import_at'] }}
+                                <span class="mx-1">·</span>
+                            @endif
+                            Do przeglądu: {{ (int) ($paymentReminderGateState['pending_review_count'] ?? 0) }}
+                        </div>
+                        @if(!($paymentReminderGateState['allowed'] ?? false) && !empty($paymentReminderGateState['block_reason']))
+                            <div class="small text-warning mt-1">{{ $paymentReminderGateState['block_reason'] }}</div>
+                        @endif
+                    </div>
+                    <div>
+                        @if($paymentReminderGateState['allowed'] ?? false)
+                            <a href="{{ route('accounting.bank-imports.payment-reminders.index') }}"
+                               class="btn btn-warning btn-sm">
+                                <i class="bi bi-envelope-exclamation"></i>
+                                Przypomnienia o zaległych płatnościach
+                            </a>
+                        @else
+                            <button type="button"
+                                    class="btn btn-outline-secondary btn-sm"
+                                    disabled
+                                    title="{{ $paymentReminderGateState['block_reason'] ?? 'Niedostępne' }}">
+                                <i class="bi bi-envelope-exclamation"></i>
+                                Przypomnienia o zaległych płatnościach
+                            </button>
+                        @endif
+                    </div>
+                </div>
+            </div>
+
             <div class="row g-3 mb-4">
                 <div class="col-lg-6">
                     <div class="card">

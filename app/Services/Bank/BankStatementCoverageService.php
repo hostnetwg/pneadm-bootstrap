@@ -86,6 +86,49 @@ class BankStatementCoverageService
     }
 
     /**
+     * Połączony zakres pokrycia (#Za okres) ze wszystkich importów.
+     *
+     * @return array{from: string, to: string}|null
+     */
+    public function mergedCoveragePeriod(): ?array
+    {
+        $imports = BankStatementImport::query()
+            ->whereNotNull('period_from')
+            ->whereNotNull('period_to')
+            ->orderBy('period_from')
+            ->get(['period_from', 'period_to']);
+
+        if ($imports->isEmpty()) {
+            return null;
+        }
+
+        $from = null;
+        $to = null;
+        foreach ($imports as $import) {
+            $periodFrom = $import->period_from->copy()->startOfDay();
+            $periodTo = $import->period_to->copy()->startOfDay();
+            if ($periodTo->lt($periodFrom)) {
+                [$periodFrom, $periodTo] = [$periodTo, $periodFrom];
+            }
+            if ($from === null || $periodFrom->lt($from)) {
+                $from = $periodFrom;
+            }
+            if ($to === null || $periodTo->gt($to)) {
+                $to = $periodTo;
+            }
+        }
+
+        if ($from === null || $to === null) {
+            return null;
+        }
+
+        return [
+            'from' => $from->toDateString(),
+            'to' => $to->toDateString(),
+        ];
+    }
+
+    /**
      * @param  list<array{from: string, to: string, days: int, trailing?: bool}>  $gaps
      */
     public function formatGapsSummary(array $gaps, int $maxShow = 5): string

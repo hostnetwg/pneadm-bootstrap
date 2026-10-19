@@ -23,6 +23,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DashboardLiveVisitorsController;
 use App\Http\Controllers\DashboardOrdersController;
 use App\Http\Controllers\DashboardOrdersStatsController;
+use App\Http\Controllers\DebtPaymentReminderCampaignController;
 use App\Http\Controllers\EducationController;
 use App\Http\Controllers\FormOrdersController;
 use App\Http\Controllers\GrowthOS\AiSettingsController as GrowthOsAiSettingsController;
@@ -789,6 +790,10 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
             Route::get('/lookup-cases', [BankStatementImportController::class, 'lookupDebtCases'])->name('lookup-cases');
             Route::get('/lookup-order-preview', [BankStatementImportController::class, 'lookupOrderPreview'])->name('lookup-order-preview');
             Route::post('/lookup-ifirma-status', [BankStatementImportController::class, 'lookupIfirmaStatus'])->name('lookup-ifirma-status');
+            Route::get('/payment-reminders', [DebtPaymentReminderCampaignController::class, 'index'])->name('payment-reminders.index');
+            Route::post('/payment-reminders', [DebtPaymentReminderCampaignController::class, 'store'])->name('payment-reminders.store');
+            Route::get('/payment-reminders/campaigns/{campaign}', [DebtPaymentReminderCampaignController::class, 'show'])->name('payment-reminders.show');
+            Route::post('/payment-reminders/campaigns/{campaign}/cancel', [DebtPaymentReminderCampaignController::class, 'cancel'])->name('payment-reminders.cancel');
             Route::get('/{bankImport}', [BankStatementImportController::class, 'show'])->name('show');
             Route::delete('/{bankImport}', [BankStatementImportController::class, 'destroy'])->name('destroy');
             Route::post('/{bankImport}/rematch', [BankStatementImportController::class, 'rematch'])->name('rematch');

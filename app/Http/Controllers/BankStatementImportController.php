@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Services\Bank\BankStatementCoverageService;
 use App\Services\Bank\BankStatementImportService;
 use App\Services\Bank\BankTransactionUnlinkService;
+use App\Services\Debt\DebtPaymentReminderGateService;
 use App\Services\DebtCaseAutoCloseService;
 use App\Services\IfirmaInvoicePaymentRegistrationService;
 use App\Services\IfirmaInvoicePaymentStatusService;
@@ -21,8 +22,11 @@ use Illuminate\Validation\ValidationException;
 
 class BankStatementImportController extends Controller
 {
-    public function index(Request $request, BankStatementCoverageService $coverageService)
-    {
+    public function index(
+        Request $request,
+        BankStatementCoverageService $coverageService,
+        DebtPaymentReminderGateService $paymentReminderGate,
+    ) {
         $search = trim($request->string('q')->toString());
         if (mb_strlen($search) > 128) {
             $search = mb_substr($search, 0, 128);
@@ -56,12 +60,14 @@ class BankStatementImportController extends Controller
         }
 
         $coverageGaps = $coverageService->detectGaps();
+        $paymentReminderGateState = $paymentReminderGate->evaluate();
 
         return view('accounting.bank-imports.index', compact(
             'imports',
             'coverageGaps',
             'search',
-            'matchingTransactions'
+            'matchingTransactions',
+            'paymentReminderGateState',
         ));
     }
 
