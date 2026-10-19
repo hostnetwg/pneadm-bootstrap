@@ -56,6 +56,7 @@ class ClosedTrainingCase extends Model
         'contact_email',
         'contact_phone',
         'institution',
+        'institution_www',
         'institution_type',
         'institution_type_other',
         'message',
@@ -163,7 +164,7 @@ class ClosedTrainingCase extends Model
     }
 
     /**
-     * @param  array{contact_name: string, contact_email?: ?string, contact_phone?: ?string, institution?: ?string, institution_type?: ?string, institution_type_other?: ?string, preferred_format?: ?string, training_offer_id?: ?int, offer_title?: ?string, topic: string, message: string}  $fields
+     * @param  array{contact_name: string, contact_email?: ?string, contact_phone?: ?string, institution?: ?string, institution_www?: ?string, institution_type?: ?string, institution_type_other?: ?string, preferred_format?: ?string, training_offer_id?: ?int, offer_title?: ?string, topic: string, message: string}  $fields
      * @return array<string, mixed>
      */
     public static function submittedSnapshot(array $fields): array
@@ -173,6 +174,7 @@ class ClosedTrainingCase extends Model
             'contact_email' => $fields['contact_email'] ?? null,
             'contact_phone' => $fields['contact_phone'] ?? null,
             'institution' => $fields['institution'] ?? null,
+            'institution_www' => $fields['institution_www'] ?? null,
             'institution_type' => $fields['institution_type'] ?? null,
             'institution_type_other' => $fields['institution_type_other'] ?? null,
             'preferred_format' => $fields['preferred_format'] ?? null,
@@ -210,6 +212,7 @@ class ClosedTrainingCase extends Model
             'E-mail' => $this->originalText($payload['contact_email'] ?? null),
             'Telefon' => $this->originalText($payload['contact_phone'] ?? null),
             'Nazwa szkoły / placówki' => $this->originalText($payload['institution'] ?? null),
+            'WWW' => $this->originalText($payload['institution_www'] ?? null),
             'Rodzaj placówki' => self::formatInstitutionType($payload['institution_type'] ?? null, $payload['institution_type_other'] ?? null),
             'Forma' => $this->originalFormat($payload['preferred_format'] ?? null),
             'Oferta' => $offerTitle === '' ? 'Brak powiązania z ofertą' : $offerTitle,

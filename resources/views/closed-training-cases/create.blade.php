@@ -50,6 +50,13 @@
                         @error('institution')<div class="invalid-feedback">{{ $message }}</div>@enderror
                     </div>
 
+                    <div class="mb-3">
+                        <label for="institution_www" class="form-label">WWW (opcjonalnie)</label>
+                        <input type="text" name="institution_www" id="institution_www" value="{{ old('institution_www') }}" maxlength="2048" placeholder="https://szkola.edu.pl" inputmode="url" autocomplete="url" class="form-control @error('institution_www') is-invalid @enderror">
+                        <div class="form-text">Adres strony szkoły / placówki.</div>
+                        @error('institution_www')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                    </div>
+
                     <script>
                         (function () {
                             const select = document.getElementById('institution_type');

@@ -60,12 +60,17 @@ class ClosedTrainingCaseController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        $request->merge([
+            'institution_www' => $this->normalizeWww($request->input('institution_www')),
+        ]);
+
         $data = $request->validate([
             'topic' => 'required|string|max:255',
             'contact_name' => 'required|string|max:255',
             'contact_email' => 'nullable|email|max:255',
             'contact_phone' => 'nullable|string|max:50',
             'institution' => 'nullable|string|max:255',
+            'institution_www' => 'nullable|url|max:2048',
             'institution_type' => ['required', Rule::in(array_keys(ClosedTrainingCase::institutionTypeOptions()))],
             'institution_type_other' => ['nullable', 'string', 'max:255', Rule::requiredIf(
                 fn () => $request->input('institution_type') === ClosedTrainingCase::INSTITUTION_OTHER
@@ -78,6 +83,7 @@ class ClosedTrainingCaseController extends Controller
         ], [
             'topic.required' => 'Podaj temat szkolenia.',
             'contact_name.required' => 'Podaj osobę kontaktową.',
+            'institution_www.url' => 'Podaj poprawny adres strony WWW.',
             'institution_type.required' => 'Wybierz rodzaj placówki.',
             'institution_type.in' => 'Wybierz rodzaj placówki.',
             'institution_type_other.required' => 'Podaj rodzaj placówki.',
@@ -95,6 +101,7 @@ class ClosedTrainingCaseController extends Controller
             'contact_email' => $data['contact_email'] ?? null,
             'contact_phone' => $data['contact_phone'] ?? null,
             'institution' => $data['institution'] ?? null,
+            'institution_www' => $data['institution_www'] ?? null,
             'institution_type' => $data['institution_type'],
             'institution_type_other' => $data['institution_type_other'] ?? null,
             'message' => $data['message'],
@@ -103,6 +110,7 @@ class ClosedTrainingCaseController extends Controller
                 'contact_email' => $data['contact_email'] ?? null,
                 'contact_phone' => $data['contact_phone'] ?? null,
                 'institution' => $data['institution'] ?? null,
+                'institution_www' => $data['institution_www'] ?? null,
                 'institution_type' => $data['institution_type'],
                 'institution_type_other' => $data['institution_type_other'] ?? null,
                 'preferred_format' => $data['preferred_format'] ?? null,
@@ -160,6 +168,7 @@ class ClosedTrainingCaseController extends Controller
             'contact_email' => $this->blankToNull($request->input('contact_email')),
             'contact_phone' => $this->blankToNull($request->input('contact_phone')),
             'institution' => $this->blankToNull($request->input('institution')),
+            'institution_www' => $this->normalizeWww($request->input('institution_www')),
         ]);
 
         if ($request->exists('institution_type')) {
@@ -179,6 +188,7 @@ class ClosedTrainingCaseController extends Controller
             'contact_email' => 'nullable|email|max:255',
             'contact_phone' => 'nullable|string|max:50',
             'institution' => 'nullable|string|max:255',
+            'institution_www' => 'nullable|url|max:2048',
             'institution_type' => ['nullable', Rule::in(array_keys(ClosedTrainingCase::institutionTypeOptions()))],
             'institution_type_other' => ['nullable', 'string', 'max:255', Rule::requiredIf(
                 fn () => $request->input('institution_type') === ClosedTrainingCase::INSTITUTION_OTHER
@@ -188,6 +198,7 @@ class ClosedTrainingCaseController extends Controller
         ], [
             'contact_name.required' => 'Podaj osobę kontaktową.',
             'contact_email.email' => 'Podaj poprawny adres e-mail.',
+            'institution_www.url' => 'Podaj poprawny adres strony WWW.',
             'institution_type.in' => 'Wybierz rodzaj placówki.',
             'institution_type_other.required' => 'Podaj rodzaj placówki.',
             'preferred_format.in' => 'Wybierz formę szkolenia.',
@@ -213,6 +224,7 @@ class ClosedTrainingCaseController extends Controller
             'contact_email' => $data['contact_email'] ?? null,
             'contact_phone' => $data['contact_phone'] ?? null,
             'institution' => $data['institution'] ?? null,
+            'institution_www' => $data['institution_www'] ?? null,
             'institution_type' => $typeData['institution_type'],
             'institution_type_other' => $typeData['institution_type_other'],
             'preferred_format' => $request->exists('preferred_format')
@@ -415,5 +427,19 @@ class ClosedTrainingCaseController extends Controller
         $value = trim((string) $value);
 
         return $value === '' ? null : $value;
+    }
+
+    private function normalizeWww(mixed $value): ?string
+    {
+        $value = $this->blankToNull(is_string($value) ? $value : null);
+        if ($value === null) {
+            return null;
+        }
+
+        if (! preg_match('#^https?://#i', $value)) {
+            $value = 'https://'.$value;
+        }
+
+        return $value;
     }
 }

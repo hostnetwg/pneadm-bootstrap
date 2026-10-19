@@ -90,6 +90,7 @@ class ClosedTrainingCaseTest extends TestCase
                 'contact_email' => 'poprawiony@example.com',
                 'contact_phone' => '500600700',
                 'institution' => 'Poprawiona nazwa placówki',
+                'institution_www' => 'szkola.edu.pl',
             ])
             ->assertRedirect(route('closed-training-cases.show', $case))
             ->assertSessionHas('success', 'Zapisano dane zapytania.');
@@ -108,6 +109,7 @@ class ClosedTrainingCaseTest extends TestCase
             ->assertSee('poprawiony@example.com');
         $this->assertSame('500600700', $case->contact_phone);
         $this->assertSame('Poprawiona nazwa placówki', $case->institution);
+        $this->assertSame('https://szkola.edu.pl', $case->institution_www);
         $this->assertSame(ClosedTrainingCase::STATUS_WAITING, $case->status);
 
         $contactEvent = $case->events()->where('body', 'like', 'Dane zapytania.%')->first();
@@ -128,6 +130,7 @@ class ClosedTrainingCaseTest extends TestCase
                 'contact_email' => '',
                 'contact_phone' => '',
                 'institution' => '',
+                'institution_www' => '',
             ])
             ->assertRedirect(route('closed-training-cases.show', $case));
 
@@ -135,6 +138,7 @@ class ClosedTrainingCaseTest extends TestCase
         $this->assertNull($case->contact_email);
         $this->assertNull($case->contact_phone);
         $this->assertNull($case->institution);
+        $this->assertNull($case->institution_www);
         $this->assertSame(ClosedTrainingCase::INSTITUTION_PRIMARY, $case->institution_type);
         $this->assertSame(ClosedTrainingCase::FORMAT_ONLINE, $case->preferred_format);
         $this->assertSame('Szkolenie rady przykładowej', $case->topic);

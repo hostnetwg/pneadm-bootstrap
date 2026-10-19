@@ -30,6 +30,7 @@ class ClosedTrainingSubmissionBackfill
                     'contact_email' => $case->contact_email,
                     'contact_phone' => $case->contact_phone,
                     'institution' => $case->institution,
+                    'institution_www' => $case->institution_www,
                     'institution_type' => $case->institution_type,
                     'institution_type_other' => $case->institution_type_other,
                     'preferred_format' => $case->preferred_format,

@@ -67,6 +67,15 @@
                                     @error('institution')<div class="invalid-feedback">{{ $message }}</div>@enderror
                                 </div>
                                 <div class="mb-3">
+                                    <label for="institution_www" class="form-label">WWW</label>
+                                    <input type="text" name="institution_www" id="institution_www" value="{{ old('institution_www', $case->institution_www) }}" maxlength="2048" placeholder="https://szkola.edu.pl" inputmode="url" autocomplete="url" class="form-control @error('institution_www') is-invalid @enderror">
+                                    <div class="form-text">Adres strony szkoły / placówki.</div>
+                                    @error('institution_www')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                    @if($case->institution_www)
+                                        <a href="{{ $case->institution_www }}" class="small" target="_blank" rel="noopener">Otwórz stronę</a>
+                                    @endif
+                                </div>
+                                <div class="mb-3">
                                     <label for="institution_type" class="form-label">Rodzaj placówki</label>
                                     <select name="institution_type" id="institution_type" class="form-select @error('institution_type') is-invalid @enderror">
                                         <option value="">Wybierz rodzaj placówki…</option>

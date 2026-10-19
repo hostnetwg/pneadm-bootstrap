@@ -45,7 +45,7 @@ Formularz zapytania:
 
 - działa tylko dla ofert aktywnych i opublikowanych na `pnedu`,
 - zapisuje sprawę szkolenia zamkniętego w `pneadm` (`closed_training_cases`) i dopiero potem wysyła e-mail jako powiadomienie. Temat sprawy to wpis z formularza ogólnego albo tytuł oferty z chwili zapytania, osobno od treści wiadomości. Wymagany jest rodzaj placówki, a nazwa szkoły zostaje opcjonalna,
-- obsługa jest na liście i karcie w ADM: `Szkolenia → Sprawy szkoleń zamkniętych`,
+- obsługa jest na liście i karcie w ADM: `Szkolenia → Sprawy szkoleń zamkniętych` (w tym opcjonalne pole WWW strony szkoły),
 - nie tworzy rekordu `courses`.
 
 Kanon sprawy: [operations-os/CURRENT.md](./operations-os/CURRENT.md).

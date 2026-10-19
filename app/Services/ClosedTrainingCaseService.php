@@ -120,6 +120,7 @@ class ClosedTrainingCaseService
             'contact_email' => $case->contact_email,
             'contact_phone' => $case->contact_phone,
             'institution' => $case->institution,
+            'institution_www' => $case->institution_www,
             'institution_type' => $case->institution_type,
             'institution_type_other' => $case->institution_type_other,
             'preferred_format' => $case->preferred_format,
@@ -134,6 +135,7 @@ class ClosedTrainingCaseService
         $case->contact_email = $attributes['contact_email'];
         $case->contact_phone = $attributes['contact_phone'];
         $case->institution = $attributes['institution'];
+        $case->institution_www = $attributes['institution_www'];
         $case->institution_type = $attributes['institution_type'];
         $case->institution_type_other = $attributes['institution_type_other'];
         $case->preferred_format = $attributes['preferred_format'];
@@ -145,6 +147,7 @@ class ClosedTrainingCaseService
             'contact_email' => $case->contact_email,
             'contact_phone' => $case->contact_phone,
             'institution' => $case->institution,
+            'institution_www' => $case->institution_www,
             'institution_type' => $case->institution_type,
             'institution_type_other' => $case->institution_type_other,
             'preferred_format' => $case->preferred_format,
@@ -158,6 +161,7 @@ class ClosedTrainingCaseService
             'contact_email',
             'contact_phone',
             'institution',
+            'institution_www',
             'institution_type',
             'institution_type_other',
             'preferred_format',
@@ -226,7 +230,7 @@ class ClosedTrainingCaseService
     }
 
     /**
-     * @param  array{contact_name: string, contact_email: ?string, contact_phone: ?string, institution: ?string, institution_type_label: string, format_label: string, offer_label: string}  $before
+     * @param  array{contact_name: string, contact_email: ?string, contact_phone: ?string, institution: ?string, institution_www: ?string, institution_type_label: string, format_label: string, offer_label: string}  $before
      */
     private function contactChangeSummary(array $before, ClosedTrainingCase $case): string
     {
@@ -246,6 +250,10 @@ class ClosedTrainingCaseService
 
         if ($before['institution'] !== $case->institution) {
             $parts[] = 'Nazwa szkoły / placówki: '.$this->contactValue($before['institution']).' → '.$this->contactValue($case->institution).'.';
+        }
+
+        if ($before['institution_www'] !== $case->institution_www) {
+            $parts[] = 'WWW: '.$this->contactValue($before['institution_www']).' → '.$this->contactValue($case->institution_www).'.';
         }
 
         if ($before['institution_type_label'] !== $case->institutionTypeLabel()) {
