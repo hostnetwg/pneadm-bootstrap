@@ -836,10 +836,9 @@
                                                    type="checkbox"
                                                    value="1"
                                                    id="bank_unlinked_only"
-                                                   name="bank_unlinked_only"
-                                                   checked>
+                                                   name="bank_unlinked_only">
                                             <label class="form-check-label small" for="bank_unlinked_only">
-                                                Szukaj tylko w nieprzypisanych
+                                                Szukaj tylko w nieprzypisanych / Do przeglądu
                                             </label>
                                         </div>
                                         <div class="form-check">
@@ -867,7 +866,7 @@
                                             </label>
                                         </div>
                                         <div class="form-text" id="bankTransferSearchStatus">
-                                            Wpisz frazę i kliknij „Szukaj przelewu”. Domyślnie wyniki obejmują tylko wpływy bez zaakceptowanego/ignorowanego powiązania. Przy numerze FV/KSeF zaznacz dokładne dopasowanie (lupka przy FV/KSeF robi to automatycznie).
+                                            Wpisz frazę i kliknij „Szukaj przelewu”. Domyślnie widać wszystkie wpływy (także „Do przeglądu” i już przypisane — z oznaczeniem). Filtr „tylko nieprzypisane / Do przeglądu” zawęża kolejkę. Przy numerze FV/KSeF zaznacz dokładne dopasowanie (lupka przy FV/KSeF robi to automatycznie i czyści filtr kwoty).
                                         </div>
                                     </div>
                                 </form>
@@ -2683,8 +2682,8 @@
             var bankPaymentsHeader = document.getElementById('caseBankPaymentsHeader');
             var bankPaymentsCollapseEl = document.getElementById('caseBankPaymentsCollapse');
             var bankPaymentsImportLink = document.getElementById('caseBankPaymentsImportLink');
-            var defaultSearchHint = 'Wpisz frazę i kliknij „Szukaj przelewu”. Domyślnie wyniki obejmują tylko wpływy bez zaakceptowanego/ignorowanego powiązania. Przy numerze FV/KSeF zaznacz dokładne dopasowanie (lupka przy FV/KSeF robi to automatycznie).';
-            var bankFiltersStorageKey = 'accounting_collections_bank_filters_v1';
+            var defaultSearchHint = 'Wpisz frazę i kliknij „Szukaj przelewu”. Domyślnie widać wszystkie wpływy (także „Do przeglądu” i już przypisane — z oznaczeniem). Filtr „tylko nieprzypisane / Do przeglądu” zawęża kolejkę. Przy numerze FV/KSeF zaznacz dokładne dopasowanie (lupka przy FV/KSeF robi to automatycznie i czyści filtr kwoty).';
+            var bankFiltersStorageKey = 'accounting_collections_bank_filters_v2';
 
             function saveBankFilters() {
                 try {
@@ -2789,6 +2788,10 @@
                 }
 
                 var rows = candidates.map(function (c) {
+                    var noteHtml = c.assignment_note
+                        ? '<div class="small mt-1"><span class="badge text-bg-secondary text-wrap text-start">'
+                          + esc(c.assignment_note) + '</span></div>'
+                        : '';
                     var actionsHtml;
                     if (c.can_mark_refunded) {
                         actionsHtml = '<div class="d-flex flex-column flex-md-row gap-1 justify-content-end">'
@@ -2798,8 +2801,8 @@
                             + ' data-description="' + esc(c.description_confirm) + '">Oznacz jako zwrot</button>'
                             + '</div>';
                     } else if (c.is_linkable === false) {
-                        actionsHtml = '<span class="badge text-bg-secondary">'
-                            + esc(c.link_status_label || 'Przypisany')
+                        actionsHtml = '<span class="badge text-bg-secondary text-wrap text-start">'
+                            + esc(c.link_status_label || c.assignment_note || 'Przypisany')
                             + '</span>';
                     } else {
                         actionsHtml = '<div class="d-flex flex-column flex-md-row gap-1 justify-content-end">'
@@ -2827,6 +2830,7 @@
                         + '<td class="small text-break" style="max-width: 34rem;">'
                         + '<div class="fw-semibold">' + esc(c.account_label || '—') + '</div>'
                         + '<div>' + esc(c.description_short || '—') + '</div>'
+                        + (c.is_linkable === false ? '' : noteHtml)
                         + '</td>'
                         + '<td class="small">'
                         + '<a href="' + esc(c.import_url) + '" class="text-decoration-none">Import #' + esc(c.import_id) + '</a>'
@@ -2907,6 +2911,10 @@
                 }
                 setBankPaymentsExpanded(true);
                 searchInput.value = value;
+                // Lupka FV/KSeF: nie zawężaj kwotą (przelew może mieć inną kwotę / częściową wpłatę).
+                if (amountInput) {
+                    amountInput.value = '';
+                }
                 if (exactSearchInput) {
                     exactSearchInput.checked = true;
                     saveBankFilters();
@@ -2944,7 +2952,7 @@
                     if (searchInput) searchInput.value = '';
                     if (amountInput) amountInput.value = defaultAmount || '';
                     if (afterOrderInput) afterOrderInput.checked = true;
-                    if (unlinkedOnlyInput) unlinkedOnlyInput.checked = true;
+                    if (unlinkedOnlyInput) unlinkedOnlyInput.checked = false;
                     if (exactSearchInput) exactSearchInput.checked = false;
                     saveBankFilters();
                     if (searchResults) {

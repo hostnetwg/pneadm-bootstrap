@@ -1216,6 +1216,22 @@ class AccountingCollectionsTest extends TestCase
             'opened_at' => now(),
         ]);
 
+        $otherOrder = FormOrder::create([
+            'product_name' => 'Inna sprawa z tym samym FV w opisie',
+            'product_price' => 250,
+            'order_date' => now()->subDays(8),
+            'invoice_number' => '78/8/2026',
+            'payment_mode' => FormOrder::PAYMENT_MODE_DEFERRED_INVOICE,
+            'payment_status' => FormOrder::PAYMENT_STATUS_SUBMITTED,
+        ]);
+        $otherCase = DebtCase::create([
+            'form_order_id' => $otherOrder->id,
+            'status' => DebtCase::STATUS_OPEN,
+            'invoice_number' => '78/8/2026',
+            'amount_gross' => 250,
+            'opened_at' => now(),
+        ]);
+
         $import = BankStatementImport::create([
             'uploaded_by' => $user->id,
             'original_filename' => 'lista_operacji_test.csv',
@@ -1247,15 +1263,17 @@ class AccountingCollectionsTest extends TestCase
             'is_incoming' => true,
         ]);
 
+        // Przypisany do innej sprawy — bieżąca sprawa nadal ma wolne miejsce na link.
         BankTransactionMatch::create([
             'bank_transaction_id' => $linked->id,
-            'debt_case_id' => $case->id,
-            'form_order_id' => $order->id,
+            'debt_case_id' => $otherCase->id,
+            'form_order_id' => $otherOrder->id,
             'confidence' => BankTransactionMatch::CONFIDENCE_HIGH,
             'match_reasons' => ['manual_case_link'],
             'status' => BankTransactionMatch::STATUS_ACCEPTED,
             'accepted_by' => $user->id,
             'accepted_at' => now(),
+            'allocated_amount' => 250,
         ]);
 
         $show = $this->actingAs($user)->get(route('accounting.collections.show', $case));
@@ -1291,6 +1309,132 @@ class AccountingCollectionsTest extends TestCase
         $linkedPayload = collect($allTransfers->json('candidates'))->firstWhere('id', $linked->id);
         $this->assertFalse($linkedPayload['is_linkable']);
         $this->assertSame(BankTransactionMatch::STATUS_ACCEPTED, $linkedPayload['link_status']);
+        $this->assertStringContainsString('Przypisany:', (string) $linkedPayload['assignment_note']);
+        $this->assertStringContainsString('#'.$otherCase->id, (string) $linkedPayload['assignment_note']);
+
+        $defaultAll = $this->actingAs($user)->getJson(route('accounting.collections.bank-transactions.search', [
+            'debtCase' => $case,
+            'bank_search' => '77/8/2026',
+            'bank_after_order' => '0',
+        ]));
+        $defaultAll->assertOk();
+        $defaultAll->assertJsonCount(2, 'candidates');
+    }
+
+    public function test_bank_transfer_search_finds_deferred_and_invoice_via_match(): void
+    {
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+            'is_active' => 1,
+        ]);
+
+        $orderA = FormOrder::create([
+            'product_name' => 'Sprawa szukająca',
+            'product_price' => 301,
+            'order_date' => now()->subDays(30),
+            'invoice_number' => '300/9/2026',
+            'payment_mode' => FormOrder::PAYMENT_MODE_DEFERRED_INVOICE,
+            'payment_status' => FormOrder::PAYMENT_STATUS_SUBMITTED,
+        ]);
+        $caseA = DebtCase::create([
+            'form_order_id' => $orderA->id,
+            'status' => DebtCase::STATUS_OPEN,
+            'invoice_number' => '300/9/2026',
+            'amount_gross' => 301,
+            'opened_at' => now(),
+        ]);
+
+        $orderB = FormOrder::create([
+            'product_name' => 'Sugestia FV w matchu',
+            'product_price' => 301,
+            'order_date' => now()->subDays(20),
+            'invoice_number' => '301/9/2026',
+            'payment_mode' => FormOrder::PAYMENT_MODE_DEFERRED_INVOICE,
+            'payment_status' => FormOrder::PAYMENT_STATUS_SUBMITTED,
+        ]);
+        $caseB = DebtCase::create([
+            'form_order_id' => $orderB->id,
+            'status' => DebtCase::STATUS_OPEN,
+            'invoice_number' => '301/9/2026',
+            'amount_gross' => 301,
+            'opened_at' => now(),
+        ]);
+
+        $import = BankStatementImport::create([
+            'uploaded_by' => $user->id,
+            'original_filename' => 'lista_operacji_test.csv',
+            'file_hash' => str_repeat('n', 64),
+            'source' => 'mbank',
+            'status' => 'parsed',
+            'rows_total' => 2,
+            'rows_incoming' => 2,
+        ]);
+
+        $deferredTx = BankTransaction::create([
+            'bank_statement_import_id' => $import->id,
+            'operation_date' => now()->subDays(3)->toDateString(),
+            'amount' => 301,
+            'currency' => 'PLN',
+            'description' => 'WPLYW NA POTEM BEZ NUMERU FV W OPISIE',
+            'account_label' => 'Deferred School',
+            'fingerprint' => str_repeat('o', 64),
+            'is_incoming' => true,
+        ]);
+        $suggestedTx = BankTransaction::create([
+            'bank_statement_import_id' => $import->id,
+            'operation_date' => now()->subDays(2)->toDateString(),
+            'amount' => 301,
+            'currency' => 'PLN',
+            'description' => 'WPLYW TYLKO Z SUGESTIA MATCH BEZ FV W OPISIE',
+            'account_label' => 'Suggested School',
+            'fingerprint' => str_repeat('p', 64),
+            'is_incoming' => true,
+        ]);
+
+        BankTransactionMatch::create([
+            'bank_transaction_id' => $deferredTx->id,
+            'debt_case_id' => $caseB->id,
+            'form_order_id' => $orderB->id,
+            'confidence' => BankTransactionMatch::CONFIDENCE_MEDIUM,
+            'match_reasons' => ['invoice_number'],
+            'status' => BankTransactionMatch::STATUS_DEFERRED,
+        ]);
+        BankTransactionMatch::create([
+            'bank_transaction_id' => $suggestedTx->id,
+            'debt_case_id' => $caseB->id,
+            'form_order_id' => $orderB->id,
+            'confidence' => BankTransactionMatch::CONFIDENCE_HIGH,
+            'match_reasons' => ['invoice_number'],
+            'status' => BankTransactionMatch::STATUS_SUGGESTED,
+        ]);
+
+        $viaMatch = $this->actingAs($user)->getJson(route('accounting.collections.bank-transactions.search', [
+            'debtCase' => $caseA,
+            'bank_search' => '301/9/2026',
+            'bank_search_exact' => '1',
+            'bank_after_order' => '0',
+            'bank_unlinked_only' => '0',
+        ]));
+        $viaMatch->assertOk();
+        $viaMatchIds = collect($viaMatch->json('candidates'))->pluck('id');
+        $this->assertTrue($viaMatchIds->contains($deferredTx->id));
+        $this->assertTrue($viaMatchIds->contains($suggestedTx->id));
+
+        $reviewOnly = $this->actingAs($user)->getJson(route('accounting.collections.bank-transactions.search', [
+            'debtCase' => $caseA,
+            'bank_search' => '301/9/2026',
+            'bank_search_exact' => '1',
+            'bank_after_order' => '0',
+            'bank_unlinked_only' => '1',
+        ]));
+        $reviewOnly->assertOk();
+        $reviewIds = collect($reviewOnly->json('candidates'))->pluck('id');
+        $this->assertTrue($reviewIds->contains($deferredTx->id));
+        $this->assertTrue($reviewIds->contains($suggestedTx->id));
+
+        $deferredPayload = collect($viaMatch->json('candidates'))->firstWhere('id', $deferredTx->id);
+        $this->assertTrue($deferredPayload['is_linkable']);
+        $this->assertSame('Na potem (Do przeglądu)', $deferredPayload['assignment_note']);
     }
 
     public function test_bank_transfer_exact_search_does_not_match_invoice_number_fragment(): void

@@ -1055,7 +1055,8 @@ class AccountingController extends Controller
         }
 
         $afterOrder = $request->boolean('bank_after_order', true);
-        $unlinkedOnly = $request->boolean('bank_unlinked_only', true);
+        // Domyślnie wszystkie wpływy (oznaczone gdy już przypisane) — jak lista importów.
+        $unlinkedOnly = $request->boolean('bank_unlinked_only', false);
         $exactSearch = $request->boolean('bank_search_exact', false);
         $notBefore = $afterOrder
             ? $debtCase->formOrder?->order_date?->toDateString()
@@ -1071,7 +1072,7 @@ class AccountingController extends Controller
                 ? number_format($caseRemaining, 2, ',', ' ')
                 : null,
             'candidates' => $candidates->map(function (BankTransaction $candidate) use ($debtCase, $caseAmount, $caseRemaining) {
-                $candidate->loadMissing('matches');
+                $candidate->loadMissing(['matches.formOrder', 'matches.debtCase']);
                 $remaining = $candidate->remainingAllocatableAmount();
                 $compareAmount = $caseRemaining !== null && $caseRemaining > 0.01
                     ? $caseRemaining
@@ -1080,6 +1081,9 @@ class AccountingController extends Controller
                     || abs((float) $candidate->amount - $compareAmount) <= 0.01;
                 $ignored = $candidate->isIgnored();
                 $refunded = $candidate->isRefunded();
+                $deferred = $candidate->matches->contains(
+                    fn (BankTransactionMatch $match) => $match->status === BankTransactionMatch::STATUS_DEFERRED
+                );
                 $alreadyLinkedToThisCase = $candidate->acceptedMatches()->contains(
                     fn (BankTransactionMatch $match) => (int) $match->debt_case_id === (int) $debtCase->id
                 );
@@ -1087,6 +1091,9 @@ class AccountingController extends Controller
                     fn (BankTransactionMatch $match) => $match->status === BankTransactionMatch::STATUS_REFUNDED
                         && (int) $match->debt_case_id === (int) $debtCase->id
                 );
+                $acceptedElsewhere = $candidate->acceptedMatches()
+                    ->filter(fn (BankTransactionMatch $match) => (int) $match->debt_case_id !== (int) $debtCase->id)
+                    ->values();
                 $blockingMatch = $ignored
                     ? $candidate->matches->firstWhere('status', BankTransactionMatch::STATUS_IGNORED)
                     : ($refunded
@@ -1095,7 +1102,11 @@ class AccountingController extends Controller
                             ? $candidate->acceptedMatches()->first(
                                 fn (BankTransactionMatch $match) => (int) $match->debt_case_id === (int) $debtCase->id
                             )
-                            : null));
+                            : ($acceptedElsewhere->isNotEmpty() && $remaining <= 0.01
+                                ? $acceptedElsewhere->first()
+                                : ($deferred
+                                    ? $candidate->matches->firstWhere('status', BankTransactionMatch::STATUS_DEFERRED)
+                                    : null))));
                 $caseHasRoom = $caseRemaining === null || $caseRemaining > 0.01;
                 $isLinkable = ! $ignored
                     && ! $refunded
@@ -1123,6 +1134,35 @@ class AccountingController extends Controller
                     );
                 }
 
+                $assignmentNote = null;
+                if ($alreadyLinkedToThisCase) {
+                    $assignmentNote = 'Przypisany do tej sprawy';
+                } elseif ($acceptedElsewhere->isNotEmpty()) {
+                    $assignmentNote = $acceptedElsewhere->map(function (BankTransactionMatch $match) {
+                        $fv = $match->debtCase?->invoice_number
+                            ?: $match->formOrder?->invoice_number
+                            ?: '—';
+                        $caseId = $match->debt_case_id ? '#'.$match->debt_case_id : 'bez sprawy';
+
+                        return 'sprawa '.$caseId.' (FV '.$fv.')';
+                    })->unique()->implode(', ');
+                    $assignmentNote = 'Przypisany: '.$assignmentNote;
+                    if ($remaining > 0.01) {
+                        $assignmentNote .= ' · wolne '.number_format($remaining, 2, ',', ' ').' zł';
+                    }
+                } elseif ($deferred) {
+                    $assignmentNote = 'Na potem (Do przeglądu)';
+                } elseif ($ignored) {
+                    $assignmentNote = $blockingMatch?->statusLabel() ?: 'Ignorowany';
+                } elseif ($refunded) {
+                    $assignmentNote = 'Zwrot';
+                }
+
+                $statusLabel = $blockingMatch?->statusLabel();
+                if ($assignmentNote !== null && ($statusLabel === null || $acceptedElsewhere->isNotEmpty() || $deferred)) {
+                    $statusLabel = $assignmentNote;
+                }
+
                 return [
                     'id' => $candidate->id,
                     'operation_date' => $candidate->operation_date?->format('Y-m-d'),
@@ -1145,7 +1185,8 @@ class AccountingController extends Controller
                     'is_linkable' => $isLinkable,
                     'can_mark_refunded' => $canMarkRefunded,
                     'link_status' => $blockingMatch?->status,
-                    'link_status_label' => $blockingMatch?->statusLabel(),
+                    'link_status_label' => $statusLabel,
+                    'assignment_note' => $assignmentNote,
                 ];
             })->values(),
         ]);
@@ -1346,10 +1387,11 @@ class AccountingController extends Controller
         }
 
         return BankTransaction::query()
-            ->with(['import', 'matches'])
+            ->with(['import', 'matches.formOrder', 'matches.debtCase'])
             ->where('is_incoming', true)
             ->when($unlinkedOnly, function ($query) {
-                $query->withRemainingAllocatable();
+                // Jak kolejka „Do przeglądu”: wolne / sugestie + „Na potem” (deferred).
+                $query->pendingOperatorReview();
             })
             ->when($amount !== null, function ($query) use ($amount) {
                 $query->where(function ($inner) use ($amount) {
@@ -1375,21 +1417,30 @@ class AccountingController extends Controller
             })
             ->latest('operation_date')
             ->latest('id')
-            ->limit(12)
+            ->limit(25)
             ->get();
     }
 
     /**
-     * Partial: LIKE %fraza%. Exact: token w tekście (nie fragment dłuższej liczby, np. 63 ≠ 263).
+     * Partial: LIKE %fraza% (opis + FV/KSeF z powiązań). Exact: token w tekście / dokładny nr FV.
      *
      * @param  \Illuminate\Database\Eloquent\Builder<\App\Models\BankTransaction>|\Illuminate\Database\Query\Builder  $query
      */
     private function applyBankTransferTextSearch($query, string $search, bool $exactSearch): void
     {
         if (! $exactSearch) {
-            $query->where('description', 'like', "%{$search}%")
-                ->orWhere('account_label', 'like', "%{$search}%")
-                ->orWhere('counterparty_account', 'like', "%{$search}%");
+            $like = "%{$search}%";
+            $query->where('description', 'like', $like)
+                ->orWhere('account_label', 'like', $like)
+                ->orWhere('counterparty_account', 'like', $like)
+                ->orWhereHas('matches.formOrder', function ($orderQuery) use ($like) {
+                    $orderQuery->where('invoice_number', 'like', $like)
+                        ->orWhere('ksef_number', 'like', $like);
+                })
+                ->orWhereHas('matches.debtCase', function ($caseQuery) use ($like) {
+                    $caseQuery->where('invoice_number', 'like', $like)
+                        ->orWhere('ksef_number', 'like', $like);
+                });
 
             return;
         }
@@ -1398,7 +1449,15 @@ class AccountingController extends Controller
 
         $query->whereRaw('description REGEXP ?', [$pattern])
             ->orWhereRaw('account_label REGEXP ?', [$pattern])
-            ->orWhereRaw('counterparty_account REGEXP ?', [$pattern]);
+            ->orWhereRaw('counterparty_account REGEXP ?', [$pattern])
+            ->orWhereHas('matches.formOrder', function ($orderQuery) use ($search) {
+                $orderQuery->where('invoice_number', $search)
+                    ->orWhere('ksef_number', $search);
+            })
+            ->orWhereHas('matches.debtCase', function ($caseQuery) use ($search) {
+                $caseQuery->where('invoice_number', $search)
+                    ->orWhere('ksef_number', $search);
+            });
     }
 
     private function escapeMysqlRegexpLiteral(string $value): string
