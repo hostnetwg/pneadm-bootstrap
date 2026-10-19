@@ -2,6 +2,15 @@
 
 Krótka numeracja panelu. Szczegóły zawsze w `docs/`. Nowy numer wersji (np. 1.1) tylko po potwierdzeniu Waldemara. Hotfixy dopisujemy do bieżącej wersji.
 
+## 1.4 — 2026-10-19
+
+Windykacja: masowe przypomnienia po wyciągu oraz doprecyzowanie wyszukiwania przelewów i danych sprawy.
+
+- Na [Import wyciągu](/accounting/bank-imports) jest przycisk **Przypomnienia o zaległych płatnościach** (tylko gdy nie ma luk w okresach i „Do przeglądu” = 0). Kreator z zakładkami Standard / VIP, wybór e-mail i SMS, kolejka z ponowną kontrolą i opcjonalnym sprawdzeniem iFirma, raport kampanii. Bez automatycznego crona. Kanon: [WINDYKACJA.md](docs/WINDYKACJA.md)
+- Na karcie [sprawy windykacyjnej](/accounting/collections) wyszukiwarka przelewów domyślnie pokazuje wszystkie wpływy (także „Do przeglądu” i już przypisane — z oznaczeniem) oraz szuka FV także po powiązaniach, jak lista importów.
+- Gdy w zamówieniu zmieni się kwota albo temat szkolenia, sprawa wykrywa rozjazd i proponuje aktualizację (tak jak przy zmianie numeru FV).
+- Kanon: [WINDYKACJA.md](docs/WINDYKACJA.md)
+
 ## 1.3 — 2026-09-29
 
 PNE Growth OS — pilotaż prawdziwego AI w etapie Koncepcja webinaru.
