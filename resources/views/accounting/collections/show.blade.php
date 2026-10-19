@@ -7,14 +7,18 @@
             @php
                 $reminderSentCount = $case->reminderEmailsSentCount();
                 $reminderSmsSentCount = $case->reminderSmsSentCount();
+                $phoneCallsCount = $case->phoneCallsLoggedCount();
                 $lastEmailAt = $case->lastReminderEmailSentAt();
                 $lastSmsAt = $case->lastReminderSmsSentAt();
+                $lastPhoneAt = $case->lastPhoneCallLoggedAt();
                 $lastEmailLabel = $case->reminderLastSentLabel($lastEmailAt);
                 $lastSmsLabel = $case->reminderLastSentLabel($lastSmsAt);
+                $lastPhoneLabel = $case->reminderLastSentLabel($lastPhoneAt);
                 $emailSentToday = $case->reminderEmailSentToday();
                 $smsSentToday = $case->reminderSmsSentToday();
+                $phoneCalledToday = $case->phoneCallLoggedToday();
             @endphp
-            <div class="d-flex flex-wrap align-items-center justify-content-center gap-3 debt-case-show-header__badges">
+            <div class="d-flex flex-wrap align-items-center justify-content-center gap-2 debt-case-show-header__badges">
                 <div class="text-center">
                     <span @class([
                               'badge',
@@ -26,8 +30,8 @@
                         <i class="bi bi-envelope-check" aria-hidden="true"></i>
                         {{ $case->reminderEmailsSentLabel($reminderSentCount) }}
                     </span>
-                    <div class="small mt-1 {{ $emailSentToday ? 'text-success fw-semibold' : 'text-muted' }}">
-                        {{ $lastEmailLabel ? 'Ostatnio: '.$lastEmailLabel : 'Brak wysyłki' }}
+                    <div @class(['debt-reminder-last-sent', 'text-muted' => ! $emailSentToday, 'is-today' => $emailSentToday])>
+                        {{ $lastEmailLabel ?: 'Brak wysyłki' }}
                     </div>
                 </div>
                 <div class="text-center">
@@ -41,8 +45,23 @@
                         <i class="bi bi-phone" aria-hidden="true"></i>
                         {{ $case->reminderSmsSentLabel($reminderSmsSentCount) }}
                     </span>
-                    <div class="small mt-1 {{ $smsSentToday ? 'text-success fw-semibold' : 'text-muted' }}">
-                        {{ $lastSmsLabel ? 'Ostatnio: '.$lastSmsLabel : 'Brak wysyłki' }}
+                    <div @class(['debt-reminder-last-sent', 'text-muted' => ! $smsSentToday, 'is-today' => $smsSentToday])>
+                        {{ $lastSmsLabel ?: 'Brak wysyłki' }}
+                    </div>
+                </div>
+                <div class="text-center">
+                    <span @class([
+                              'badge',
+                              'debt-reminder-count-badge',
+                              $case->phoneCallsLoggedBadgeClass($phoneCallsCount),
+                              'debt-reminder-sent-today' => $phoneCalledToday,
+                          ])
+                          title="Kontakty telefoniczne z historii (typ Telefon). 1=niebieski, 2=żółty, 3=czerwony, 4+=ciemny.">
+                        <i class="bi bi-telephone" aria-hidden="true"></i>
+                        {{ $case->phoneCallsLoggedLabel($phoneCallsCount) }}
+                    </span>
+                    <div @class(['debt-reminder-last-sent', 'text-muted' => ! $phoneCalledToday, 'is-today' => $phoneCalledToday])>
+                        {{ $lastPhoneLabel ?: 'Brak kontaktu' }}
                     </div>
                 </div>
             </div>
@@ -2039,14 +2058,25 @@
                 justify-content: flex-start;
             }
         }
-        /* Karta sprawy: trochę powyżej domyślnego Bootstrap badge (0.75em), mniejsze niż wcześniejsze 1.125em. */
+        /* Karta sprawy: rozmiar jak btn-sm (obok „Wyślij e-mail”). */
         .debt-reminder-count-badge {
-            font-size: 0.95em;
-            padding: 0.4em 0.75em;
-            line-height: 1.2;
+            font-size: 0.875rem;
+            padding: 0.25rem 0.5rem;
+            font-weight: 400;
+            line-height: 1.5;
         }
         .debt-reminder-count-badge.debt-reminder-sent-today {
             box-shadow: 0 0 0 2px var(--bs-success);
+        }
+        .debt-case-show-header__badges .debt-reminder-last-sent {
+            font-size: 0.7rem;
+            line-height: 1.15;
+            margin-top: 0.15rem;
+            white-space: nowrap;
+        }
+        .debt-case-show-header__badges .debt-reminder-last-sent.is-today {
+            color: var(--bs-success);
+            font-weight: 600;
         }
     </style>
 

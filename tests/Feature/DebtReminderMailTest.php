@@ -151,7 +151,7 @@ class DebtReminderMailTest extends TestCase
         $show = $this->actingAs($user)->get(route('accounting.collections.show', $case));
         $show->assertOk();
         $show->assertSee('1 przypomnienie', false);
-        $show->assertSee('Ostatnio: dziś', false);
+        $show->assertSee('dziś', false);
 
         $index = $this->actingAs($user)->get(route('accounting.collections.index', [
             'status' => 'all',

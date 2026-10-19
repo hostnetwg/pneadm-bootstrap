@@ -194,7 +194,7 @@ class DebtReminderSmsTest extends TestCase
         $show = $this->actingAs($user)->get(route('accounting.collections.show', $case));
         $show->assertOk();
         $show->assertSee('1 SMS', false);
-        $show->assertSee('Ostatnio: dziś', false);
+        $show->assertSee('dziś', false);
 
         Http::assertSent(function ($request) {
             return str_contains($request->url(), 'sms.do')

@@ -289,9 +289,10 @@ class AccountingController extends Controller
             ->select('debt_cases.*')
             ->leftJoin('form_orders', 'form_orders.id', '=', 'debt_cases.form_order_id')
             ->with(['formOrder.primaryParticipant', 'assignedTo', 'createdBy'])
-            ->withCount(['reminderEmailsSent', 'reminderSmsSent'])
+            ->withCount(['reminderEmailsSent', 'reminderSmsSent', 'phoneCallsLogged'])
             ->withMax(['reminderEmailsSent as last_reminder_email_sent_at'], 'happened_at')
-            ->withMax(['reminderSmsSent as last_reminder_sms_sent_at'], 'happened_at');
+            ->withMax(['reminderSmsSent as last_reminder_sms_sent_at'], 'happened_at')
+            ->withMax(['phoneCallsLogged as last_phone_call_logged_at'], 'happened_at');
 
         if ($status === 'active') {
             $casesQuery->active();
@@ -580,9 +581,10 @@ class AccountingController extends Controller
                     ])
                     ->latest('accepted_at');
             },
-        ])->loadCount(['reminderEmailsSent', 'reminderSmsSent'])
+        ])->loadCount(['reminderEmailsSent', 'reminderSmsSent', 'phoneCallsLogged'])
             ->loadMax(['reminderEmailsSent as last_reminder_email_sent_at'], 'happened_at')
-            ->loadMax(['reminderSmsSent as last_reminder_sms_sent_at'], 'happened_at');
+            ->loadMax(['reminderSmsSent as last_reminder_sms_sent_at'], 'happened_at')
+            ->loadMax(['phoneCallsLogged as last_phone_call_logged_at'], 'happened_at');
 
         $profile = $profileService->profileForOrder($debtCase->formOrder);
         $invoiceTarget = $debtCase->invoiceTargetAmount();

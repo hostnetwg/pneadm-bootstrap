@@ -200,6 +200,44 @@ class DebtCase extends Model
     }
 
     /**
+     * Ręczne kontakty telefoniczne z historii działań (typ „Telefon”).
+     */
+    public function phoneCallsLogged(): HasMany
+    {
+        return $this->hasMany(DebtCaseAction::class)
+            ->where('action_type', DebtCaseAction::TYPE_PHONE);
+    }
+
+    public function phoneCallsLoggedCount(): int
+    {
+        if (array_key_exists('phone_calls_logged_count', $this->attributes)) {
+            return (int) $this->attributes['phone_calls_logged_count'];
+        }
+
+        return (int) $this->phoneCallsLogged()->count();
+    }
+
+    public function phoneCallsLoggedLabel(?int $count = null): string
+    {
+        $count ??= $this->phoneCallsLoggedCount();
+        $abs = abs($count) % 100;
+        $last = $abs % 10;
+
+        $noun = match (true) {
+            $abs === 1 => 'telefon',
+            $last >= 2 && $last <= 4 && ($abs < 12 || $abs > 14) => 'telefony',
+            default => 'telefonów',
+        };
+
+        return $count.' '.$noun;
+    }
+
+    public function phoneCallsLoggedBadgeClass(?int $count = null): string
+    {
+        return $this->reminderEmailsSentBadgeClass($count ?? $this->phoneCallsLoggedCount());
+    }
+
+    /**
      * Data ostatniej prawdziwej wysyłki e-mail (z withMax lub zapytania).
      */
     public function lastReminderEmailSentAt(): ?\Illuminate\Support\Carbon
@@ -215,6 +253,14 @@ class DebtCase extends Model
         return $this->resolveReminderLastSentAt('last_reminder_sms_sent_at', $this->reminderSmsSent());
     }
 
+    /**
+     * Data ostatniego kontaktu telefonicznego (z withMax lub zapytania).
+     */
+    public function lastPhoneCallLoggedAt(): ?\Illuminate\Support\Carbon
+    {
+        return $this->resolveReminderLastSentAt('last_phone_call_logged_at', $this->phoneCallsLogged());
+    }
+
     public function reminderEmailSentToday(): bool
     {
         return $this->reminderTimestampIsToday($this->lastReminderEmailSentAt());
@@ -225,10 +271,17 @@ class DebtCase extends Model
         return $this->reminderTimestampIsToday($this->lastReminderSmsSentAt());
     }
 
-    /** Czy dziś poszła prawdziwa wysyłka e-mail lub SMS (do wyróżnienia wiersza na liście). */
+    public function phoneCallLoggedToday(): bool
+    {
+        return $this->reminderTimestampIsToday($this->lastPhoneCallLoggedAt());
+    }
+
+    /** Czy dziś był kontakt e-mail, SMS lub telefon (do wyróżnienia wiersza na liście). */
     public function reminderContactedToday(): bool
     {
-        return $this->reminderEmailSentToday() || $this->reminderSmsSentToday();
+        return $this->reminderEmailSentToday()
+            || $this->reminderSmsSentToday()
+            || $this->phoneCallLoggedToday();
     }
 
     /**

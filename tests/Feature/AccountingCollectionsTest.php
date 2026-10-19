@@ -472,6 +472,54 @@ class AccountingCollectionsTest extends TestCase
         ]);
     }
 
+    public function test_phone_action_increments_phone_calls_counter_and_highlights_today(): void
+    {
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+            'is_active' => 1,
+        ]);
+
+        $order = FormOrder::create([
+            'product_name' => 'Szkolenie telefon',
+            'product_price' => 400,
+            'order_date' => now()->subDays(12),
+            'invoice_number' => '77/10/2026',
+        ]);
+        $case = DebtCase::create([
+            'form_order_id' => $order->id,
+            'status' => DebtCase::STATUS_OPEN,
+            'opened_at' => now(),
+        ]);
+
+        $this->actingAs($user)->post(route('accounting.collections.actions.store', $case), [
+            'action_type' => DebtCaseAction::TYPE_PHONE,
+            'note' => 'Rozmowa — obiecał oddzwonić.',
+        ])->assertRedirect(route('accounting.collections.show', $case));
+
+        $fresh = $case->fresh();
+        $this->assertSame(1, $fresh->phoneCallsLoggedCount());
+        $this->assertSame('1 telefon', $fresh->phoneCallsLoggedLabel());
+        $this->assertTrue($fresh->phoneCallLoggedToday());
+        $this->assertTrue($fresh->reminderContactedToday());
+        $this->assertSame('text-bg-primary', $fresh->phoneCallsLoggedBadgeClass());
+        $this->assertSame('2 telefony', $fresh->phoneCallsLoggedLabel(2));
+        $this->assertSame('5 telefonów', $fresh->phoneCallsLoggedLabel(5));
+
+        $show = $this->actingAs($user)->get(route('accounting.collections.show', $case));
+        $show->assertOk();
+        $show->assertSee('1 telefon', false);
+        $show->assertSee('dziś', false);
+
+        $index = $this->actingAs($user)->get(route('accounting.collections.index', [
+            'status' => 'all',
+            'search' => (string) $case->id,
+        ]));
+        $index->assertOk();
+        $index->assertSee('Telefon', false);
+        $index->assertSee('debt-case-contacted-today', false);
+        $index->assertSee('dziś', false);
+    }
+
     public function test_user_can_delete_debt_case_contact(): void
     {
         $user = User::factory()->create([

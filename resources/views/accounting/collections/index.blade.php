@@ -19,11 +19,12 @@
     </x-slot>
 
     <style>
-        /* ~50% większe niż domyślny Bootstrap badge (0.75em → 1.125em). */
+        /* Jak btn-sm / badge na karcie sprawy. */
         .debt-reminder-count-badge {
-            font-size: 1.125em;
-            padding: 0.525em 0.975em;
-            line-height: 1.2;
+            font-size: 0.875rem;
+            padding: 0.25rem 0.5rem;
+            font-weight: 400;
+            line-height: 1.5;
         }
         .debt-reminder-count-badge.debt-reminder-sent-today {
             box-shadow: 0 0 0 2px var(--bs-success);
@@ -273,6 +274,7 @@
                                 <th>Następny krok</th>
                                 <th class="text-center" title="Wysłane e-maile przypomnienia (bez testów). Pod spodem data ostatniej wysyłki; dziś = zielone.">E-mail</th>
                                 <th class="text-center" title="Wysłane SMS-y przypomnienia (bez testów). Pod spodem data ostatniej wysyłki; dziś = zielone.">SMS</th>
+                                <th class="text-center" title="Kontakty telefoniczne z historii działań (typ Telefon). Pod spodem data ostatniego kontaktu; dziś = zielone.">Telefon</th>
                                 <th class="text-end">Kwota</th>
                             </tr>
                         </thead>
@@ -282,12 +284,16 @@
                                     $order = $case->formOrder;
                                     $reminderSentCount = $case->reminderEmailsSentCount();
                                     $reminderSmsSentCount = $case->reminderSmsSentCount();
+                                    $phoneCallsCount = $case->phoneCallsLoggedCount();
                                     $lastEmailAt = $case->lastReminderEmailSentAt();
                                     $lastSmsAt = $case->lastReminderSmsSentAt();
+                                    $lastPhoneAt = $case->lastPhoneCallLoggedAt();
                                     $lastEmailLabel = $case->reminderLastSentLabel($lastEmailAt);
                                     $lastSmsLabel = $case->reminderLastSentLabel($lastSmsAt);
+                                    $lastPhoneLabel = $case->reminderLastSentLabel($lastPhoneAt);
                                     $emailSentToday = $case->reminderEmailSentToday();
                                     $smsSentToday = $case->reminderSmsSentToday();
+                                    $phoneCalledToday = $case->phoneCallLoggedToday();
                                     $invoiceDrift = app(\App\Services\DebtCaseInvoiceIdentityService::class)->compare($case);
                                     $listInvoice = $case->invoice_number ?: ($order->invoice_number ?: null);
                                     $listKsef = ($invoiceDrift['invoice_replaced'] ?? false)
@@ -407,11 +413,27 @@
                                             </div>
                                         @endif
                                     </td>
+                                    <td class="text-center">
+                                        <span @class([
+                                                  'badge',
+                                                  'debt-reminder-count-badge',
+                                                  $case->phoneCallsLoggedBadgeClass($phoneCallsCount),
+                                                  'debt-reminder-sent-today' => $phoneCalledToday,
+                                              ])
+                                              title="{{ $case->phoneCallsLoggedLabel($phoneCallsCount) }}{{ $lastPhoneLabel ? ' · ostatnio: '.$lastPhoneLabel : '' }}. 1=niebieski, 2=żółty, 3=czerwony, 4+=ciemny.">
+                                            {{ $phoneCallsCount }}
+                                        </span>
+                                        @if($lastPhoneLabel)
+                                            <div @class(['debt-reminder-last-sent', 'text-muted' => ! $phoneCalledToday, 'is-today' => $phoneCalledToday])>
+                                                {{ $lastPhoneLabel }}
+                                            </div>
+                                        @endif
+                                    </td>
                                     <td class="text-end">{{ number_format((float) ($case->amount_gross ?? $order->product_price ?? 0), 2, ',', ' ') }} zł</td>
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="11" class="text-center text-muted py-4">
+                                    <td colspan="12" class="text-center text-muted py-4">
                                         Brak spraw windykacyjnych dla wybranych filtrów.
                                     </td>
                                 </tr>
