@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Mail\ClosedTrainingCaseSchoolMail;
 use App\Models\ClosedTrainingCase;
 use App\Models\ClosedTrainingCaseEvent;
+use App\Models\Course;
 use App\Models\TrainingOffer;
 use App\Models\User;
 use App\Services\ClosedTrainingCaseService;
@@ -131,13 +132,45 @@ class ClosedTrainingCaseController extends Controller
 
     public function show(ClosedTrainingCase $closedTrainingCase): View
     {
-        $closedTrainingCase->load(['assignee', 'trainingOffer', 'events.user']);
+        $closedTrainingCase->load(['assignee', 'trainingOffer', 'events.user', 'course']);
 
         return view('closed-training-cases.show', [
             'case' => $closedTrainingCase,
             'users' => $this->activeUsers(),
             'offers' => $this->offersForCase($closedTrainingCase),
         ]);
+    }
+
+    public function bindCourse(Request $request, ClosedTrainingCase $closedTrainingCase): RedirectResponse
+    {
+        $data = $request->validate([
+            'course_id' => ['required', 'integer', 'exists:courses,id'],
+        ], [
+            'course_id.required' => 'Podaj ID szkolenia.',
+            'course_id.exists' => 'Nie znaleziono szkolenia o podanym ID.',
+        ]);
+
+        $course = Course::query()->findOrFail($data['course_id']);
+        $via = $closedTrainingCase->course()->exists() ? 'replace' : 'bind';
+
+        $this->cases->linkCourse($closedTrainingCase, $course, $request->user(), $via);
+
+        return redirect()
+            ->route('closed-training-cases.show', $closedTrainingCase)
+            ->with('success', $via === 'replace'
+                ? 'Zmieniono powiązanie ze szkoleniem.'
+                : 'Powiązano sprawę ze szkoleniem.');
+    }
+
+    public function unbindCourse(Request $request, ClosedTrainingCase $closedTrainingCase): RedirectResponse
+    {
+        $course = $this->cases->unlinkCourse($closedTrainingCase, $request->user());
+
+        return redirect()
+            ->route('closed-training-cases.show', $closedTrainingCase)
+            ->with('success', $course
+                ? 'Odłączono szkolenie od sprawy.'
+                : 'Sprawa nie miała powiązanego szkolenia.');
     }
 
     public function update(Request $request, ClosedTrainingCase $closedTrainingCase): RedirectResponse

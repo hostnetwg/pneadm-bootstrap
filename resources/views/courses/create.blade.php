@@ -1,7 +1,9 @@
 <x-app-layout>
     <x-slot name="header">
         <h2 class="fw-semibold fs-4 text-dark">
-            @if(!empty($sourceOffer))
+            @if(!empty($sourceCase))
+                {{ __('Dodaj szkolenie ze sprawy') }}
+            @elseif(!empty($sourceOffer))
                 {{ __('Dodaj szkolenie z oferty') }}
             @elseif(!empty($sourceClickMeeting))
                 {{ __('Dodaj szkolenie z ClickMeeting') }}
@@ -20,14 +22,26 @@
                 @php
                     $sourceOffer = $sourceOffer ?? null;
                     $sourceClickMeeting = $sourceClickMeeting ?? null;
+                    $sourceCase = $sourceCase ?? null;
+                    $caseTopic = $sourceCase
+                        ? trim((string) $sourceCase->trainingTopicLabel())
+                        : '';
+                    if ($caseTopic === 'Nie podano') {
+                        $caseTopic = '';
+                    }
                     $defaultIsPaid = old('is_paid', '1');
-                    $defaultCategory = old('category', optional($sourceOffer)->default_course_category ?? 'open');
+                    $defaultCategory = old(
+                        'category',
+                        $sourceCase ? 'closed' : (optional($sourceOffer)->default_course_category ?? 'open')
+                    );
                     $defaultInstructorId = old('instructor_id', optional($sourceOffer)->instructor_id ?? '');
                     $copyImageDefault = old('copy_image_from_offer', $sourceOffer && $sourceOffer->image ? '1' : '0');
                     $defaultLiveRoomMode = old('live_room_mode', 'embed_pnedu');
                     $defaultTitle = old(
                         'title',
-                        $sourceClickMeeting['name'] ?? optional($sourceOffer)->title ?? ''
+                        $caseTopic !== ''
+                            ? $caseTopic
+                            : ($sourceClickMeeting['name'] ?? optional($sourceOffer)->title ?? '')
                     );
                     $defaultStartDate = old('start_date', $sourceClickMeeting['start_date'] ?? '');
                     $defaultEndDate = old('end_date', $sourceClickMeeting['end_date'] ?? '');
@@ -39,7 +53,27 @@
                     );
                 @endphp
 
-                @if($sourceOffer)
+                @if($sourceCase)
+                    <div class="alert alert-info d-flex justify-content-between align-items-start gap-3">
+                        <div>
+                            <strong>Tworzenie szkolenia ze sprawy #{{ $sourceCase->id }}.</strong>
+                            @if($sourceOffer)
+                                Uzupełniono temat i ofertę „{{ $sourceOffer->title }}”.
+                            @else
+                                Uzupełniono temat.
+                            @endif
+                            Kategoria: szkolenie zamknięte. Uzupełnij daty i zapisz — dopiero wtedy powstanie powiązanie.
+                            Anulowanie formularza nic nie zmienia.
+                        </div>
+                        <a href="{{ route('closed-training-cases.show', $sourceCase) }}" class="btn btn-sm btn-outline-primary text-nowrap">
+                            Wróć do sprawy
+                        </a>
+                    </div>
+                    <input type="hidden" name="closed_training_case_id" value="{{ old('closed_training_case_id', $sourceCase->id) }}">
+                    @if($sourceOffer)
+                        <input type="hidden" name="training_offer_id" value="{{ old('training_offer_id', $sourceOffer->id) }}">
+                    @endif
+                @elseif($sourceOffer)
                     <div class="alert alert-info d-flex justify-content-between align-items-start gap-3">
                         <div>
                             <strong>Tworzenie szkolenia z oferty.</strong>

@@ -25,7 +25,7 @@ To już jest prawdą w kodzie ofert:
 - `courses` wymaga `start_date` i `end_date` (`CoursesController::store`).
 - Jedyna istniejąca ścieżka „oferta → szkolenie” to ręczny formularz `GET /training-offers/{id}/create-course`. Zapisuje opcjonalne `courses.training_offer_id`. Nie tworzy szkolenia sama.
 
-Rekomendacja: sprawa dostaje opcjonalne `training_offer_id` i, dopiero po ludzkiej decyzji, opcjonalne `course_id`. Brak automatycznej konwersji.
+Rekomendacja (wdrożone): sprawa ma opcjonalne `training_offer_id`. Po ludzkiej decyzji szkolenie wskazuje sprawę przez `courses.closed_training_case_id` (nullable, unique, 1:0..1). Brak automatycznej konwersji. Soft delete szkolenia czyści FK i dopisuje historię sprawy.
 
 ## Proces później, nie teraz
 

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Mail\InstructorTrainingLinksMail;
 use App\Models\CertificateTemplate;
+use App\Models\ClosedTrainingCase;
 use App\Models\Course;
 use App\Models\CourseLocation;
 use App\Models\CourseOnlineDetails;
@@ -14,6 +15,7 @@ use App\Models\PaymentDisplayOption;
 use App\Models\TrainingOffer;
 use App\Services\ClickMeetingCourseRoomUrlSyncService;
 use App\Services\ClickMeetingService;
+use App\Services\ClosedTrainingCaseService;
 use App\Services\CourseFormOrderBillingService;
 use App\Services\CourseFunnelStatsService;
 use App\Services\CourseGoogleCalendarSyncService;
@@ -789,7 +791,7 @@ class CoursesController extends Controller
      */
     public function show($id)
     {
-        $course = Course::with(['instructor', 'location', 'onlineDetails', 'participants', 'surveys', 'priceVariants', 'videos' => function ($query) {
+        $course = Course::with(['instructor', 'location', 'onlineDetails', 'closedTrainingCase.trainingOffer', 'participants', 'surveys', 'priceVariants', 'videos' => function ($query) {
             $query->orderBy('order');
         }, 'fileLinks' => function ($query) {
             $query->orderBy('order');
@@ -953,6 +955,25 @@ class CoursesController extends Controller
     }
 
     /**
+     * Formularz tworzenia szkolenia ze sprawy zamkniętej (bez automatycznego zapisu).
+     */
+    public function createFromClosedTrainingCase(ClosedTrainingCase $closedTrainingCase)
+    {
+        if ($closedTrainingCase->course()->exists()) {
+            return redirect()
+                ->route('closed-training-cases.show', $closedTrainingCase)
+                ->with('error', 'Ta sprawa jest już powiązana ze szkoleniem. Odłącz je albo otwórz istniejące szkolenie.');
+        }
+
+        $closedTrainingCase->loadMissing('trainingOffer.instructor');
+
+        return view('courses.create', $this->courseCreateFormData(
+            sourceOffer: $closedTrainingCase->trainingOffer,
+            sourceCase: $closedTrainingCase,
+        ));
+    }
+
+    /**
      * Formularz tworzenia szkolenia z prefill z wydarzenia ClickMeeting (bez automatycznego zapisu).
      */
     public function createFromClickMeeting(string $eventId, ClickMeetingService $clickMeetingService)
@@ -1022,6 +1043,7 @@ class CoursesController extends Controller
             'category' => 'required|in:open,closed',
             'instructor_id' => 'nullable|exists:instructors,id',
             'training_offer_id' => 'nullable|exists:training_offers,id',
+            'closed_training_case_id' => 'nullable|integer|exists:closed_training_cases,id',
             'copy_image_from_offer' => 'nullable|boolean',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
             'certificate_format' => 'nullable|string|max:255',
@@ -1040,17 +1062,33 @@ class CoursesController extends Controller
             'post_end_access_duration_value' => 'nullable|integer|min:1|max:999',
             'post_end_access_duration_unit' => 'nullable|in:days,weeks,months,years',
             'save_action' => 'required|in:close,stay_editing',
+        ], [
+            'closed_training_case_id.exists' => 'Nie znaleziono wskazanej sprawy szkolenia zamkniętego.',
         ]);
         $saveAction = $validated['save_action'];
         $copyImageFromOffer = $request->boolean('copy_image_from_offer');
         $sourceOfferId = $validated['training_offer_id'] ?? null;
+        $sourceCaseId = isset($validated['closed_training_case_id'])
+            ? (int) $validated['closed_training_case_id']
+            : null;
         unset(
             $validated['save_action'],
             $validated['image'],
             $validated['copy_image_from_offer'],
             $validated['live_room_mode'],
             $validated['embed_email_link_enabled'],
+            $validated['closed_training_case_id'],
         );
+
+        $sourceCase = null;
+        if ($sourceCaseId) {
+            $sourceCase = ClosedTrainingCase::query()->findOrFail($sourceCaseId);
+            if ($sourceCase->course()->exists()) {
+                return back()
+                    ->withInput()
+                    ->with('error', 'Ta sprawa jest już powiązana ze szkoleniem. Odłącz je albo otwórz istniejące szkolenie.');
+            }
+        }
 
         $validated['certificate_format'] = $validated['certificate_format'] ?? '{nr}/{course_id}/{year}/PNE'; //
         $validated['sendy_suppression_list_id'] = ! empty(trim((string) ($validated['sendy_suppression_list_id'] ?? '')))
@@ -1085,6 +1123,15 @@ class CoursesController extends Controller
 
             // Kurs bez pliku w $validated — obraz zapisujemy osobno (walidacja zwraca UploadedFile, nie ścieżkę).
             $course = Course::create($validated);
+
+            if ($sourceCase instanceof ClosedTrainingCase) {
+                app(ClosedTrainingCaseService::class)->linkCourse(
+                    $sourceCase,
+                    $course,
+                    $request->user(),
+                    'create',
+                );
+            }
 
             $imageUploadWarning = null;
             if ($request->hasFile('image')) {
@@ -1150,6 +1197,10 @@ class CoursesController extends Controller
             if ($saveAction === 'stay_editing') {
                 $redirect = $this->redirectToCourseEdit($course->id)
                     ->with('success', 'Szkolenie zostało dodane. Możesz kontynuować edycję.');
+            } elseif ($sourceCase instanceof ClosedTrainingCase) {
+                $redirect = redirect()
+                    ->route('closed-training-cases.show', $sourceCase)
+                    ->with('success', 'Szkolenie zostało utworzone i powiązane ze sprawą.');
             } else {
                 $redirect = redirect()->route('courses.index')
                     ->with('success', 'Szkolenie zostało dodane!');
@@ -1159,6 +1210,10 @@ class CoursesController extends Controller
 
             return $redirect;
 
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            DB::rollBack();
+
+            throw $e;
         } catch (\Exception $e) {
             DB::rollBack();
             \Log::error('Błąd zapisu kursu: '.$e->getMessage());
@@ -1230,9 +1285,11 @@ class CoursesController extends Controller
         ];
     }
 
-    public function destroy($id)
+    public function destroy(Request $request, $id)
     {
         $course = Course::findOrFail($id);
+
+        app(ClosedTrainingCaseService::class)->detachCourseBeforeSoftDelete($course, $request->user());
 
         // Sprawdzenie, czy instruktor ma zdjęcie
         if ($course->image && Storage::disk('public')->exists($course->image)) {
@@ -1620,8 +1677,11 @@ class CoursesController extends Controller
      * }|null  $sourceClickMeeting
      * @return array<string, mixed>
      */
-    private function courseCreateFormData(?TrainingOffer $sourceOffer = null, ?array $sourceClickMeeting = null): array
-    {
+    private function courseCreateFormData(
+        ?TrainingOffer $sourceOffer = null,
+        ?array $sourceClickMeeting = null,
+        ?ClosedTrainingCase $sourceCase = null,
+    ): array {
         return [
             'instructors' => Instructor::all(),
             'paymentDisplayOptions' => PaymentDisplayOption::getSettings(),
@@ -1630,6 +1690,7 @@ class CoursesController extends Controller
                 ->get(),
             'sourceOffer' => $sourceOffer,
             'sourceClickMeeting' => $sourceClickMeeting,
+            'sourceCase' => $sourceCase,
             'registrationSuccessorOptions' => Course::query()
                 ->orderByDesc('start_date')
                 ->limit(200)

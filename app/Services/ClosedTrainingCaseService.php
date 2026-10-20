@@ -4,8 +4,12 @@ namespace App\Services;
 
 use App\Models\ClosedTrainingCase;
 use App\Models\ClosedTrainingCaseEvent;
+use App\Models\Course;
 use App\Models\User;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class ClosedTrainingCaseService
 {
@@ -198,6 +202,150 @@ class ClosedTrainingCaseService
             'body' => "E-mail wysłany do szkoły.\nDo: {$recipient}\nTemat: {$subject}\n\n{$body}",
             'happened_at' => now(),
         ]);
+    }
+
+    /**
+     * @param  'create'|'bind'|'replace'  $via
+     */
+    public function linkCourse(ClosedTrainingCase $case, Course $course, User $user, string $via = 'bind'): void
+    {
+        if ($course->trashed()) {
+            throw ValidationException::withMessages([
+                'course_id' => 'Nie można powiązać usuniętego szkolenia.',
+            ]);
+        }
+
+        $existing = $case->course()->first();
+        if ($existing && (int) $existing->id === (int) $course->id) {
+            return;
+        }
+
+        if ($existing && $via !== 'replace') {
+            throw ValidationException::withMessages([
+                'course_id' => 'Ta sprawa jest już powiązana ze szkoleniem #'.$existing->id.'. Najpierw odłącz obecne powiązanie.',
+            ]);
+        }
+
+        if ($course->closed_training_case_id !== null && (int) $course->closed_training_case_id !== (int) $case->id) {
+            throw ValidationException::withMessages([
+                'course_id' => 'Szkolenie #'.$course->id.' jest już powiązane z inną sprawą (#'.$course->closed_training_case_id.').',
+            ]);
+        }
+
+        try {
+            DB::transaction(function () use ($case, $course, $user, $via, $existing) {
+                if ($existing && $via === 'replace') {
+                    $existing->closed_training_case_id = null;
+                    $existing->save();
+                }
+
+                $course->closed_training_case_id = $case->id;
+                $course->save();
+
+                $case->events()->create([
+                    'user_id' => $user->id,
+                    'event_type' => ClosedTrainingCaseEvent::TYPE_UPDATED,
+                    'body' => $this->courseLinkSummary($course, $via, $existing),
+                    'happened_at' => now(),
+                ]);
+            });
+        } catch (UniqueConstraintViolationException $e) {
+            throw ValidationException::withMessages([
+                'course_id' => 'Nie udało się zapisać powiązania — sprawa lub szkolenie jest już powiązane. Odśwież stronę i spróbuj ponownie.',
+            ]);
+        }
+
+        $case->unsetRelation('course');
+    }
+
+    public function unlinkCourse(ClosedTrainingCase $case, User $user, string $reason = 'manual'): ?Course
+    {
+        $course = $case->course()->first();
+        if (! $course) {
+            return null;
+        }
+
+        DB::transaction(function () use ($case, $course, $user, $reason) {
+            $course->closed_training_case_id = null;
+            $course->save();
+
+            $case->events()->create([
+                'user_id' => $user->id,
+                'event_type' => ClosedTrainingCaseEvent::TYPE_UPDATED,
+                'body' => $this->courseUnlinkSummary($course, $reason),
+                'happened_at' => now(),
+            ]);
+        });
+
+        $case->unsetRelation('course');
+
+        return $course;
+    }
+
+    /**
+     * Soft delete szkolenia: wyczyść FK i dopisz historię, żeby UNIQUE nie blokował ponownego powiązania.
+     */
+    public function detachCourseBeforeSoftDelete(Course $course, ?User $user): void
+    {
+        if ($course->closed_training_case_id === null) {
+            return;
+        }
+
+        $case = ClosedTrainingCase::query()->find($course->closed_training_case_id);
+        if (! $case) {
+            $course->closed_training_case_id = null;
+            $course->save();
+
+            return;
+        }
+
+        DB::transaction(function () use ($case, $course, $user) {
+            $course->closed_training_case_id = null;
+            $course->save();
+
+            $case->events()->create([
+                'user_id' => $user?->id,
+                'event_type' => ClosedTrainingCaseEvent::TYPE_UPDATED,
+                'body' => $this->courseUnlinkSummary($course, 'soft_delete'),
+                'happened_at' => now(),
+            ]);
+        });
+    }
+
+    private function courseLinkSummary(Course $course, string $via, ?Course $previous): string
+    {
+        $label = $this->courseLabel($course);
+
+        return match ($via) {
+            'create' => 'Powiązano szkolenie (utworzone ze sprawy): '.$label.'.',
+            'replace' => 'Zmieniono powiązanie szkolenia'
+                .($previous ? ' z '.$this->courseLabel($previous) : '')
+                .' na '.$label.'.',
+            default => 'Powiązano szkolenie: '.$label.'.',
+        };
+    }
+
+    private function courseUnlinkSummary(Course $course, string $reason): string
+    {
+        $label = $this->courseLabel($course);
+
+        return match ($reason) {
+            'soft_delete' => 'Odłączono szkolenie '.$label.' (szkolenie usunięte).',
+            'replace' => 'Odłączono szkolenie '.$label.' (zmiana powiązania).',
+            default => 'Odłączono szkolenie '.$label.'.',
+        };
+    }
+
+    private function courseLabel(Course $course): string
+    {
+        $title = trim((string) $course->title);
+        $when = $course->start_date
+            ? $course->start_date->timezone(config('app.timezone'))->format('Y-m-d H:i')
+            : null;
+
+        return '#'.$course->id
+            .($title !== '' ? ' „'.$title.'”' : '')
+            .($when ? ' ('.$when.')' : '');
     }
 
     /**

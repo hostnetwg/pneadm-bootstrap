@@ -6,6 +6,7 @@ use App\Traits\LogsActivity;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
 
 class ClosedTrainingCase extends Model
@@ -87,6 +88,24 @@ class ClosedTrainingCase extends Model
     public function events(): HasMany
     {
         return $this->hasMany(ClosedTrainingCaseEvent::class)->orderBy('happened_at')->orderBy('id');
+    }
+
+    public function course(): HasOne
+    {
+        return $this->hasOne(Course::class, 'closed_training_case_id');
+    }
+
+    public function linkedCourseOfferMismatch(): bool
+    {
+        $course = $this->relationLoaded('course') ? $this->course : $this->course()->first();
+        if (! $course) {
+            return false;
+        }
+
+        $caseOfferId = $this->training_offer_id !== null ? (int) $this->training_offer_id : null;
+        $courseOfferId = $course->training_offer_id !== null ? (int) $course->training_offer_id : null;
+
+        return $caseOfferId !== $courseOfferId;
     }
 
     public static function statusOptions(): array

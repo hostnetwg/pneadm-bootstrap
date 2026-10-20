@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Mail\ClosedTrainingCaseSchoolMail;
 use App\Models\ClosedTrainingCase;
 use App\Models\ClosedTrainingCaseEvent;
+use App\Models\Course;
 use App\Models\TrainingOffer;
 use App\Models\User;
 use App\Services\ClosedTrainingSubmissionBackfill;
@@ -205,6 +206,8 @@ class ClosedTrainingCaseTest extends TestCase
             ->get(route('closed-training-cases.index'))
             ->assertOk()
             ->assertSee('Szkolenie rady przykładowej')
+            ->assertSee('Wiadomość')
+            ->assertSee('Telefon: prośba o termin w listopadzie.')
             ->assertSee('Oczekuje');
     }
 
@@ -518,5 +521,191 @@ class ClosedTrainingCaseTest extends TestCase
 
         $this->assertDatabaseMissing('closed_training_case_events', ['id' => $note->id]);
         $this->assertDatabaseHas('closed_training_case_events', ['id' => $foreignNote->id]);
+    }
+
+    public function test_operator_can_create_course_from_case_without_changing_status(): void
+    {
+        $user = User::factory()->create(['is_active' => true]);
+        $case = $this->makeCase([
+            'topic' => 'Szkolenie z sprawy do kursu',
+            'status' => ClosedTrainingCase::STATUS_IN_PROGRESS,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('closed-training-cases.create-course', $case))
+            ->assertOk()
+            ->assertSee('Tworzenie szkolenia ze sprawy')
+            ->assertSee('name="closed_training_case_id"', false)
+            ->assertSee('value="'.$case->id.'"', false);
+
+        $this->actingAs($user)
+            ->post(route('courses.store'), [
+                'title' => 'Szkolenie z sprawy do kursu',
+                'description' => 'Zakres',
+                'start_date' => now()->addDays(10)->format('Y-m-d\TH:i'),
+                'end_date' => now()->addDays(10)->addHours(2)->format('Y-m-d\TH:i'),
+                'is_paid' => '1',
+                'type' => 'online',
+                'category' => 'closed',
+                'closed_training_case_id' => $case->id,
+                'show_on_pnedu' => '0',
+                'platform' => 'ClickMeeting',
+                'meeting_link' => 'https://example.com/meeting',
+                'save_action' => 'close',
+            ])
+            ->assertRedirect(route('closed-training-cases.show', $case));
+
+        $case->refresh();
+        $this->assertSame(ClosedTrainingCase::STATUS_IN_PROGRESS, $case->status);
+        $this->assertNotNull($case->course);
+        $this->assertSame('Szkolenie z sprawy do kursu', $case->course->title);
+        $this->assertTrue(
+            $case->events()->where('body', 'like', 'Powiązano szkolenie (utworzone ze sprawy):%')->exists()
+        );
+    }
+
+    public function test_operator_can_bind_and_unbind_existing_course(): void
+    {
+        $user = User::factory()->create(['is_active' => true]);
+        $case = $this->makeCase();
+        $course = $this->makeCourse(['title' => 'Istniejący termin']);
+
+        $this->actingAs($user)
+            ->post(route('closed-training-cases.course.bind', $case), [
+                'course_id' => $course->id,
+            ])
+            ->assertRedirect(route('closed-training-cases.show', $case));
+
+        $case->refresh();
+        $course->refresh();
+        $this->assertSame($case->id, (int) $course->closed_training_case_id);
+        $this->assertSame(ClosedTrainingCase::STATUS_NEW, $case->status);
+
+        $this->actingAs($user)
+            ->get(route('courses.show', $course))
+            ->assertOk()
+            ->assertSee('Sprawa szkolenia zamkniętego')
+            ->assertSee('Otwórz sprawę');
+
+        $this->actingAs($user)
+            ->delete(route('closed-training-cases.course.unbind', $case))
+            ->assertRedirect(route('closed-training-cases.show', $case));
+
+        $course->refresh();
+        $this->assertNull($course->closed_training_case_id);
+        $this->assertTrue(
+            $case->events()->where('body', 'like', 'Odłączono szkolenie%')->exists()
+        );
+    }
+
+    public function test_cannot_silently_take_course_already_linked_to_another_case(): void
+    {
+        $user = User::factory()->create(['is_active' => true]);
+        $owner = $this->makeCase(['topic' => 'Sprawa właściciela']);
+        $other = $this->makeCase(['topic' => 'Inna sprawa']);
+        $course = $this->makeCourse(['title' => 'Zajęty termin']);
+
+        $this->actingAs($user)
+            ->post(route('closed-training-cases.course.bind', $owner), [
+                'course_id' => $course->id,
+            ])
+            ->assertRedirect(route('closed-training-cases.show', $owner));
+
+        $this->actingAs($user)
+            ->post(route('closed-training-cases.course.bind', $other), [
+                'course_id' => $course->id,
+            ])
+            ->assertSessionHasErrors('course_id');
+
+        $course->refresh();
+        $this->assertSame($owner->id, (int) $course->closed_training_case_id);
+        $this->assertNull($other->fresh()->course);
+    }
+
+    public function test_soft_deleting_linked_course_clears_fk_and_writes_history(): void
+    {
+        $user = User::factory()->create(['is_active' => true]);
+        $case = $this->makeCase();
+        $course = $this->makeCourse(['title' => 'Do usunięcia']);
+
+        $this->actingAs($user)
+            ->post(route('closed-training-cases.course.bind', $case), [
+                'course_id' => $course->id,
+            ])
+            ->assertRedirect();
+
+        $this->actingAs($user)
+            ->delete(route('courses.destroy', $course->id))
+            ->assertRedirect(route('courses.index'));
+
+        $this->assertSoftDeleted('courses', ['id' => $course->id]);
+        $this->assertDatabaseHas('courses', [
+            'id' => $course->id,
+            'closed_training_case_id' => null,
+        ]);
+        $this->assertNull($case->fresh()->course);
+        $this->assertTrue(
+            $case->events()->where('body', 'like', '%szkolenie usunięte%')->exists()
+        );
+    }
+
+    public function test_storing_course_without_case_still_works(): void
+    {
+        $user = User::factory()->create(['is_active' => true]);
+
+        $this->actingAs($user)
+            ->post(route('courses.store'), [
+                'title' => 'Szkolenie bez sprawy',
+                'description' => 'Zakres',
+                'start_date' => now()->addDays(3)->format('Y-m-d\TH:i'),
+                'end_date' => now()->addDays(3)->addHours(2)->format('Y-m-d\TH:i'),
+                'is_paid' => '1',
+                'type' => 'online',
+                'category' => 'open',
+                'show_on_pnedu' => '0',
+                'platform' => 'ClickMeeting',
+                'meeting_link' => 'https://example.com/meeting-open',
+                'save_action' => 'close',
+            ])
+            ->assertRedirect(route('courses.index'));
+
+        $this->assertDatabaseHas('courses', [
+            'title' => 'Szkolenie bez sprawy',
+            'closed_training_case_id' => null,
+        ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $overrides
+     */
+    private function makeCase(array $overrides = []): ClosedTrainingCase
+    {
+        return ClosedTrainingCase::query()->create(array_merge([
+            'source' => ClosedTrainingCase::SOURCE_MANUAL,
+            'status' => ClosedTrainingCase::STATUS_NEW,
+            'topic' => 'Sprawa testowa',
+            'contact_name' => 'Osoba',
+            'message' => 'Treść zapytania.',
+        ], $overrides));
+    }
+
+    /**
+     * @param  array<string, mixed>  $overrides
+     */
+    private function makeCourse(array $overrides = []): Course
+    {
+        $start = now()->addDays(5);
+
+        return Course::query()->create(array_merge([
+            'title' => 'Kurs testowy',
+            'description' => 'Opis',
+            'start_date' => $start,
+            'end_date' => $start->copy()->addHours(2),
+            'is_paid' => true,
+            'type' => 'online',
+            'category' => 'closed',
+            'is_active' => true,
+            'certificate_format' => '{nr}/PNE',
+        ], $overrides));
     }
 }

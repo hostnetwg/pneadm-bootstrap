@@ -173,6 +173,60 @@
                         </div>
                     </div>
 
+                    <div class="card mb-4">
+                        <div class="card-header fw-semibold">Szkolenie (termin)</div>
+                        <div class="card-body">
+                            @if($case->course)
+                                <p class="mb-1">
+                                    <a href="{{ route('courses.show', $case->course) }}" class="fw-semibold">
+                                        #{{ $case->course->id }} {{ $case->course->title }}
+                                    </a>
+                                </p>
+                                @if($case->course->start_date)
+                                    <p class="text-secondary small mb-3">
+                                        {{ $case->formatLocal($case->course->start_date) }}
+                                        @if($case->course->end_date)
+                                            – {{ $case->formatLocal($case->course->end_date) }}
+                                        @endif
+                                    </p>
+                                @endif
+                                @if($case->linkedCourseOfferMismatch())
+                                    <div class="alert alert-warning py-2 small">
+                                        Oferta na sprawie i na szkoleniu różni się — zakres mógł zmienić się w negocjacjach. Pola nie są synchronizowane automatycznie.
+                                    </div>
+                                @endif
+                                <div class="d-flex flex-wrap gap-2">
+                                    <a href="{{ route('courses.show', $case->course) }}" class="btn btn-outline-primary btn-sm">Otwórz szkolenie</a>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#closedTrainingCaseReplaceCourseModal">
+                                        Zmień powiązanie
+                                    </button>
+                                    <button type="button" class="btn btn-outline-danger btn-sm" data-bs-toggle="modal" data-bs-target="#closedTrainingCaseUnbindCourseModal">
+                                        Odłącz
+                                    </button>
+                                </div>
+                                @if($case->status !== \App\Models\ClosedTrainingCase::STATUS_CLOSED)
+                                    <p class="form-text mb-0 mt-3">Status sprawy nie zmienia się automatycznie. Możesz zamknąć sprawę w panelu Obsługa.</p>
+                                @endif
+                            @else
+                                <p class="text-secondary mb-3">Brak powiązanego szkolenia. Po uzgodnieniu terminu utwórz rekord albo powiąż istniejący.</p>
+                                <div class="d-flex flex-wrap gap-2 mb-3">
+                                    <a href="{{ route('closed-training-cases.create-course', $case) }}" class="btn btn-primary btn-sm">Utwórz szkolenie ze sprawy</a>
+                                </div>
+                                <form method="POST" action="{{ route('closed-training-cases.course.bind', $case) }}" class="row g-2 align-items-end">
+                                    @csrf
+                                    <div class="col-sm-8">
+                                        <label for="course_id" class="form-label">Powiąż istniejące (ID szkolenia)</label>
+                                        <input type="number" name="course_id" id="course_id" min="1" value="{{ old('course_id') }}" class="form-control @error('course_id') is-invalid @enderror" placeholder="np. 578" required>
+                                        @error('course_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                    </div>
+                                    <div class="col-sm-4">
+                                        <button type="submit" class="btn btn-outline-primary w-100">Powiąż</button>
+                                    </div>
+                                </form>
+                            @endif
+                        </div>
+                    </div>
+
                     <div class="card">
                         <div class="card-header fw-semibold">Historia</div>
                         <ul class="list-group list-group-flush">
@@ -301,6 +355,59 @@
                 </div>
             </div>
     </div>
+
+    @if($case->course)
+        <div class="modal fade" id="closedTrainingCaseUnbindCourseModal" tabindex="-1" aria-labelledby="closedTrainingCaseUnbindCourseModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <form method="POST" action="{{ route('closed-training-cases.course.unbind', $case) }}">
+                        @csrf
+                        @method('DELETE')
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="closedTrainingCaseUnbindCourseModalLabel">Odłącz szkolenie</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+                        </div>
+                        <div class="modal-body">
+                            <p class="mb-2">Odłączyć szkolenie od tej sprawy?</p>
+                            <div class="alert alert-warning mb-0">
+                                Szkolenie #{{ $case->course->id }} „{{ $case->course->title }}” pozostanie w systemie — usunięte zostanie tylko powiązanie. Wpis trafi do historii sprawy.
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Wróć</button>
+                            <button type="submit" class="btn btn-danger">Odłącz</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal fade" id="closedTrainingCaseReplaceCourseModal" tabindex="-1" aria-labelledby="closedTrainingCaseReplaceCourseModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <form method="POST" action="{{ route('closed-training-cases.course.bind', $case) }}">
+                        @csrf
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="closedTrainingCaseReplaceCourseModalLabel">Zmień powiązanie</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+                        </div>
+                        <div class="modal-body">
+                            <p class="mb-2">Obecne szkolenie: <strong>#{{ $case->course->id }} {{ $case->course->title }}</strong></p>
+                            <div class="alert alert-warning">
+                                Nowe szkolenie nie może być już powiązane z inną sprawą. Zmiana zostanie zapisana w historii.
+                            </div>
+                            <label for="replace_course_id" class="form-label">ID nowego szkolenia</label>
+                            <input type="number" name="course_id" id="replace_course_id" min="1" class="form-control" required placeholder="np. 578">
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Wróć</button>
+                            <button type="submit" class="btn btn-primary">Zmień powiązanie</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    @endif
 
     <div class="modal fade" id="closedTrainingCaseEventEditModal" tabindex="-1" aria-labelledby="closedTrainingCaseEventEditModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-lg">

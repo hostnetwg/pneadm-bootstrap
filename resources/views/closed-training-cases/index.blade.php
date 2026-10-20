@@ -43,6 +43,7 @@
                         <thead>
                             <tr>
                                 <th>Temat szkolenia</th>
+                                <th>Wiadomość</th>
                                 <th>Placówka</th>
                                 <th>Status</th>
                                 <th>Opiekun</th>
@@ -55,6 +56,14 @@
                                     <td>
                                         <a href="{{ route('closed-training-cases.show', $case) }}">{{ $case->trainingTopicLabel() }}</a>
                                         <div class="small text-muted">{{ $case->sourceLabel() }}</div>
+                                    </td>
+                                    <td style="min-width: 14rem; max-width: 28rem;">
+                                        @php($messagePreview = trim(preg_replace('/\s+/u', ' ', (string) $case->message)))
+                                        @if($messagePreview !== '')
+                                            <div class="small" title="{{ $messagePreview }}">{{ \Illuminate\Support\Str::limit($messagePreview, 180) }}</div>
+                                        @else
+                                            <span class="text-muted">—</span>
+                                        @endif
                                     </td>
                                     <td>
                                         {{ $case->institution ?: '—' }}
@@ -71,7 +80,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="5" class="text-muted p-4">Brak spraw dla tego filtra.</td>
+                                    <td colspan="6" class="text-muted p-4">Brak spraw dla tego filtra.</td>
                                 </tr>
                             @endforelse
                         </tbody>

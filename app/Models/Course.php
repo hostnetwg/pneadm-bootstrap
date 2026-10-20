@@ -38,6 +38,7 @@ class Course extends Model
         'category', // open/closed
         'instructor_id',
         'training_offer_id',
+        'closed_training_case_id',
         'image',
         'is_active',
         'certificate_format',
@@ -163,6 +164,11 @@ class Course extends Model
     public function trainingOffer()
     {
         return $this->belongsTo(TrainingOffer::class, 'training_offer_id');
+    }
+
+    public function closedTrainingCase()
+    {
+        return $this->belongsTo(ClosedTrainingCase::class, 'closed_training_case_id');
     }
 
     /**

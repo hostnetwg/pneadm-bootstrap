@@ -6,6 +6,7 @@ Krótka numeracja panelu. Szczegóły zawsze w `docs/`. Nowy numer wersji (np. 1
 
 Windykacja: masowe przypomnienia po wyciągu oraz doprecyzowanie wyszukiwania przelewów i danych sprawy.
 
+- **Hotfix 2026-10-20:** na [Sprawach szkoleń zamkniętych](/closed-training-cases) lista pokazuje podgląd **Wiadomości**. Z karty sprawy można **utworzyć szkolenie** albo **powiązać istniejące** (`courses`); na karcie szkolenia jest link wstecz do sprawy. Powiązanie nie zmienia statusu sprawy. Soft delete szkolenia odłącza powiązanie i zapisuje to w historii. Kanon: [operations-os/CURRENT.md](docs/operations-os/CURRENT.md)
 - Na [Import wyciągu](/accounting/bank-imports) jest przycisk **Przypomnienia o zaległych płatnościach** (tylko gdy nie ma luk w okresach i „Do przeglądu” = 0). Kreator z zakładkami Standard / VIP, wybór e-mail i SMS, kolejka z ponowną kontrolą i opcjonalnym sprawdzeniem iFirma, raport kampanii. Bez automatycznego crona. Kanon: [WINDYKACJA.md](docs/WINDYKACJA.md)
 - Na karcie [sprawy windykacyjnej](/accounting/collections) wyszukiwarka przelewów domyślnie pokazuje wszystkie wpływy (także „Do przeglądu” i już przypisane — z oznaczeniem) oraz szuka FV także po powiązaniach, jak lista importów.
 - Gdy w zamówieniu zmieni się kwota albo temat szkolenia, sprawa wykrywa rozjazd i proponuje aktualizację (tak jak przy zmianie numeru FV).

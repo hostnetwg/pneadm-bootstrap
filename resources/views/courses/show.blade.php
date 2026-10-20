@@ -474,6 +474,43 @@
                 </div>
 
                 <div class="col-md-4">
+                    @if($course->closedTrainingCase)
+                        <div class="card mb-4 border-primary">
+                            <div class="card-header bg-primary text-white">
+                                <h5 class="mb-0">Sprawa szkolenia zamkniętego</h5>
+                            </div>
+                            <div class="card-body">
+                                <p class="mb-1">
+                                    <a href="{{ route('closed-training-cases.show', $course->closedTrainingCase) }}" class="fw-semibold">
+                                        #{{ $course->closedTrainingCase->id }} {{ $course->closedTrainingCase->trainingTopicLabel() }}
+                                    </a>
+                                </p>
+                                <p class="small text-muted mb-2">
+                                    {{ $course->closedTrainingCase->statusLabel() }}
+                                    @if($course->closedTrainingCase->institution)
+                                        · {{ $course->closedTrainingCase->institution }}
+                                    @endif
+                                </p>
+                                @php
+                                    $caseOfferId = $course->closedTrainingCase->training_offer_id !== null
+                                        ? (int) $course->closedTrainingCase->training_offer_id
+                                        : null;
+                                    $courseOfferId = $course->training_offer_id !== null
+                                        ? (int) $course->training_offer_id
+                                        : null;
+                                @endphp
+                                @if($caseOfferId !== $courseOfferId)
+                                    <div class="alert alert-warning py-2 small mb-2">
+                                        Oferta na sprawie i na szkoleniu różni się. Pola nie są synchronizowane automatycznie.
+                                    </div>
+                                @endif
+                                <a href="{{ route('closed-training-cases.show', $course->closedTrainingCase) }}" class="btn btn-sm btn-outline-primary">
+                                    Otwórz sprawę
+                                </a>
+                            </div>
+                        </div>
+                    @endif
+
                     <!-- Statystyki -->
                     <div class="card mb-4">
                         <div class="card-header">
