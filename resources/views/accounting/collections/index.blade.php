@@ -11,6 +11,9 @@
                 <a href="{{ route('accounting.debtors.index') }}" class="btn btn-outline-success btn-sm">
                     <i class="bi bi-search"></i> Lookup faktury
                 </a>
+                <a href="{{ route('accounting.collections.effectiveness') }}" class="btn btn-outline-info btn-sm">
+                    <i class="bi bi-graph-up"></i> Skuteczność
+                </a>
                 <a href="{{ route('accounting.collections.settings.edit') }}" class="btn btn-outline-dark btn-sm">
                     <i class="bi bi-gear"></i> Ustawienia
                 </a>
@@ -120,7 +123,7 @@
                                     <input type="text" id="search" name="search" class="form-control form-control-sm"
                                            value="{{ $search }}" placeholder="FV, KSeF, ID, NIP, e-mail, nazwa">
                                 </div>
-                                <div class="col-6">
+                                <div class="col-6 col-md-4">
                                     <label for="status" class="form-label small mb-1">Status</label>
                                     <select id="status" name="status" class="form-select form-select-sm">
                                         <option value="active" @selected($status === 'active')>Niezamknięte</option>
@@ -130,7 +133,7 @@
                                         @endforeach
                                     </select>
                                 </div>
-                                <div class="col-6">
+                                <div class="col-6 col-md-4">
                                     <label for="segment" class="form-label small mb-1">Segment</label>
                                     <select id="segment" name="segment" class="form-select form-select-sm">
                                         <option value="">Wszystkie</option>
@@ -139,11 +142,31 @@
                                         @endforeach
                                     </select>
                                 </div>
+                                <div class="col-12 col-md-4">
+                                    <label for="contact" class="form-label small mb-1">Kontakt</label>
+                                    <select id="contact" name="contact" class="form-select form-select-sm"
+                                            title="E-mail/SMS wysłane albo wpis telefonu w historii. Przy Zamknięte domyślnie «Z kontaktem».">
+                                        <option value="all" @selected(($contact ?? 'all') === 'all')>Wszystkie</option>
+                                        <option value="with" @selected(($contact ?? 'all') === 'with')>Z kontaktem</option>
+                                        <option value="without" @selected(($contact ?? 'all') === 'without')>Bez kontaktu</option>
+                                    </select>
+                                </div>
+                                @if($status === \App\Models\DebtCase::STATUS_CLOSED)
+                                    <div class="col-12">
+                                        <div class="small text-muted">
+                                            Zamknięte: domyślnie sprawy z monitami.
+                                            Bez kontaktu: {{ $stats['closed_without_contact'] ?? 0 }}
+                                            · Z kontaktem: {{ $stats['closed_with_contact'] ?? 0 }}
+                                            ·
+                                            <a href="{{ route('accounting.collections.effectiveness') }}">Widok skuteczności</a>
+                                        </div>
+                                    </div>
+                                @endif
                                 <div class="col-12 d-flex gap-2">
                                     <button type="submit" class="btn btn-primary btn-sm">
                                         <i class="bi bi-search"></i> Filtruj
                                     </button>
-                                    @if($search !== '' || $status !== 'active' || $segment !== '')
+                                    @if($search !== '' || $status !== 'active' || $segment !== '' || ($contact ?? 'all') !== 'all')
                                         <a href="{{ route('accounting.collections.index') }}" class="btn btn-outline-secondary btn-sm">Wyczyść</a>
                                     @endif
                                 </div>
@@ -354,7 +377,14 @@
                                         <div>{{ $order->recipient_name ?: $order->buyer_name ?: $order->orderer_name ?: '—' }}</div>
                                         <div class="small text-muted">{{ $order->orderer_email ?: $order->display_participant_email }}</div>
                                     </td>
-                                    <td><span class="badge {{ $case->statusBadgeClass() }}">{{ $case->statusLabel() }}</span></td>
+                                    <td>
+                                        <span class="badge {{ $case->statusBadgeClass() }}">{{ $case->statusLabel() }}</span>
+                                        @if(! $case->hasCollectionContact())
+                                            <div class="mt-1">
+                                                <span class="badge text-bg-light border text-muted" title="Brak e-maila/SMS (sent) i telefonu w historii — np. zamknięcie po dopasowaniu przelewu.">bez kontaktu</span>
+                                            </div>
+                                        @endif
+                                    </td>
                                     <td>
                                         <span class="badge {{ $case->isVip() ? 'text-bg-warning' : 'text-bg-light border' }}">
                                             {{ $case->segmentLabel() }}

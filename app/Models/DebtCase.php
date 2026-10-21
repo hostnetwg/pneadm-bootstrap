@@ -286,6 +286,106 @@ class DebtCase extends Model
     }
 
     /**
+     * Czy sprawa miała kontakt windykacyjny: prawdziwy e-mail/SMS (outcome=sent) albo wpis telefonu.
+     * Nie obejmuje samego dopasowania przelewu / zamknięcia bez monitu.
+     */
+    public function hasCollectionContact(): bool
+    {
+        return $this->reminderEmailsSentCount() > 0
+            || $this->reminderSmsSentCount() > 0
+            || $this->phoneCallsLoggedCount() > 0;
+    }
+
+    /**
+     * Najpóźniejsza data kontaktu (e-mail, SMS lub telefon).
+     */
+    public function lastCollectionContactAt(): ?\Illuminate\Support\Carbon
+    {
+        $dates = array_values(array_filter([
+            $this->lastReminderEmailSentAt(),
+            $this->lastReminderSmsSentAt(),
+            $this->lastPhoneCallLoggedAt(),
+        ]));
+
+        if ($dates === []) {
+            return null;
+        }
+
+        return collect($dates)->sortByDesc(fn (\Illuminate\Support\Carbon $at) => $at->getTimestamp())->first();
+    }
+
+    /**
+     * Kanał ostatniego kontaktu (przy remisie timestampów: telefon → SMS → e-mail).
+     */
+    public function lastCollectionContactChannelLabel(): ?string
+    {
+        $last = $this->lastCollectionContactAt();
+        if ($last === null) {
+            return null;
+        }
+
+        $candidates = [
+            ['at' => $this->lastPhoneCallLoggedAt(), 'label' => 'Telefon'],
+            ['at' => $this->lastReminderSmsSentAt(), 'label' => 'SMS'],
+            ['at' => $this->lastReminderEmailSentAt(), 'label' => 'E-mail'],
+        ];
+
+        foreach ($candidates as $candidate) {
+            if ($candidate['at'] !== null && $candidate['at']->getTimestamp() === $last->getTimestamp()) {
+                return $candidate['label'];
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Liczba dni kalendarzowych od ostatniego kontaktu do zamknięcia sprawy (null gdy brak danych).
+     * Ujemna wartość = kontakt po dacie zamknięcia.
+     */
+    public function daysFromLastContactToClose(): ?int
+    {
+        $last = $this->lastCollectionContactAt();
+        $closed = $this->closed_at;
+        if ($last === null || $closed === null) {
+            return null;
+        }
+
+        $from = $last->copy()->timezone(config('app.timezone'))->startOfDay();
+        $to = $closed->copy()->timezone(config('app.timezone'))->startOfDay();
+
+        return (int) round(($to->getTimestamp() - $from->getTimestamp()) / 86400);
+    }
+
+    /**
+     * Sprawy z co najmniej jednym kontaktem (e-mail/SMS sent lub telefon).
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder<\App\Models\DebtCase>  $query
+     * @return \Illuminate\Database\Eloquent\Builder<\App\Models\DebtCase>
+     */
+    public function scopeWithCollectionContact($query)
+    {
+        return $query->where(function ($inner) {
+            $inner->whereHas('reminderEmailsSent')
+                ->orWhereHas('reminderSmsSent')
+                ->orWhereHas('phoneCallsLogged');
+        });
+    }
+
+    /**
+     * Sprawy bez kontaktu windykacyjnego (np. zamknięte tylko po dopasowaniu przelewu).
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder<\App\Models\DebtCase>  $query
+     * @return \Illuminate\Database\Eloquent\Builder<\App\Models\DebtCase>
+     */
+    public function scopeWithoutCollectionContact($query)
+    {
+        return $query->whereDoesntHave('reminderEmailsSent')
+            ->whereDoesntHave('reminderSmsSent')
+            ->whereDoesntHave('phoneCallsLogged');
+    }
+
+    /**
      * Etykieta ostatniej wysyłki: „dziś 14:32” albo „15.10.2026 14:32”; null gdy brak.
      */
     public function reminderLastSentLabel(?\Illuminate\Support\Carbon $at): ?string

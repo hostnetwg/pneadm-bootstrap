@@ -285,6 +285,17 @@ class AccountingController extends Controller
             $sort = 'id';
         }
 
+        // Kontakt: przy statusie Zamknięte domyślnie „Z kontaktem” (skuteczność monitów, nie sam bank-match).
+        $allowedContacts = ['all', 'with', 'without'];
+        $rawContact = (string) $request->get('contact', '');
+        if ($status === DebtCase::STATUS_CLOSED) {
+            $contact = ($request->has('contact') && in_array($rawContact, $allowedContacts, true))
+                ? $rawContact
+                : 'with';
+        } else {
+            $contact = in_array($rawContact, $allowedContacts, true) ? $rawContact : 'all';
+        }
+
         $casesQuery = DebtCase::query()
             ->select('debt_cases.*')
             ->leftJoin('form_orders', 'form_orders.id', '=', 'debt_cases.form_order_id')
@@ -298,6 +309,12 @@ class AccountingController extends Controller
             $casesQuery->active();
         } elseif ($status !== 'all' && array_key_exists($status, DebtCase::statusLabels())) {
             $casesQuery->where('debt_cases.status', $status);
+        }
+
+        if ($contact === 'with') {
+            $casesQuery->withCollectionContact();
+        } elseif ($contact === 'without') {
+            $casesQuery->withoutCollectionContact();
         }
 
         if ($segment !== '' && array_key_exists($segment, DebtCase::segmentLabels())) {
@@ -330,6 +347,7 @@ class AccountingController extends Controller
             'search' => $search,
             'status' => $status,
             'segment' => $segment,
+            'contact' => $contact,
             'sort' => $sort,
             'dir' => $direction,
         ]);
@@ -344,6 +362,8 @@ class AccountingController extends Controller
                 ->whereNotNull('next_action_at')
                 ->where('next_action_at', '<=', now()->endOfDay())
                 ->count(),
+            'closed_with_contact' => DebtCase::where('status', DebtCase::STATUS_CLOSED)->withCollectionContact()->count(),
+            'closed_without_contact' => DebtCase::where('status', DebtCase::STATUS_CLOSED)->withoutCollectionContact()->count(),
         ];
 
         return view('accounting.collections.index', [
@@ -351,11 +371,105 @@ class AccountingController extends Controller
             'stats' => $stats,
             'status' => $status,
             'segment' => $segment,
+            'contact' => $contact,
             'search' => $search,
             'sort' => $sort,
             'direction' => $direction,
             'statusLabels' => DebtCase::statusLabels(),
             'segmentLabels' => DebtCase::segmentLabels(),
+        ]);
+    }
+
+    /**
+     * Widok skuteczności kontaktu: zamknięte sprawy z monitami (e-mail/SMS/telefon)
+     * oraz dni od ostatniego kontaktu do zamknięcia.
+     */
+    public function collectionsEffectiveness(Request $request)
+    {
+        $search = trim((string) $request->get('search', ''));
+        $daysRaw = $request->get('days', '90');
+        $allowedDays = [30, 90, 180, 365, 0];
+        $days = in_array((int) $daysRaw, $allowedDays, true) ? (int) $daysRaw : 90;
+
+        $casesQuery = DebtCase::query()
+            ->select('debt_cases.*')
+            ->leftJoin('form_orders', 'form_orders.id', '=', 'debt_cases.form_order_id')
+            ->where('debt_cases.status', DebtCase::STATUS_CLOSED)
+            ->withCollectionContact()
+            ->with(['formOrder.primaryParticipant', 'assignedTo'])
+            ->withCount(['reminderEmailsSent', 'reminderSmsSent', 'phoneCallsLogged'])
+            ->withMax(['reminderEmailsSent as last_reminder_email_sent_at'], 'happened_at')
+            ->withMax(['reminderSmsSent as last_reminder_sms_sent_at'], 'happened_at')
+            ->withMax(['phoneCallsLogged as last_phone_call_logged_at'], 'happened_at');
+
+        if ($days > 0) {
+            $casesQuery->where('debt_cases.closed_at', '>=', now()->subDays($days)->startOfDay());
+        }
+
+        if ($search !== '') {
+            $casesQuery->where(function ($query) use ($search) {
+                $query->where('debt_cases.invoice_number', 'like', "%{$search}%")
+                    ->orWhere('debt_cases.ksef_number', 'like', "%{$search}%")
+                    ->orWhere('form_orders.invoice_number', 'like', "%{$search}%")
+                    ->orWhere('form_orders.ksef_number', 'like', "%{$search}%")
+                    ->orWhere('form_orders.buyer_name', 'like', "%{$search}%")
+                    ->orWhere('form_orders.recipient_name', 'like', "%{$search}%")
+                    ->orWhere('form_orders.orderer_email', 'like', "%{$search}%");
+
+                if (ctype_digit($search)) {
+                    $query->orWhere('debt_cases.id', (int) $search)
+                        ->orWhere('debt_cases.form_order_id', (int) $search)
+                        ->orWhere('form_orders.id', (int) $search);
+                }
+            });
+        }
+
+        $casesQuery->orderByDesc('debt_cases.closed_at')->orderByDesc('debt_cases.id');
+
+        $cases = $casesQuery->paginate(25)->appends([
+            'search' => $search,
+            'days' => $days,
+        ]);
+
+        $statsSample = DebtCase::query()
+            ->where('status', DebtCase::STATUS_CLOSED)
+            ->withCollectionContact()
+            ->when($days > 0, fn ($q) => $q->where('closed_at', '>=', now()->subDays($days)->startOfDay()))
+            ->withMax(['reminderEmailsSent as last_reminder_email_sent_at'], 'happened_at')
+            ->withMax(['reminderSmsSent as last_reminder_sms_sent_at'], 'happened_at')
+            ->withMax(['phoneCallsLogged as last_phone_call_logged_at'], 'happened_at')
+            ->orderByDesc('closed_at')
+            ->limit(500)
+            ->get();
+
+        $daySpans = $statsSample
+            ->map(fn (DebtCase $case) => $case->daysFromLastContactToClose())
+            ->filter(fn ($value) => $value !== null && $value >= 0)
+            ->values();
+
+        $sortedSpans = $daySpans->sort()->values();
+        $medianDays = null;
+        if ($sortedSpans->isNotEmpty()) {
+            $mid = (int) floor(($sortedSpans->count() - 1) / 2);
+            $medianDays = $sortedSpans->count() % 2 === 1
+                ? (int) $sortedSpans[$mid]
+                : (int) round(($sortedSpans[$mid] + $sortedSpans[$mid + 1]) / 2);
+        }
+
+        $stats = [
+            'closed_with_contact' => DebtCase::where('status', DebtCase::STATUS_CLOSED)->withCollectionContact()->count(),
+            'closed_without_contact' => DebtCase::where('status', DebtCase::STATUS_CLOSED)->withoutCollectionContact()->count(),
+            'in_period' => $cases->total(),
+            'avg_days' => $daySpans->isNotEmpty() ? round((float) $daySpans->avg(), 1) : null,
+            'median_days' => $medianDays,
+            'sample_size' => $daySpans->count(),
+        ];
+
+        return view('accounting.collections.effectiveness', [
+            'cases' => $cases,
+            'stats' => $stats,
+            'search' => $search,
+            'days' => $days,
         ]);
     }
 

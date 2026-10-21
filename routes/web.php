@@ -769,6 +769,7 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
         Route::prefix('collections')->name('collections.')->group(function () {
             Route::get('/', [AccountingController::class, 'collectionsIndex'])->name('index');
             Route::post('/', [AccountingController::class, 'collectionsStore'])->name('store');
+            Route::get('/effectiveness', [AccountingController::class, 'collectionsEffectiveness'])->name('effectiveness');
             Route::get('/settings', [AccountingController::class, 'collectionsSettingsEdit'])->name('settings.edit');
             Route::post('/settings', [AccountingController::class, 'collectionsSettingsUpdate'])->name('settings.update');
             Route::get('/{debtCase}', [AccountingController::class, 'collectionsShow'])->name('show');

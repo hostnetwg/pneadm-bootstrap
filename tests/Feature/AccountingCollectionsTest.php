@@ -2024,4 +2024,135 @@ class AccountingCollectionsTest extends TestCase
         $this->assertSame('76/2026', $order->invoice_number);
         $this->assertSame('222', $order->ifirma_invoice_id);
     }
+
+    public function test_collections_closed_defaults_to_with_contact_filter(): void
+    {
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+            'is_active' => 1,
+        ]);
+
+        $withOrder = FormOrder::create([
+            'product_name' => 'Z kontaktem',
+            'product_price' => 100,
+            'order_date' => now()->subDays(20),
+            'invoice_number' => '801/contact/2026',
+        ]);
+        $withoutOrder = FormOrder::create([
+            'product_name' => 'Bez kontaktu',
+            'product_price' => 100,
+            'order_date' => now()->subDays(20),
+            'invoice_number' => '802/nocontact/2026',
+        ]);
+
+        $withCase = DebtCase::create([
+            'form_order_id' => $withOrder->id,
+            'status' => DebtCase::STATUS_CLOSED,
+            'invoice_number' => '801/contact/2026',
+            'opened_at' => now()->subDays(10),
+            'closed_at' => now()->subDays(2),
+        ]);
+        DebtCaseAction::create([
+            'debt_case_id' => $withCase->id,
+            'user_id' => $user->id,
+            'action_type' => DebtCaseAction::TYPE_EMAIL,
+            'channel' => 'email',
+            'outcome' => 'sent',
+            'happened_at' => now()->subDays(5),
+            'note' => 'monit',
+        ]);
+
+        DebtCase::create([
+            'form_order_id' => $withoutOrder->id,
+            'status' => DebtCase::STATUS_CLOSED,
+            'invoice_number' => '802/nocontact/2026',
+            'opened_at' => now()->subDays(10),
+            'closed_at' => now()->subDay(),
+            'closure_reason' => 'bank_match',
+        ]);
+
+        $defaultClosed = $this->actingAs($user)->get(route('accounting.collections.index', [
+            'status' => 'closed',
+        ]));
+        $defaultClosed->assertOk();
+        $defaultClosed->assertSee('801/contact/2026');
+        $defaultClosed->assertDontSee('802/nocontact/2026');
+        $defaultClosed->assertSee('name="contact"', false);
+        $defaultClosed->assertSee('value="with"', false);
+
+        $without = $this->actingAs($user)->get(route('accounting.collections.index', [
+            'status' => 'closed',
+            'contact' => 'without',
+        ]));
+        $without->assertOk();
+        $without->assertSee('802/nocontact/2026');
+        $without->assertDontSee('801/contact/2026');
+        $without->assertSee('bez kontaktu', false);
+
+        $allClosed = $this->actingAs($user)->get(route('accounting.collections.index', [
+            'status' => 'closed',
+            'contact' => 'all',
+        ]));
+        $allClosed->assertOk();
+        $allClosed->assertSee('801/contact/2026');
+        $allClosed->assertSee('802/nocontact/2026');
+    }
+
+    public function test_collections_effectiveness_shows_closed_with_contact_and_days(): void
+    {
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+            'is_active' => 1,
+        ]);
+
+        $withOrder = FormOrder::create([
+            'product_name' => 'Skuteczność OK',
+            'product_price' => 150,
+            'order_date' => now()->subDays(30),
+            'invoice_number' => '901/eff/2026',
+        ]);
+        $withoutOrder = FormOrder::create([
+            'product_name' => 'Tylko bank',
+            'product_price' => 150,
+            'order_date' => now()->subDays(30),
+            'invoice_number' => '902/eff/2026',
+        ]);
+
+        $withCase = DebtCase::create([
+            'form_order_id' => $withOrder->id,
+            'status' => DebtCase::STATUS_CLOSED,
+            'invoice_number' => '901/eff/2026',
+            'amount_gross' => 150,
+            'opened_at' => now()->subDays(20),
+            'closed_at' => now()->subDays(3),
+            'closure_reason' => 'paid',
+        ]);
+        DebtCaseAction::create([
+            'debt_case_id' => $withCase->id,
+            'user_id' => $user->id,
+            'action_type' => DebtCaseAction::TYPE_SMS,
+            'channel' => 'sms',
+            'outcome' => 'sent',
+            'happened_at' => now()->subDays(7),
+            'note' => 'sms monit',
+        ]);
+
+        DebtCase::create([
+            'form_order_id' => $withoutOrder->id,
+            'status' => DebtCase::STATUS_CLOSED,
+            'invoice_number' => '902/eff/2026',
+            'opened_at' => now()->subDays(15),
+            'closed_at' => now()->subDay(),
+        ]);
+
+        $response = $this->actingAs($user)->get(route('accounting.collections.effectiveness'));
+
+        $response->assertOk();
+        $response->assertSee('Skuteczność kontaktu', false);
+        $response->assertSee('901/eff/2026');
+        $response->assertDontSee('902/eff/2026');
+        $response->assertSee('>4<', false);
+        $this->assertSame(4, $withCase->fresh()->daysFromLastContactToClose());
+        $this->assertSame('SMS', $withCase->fresh()->lastCollectionContactChannelLabel());
+    }
 }
