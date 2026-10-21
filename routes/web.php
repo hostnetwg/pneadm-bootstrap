@@ -474,6 +474,8 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
         ->name('closed-training-cases.course.unbind');
     Route::put('/closed-training-cases/{closedTrainingCase}/events/{event}', [ClosedTrainingCaseController::class, 'updateEvent'])->name('closed-training-cases.events.update');
     Route::delete('/closed-training-cases/{closedTrainingCase}/events/{event}', [ClosedTrainingCaseController::class, 'destroyEvent'])->name('closed-training-cases.events.destroy');
+    Route::post('training-offers/reorder', [TrainingOfferController::class, 'reorder'])
+        ->name('training-offers.reorder');
     Route::resource('training-offers', TrainingOfferController::class);
     Route::get('/training-offers/{training_offer}/create-course', [CoursesController::class, 'createFromTrainingOffer'])
         ->name('training-offers.create-course');

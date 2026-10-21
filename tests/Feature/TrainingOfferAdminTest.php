@@ -14,6 +14,12 @@ class TrainingOfferAdminTest extends TestCase
 
     private ?TrainingOffer $offer = null;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->withoutVite();
+    }
+
     protected function tearDown(): void
     {
         if ($this->offer) {
@@ -43,7 +49,9 @@ class TrainingOfferAdminTest extends TestCase
             ->get(route('training-offers.index'))
             ->assertOk()
             ->assertSee('Testowa oferta rady pedagogicznej')
-            ->assertSee('Strona główna');
+            ->assertSee('Strona główna')
+            ->assertSee('Kolejność na pnedu.pl')
+            ->assertSee('data-offer-id="'.$this->offer->id.'"', false);
 
         $this->actingAs($user)
             ->get(route('training-offers.show', $this->offer))
@@ -56,6 +64,81 @@ class TrainingOfferAdminTest extends TestCase
             ->assertOk()
             ->assertSee('name="featured_on_homepage"', false)
             ->assertSee('Wyróżnij na stronie głównej');
+    }
+
+    public function test_admin_can_reorder_training_offers(): void
+    {
+        $user = User::factory()->create(['is_active' => true]);
+
+        $first = TrainingOffer::create([
+            'title' => 'Oferta Alfa',
+            'slug' => 'oferta-alfa-'.Str::lower(Str::random(6)),
+            'price_mode' => TrainingOffer::PRICE_MODE_INDIVIDUAL,
+            'default_course_category' => TrainingOffer::COURSE_CATEGORY_CLOSED,
+            'is_active' => true,
+            'show_on_pnedu' => true,
+            'sort_order' => 0,
+        ]);
+        $second = TrainingOffer::create([
+            'title' => 'Oferta Beta',
+            'slug' => 'oferta-beta-'.Str::lower(Str::random(6)),
+            'price_mode' => TrainingOffer::PRICE_MODE_INDIVIDUAL,
+            'default_course_category' => TrainingOffer::COURSE_CATEGORY_CLOSED,
+            'is_active' => true,
+            'show_on_pnedu' => true,
+            'sort_order' => 1,
+        ]);
+
+        $this->actingAs($user)
+            ->postJson(route('training-offers.reorder'), [
+                'order' => [$second->id, $first->id],
+            ])
+            ->assertOk()
+            ->assertJsonFragment(['message' => 'Kolejność ofert na pnedu.pl zapisana.']);
+
+        $this->assertSame(0, $second->fresh()->sort_order);
+        $this->assertSame(1, $first->fresh()->sort_order);
+
+        $first->forceDelete();
+        $second->forceDelete();
+    }
+
+    public function test_search_hides_reorder_and_rejects_partial_order(): void
+    {
+        $user = User::factory()->create(['is_active' => true]);
+
+        $first = TrainingOffer::create([
+            'title' => 'Oferta Alfa',
+            'slug' => 'oferta-alfa-'.Str::lower(Str::random(6)),
+            'price_mode' => TrainingOffer::PRICE_MODE_INDIVIDUAL,
+            'default_course_category' => TrainingOffer::COURSE_CATEGORY_CLOSED,
+            'is_active' => true,
+            'show_on_pnedu' => true,
+            'sort_order' => 0,
+        ]);
+        TrainingOffer::create([
+            'title' => 'Oferta Beta',
+            'slug' => 'oferta-beta-'.Str::lower(Str::random(6)),
+            'price_mode' => TrainingOffer::PRICE_MODE_INDIVIDUAL,
+            'default_course_category' => TrainingOffer::COURSE_CATEGORY_CLOSED,
+            'is_active' => true,
+            'show_on_pnedu' => true,
+            'sort_order' => 1,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('training-offers.index', ['q' => 'Alfa']))
+            ->assertOk()
+            ->assertSee('wyczyść wyszukiwanie i filtr widoczności')
+            ->assertDontSee('training-offers-sortable');
+
+        $this->actingAs($user)
+            ->postJson(route('training-offers.reorder'), [
+                'order' => [$first->id],
+            ])
+            ->assertStatus(422);
+
+        TrainingOffer::query()->forceDelete();
     }
 
     public function test_admin_can_delete_training_offer_from_index(): void

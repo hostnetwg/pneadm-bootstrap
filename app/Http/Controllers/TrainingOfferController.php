@@ -4,8 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Models\Instructor;
 use App\Models\TrainingOffer;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 
@@ -15,8 +17,9 @@ class TrainingOfferController extends Controller
     {
         $search = trim((string) $request->query('q', ''));
         $visibility = $request->query('visibility', 'all');
+        $canReorder = $search === '' && $visibility === 'all';
 
-        $offers = TrainingOffer::with('instructor')
+        $query = TrainingOffer::with('instructor')
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($q) use ($search) {
                     $q->where('title', 'like', '%'.$search.'%')
@@ -30,10 +33,44 @@ class TrainingOfferController extends Controller
             ->when($visibility === 'inactive', fn ($query) => $query->where('is_active', false))
             ->orderBy('sort_order')
             ->orderBy('title')
-            ->paginate(20)
-            ->withQueryString();
+            ->orderBy('id');
 
-        return view('training-offers.index', compact('offers', 'search', 'visibility'));
+        $offers = $canReorder
+            ? $query->get()
+            : $query->paginate(20)->withQueryString();
+
+        return view('training-offers.index', compact('offers', 'search', 'visibility', 'canReorder'));
+    }
+
+    public function reorder(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'order' => ['required', 'array'],
+            'order.*' => ['integer', 'exists:training_offers,id'],
+        ]);
+
+        $order = array_values(array_unique(array_map('intval', $validated['order'])));
+        $expectedIds = TrainingOffer::query()
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->sort()
+            ->values()
+            ->all();
+        $sortedOrder = collect($order)->sort()->values()->all();
+
+        if ($sortedOrder !== $expectedIds) {
+            return response()->json([
+                'message' => 'Lista musi zawierać wszystkie oferty.',
+            ], 422);
+        }
+
+        DB::transaction(function () use ($order): void {
+            foreach ($order as $position => $id) {
+                TrainingOffer::query()->whereKey($id)->update(['sort_order' => $position]);
+            }
+        });
+
+        return response()->json(['message' => 'Kolejność ofert na pnedu.pl zapisana.']);
     }
 
     public function create(): View
@@ -43,7 +80,6 @@ class TrainingOfferController extends Controller
             'default_course_category' => TrainingOffer::COURSE_CATEGORY_CLOSED,
             'is_active' => true,
             'show_on_pnedu' => false,
-            'sort_order' => 0,
         ]);
 
         $instructors = $this->instructorsForSelect();
@@ -63,6 +99,10 @@ class TrainingOfferController extends Controller
             : null;
 
         unset($validated['image']);
+
+        if ($validated['sort_order'] === null) {
+            unset($validated['sort_order']);
+        }
 
         $offer = TrainingOffer::create($validated);
 
@@ -111,6 +151,10 @@ class TrainingOfferController extends Controller
 
         unset($validated['image']);
 
+        if ($validated['sort_order'] === null) {
+            unset($validated['sort_order']);
+        }
+
         if ($request->boolean('remove_image') && $trainingOffer->image) {
             Storage::disk('public')->delete($trainingOffer->image);
             $validated['image'] = null;
@@ -147,6 +191,10 @@ class TrainingOfferController extends Controller
 
     private function validateOffer(Request $request, ?TrainingOffer $offer = null): array
     {
+        if ($request->input('sort_order') === '') {
+            $request->merge(['sort_order' => null]);
+        }
+
         return $request->validate([
             'title' => 'required|string|max:255',
             'slug' => 'nullable|string|max:255',

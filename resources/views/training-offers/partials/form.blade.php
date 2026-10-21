@@ -113,7 +113,8 @@
 
                 <div class="mb-3">
                     <label for="sort_order" class="form-label">Kolejność</label>
-                    <input type="number" min="0" name="sort_order" id="sort_order" class="form-control @error('sort_order') is-invalid @enderror" value="{{ old('sort_order', $offer->sort_order ?? 0) }}">
+                    <input type="number" min="0" name="sort_order" id="sort_order" class="form-control @error('sort_order') is-invalid @enderror" value="{{ old('sort_order', $offer->exists ? $offer->sort_order : '') }}" placeholder="Automatycznie">
+                    <div class="form-text">Najwygodniej ustawisz kolejność przeciąganiem na liście ofert. Puste pole przy tworzeniu = na końcu listy.</div>
                     @error('sort_order')<div class="invalid-feedback">{{ $message }}</div>@enderror
                 </div>
             </div>

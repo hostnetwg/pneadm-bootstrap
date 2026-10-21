@@ -493,6 +493,7 @@ Zakres wdrożony lokalnie (do deploy prod):
 - `courses.training_offer_id` FK z `nullOnDelete` (migracja `2026_07_29_090000`),
 - `training_offers.featured_on_homepage` do ręcznego wyróżniania ofert na stronie głównej (migracja `2026_07_29_133000`),
 - CRUD ofert w `adm.pnedu.pl` pod `Szkolenia -> Oferty szkoleń`,
+- ręczna kolejność na liście (`sort_order`): przeciąganie / strzałki, `POST /training-offers/reorder` (jak `/online-courses`),
 - przycisk „Utwórz szkolenie z oferty" na podglądzie i liście ofert,
 - formularz `courses/create` z prefill z oferty (tytuł, opis, zakres, instruktor, kategoria, notatki),
 - kopiowanie grafiki oferty do `courses/images` przy zapisie szkolenia.

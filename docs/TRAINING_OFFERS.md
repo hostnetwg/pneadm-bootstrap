@@ -1,6 +1,6 @@
 # Oferty Szkoleń Bez Terminu
 
-Data utworzenia/aktualizacji: 2026-07-28  
+Data utworzenia/aktualizacji: 2026-10-21  
 Status: MVP wdrożone lokalnie
 
 ## Cel Funkcji
@@ -73,7 +73,7 @@ Wyróżnianie na stronie głównej (`featured_on_homepage`) i tworzenie `courses
 - `is_active` - status administracyjny oferty.
 - `show_on_pnedu` - publikacja w katalogu ofert na `pnedu.pl`.
 - `featured_on_homepage` - wyróżnienie oferty w sekcji szkoleń rad pedagogicznych na stronie głównej `pnedu.pl`.
-- `sort_order` - kolejność na publicznej liście ofert.
+- `sort_order` - kolejność na publicznej liście ofert (katalog `/szkolenia-rad-pedagogicznych` i karuzela na stronie głównej). W ADM na liście `/training-offers` ustawiasz ją przeciąganiem wierszy albo strzałkami (jak przy kursach online); wymaga pustego wyszukiwania i filtra „Wszystkie”. Endpoint: `POST /training-offers/reorder`.
 - `meta_title` - tytuł SEO strony szczegółowej.
 - `meta_description` - opis SEO strony szczegółowej.
 - `internal_notes` - notatki administracyjne niewidoczne publicznie.

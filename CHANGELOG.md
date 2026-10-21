@@ -6,6 +6,7 @@ Krótka numeracja panelu. Szczegóły zawsze w `docs/`. Nowy numer wersji (np. 1
 
 Windykacja: masowe przypomnienia po wyciągu oraz doprecyzowanie wyszukiwania przelewów i danych sprawy.
 
+- **Hotfix 2026-10-21:** na [Ofertach szkoleń](/training-offers) kolejność ustawiasz przeciąganiem wierszy albo strzałkami (jak przy kursach online); zapisuje `sort_order` na katalogu i karuzeli pnedu.pl. Bez wyszukiwania i przy filtrze „Wszystkie”. Kanon: [TRAINING_OFFERS.md](docs/TRAINING_OFFERS.md)
 - **Hotfix 2026-10-21:** na [Windykacji](/accounting/collections) w kolumnie Termin dla spraw zamkniętych „X dni po terminie” liczy się do daty wpłaty / zamknięcia (nie do dziś); otwarte nadal względem dziś. Kanon: [WINDYKACJA.md](docs/WINDYKACJA.md)
 - **Hotfix 2026-10-21:** na [Windykacji](/accounting/collections) filtr **Kontakt** (z kontaktem / bez / wszystkie); przy **Zamknięte** domyślnie sprawy z monitami. Osobny widok [Skuteczność](/accounting/collections/effectiveness): dni od ostatniego kontaktu do zamknięcia, średnia/mediana. Badge „bez kontaktu” na liście. Kanon: [WINDYKACJA.md](docs/WINDYKACJA.md)
 - **Hotfix 2026-10-20:** na [Sprawach szkoleń zamkniętych](/closed-training-cases) lista pokazuje podgląd **Wiadomości**. Z karty sprawy można **utworzyć szkolenie** albo **powiązać istniejące** (`courses`); na karcie szkolenia jest link wstecz do sprawy. Powiązanie nie zmienia statusu sprawy. Soft delete szkolenia odłącza powiązanie i zapisuje to w historii. Kanon: [operations-os/CURRENT.md](docs/operations-os/CURRENT.md)

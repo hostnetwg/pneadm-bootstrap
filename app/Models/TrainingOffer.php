@@ -55,6 +55,12 @@ class TrainingOffer extends Model
 
     protected static function booted(): void
     {
+        static::creating(function (TrainingOffer $offer) {
+            if ($offer->sort_order === null) {
+                $offer->sort_order = (int) static::query()->max('sort_order') + 1;
+            }
+        });
+
         static::saving(function (TrainingOffer $offer) {
             if (empty(trim((string) $offer->slug))) {
                 $offer->slug = static::generateUniqueSlug((string) $offer->title, $offer->id);

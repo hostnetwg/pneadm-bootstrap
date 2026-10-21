@@ -41,22 +41,66 @@
                 </div>
             </div>
 
+            @if($canReorder)
+                <div id="training-offers-reorder-root"
+                     class="alert alert-light border mb-3"
+                     data-reorder-url="{{ route('training-offers.reorder') }}">
+                    <p class="mb-2">
+                        <i class="bi bi-arrows-move text-primary"></i>
+                        <strong>Kolejność na pnedu.pl:</strong> przeciągnij wiersze albo użyj strzałek.
+                        Ta sama kolejność obowiązuje w katalogu /szkolenia-rad-pedagogicznych i w karuzeli na stronie głównej.
+                    </p>
+                    <div id="training-offers-reorder-toast"
+                         class="alert alert-success alert-dismissible fade show d-none mb-0 py-2"
+                         role="alert">
+                        <span data-toast-body></span>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Zamknij"></button>
+                    </div>
+                </div>
+            @else
+                <p class="text-muted small mb-3">Żeby zmienić kolejność na pnedu.pl, wyczyść wyszukiwanie i filtr widoczności.</p>
+            @endif
+
             <div class="card">
                 <div class="table-responsive">
                     <table class="table table-hover align-middle mb-0">
                         <thead class="table-light">
                             <tr>
+                                @if($canReorder)
+                                    <th class="text-center" style="width: 5rem;" title="Kolejność na publicznej liście ofert">Kolej.</th>
+                                @endif
                                 <th>Tytuł</th>
                                 <th>Trener</th>
                                 <th>Cena</th>
                                 <th>Status</th>
-                                <th>Kolejność</th>
                                 <th class="text-end">Akcje</th>
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody id="{{ $canReorder ? 'training-offers-sortable' : '' }}">
                             @forelse($offers as $offer)
-                                <tr>
+                                <tr class="{{ $canReorder ? 'training-offer-row' : '' }}"
+                                    @if($canReorder) data-offer-id="{{ $offer->id }}" @endif>
+                                    @if($canReorder)
+                                        <td class="text-center text-nowrap">
+                                            <button type="button"
+                                                    class="btn btn-sm btn-outline-secondary btn-training-offer-move-up"
+                                                    title="Wyżej"
+                                                    aria-label="Przesuń wyżej">
+                                                <i class="bi bi-chevron-up"></i>
+                                            </button>
+                                            <span class="training-offer-drag-handle d-inline-flex align-items-center justify-content-center mx-1 text-muted"
+                                                  title="Przeciągnij"
+                                                  style="cursor: grab;">
+                                                <i class="bi bi-grip-vertical"></i>
+                                            </span>
+                                            <button type="button"
+                                                    class="btn btn-sm btn-outline-secondary btn-training-offer-move-down"
+                                                    title="Niżej"
+                                                    aria-label="Przesuń niżej">
+                                                <i class="bi bi-chevron-down"></i>
+                                            </button>
+                                        </td>
+                                    @endif
                                     <td>
                                         <div class="fw-semibold">{{ $offer->title }}</div>
                                         <div class="small text-muted">{{ $offer->slug }}</div>
@@ -76,7 +120,6 @@
                                             @endif
                                         </div>
                                     </td>
-                                    <td>{{ $offer->sort_order }}</td>
                                     <td class="text-end">
                                         <div class="btn-group btn-group-sm" role="group">
                                             <a href="{{ route('training-offers.show', $offer) }}" class="btn btn-outline-secondary">Podgląd</a>
@@ -93,7 +136,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="6" class="text-center text-muted py-4">
+                                    <td colspan="{{ $canReorder ? 6 : 5 }}" class="text-center text-muted py-4">
                                         Brak ofert szkoleń.
                                     </td>
                                 </tr>
@@ -101,7 +144,7 @@
                         </tbody>
                     </table>
                 </div>
-                @if($offers->hasPages())
+                @if(! $canReorder && $offers->hasPages())
                     <div class="card-footer">
                         {{ $offers->links() }}
                     </div>
@@ -148,4 +191,6 @@
             </div>
         </div>
     @endforeach
+
+    @include('training-offers.partials.index-sortable')
 </x-app-layout>
