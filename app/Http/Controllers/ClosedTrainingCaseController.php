@@ -36,6 +36,12 @@ class ClosedTrainingCaseController extends Controller
                         ->orWhere('institution', 'like', "%{$search}%")
                         ->orWhere('contact_name', 'like', "%{$search}%")
                         ->orWhere('contact_email', 'like', "%{$search}%");
+
+                    if (preg_match('/^\[?\s*SZ-(\d+)\s*\]?$/iu', $search, $matches)) {
+                        $inner->orWhere('id', (int) $matches[1]);
+                    } elseif (ctype_digit($search)) {
+                        $inner->orWhere('id', (int) $search);
+                    }
                 });
             })
             ->orderByRaw('CASE WHEN status = ? THEN 1 ELSE 0 END', [ClosedTrainingCase::STATUS_CLOSED])

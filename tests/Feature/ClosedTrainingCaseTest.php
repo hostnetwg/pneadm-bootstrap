@@ -205,10 +205,50 @@ class ClosedTrainingCaseTest extends TestCase
         $this->actingAs($user)
             ->get(route('closed-training-cases.index'))
             ->assertOk()
+            ->assertSee('Symbol')
+            ->assertSee('['.$case->referenceCode().']', false)
             ->assertSee('Szkolenie rady przykładowej')
             ->assertSee('Wiadomość')
             ->assertSee('Telefon: prośba o termin w listopadzie.')
             ->assertSee('Oczekuje');
+    }
+
+    public function test_operator_can_find_a_case_by_email_reference_symbol(): void
+    {
+        $user = User::factory()->create(['is_active' => true]);
+        $case = ClosedTrainingCase::query()->create([
+            'source' => ClosedTrainingCase::SOURCE_MANUAL,
+            'status' => ClosedTrainingCase::STATUS_NEW,
+            'topic' => 'Szkolenie do wyszukania po symbolu',
+            'contact_name' => 'Osoba SZ',
+            'contact_email' => 'sz@example.com',
+            'institution' => 'Placówka SZ',
+            'message' => 'Wiadomość sprawy SZ.',
+        ]);
+        $other = ClosedTrainingCase::query()->create([
+            'source' => ClosedTrainingCase::SOURCE_MANUAL,
+            'status' => ClosedTrainingCase::STATUS_NEW,
+            'topic' => 'Inna sprawa bez trafienia',
+            'contact_name' => 'Inna osoba',
+            'contact_email' => 'inna@example.com',
+            'institution' => 'Inna placówka',
+            'message' => 'Wiadomość innej sprawy.',
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('closed-training-cases.index', ['q' => '[SZ-'.$case->id.']', 'status' => 'all']))
+            ->assertOk()
+            ->assertSee('['.$case->referenceCode().']', false)
+            ->assertSee('Szkolenie do wyszukania po symbolu')
+            ->assertDontSee('Inna sprawa bez trafienia');
+
+        $this->actingAs($user)
+            ->get(route('closed-training-cases.index', ['q' => 'SZ-'.$case->id, 'status' => 'all']))
+            ->assertOk()
+            ->assertSee('Szkolenie do wyszukania po symbolu')
+            ->assertDontSee('Inna sprawa bez trafienia');
+
+        $this->assertNotSame($case->id, $other->id);
     }
 
     public function test_case_without_a_given_topic_shows_a_neutral_label(): void

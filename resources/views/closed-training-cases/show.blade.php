@@ -1,7 +1,10 @@
 <x-app-layout>
     <x-slot name="header">
         <div class="d-flex justify-content-between align-items-center gap-3">
-            <h2 class="fw-semibold fs-4 text-dark mb-0">{{ $case->trainingTopicLabel() }}</h2>
+            <h2 class="fw-semibold fs-4 text-dark mb-0">
+                <span class="font-monospace text-secondary me-2" title="Identyfikator w temacie e-maila do szkoły">[{{ $case->referenceCode() }}]</span>
+                {{ $case->trainingTopicLabel() }}
+            </h2>
             <a href="{{ route('closed-training-cases.index') }}" class="btn btn-outline-secondary">Lista spraw</a>
         </div>
     </x-slot>

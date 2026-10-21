@@ -17,7 +17,7 @@
                     <form method="GET" action="{{ route('closed-training-cases.index') }}" class="row g-3 align-items-end">
                         <div class="col-md-5">
                             <label for="q" class="form-label">Szukaj</label>
-                            <input type="text" name="q" id="q" value="{{ $search }}" class="form-control" placeholder="Temat, placówka, osoba, e-mail">
+                            <input type="text" name="q" id="q" value="{{ $search }}" class="form-control" placeholder="SZ-3, temat, placówka, osoba, e-mail">
                         </div>
                         <div class="col-md-3">
                             <label for="status" class="form-label">Status</label>
@@ -42,6 +42,7 @@
                     <table class="table table-hover align-middle mb-0">
                         <thead>
                             <tr>
+                                <th style="width: 5.5rem;" title="Identyfikator w temacie e-maila do szkoły">Symbol</th>
                                 <th>Temat szkolenia</th>
                                 <th>Wiadomość</th>
                                 <th>Placówka</th>
@@ -53,6 +54,11 @@
                         <tbody>
                             @forelse($cases as $case)
                                 <tr>
+                                    <td>
+                                        <a href="{{ route('closed-training-cases.show', $case) }}"
+                                           class="font-monospace text-decoration-none fw-semibold"
+                                           title="Ten sam symbol jest w temacie e-maila do szkoły">[{{ $case->referenceCode() }}]</a>
+                                    </td>
                                     <td>
                                         <a href="{{ route('closed-training-cases.show', $case) }}">{{ $case->trainingTopicLabel() }}</a>
                                         <div class="small text-muted">{{ $case->sourceLabel() }}</div>
@@ -80,7 +86,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="6" class="text-muted p-4">Brak spraw dla tego filtra.</td>
+                                    <td colspan="7" class="text-muted p-4">Brak spraw dla tego filtra.</td>
                                 </tr>
                             @endforelse
                         </tbody>
