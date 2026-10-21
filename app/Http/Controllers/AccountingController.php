@@ -299,7 +299,14 @@ class AccountingController extends Controller
         $casesQuery = DebtCase::query()
             ->select('debt_cases.*')
             ->leftJoin('form_orders', 'form_orders.id', '=', 'debt_cases.form_order_id')
-            ->with(['formOrder.primaryParticipant', 'assignedTo', 'createdBy'])
+            ->with([
+                'formOrder.primaryParticipant',
+                'assignedTo',
+                'createdBy',
+                'bankTransactionMatches' => fn ($q) => $q
+                    ->where('status', \App\Models\BankTransactionMatch::STATUS_ACCEPTED)
+                    ->with('transaction'),
+            ])
             ->withCount(['reminderEmailsSent', 'reminderSmsSent', 'phoneCallsLogged'])
             ->withMax(['reminderEmailsSent as last_reminder_email_sent_at'], 'happened_at')
             ->withMax(['reminderSmsSent as last_reminder_sms_sent_at'], 'happened_at')

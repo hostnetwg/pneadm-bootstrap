@@ -258,6 +258,41 @@ class AccountingCollectionsTest extends TestCase
         $response->assertSee('text-danger', false);
     }
 
+    public function test_collections_index_closed_overdue_uses_closed_at_not_today(): void
+    {
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+            'is_active' => 1,
+        ]);
+
+        $order = FormOrder::create([
+            'product_name' => 'Zamknięte po terminie',
+            'product_price' => 100,
+            'order_date' => now()->subDays(40),
+            'invoice_number' => '302/closed-due/2026',
+        ]);
+        DebtCase::create([
+            'form_order_id' => $order->id,
+            'status' => DebtCase::STATUS_CLOSED,
+            'invoice_number' => '302/closed-due/2026',
+            'due_date' => now()->subDays(20)->toDateString(),
+            'opened_at' => now()->subDays(25),
+            'closed_at' => now()->subDays(10),
+        ]);
+
+        $response = $this->actingAs($user)->get(route('accounting.collections.index', [
+            'status' => 'closed',
+            'contact' => 'all',
+            'search' => '302/closed-due/2026',
+        ]));
+
+        $response->assertOk();
+        // 20−10 = 10 dni do zamknięcia; NIE 20 dni do dziś
+        $response->assertSee('10 dni po terminie', false);
+        $response->assertDontSee('20 dni po terminie', false);
+        $response->assertSee('text-muted', false);
+    }
+
     public function test_user_can_create_debt_case_from_form_order(): void
     {
         $user = User::factory()->create([
@@ -1556,10 +1591,12 @@ class AccountingCollectionsTest extends TestCase
             'ifirma_payment_status' => \App\Services\IfirmaInvoicePaymentStatusService::STATUS_PAID,
             'status' => DebtCase::STATUS_CLOSED,
             'closed_at' => now(),
+            'due_date' => now()->subDays(10)->toDateString(),
         ]);
         $paidNoDateShow = $this->actingAs($user)->get(route('accounting.collections.show', $paidWithoutPaymentDate));
         $paidNoDateShow->assertOk();
-        $paidNoDateShow->assertDontSee('po terminie', false);
+        // Bez przelewu: opóźnienie liczone do closed_at (= dziś) → 10 dni, szary
+        $paidNoDateShow->assertSee('text-muted fw-normal">(10 dni po terminie)', false);
 
         $paidLate = $makeCase([
             'ifirma_payment_status' => \App\Services\IfirmaInvoicePaymentStatusService::STATUS_PAID,
@@ -1607,7 +1644,9 @@ class AccountingCollectionsTest extends TestCase
         ]);
         $unpaidShow = $this->actingAs($user)->get(route('accounting.collections.show', $unpaidPastDue));
         $unpaidShow->assertOk();
-        $unpaidShow->assertDontSee('po terminie', false);
+        // Status iFirma „nieopłacona” (nie „przeterminowana”): bez etykiety przy terminie (treść e-maila może mieć „po terminie”).
+        $unpaidShow->assertDontSee('text-danger">(10 dni po terminie)', false);
+        $unpaidShow->assertDontSee('text-muted fw-normal">(10 dni po terminie)', false);
     }
 
     public function test_collections_show_has_previous_and_next_case_links(): void

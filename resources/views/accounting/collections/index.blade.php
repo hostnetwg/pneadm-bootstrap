@@ -408,14 +408,19 @@
                                     <td>
                                         <div>{{ $case->due_date?->format('d.m.Y') ?: '—' }}</div>
                                         @php
-                                            $dueStatusLabel = app(\App\Services\DebtReminderTemplateService::class)
-                                                ->paymentDueStatusLabel($case, $order);
-                                            $dueOverdueLabel = ($dueStatusLabel !== null && str_contains($dueStatusLabel, 'po terminie'))
-                                                ? $dueStatusLabel
-                                                : null;
+                                            $dueStatus = app(\App\Services\DebtReminderTemplateService::class)
+                                                ->collectionsListDueStatus($case, $order);
                                         @endphp
-                                        @if($dueOverdueLabel)
-                                            <div class="small text-danger fw-semibold">{{ $dueOverdueLabel }}</div>
+                                        @if($dueStatus)
+                                            <div @class([
+                                                'small',
+                                                'fw-semibold',
+                                                'text-danger' => $dueStatus['danger'],
+                                                'text-muted' => ! $dueStatus['danger'],
+                                            ])
+                                                 title="{{ $dueStatus['danger'] ? 'Dni po terminie względem dziś' : 'Dni po terminie do daty wpłaty / zamknięcia sprawy' }}">
+                                                {{ $dueStatus['label'] }}
+                                            </div>
                                         @endif
                                     </td>
                                     <td>{{ $case->next_action_at?->timezone(config('app.timezone'))->format('d.m.Y H:i') ?: '—' }}</td>

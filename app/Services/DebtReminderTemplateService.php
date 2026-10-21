@@ -657,6 +657,81 @@ class DebtReminderTemplateService
         return 'za '.$days.' '.$this->polishDayWord($days);
     }
 
+    /**
+     * Etykieta opóźnienia na liście spraw windykacyjnych.
+     * Otwarte: względem dziś (czerwone „po terminie”).
+     * Zamknięte: względem daty wpłaty z wyciągu (ostatni zaakceptowany przelew) albo closed_at — bez czerwieni.
+     *
+     * @return array{label: string, danger: bool}|null
+     */
+    public function collectionsListDueStatus(DebtCase $case, ?FormOrder $order = null): ?array
+    {
+        $order ??= $case->formOrder;
+        $due = $case->due_date?->copy()->timezone(config('app.timezone'))->startOfDay()
+            ?? $order?->invoice_due_date?->copy()->timezone(config('app.timezone'))->startOfDay();
+        if ($due === null) {
+            return null;
+        }
+
+        if ($case->status === DebtCase::STATUS_CLOSED) {
+            $asOf = $this->settlementAsOfDate($case);
+            if ($asOf === null || ! $asOf->gt($due)) {
+                return null;
+            }
+
+            $days = (int) $due->diffInDays($asOf);
+
+            return [
+                'label' => $days.' '.$this->polishDayWord($days).' po terminie',
+                'danger' => false,
+            ];
+        }
+
+        $label = $this->paymentDueStatusLabel($case, $order);
+        if ($label === null || ! str_contains($label, 'po terminie')) {
+            return null;
+        }
+
+        return [
+            'label' => $label,
+            'danger' => true,
+        ];
+    }
+
+    /**
+     * Data rozliczenia do liczenia opóźnienia: ostatnia data operacji z zaakceptowanego przelewu, inaczej closed_at.
+     */
+    public function settlementAsOfDate(DebtCase $case): ?\Illuminate\Support\Carbon
+    {
+        $paymentDate = null;
+        $matches = $case->relationLoaded('bankTransactionMatches')
+            ? $case->bankTransactionMatches
+            : $case->bankTransactionMatches()
+                ->where('status', \App\Models\BankTransactionMatch::STATUS_ACCEPTED)
+                ->with('transaction')
+                ->get();
+
+        foreach ($matches as $match) {
+            if ($match->status !== \App\Models\BankTransactionMatch::STATUS_ACCEPTED) {
+                continue;
+            }
+            $operationDate = $match->transaction?->operation_date;
+            if ($operationDate === null) {
+                continue;
+            }
+            $candidate = $operationDate->copy()->timezone(config('app.timezone'))->startOfDay();
+            if ($paymentDate === null || $candidate->gt($paymentDate)) {
+                $paymentDate = $candidate;
+            }
+        }
+
+        if ($paymentDate !== null) {
+            return $paymentDate;
+        }
+
+        return $case->closed_at?->copy()->timezone(config('app.timezone'))->startOfDay();
+    }
+
     private function polishDayWord(int $n): string
     {
         $mod10 = $n % 10;

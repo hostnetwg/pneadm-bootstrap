@@ -328,10 +328,13 @@
                                         return 'dni';
                                     };
 
-                                    if ($ifirmaStatus === \App\Services\IfirmaInvoicePaymentStatusService::STATUS_PAID) {
-                                        // Opłacona: „X dni po terminie” tylko gdy znamy datę wpłaty i była po terminie (szary).
-                                        if ($paymentDate !== null && $paymentDate->gt($dueDate)) {
-                                            $dueOverdueDays = (int) $dueDate->diffInDays($paymentDate);
+                                    if ($ifirmaStatus === \App\Services\IfirmaInvoicePaymentStatusService::STATUS_PAID
+                                        || $case->status === \App\Models\DebtCase::STATUS_CLOSED) {
+                                        // Opłacona / zamknięta: opóźnienie do daty wpłaty (przelew) albo closed_at — nie do dziś.
+                                        $asOf = $paymentDate
+                                            ?? $case->closed_at?->copy()->timezone(config('app.timezone'))->startOfDay();
+                                        if ($asOf !== null && $asOf->gt($dueDate)) {
+                                            $dueOverdueDays = (int) $dueDate->diffInDays($asOf);
                                             $dueDaysLabel = $dueOverdueDays.' '.$dayWord($dueOverdueDays).' po terminie';
                                             $dueDaysIsDanger = false;
                                         }
