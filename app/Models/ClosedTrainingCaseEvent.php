@@ -19,6 +19,10 @@ class ClosedTrainingCaseEvent extends Model
 
     public const NOTE_CHANNEL_EMAIL = 'email';
 
+    public const NOTE_CHANNEL_SMS = 'sms';
+
+    public const NOTE_CHANNEL_MESSENGER = 'messenger';
+
     public const NOTE_CHANNEL_OTHER = 'other';
 
     public const NOTE_PARTY_INSTRUCTOR = 'instructor';
@@ -70,8 +74,50 @@ class ClosedTrainingCaseEvent extends Model
         return [
             self::NOTE_CHANNEL_PHONE => 'Telefon',
             self::NOTE_CHANNEL_EMAIL => 'E-mail',
+            self::NOTE_CHANNEL_SMS => 'SMS',
+            self::NOTE_CHANNEL_MESSENGER => 'Messenger',
             self::NOTE_CHANNEL_OTHER => 'Inny',
         ];
+    }
+
+    /**
+     * Bootstrap Icons class for history list (without leading "bi ").
+     */
+    public function historyIconClass(): string
+    {
+        if ($this->event_type === self::TYPE_UPDATED) {
+            return 'bi-pencil';
+        }
+
+        if ($this->event_type === self::TYPE_EMAIL_SENT) {
+            return 'bi-envelope';
+        }
+
+        if ($this->event_type === self::TYPE_CREATED) {
+            return 'bi-plus-circle';
+        }
+
+        if ($this->event_type === self::TYPE_NOTE) {
+            return match ($this->note_channel) {
+                self::NOTE_CHANNEL_PHONE => 'bi-telephone',
+                self::NOTE_CHANNEL_EMAIL => 'bi-envelope',
+                self::NOTE_CHANNEL_SMS => 'bi-chat-left-text',
+                self::NOTE_CHANNEL_MESSENGER => 'bi-messenger',
+                self::NOTE_CHANNEL_OTHER => 'bi-chat-dots',
+                default => 'bi-sticky',
+            };
+        }
+
+        return 'bi-circle';
+    }
+
+    public function historyIconTitle(): string
+    {
+        if ($this->event_type === self::TYPE_NOTE && $this->noteChannelLabel()) {
+            return $this->noteChannelLabel();
+        }
+
+        return $this->typeLabel();
     }
 
     /**

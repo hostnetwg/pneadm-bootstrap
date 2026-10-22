@@ -252,29 +252,41 @@ class ClosedTrainingCaseTest extends TestCase
         $this->actingAs($user)
             ->post(route('closed-training-cases.notes.store', $case), [
                 'body' => 'Ustaliliśmy termin szkolenia.',
-                'note_channel' => ClosedTrainingCaseEvent::NOTE_CHANNEL_OTHER,
-                'note_channel_other' => 'SMS',
+                'note_channel' => ClosedTrainingCaseEvent::NOTE_CHANNEL_SMS,
                 'note_party' => ClosedTrainingCaseEvent::NOTE_PARTY_INSTRUCTOR,
             ])
             ->assertRedirect(route('closed-training-cases.show', $case));
 
         $note = $case->events()->where('event_type', ClosedTrainingCaseEvent::TYPE_NOTE)->first();
         $this->assertNotNull($note);
-        $this->assertSame(ClosedTrainingCaseEvent::NOTE_CHANNEL_OTHER, $note->note_channel);
-        $this->assertSame('SMS', $note->note_channel_other);
+        $this->assertSame(ClosedTrainingCaseEvent::NOTE_CHANNEL_SMS, $note->note_channel);
         $this->assertSame(ClosedTrainingCaseEvent::NOTE_PARTY_INSTRUCTOR, $note->note_party);
         $this->assertStringContainsString('Trenerski', (string) $note->note_party_name);
         $this->assertSame('bg-info-subtle', $note->historyItemClass());
+        $this->assertSame('bi-chat-left-text', $note->historyIconClass());
+        $this->assertSame('bi-pencil', (new ClosedTrainingCaseEvent(['event_type' => ClosedTrainingCaseEvent::TYPE_UPDATED]))->historyIconClass());
+        $this->assertSame('bi-envelope', (new ClosedTrainingCaseEvent(['event_type' => ClosedTrainingCaseEvent::TYPE_EMAIL_SENT]))->historyIconClass());
+        $this->assertSame('bi-telephone', (new ClosedTrainingCaseEvent([
+            'event_type' => ClosedTrainingCaseEvent::TYPE_NOTE,
+            'note_channel' => ClosedTrainingCaseEvent::NOTE_CHANNEL_PHONE,
+        ]))->historyIconClass());
+        $this->assertSame('bi-messenger', (new ClosedTrainingCaseEvent([
+            'event_type' => ClosedTrainingCaseEvent::TYPE_NOTE,
+            'note_channel' => ClosedTrainingCaseEvent::NOTE_CHANNEL_MESSENGER,
+        ]))->historyIconClass());
         $this->assertSame('bg-secondary-subtle', (new ClosedTrainingCaseEvent(['event_type' => ClosedTrainingCaseEvent::TYPE_UPDATED]))->historyItemClass());
         $this->assertSame('bg-success-subtle', (new ClosedTrainingCaseEvent(['event_type' => ClosedTrainingCaseEvent::TYPE_EMAIL_SENT]))->historyItemClass());
-        $this->assertSame('Inny: SMS · Trener: '.$note->note_party_name, $note->noteContextLabel());
+        $this->assertSame('SMS · Trener: '.$note->note_party_name, $note->noteContextLabel());
 
         $this->actingAs($user)
             ->get(route('closed-training-cases.show', $case))
             ->assertOk()
-            ->assertSee('Inny: SMS · Trener:', false)
+            ->assertSee('SMS · Trener:', false)
+            ->assertSee('bi-chat-left-text', false)
             ->assertSee('bg-info-subtle', false)
-            ->assertSee('Ustaliliśmy termin szkolenia.');
+            ->assertSee('Ustaliliśmy termin szkolenia.')
+            ->assertSee('>Messenger<', false)
+            ->assertSee('>SMS<', false);
     }
 
     public function test_operator_can_edit_note_channel_and_party(): void

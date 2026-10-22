@@ -423,12 +423,17 @@
                             @foreach($case->events->sortByDesc('happened_at') as $event)
                                 <li class="list-group-item rounded border {{ $event->historyItemClass() }}">
                                     <div class="d-flex justify-content-between gap-3 align-items-start">
-                                        <div>
+                                        <div class="d-flex gap-2 align-items-start min-w-0">
+                                            <i class="bi {{ $event->historyIconClass() }} flex-shrink-0 mt-1"
+                                               title="{{ $event->historyIconTitle() }}"
+                                               aria-hidden="true"></i>
+                                            <div class="min-w-0">
                                             <strong>{{ $event->typeLabel() }}</strong>
                                             @if($event->noteContextLabel())
                                                 <span class="text-secondary"> · {{ $event->noteContextLabel() }}</span>
                                             @endif
                                             <div class="text-secondary small">{{ $case->formatLocal($event->happened_at) }} · {{ $event->user?->name ?: 'pnedu.pl' }}</div>
+                                            </div>
                                         </div>
                                         <script type="application/json" id="closed-training-case-event-body-{{ $event->id }}">@json($event->body ?? '')</script>
                                         <div class="btn-group btn-group-sm">
@@ -473,54 +478,56 @@
                 <div class="col-lg-5">
                     <form method="POST"
                           action="{{ route('closed-training-cases.notes.store', $case) }}"
-                          class="card mb-4 shadow-sm"
-                          :class="{ 'position-sticky': !pinned }"
-                          :style="pinned
-                              ? 'max-height: none; overflow-y: visible;'
-                              : 'top: 1rem; z-index: 1020; max-height: calc(100vh - 2rem); overflow-y: auto;'"
-                          x-data="{
-                              channel: '{{ old('note_channel', '') }}',
-                              pinned: false,
-                              storageKey: 'closed_training_case_note_pinned',
-                              init() {
-                                  try {
-                                      this.pinned = window.localStorage.getItem(this.storageKey) === '1';
-                                  } catch (e) {
-                                      this.pinned = false;
-                                  }
-                              },
-                              togglePin() {
-                                  this.pinned = !this.pinned;
-                                  try {
-                                      window.localStorage.setItem(this.storageKey, this.pinned ? '1' : '0');
-                                  } catch (e) {}
-                              }
-                          }">
+                          id="closed-training-note-form"
+                          class="card mb-4 shadow-sm position-sticky"
+                          style="top: 1rem; z-index: 1020; max-height: calc(100vh - 2rem); overflow-y: auto;"
+                          data-note-sticky="1">
                         @csrf
                         <div class="card-header fw-semibold d-flex align-items-center justify-content-between gap-2">
                             <span>Notatka</span>
                             <button type="button"
+                                    id="closed-training-note-pin"
                                     class="btn btn-sm btn-outline-secondary"
-                                    @click="togglePin()"
-                                    :title="pinned ? 'Odepnij — znów pływa przy przewijaniu' : 'Przypnij — zostaje na swoim miejscu'"
-                                    :aria-pressed="pinned ? 'true' : 'false'"
-                                    :aria-label="pinned ? 'Odepnij notatkę' : 'Przypnij notatkę'">
-                                <i class="bi" :class="pinned ? 'bi-pin-angle-fill' : 'bi-pin-angle'" aria-hidden="true"></i>
-                                <span x-text="pinned ? 'Odepnij' : 'Przypnij'"></span>
+                                    title="Przypnij — zostaje na swoim miejscu"
+                                    aria-pressed="false"
+                                    aria-label="Przypnij notatkę">
+                                <i class="bi bi-pin-angle" aria-hidden="true"></i>
+                                <span data-note-pin-label>Przypnij</span>
                             </button>
                         </div>
                         <div class="card-body">
-                            <div class="mb-3">
-                                <label for="note_channel" class="form-label">Forma kontaktu</label>
-                                <select name="note_channel" id="note_channel" class="form-select @error('note_channel') is-invalid @enderror" x-model="channel">
-                                    <option value="">Bez oznaczenia</option>
-                                    @foreach(\App\Models\ClosedTrainingCaseEvent::noteChannelOptions() as $value => $label)
-                                        <option value="{{ $value }}" @selected(old('note_channel') === $value)>{{ $label }}</option>
-                                    @endforeach
-                                </select>
-                                @error('note_channel')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                            @php
+                                $instructorOptionLabel = $case->listInstructorName();
+                                $instructorOptionLabel = $instructorOptionLabel === '—'
+                                    ? 'Trener (brak na sprawie)'
+                                    : 'Trener: '.$instructorOptionLabel;
+                                $clientOptionLabel = filled($case->contact_name)
+                                    ? 'Zamawiający: '.$case->contact_name
+                                    : 'Zamawiający (brak osoby)';
+                                $noteChannelIsOther = old('note_channel') === \App\Models\ClosedTrainingCaseEvent::NOTE_CHANNEL_OTHER;
+                            @endphp
+                            <div class="row g-2 mb-2">
+                                <div class="col-6">
+                                    <label for="note_channel" class="form-label">Forma kontaktu</label>
+                                    <select name="note_channel" id="note_channel" class="form-select @error('note_channel') is-invalid @enderror">
+                                        <option value="">Bez oznaczenia</option>
+                                        @foreach(\App\Models\ClosedTrainingCaseEvent::noteChannelOptions() as $value => $label)
+                                            <option value="{{ $value }}" @selected(old('note_channel') === $value)>{{ $label }}</option>
+                                        @endforeach
+                                    </select>
+                                    @error('note_channel')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                </div>
+                                <div class="col-6">
+                                    <label for="note_party" class="form-label">Z kim</label>
+                                    <select name="note_party" id="note_party" class="form-select @error('note_party') is-invalid @enderror">
+                                        <option value="">Bez oznaczenia</option>
+                                        <option value="instructor" @selected(old('note_party') === 'instructor')>{{ $instructorOptionLabel }}</option>
+                                        <option value="client" @selected(old('note_party') === 'client')>{{ $clientOptionLabel }}</option>
+                                    </select>
+                                    @error('note_party')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                </div>
                             </div>
-                            <div class="mb-3" x-show="channel === 'other'" x-cloak>
+                            <div class="mb-2 {{ $noteChannelIsOther ? '' : 'd-none' }}" id="note-channel-other-wrap">
                                 <label for="note_channel_other" class="form-label">Doprecyzowanie formy</label>
                                 <input type="text"
                                        name="note_channel_other"
@@ -531,25 +538,7 @@
                                        placeholder="np. SMS, spotkanie">
                                 @error('note_channel_other')<div class="invalid-feedback">{{ $message }}</div>@enderror
                             </div>
-                            <div class="mb-3">
-                                <label for="note_party" class="form-label">Z kim</label>
-                                <select name="note_party" id="note_party" class="form-select @error('note_party') is-invalid @enderror">
-                                    <option value="">Bez oznaczenia</option>
-                                    @php
-                                        $instructorOptionLabel = $case->listInstructorName();
-                                        $instructorOptionLabel = $instructorOptionLabel === '—'
-                                            ? 'Trener (brak na sprawie)'
-                                            : 'Trener: '.$instructorOptionLabel;
-                                        $clientOptionLabel = filled($case->contact_name)
-                                            ? 'Zamawiający: '.$case->contact_name
-                                            : 'Zamawiający (brak osoby)';
-                                    @endphp
-                                    <option value="instructor" @selected(old('note_party') === 'instructor')>{{ $instructorOptionLabel }}</option>
-                                    <option value="client" @selected(old('note_party') === 'client')>{{ $clientOptionLabel }}</option>
-                                </select>
-                                @error('note_party')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                                <div class="form-text">Opcjonalnie. Puste = notatka nie z rozmowy z trenerem ani zamawiającym.</div>
-                            </div>
+                            <div class="form-text mb-3">Opcjonalnie. Puste „Z kim” = notatka nie z rozmowy z trenerem ani zamawiającym.</div>
                             <textarea name="body" rows="4" class="form-control @error('body') is-invalid @enderror" placeholder="Ustalenie z rozmowy, bez zmiany statusu.">{{ old('body') }}</textarea>
                             @error('body')<div class="invalid-feedback">{{ $message }}</div>@enderror
                             <button type="submit" class="btn btn-outline-primary mt-3">Dodaj notatkę</button>
@@ -699,16 +688,35 @@
                             <textarea id="closedTrainingCaseEventEditMeta" class="form-control" rows="4" readonly></textarea>
                         </div>
                         <div class="d-none" id="closedTrainingCaseEventEditNoteContextWrap">
-                            <div class="mb-3">
-                                <label for="closedTrainingCaseEventEditNoteChannel" class="form-label">Forma kontaktu</label>
-                                <select name="note_channel" id="closedTrainingCaseEventEditNoteChannel" class="form-select">
-                                    <option value="">Bez oznaczenia</option>
-                                    @foreach(\App\Models\ClosedTrainingCaseEvent::noteChannelOptions() as $value => $label)
-                                        <option value="{{ $value }}">{{ $label }}</option>
-                                    @endforeach
-                                </select>
+                            @php
+                                $editInstructorOptionLabel = $case->listInstructorName();
+                                $editInstructorOptionLabel = $editInstructorOptionLabel === '—'
+                                    ? 'Trener (brak na sprawie)'
+                                    : 'Trener: '.$editInstructorOptionLabel;
+                                $editClientOptionLabel = filled($case->contact_name)
+                                    ? 'Zamawiający: '.$case->contact_name
+                                    : 'Zamawiający (brak osoby)';
+                            @endphp
+                            <div class="row g-2 mb-2">
+                                <div class="col-6">
+                                    <label for="closedTrainingCaseEventEditNoteChannel" class="form-label">Forma kontaktu</label>
+                                    <select name="note_channel" id="closedTrainingCaseEventEditNoteChannel" class="form-select">
+                                        <option value="">Bez oznaczenia</option>
+                                        @foreach(\App\Models\ClosedTrainingCaseEvent::noteChannelOptions() as $value => $label)
+                                            <option value="{{ $value }}">{{ $label }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <div class="col-6">
+                                    <label for="closedTrainingCaseEventEditNoteParty" class="form-label">Z kim</label>
+                                    <select name="note_party" id="closedTrainingCaseEventEditNoteParty" class="form-select">
+                                        <option value="">Bez oznaczenia</option>
+                                        <option value="instructor">{{ $editInstructorOptionLabel }}</option>
+                                        <option value="client">{{ $editClientOptionLabel }}</option>
+                                    </select>
+                                </div>
                             </div>
-                            <div class="mb-3 d-none" id="closedTrainingCaseEventEditNoteChannelOtherWrap">
+                            <div class="mb-2 d-none" id="closedTrainingCaseEventEditNoteChannelOtherWrap">
                                 <label for="closedTrainingCaseEventEditNoteChannelOther" class="form-label">Doprecyzowanie formy</label>
                                 <input type="text"
                                        name="note_channel_other"
@@ -717,24 +725,7 @@
                                        class="form-control"
                                        placeholder="np. SMS, spotkanie">
                             </div>
-                            <div class="mb-3">
-                                <label for="closedTrainingCaseEventEditNoteParty" class="form-label">Z kim</label>
-                                <select name="note_party" id="closedTrainingCaseEventEditNoteParty" class="form-select">
-                                    <option value="">Bez oznaczenia</option>
-                                    @php
-                                        $editInstructorOptionLabel = $case->listInstructorName();
-                                        $editInstructorOptionLabel = $editInstructorOptionLabel === '—'
-                                            ? 'Trener (brak na sprawie)'
-                                            : 'Trener: '.$editInstructorOptionLabel;
-                                        $editClientOptionLabel = filled($case->contact_name)
-                                            ? 'Zamawiający: '.$case->contact_name
-                                            : 'Zamawiający (brak osoby)';
-                                    @endphp
-                                    <option value="instructor">{{ $editInstructorOptionLabel }}</option>
-                                    <option value="client">{{ $editClientOptionLabel }}</option>
-                                </select>
-                                <div class="form-text">Opcjonalnie. Puste = notatka nie z rozmowy z trenerem ani zamawiającym.</div>
-                            </div>
+                            <div class="form-text mb-3">Opcjonalnie. Puste „Z kim” = notatka nie z rozmowy z trenerem ani zamawiającym.</div>
                         </div>
                         <label for="closedTrainingCaseEventEditBody" class="form-label">Treść</label>
                         <textarea name="body" id="closedTrainingCaseEventEditBody" rows="10" class="form-control"></textarea>
@@ -933,6 +924,69 @@
                     }
                     deleteForm.action = button.getAttribute('data-event-delete-url') || '#';
                     deleteSummary.textContent = button.getAttribute('data-event-label') || '—';
+                });
+            }
+
+            const noteChannel = document.getElementById('note_channel');
+            const noteChannelOtherWrap = document.getElementById('note-channel-other-wrap');
+            function syncNoteChannelOtherVisibility() {
+                if (!noteChannel || !noteChannelOtherWrap) {
+                    return;
+                }
+                if (noteChannel.value === 'other') {
+                    noteChannelOtherWrap.classList.remove('d-none');
+                } else {
+                    noteChannelOtherWrap.classList.add('d-none');
+                }
+            }
+            if (noteChannel) {
+                noteChannel.addEventListener('change', syncNoteChannelOtherVisibility);
+                syncNoteChannelOtherVisibility();
+            }
+
+            const noteForm = document.getElementById('closed-training-note-form');
+            const notePinBtn = document.getElementById('closed-training-note-pin');
+            const notePinStorageKey = 'closed_training_case_note_pinned';
+            if (noteForm && notePinBtn) {
+                const notePinIcon = notePinBtn.querySelector('i.bi');
+                const notePinLabel = notePinBtn.querySelector('[data-note-pin-label]');
+                const stickyStyle = 'top: 1rem; z-index: 1020; max-height: calc(100vh - 2rem); overflow-y: auto;';
+                const pinnedStyle = 'max-height: none; overflow-y: visible;';
+
+                const applyNotePin = function (pinned) {
+                    noteForm.classList.toggle('position-sticky', !pinned);
+                    noteForm.style.cssText = pinned ? pinnedStyle : stickyStyle;
+                    noteForm.setAttribute('data-note-sticky', pinned ? '0' : '1');
+                    notePinBtn.setAttribute('aria-pressed', pinned ? 'true' : 'false');
+                    notePinBtn.setAttribute(
+                        'aria-label',
+                        pinned ? 'Odepnij notatkę' : 'Przypnij notatkę'
+                    );
+                    notePinBtn.title = pinned
+                        ? 'Odepnij — znów pływa przy przewijaniu'
+                        : 'Przypnij — zostaje na swoim miejscu';
+                    if (notePinIcon) {
+                        notePinIcon.className = pinned ? 'bi bi-pin-angle-fill' : 'bi bi-pin-angle';
+                    }
+                    if (notePinLabel) {
+                        notePinLabel.textContent = pinned ? 'Odepnij' : 'Przypnij';
+                    }
+                };
+
+                let notePinned = false;
+                try {
+                    notePinned = window.localStorage.getItem(notePinStorageKey) === '1';
+                } catch (e) {
+                    notePinned = false;
+                }
+                applyNotePin(notePinned);
+
+                notePinBtn.addEventListener('click', function () {
+                    notePinned = !notePinned;
+                    applyNotePin(notePinned);
+                    try {
+                        window.localStorage.setItem(notePinStorageKey, notePinned ? '1' : '0');
+                    } catch (e) {}
                 });
             }
         })();
