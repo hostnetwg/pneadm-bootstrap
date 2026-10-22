@@ -6,10 +6,12 @@ use App\Mail\ClosedTrainingCaseSchoolMail;
 use App\Models\ClosedTrainingCase;
 use App\Models\ClosedTrainingCaseEvent;
 use App\Models\Course;
+use App\Models\Instructor;
 use App\Models\TrainingOffer;
 use App\Models\User;
 use App\Services\ClosedTrainingSubmissionBackfill;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Mail;
 use Mockery;
 use Tests\TestCase;
@@ -718,6 +720,220 @@ class ClosedTrainingCaseTest extends TestCase
     /**
      * @param  array<string, mixed>  $overrides
      */
+    public function test_operator_can_save_negotiation_fields_and_confirmations(): void
+    {
+        $user = User::factory()->create(['is_active' => true]);
+        $instructor = Instructor::query()->create([
+            'title' => 'mgr',
+            'first_name' => 'Anna',
+            'last_name' => 'Trener',
+            'email' => 'anna.trener.'.uniqid().'@example.com',
+            'is_active' => true,
+        ]);
+        $case = $this->makeCase();
+
+        $this->actingAs($user)
+            ->put(route('closed-training-cases.negotiation.update', $case), [
+                'instructor_id' => $instructor->id,
+                'client_price' => '2500.50',
+                'client_price_confirmed' => '1',
+                'instructor_fee' => '1200',
+                'instructor_fee_confirmed' => '1',
+                'start_date' => '2026-11-10',
+                'end_date' => '2026-11-10',
+                'schedule_time_known' => '0',
+            ])
+            ->assertRedirect(route('closed-training-cases.show', $case));
+
+        $case->refresh();
+        $this->assertSame($instructor->id, (int) $case->instructor_id);
+        $this->assertSame('2500.50', (string) $case->client_price);
+        $this->assertNotNull($case->client_price_confirmed_at);
+        $this->assertSame('1200.00', (string) $case->instructor_fee);
+        $this->assertNotNull($case->instructor_fee_confirmed_at);
+        $this->assertFalse((bool) $case->schedule_time_known);
+        $this->assertTrue(
+            $case->events()->where('body', 'like', 'Ustalenia negocjacyjne.%')->exists()
+        );
+
+        $this->actingAs($user)
+            ->put(route('closed-training-cases.negotiation.update', $case), [
+                'instructor_id' => $instructor->id,
+                'client_price' => '2600',
+                'instructor_fee' => '1200',
+                'instructor_fee_confirmed' => '1',
+                'start_date' => '2026-11-10',
+                'end_date' => '',
+                'schedule_time_known' => '0',
+            ])
+            ->assertRedirect(route('closed-training-cases.show', $case));
+
+        $case->refresh();
+        $this->assertSame('2600.00', (string) $case->client_price);
+        $this->assertNull($case->client_price_confirmed_at);
+        $this->assertNotNull($case->instructor_fee_confirmed_at);
+    }
+
+    public function test_changing_instructor_clears_fee_confirmation_unless_reconfirmed(): void
+    {
+        $user = User::factory()->create(['is_active' => true]);
+        $first = Instructor::query()->create([
+            'first_name' => 'Jan',
+            'last_name' => 'Pierwszy',
+            'email' => 'jan.'.uniqid().'@example.com',
+            'is_active' => true,
+        ]);
+        $second = Instructor::query()->create([
+            'first_name' => 'Ewa',
+            'last_name' => 'Druga',
+            'email' => 'ewa.'.uniqid().'@example.com',
+            'is_active' => true,
+        ]);
+        $case = $this->makeCase([
+            'instructor_id' => $first->id,
+            'instructor_fee' => 1000,
+            'instructor_fee_confirmed_at' => now(),
+        ]);
+
+        $this->actingAs($user)
+            ->put(route('closed-training-cases.negotiation.update', $case), [
+                'instructor_id' => $second->id,
+                'instructor_fee' => '1000',
+                'start_date' => '',
+                'end_date' => '',
+            ])
+            ->assertRedirect();
+
+        $case->refresh();
+        $this->assertSame($second->id, (int) $case->instructor_id);
+        $this->assertNull($case->instructor_fee_confirmed_at);
+    }
+
+    public function test_linked_case_blocks_schedule_and_instructor_edits_but_allows_prices(): void
+    {
+        $user = User::factory()->create(['is_active' => true]);
+        $instructor = Instructor::query()->create([
+            'first_name' => 'Ola',
+            'last_name' => 'Locked',
+            'email' => 'ola.'.uniqid().'@example.com',
+            'is_active' => true,
+        ]);
+        $case = $this->makeCase([
+            'instructor_id' => $instructor->id,
+            'client_price' => 2000,
+            'start_date' => '2026-12-01 09:00:00',
+            'end_date' => '2026-12-01 11:00:00',
+            'schedule_time_known' => true,
+        ]);
+        $course = $this->makeCourse([
+            'instructor_id' => $instructor->id,
+            'title' => 'Powiązany termin',
+        ]);
+
+        $this->actingAs($user)
+            ->post(route('closed-training-cases.course.bind', $case), [
+                'course_id' => $course->id,
+                'confirm_mismatch' => '1',
+            ])
+            ->assertRedirect(route('closed-training-cases.show', $case));
+
+        $other = Instructor::query()->create([
+            'first_name' => 'Inny',
+            'last_name' => 'Trener',
+            'email' => 'inny.'.uniqid().'@example.com',
+            'is_active' => true,
+        ]);
+
+        $this->actingAs($user)
+            ->put(route('closed-training-cases.negotiation.update', $case), [
+                'instructor_id' => $other->id,
+                'client_price' => '2000',
+                'start_date' => '2026-12-02T09:00',
+                'end_date' => '2026-12-02T11:00',
+                'schedule_time_known' => '1',
+            ])
+            ->assertSessionHasErrors(['instructor_id', 'start_date']);
+
+        $this->actingAs($user)
+            ->put(route('closed-training-cases.negotiation.update', $case), [
+                'instructor_id' => $instructor->id,
+                'client_price' => '2100',
+                'client_price_confirmed' => '1',
+                'instructor_fee' => '900',
+                'start_date' => '2026-12-01T09:00',
+                'end_date' => '2026-12-01T11:00',
+                'schedule_time_known' => '1',
+            ])
+            ->assertRedirect(route('closed-training-cases.show', $case));
+
+        $case->refresh();
+        $this->assertSame($instructor->id, (int) $case->instructor_id);
+        $this->assertSame('2100.00', (string) $case->client_price);
+        $this->assertNotNull($case->client_price_confirmed_at);
+    }
+
+    public function test_create_course_form_prefills_instructor_and_dates_from_case(): void
+    {
+        $user = User::factory()->create(['is_active' => true]);
+        $instructor = Instructor::query()->create([
+            'first_name' => 'Prefill',
+            'last_name' => 'Trener',
+            'email' => 'prefill.'.uniqid().'@example.com',
+            'is_active' => true,
+        ]);
+        $case = $this->makeCase([
+            'topic' => 'Temat z datami ze sprawy',
+            'instructor_id' => $instructor->id,
+            'start_date' => Carbon::parse('2026-11-20 10:00:00', 'Europe/Warsaw'),
+            'end_date' => Carbon::parse('2026-11-20 12:00:00', 'Europe/Warsaw'),
+            'schedule_time_known' => true,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('closed-training-cases.create-course', $case))
+            ->assertOk()
+            ->assertSee('value="'.$instructor->id.'"', false)
+            ->assertSee('2026-11-20T10:00', false);
+    }
+
+    public function test_unbind_clears_fee_confirmation_and_keeps_case_fields(): void
+    {
+        $user = User::factory()->create(['is_active' => true]);
+        $instructor = Instructor::query()->create([
+            'first_name' => 'Unbind',
+            'last_name' => 'Test',
+            'email' => 'unbind.'.uniqid().'@example.com',
+            'is_active' => true,
+        ]);
+        $case = $this->makeCase([
+            'instructor_id' => $instructor->id,
+            'instructor_fee' => 800,
+            'instructor_fee_confirmed_at' => now(),
+            'client_price' => 3000,
+            'client_price_confirmed_at' => now(),
+            'start_date' => '2026-11-01 09:00:00',
+        ]);
+        $course = $this->makeCourse(['instructor_id' => $instructor->id]);
+
+        $this->actingAs($user)
+            ->post(route('closed-training-cases.course.bind', $case), [
+                'course_id' => $course->id,
+                'confirm_mismatch' => '1',
+            ])
+            ->assertRedirect();
+
+        $this->actingAs($user)
+            ->delete(route('closed-training-cases.course.unbind', $case))
+            ->assertRedirect(route('closed-training-cases.show', $case));
+
+        $case->refresh();
+        $this->assertSame($instructor->id, (int) $case->instructor_id);
+        $this->assertSame('800.00', (string) $case->instructor_fee);
+        $this->assertNull($case->instructor_fee_confirmed_at);
+        $this->assertNotNull($case->client_price_confirmed_at);
+        $this->assertNotNull($case->start_date);
+    }
+
     private function makeCase(array $overrides = []): ClosedTrainingCase
     {
         return ClosedTrainingCase::query()->create(array_merge([

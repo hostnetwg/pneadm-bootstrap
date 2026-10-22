@@ -6,11 +6,13 @@ use App\Mail\ClosedTrainingCaseSchoolMail;
 use App\Models\ClosedTrainingCase;
 use App\Models\ClosedTrainingCaseEvent;
 use App\Models\Course;
+use App\Models\Instructor;
 use App\Models\TrainingOffer;
 use App\Models\User;
 use App\Services\ClosedTrainingCaseService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\Rule;
@@ -138,12 +140,30 @@ class ClosedTrainingCaseController extends Controller
 
     public function show(ClosedTrainingCase $closedTrainingCase): View
     {
-        $closedTrainingCase->load(['assignee', 'trainingOffer', 'events.user', 'course']);
+        $closedTrainingCase->load([
+            'assignee',
+            'instructor',
+            'trainingOffer',
+            'events.user',
+            'course.instructor',
+        ]);
+
+        $this->cases->syncFeeConfirmationWithLinkedCourse($closedTrainingCase);
+        $closedTrainingCase->refresh();
+        $closedTrainingCase->load([
+            'assignee',
+            'instructor',
+            'trainingOffer',
+            'events.user',
+            'course.instructor',
+        ]);
 
         return view('closed-training-cases.show', [
             'case' => $closedTrainingCase,
             'users' => $this->activeUsers(),
             'offers' => $this->offersForCase($closedTrainingCase),
+            'instructors' => $this->instructorsForSelect($closedTrainingCase),
+            'negotiationLocked' => $closedTrainingCase->isLinkedToCourse(),
         ]);
     }
 
@@ -151,21 +171,31 @@ class ClosedTrainingCaseController extends Controller
     {
         $data = $request->validate([
             'course_id' => ['required', 'integer', 'exists:courses,id'],
+            'confirm_mismatch' => ['nullable', 'boolean'],
         ], [
             'course_id.required' => 'Podaj ID szkolenia.',
             'course_id.exists' => 'Nie znaleziono szkolenia o podanym ID.',
         ]);
 
-        $course = Course::query()->findOrFail($data['course_id']);
+        $course = Course::query()->with('instructor')->findOrFail($data['course_id']);
         $via = $closedTrainingCase->course()->exists() ? 'replace' : 'bind';
+        $diffs = $this->cases->courseLinkDiffLines($closedTrainingCase, $course);
+
+        if ($diffs !== [] && ! $request->boolean('confirm_mismatch')) {
+            return redirect()
+                ->route('closed-training-cases.show', $closedTrainingCase)
+                ->withInput()
+                ->with('course_bind_mismatch', $diffs)
+                ->with('course_bind_id', $course->id);
+        }
 
         $this->cases->linkCourse($closedTrainingCase, $course, $request->user(), $via);
 
         return redirect()
             ->route('closed-training-cases.show', $closedTrainingCase)
             ->with('success', $via === 'replace'
-                ? 'Zmieniono powiązanie ze szkoleniem.'
-                : 'Powiązano sprawę ze szkoleniem.');
+                ? 'Zmieniono powiązanie ze szkoleniem. Aktualny termin i trener pochodzą ze szkolenia.'
+                : 'Powiązano sprawę ze szkoleniem. Aktualny termin i trener pochodzą ze szkolenia.');
     }
 
     public function unbindCourse(Request $request, ClosedTrainingCase $closedTrainingCase): RedirectResponse
@@ -175,8 +205,76 @@ class ClosedTrainingCaseController extends Controller
         return redirect()
             ->route('closed-training-cases.show', $closedTrainingCase)
             ->with('success', $course
-                ? 'Odłączono szkolenie od sprawy.'
+                ? 'Odłączono szkolenie od sprawy. Sprawdź ponownie trenera, termin i wynagrodzenie.'
                 : 'Sprawa nie miała powiązanego szkolenia.');
+    }
+
+    public function updateNegotiation(Request $request, ClosedTrainingCase $closedTrainingCase): RedirectResponse
+    {
+        if ($request->input('client_price') === '') {
+            $request->merge(['client_price' => null]);
+        }
+        if ($request->input('instructor_fee') === '') {
+            $request->merge(['instructor_fee' => null]);
+        }
+        if ($request->input('instructor_id') === '') {
+            $request->merge(['instructor_id' => null]);
+        }
+
+        $data = $request->validate([
+            'instructor_id' => ['nullable', 'integer', Rule::exists('instructors', 'id')],
+            'client_price' => ['nullable', 'numeric', 'min:0', 'max:999999.99'],
+            'client_price_confirmed' => ['nullable', 'boolean'],
+            'instructor_fee' => ['nullable', 'numeric', 'min:0', 'max:999999.99'],
+            'instructor_fee_confirmed' => ['nullable', 'boolean'],
+            'start_date' => ['nullable', 'string', 'max:32'],
+            'end_date' => ['nullable', 'string', 'max:32'],
+            'schedule_time_known' => ['nullable', 'boolean'],
+        ], [
+            'instructor_id.exists' => 'Wybierz instruktora z listy.',
+            'client_price.numeric' => 'Cena dla szkoły musi być liczbą.',
+            'instructor_fee.numeric' => 'Wynagrodzenie musi być liczbą.',
+        ]);
+
+        $timeKnown = $request->boolean('schedule_time_known');
+        $start = $this->parseNegotiationDate($data['start_date'] ?? null, $timeKnown, 'start_date');
+        $end = $this->parseNegotiationDate($data['end_date'] ?? null, $timeKnown, 'end_date');
+
+        if ($end && ! $start) {
+            throw ValidationException::withMessages([
+                'end_date' => 'Koniec szkolenia wymaga podania początku.',
+            ]);
+        }
+        if ($start && $end) {
+            $invalid = $timeKnown
+                ? $end->lessThanOrEqualTo($start)
+                : $end->toDateString() < $start->toDateString();
+            if ($invalid) {
+                throw ValidationException::withMessages([
+                    'end_date' => $timeKnown
+                        ? 'Koniec musi być późniejszy niż początek.'
+                        : 'Data końca nie może być wcześniejsza niż początek.',
+                ]);
+            }
+        }
+        if (! $start) {
+            $timeKnown = false;
+        }
+
+        $this->cases->updateNegotiation($closedTrainingCase, [
+            'instructor_id' => isset($data['instructor_id']) ? (int) $data['instructor_id'] : null,
+            'client_price' => $data['client_price'] ?? null,
+            'client_price_confirmed' => $request->boolean('client_price_confirmed'),
+            'instructor_fee' => $data['instructor_fee'] ?? null,
+            'instructor_fee_confirmed' => $request->boolean('instructor_fee_confirmed'),
+            'start_date' => $start,
+            'end_date' => $end,
+            'schedule_time_known' => $timeKnown,
+        ], $request->user());
+
+        return redirect()
+            ->route('closed-training-cases.show', $closedTrainingCase)
+            ->with('success', 'Zapisano ustalenia negocjacyjne.');
     }
 
     public function update(Request $request, ClosedTrainingCase $closedTrainingCase): RedirectResponse
@@ -435,6 +533,54 @@ class ClosedTrainingCaseController extends Controller
             ->where('is_active', true)
             ->orderBy('name')
             ->get(['id', 'name']);
+    }
+
+    private function instructorsForSelect(ClosedTrainingCase $case)
+    {
+        $instructors = Instructor::query()
+            ->where('is_active', true)
+            ->orderBy('last_name')
+            ->orderBy('first_name')
+            ->get();
+
+        if ($case->instructor_id && ! $instructors->contains('id', $case->instructor_id)) {
+            $current = Instructor::withTrashed()->find($case->instructor_id);
+            if ($current) {
+                $instructors->prepend($current);
+            }
+        }
+
+        return $instructors;
+    }
+
+    private function parseNegotiationDate(?string $value, bool $timeKnown, string $field): ?Carbon
+    {
+        $value = trim((string) $value);
+        if ($value === '') {
+            return null;
+        }
+
+        $value = str_replace('T', ' ', $value);
+
+        try {
+            if ($timeKnown) {
+                if (preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/', $value)) {
+                    $value .= ':00';
+                }
+
+                return Carbon::createFromFormat('Y-m-d H:i:s', $value, 'Europe/Warsaw');
+            }
+
+            $date = substr($value, 0, 10);
+
+            return Carbon::createFromFormat('Y-m-d H:i:s', $date.' 00:00:00', 'Europe/Warsaw');
+        } catch (\Throwable) {
+            throw ValidationException::withMessages([
+                $field => $timeKnown
+                    ? 'Podaj poprawną datę i godzinę.'
+                    : 'Podaj poprawną datę.',
+            ]);
+        }
     }
 
     private function normalizeInstitutionType(array $data): array

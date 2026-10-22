@@ -64,7 +64,7 @@ Testy integracyjne z prawdziwym API Sendy — wyjątki mockowane przez `Http::fa
 
 | Moduł | Filtr / plik |
 |-------|----------------|
-| Sprawy szkoleń zamkniętych | `sail artisan test --filter=ClosedTrainingCaseTest`; **pnedu:** `sail artisan test --filter=TrainingOfferPublicTest`; kanon: [operations-os/CURRENT.md](./operations-os/CURRENT.md) |
+| Sprawy szkoleń zamkniętych | `sail artisan test --filter=ClosedTrainingCaseTest` (w tym negocjacja: ceny, potwierdzenia, blokada po linku, prefill, unbind); **pnedu:** `sail artisan test --filter=TrainingOfferPublicTest`; kanon: [operations-os/CURRENT.md](./operations-os/CURRENT.md) |
 | Oferty szkoleń (ADM + kolejność) | `--filter=TrainingOfferAdminTest` (CRUD, soft delete, reorder drag/strzałki jak online-courses); kanon: [TRAINING_OFFERS.md](./TRAINING_OFFERS.md) |
 | PNE Growth OS — Etap 0.1–0.3.2 | `sail artisan test tests/Feature/GrowthOS` oraz `sail artisan test tests/Unit/GrowthOS` — flaga, role, menu; sesyjny flow webinaru; Asystent planowania (`direction_planning`, fake provider, `Http::preventStrayRequests`); bezpieczny pilotaż OpenAI bez prawdziwych requestów; kanon: [growth-os/CURRENT.md](./growth-os/CURRENT.md) |
 | ClickMeeting / provision PNEDU | `--filter=ClickMeetingServiceTest`, `PneduProvisionEmailContextBuilderTest`, `ParticipantLiveAccessServiceTest`, `SystemMailConfigurationTest` |

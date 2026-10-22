@@ -177,7 +177,137 @@
                     </div>
 
                     <div class="card mb-4">
-                        <div class="card-header fw-semibold">Szkolenie (termin)</div>
+                        <div class="card-header fw-semibold">Ustalenia (negocjacja)</div>
+                        <div class="card-body">
+                            <p class="small text-secondary mb-3">
+                                Cena = ryczałt za całe szkolenie zamknięte, PLN brutto.
+                                Wynagrodzenie instruktora = osobna kwota PLN brutto.
+                                @if($negotiationLocked)
+                                    Po powiązaniu ze szkoleniem aktualny trener i termin pochodzą ze szkolenia; poniżej widać ustalenia sprzed powiązania (tylko do odczytu).
+                                @endif
+                            </p>
+
+                            @if($negotiationLocked)
+                                <div class="mb-3">
+                                    <div class="small text-uppercase text-secondary">Aktualnie ze szkolenia</div>
+                                    <p class="mb-1">
+                                        Trener:
+                                        <strong>{{ $case->course?->instructor?->full_title_name ?: '—' }}</strong>
+                                    </p>
+                                    <p class="mb-0">
+                                        Termin:
+                                        <strong>{{ $case->formatScheduleRange($case->course?->start_date, $case->course?->end_date, true) }}</strong>
+                                    </p>
+                                    @if($case->linkedCourseInstructorMismatch() || $case->linkedCourseScheduleMismatch())
+                                        <div class="alert alert-warning py-2 small mt-2 mb-0">
+                                            Ustalenia na sprawie różnią się od szkolenia — źródłem realizacji jest szkolenie. Sprawdź dostępność i warunki przy zmianie terminu lub trenera.
+                                        </div>
+                                    @endif
+                                </div>
+                                <hr>
+                                <div class="small text-uppercase text-secondary mb-2">Ustalenia sprzed powiązania (historyczne)</div>
+                            @endif
+
+                            <form method="POST" action="{{ route('closed-training-cases.negotiation.update', $case) }}">
+                                @csrf
+                                @method('PUT')
+                                <div class="mb-3">
+                                    <label for="instructor_id" class="form-label">Instruktor</label>
+                                    <select name="instructor_id" id="instructor_id" class="form-select @error('instructor_id') is-invalid @enderror" @disabled($negotiationLocked)>
+                                        <option value="">— nie wybrano —</option>
+                                        @foreach($instructors as $instructor)
+                                            <option value="{{ $instructor->id }}" @selected((string) old('instructor_id', $case->instructor_id) === (string) $instructor->id)>
+                                                {{ $instructor->full_title_name }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                    @error('instructor_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                    <div class="form-text">Przypisanie nie oznacza potwierdzenia dostępności.</div>
+                                    @if($negotiationLocked)
+                                        <input type="hidden" name="instructor_id" value="{{ $case->instructor_id }}">
+                                    @endif
+                                </div>
+
+                                <div class="row g-3 mb-3">
+                                    <div class="col-md-6">
+                                        <label for="client_price" class="form-label">Cena dla szkoły (brutto)</label>
+                                        <input type="number" step="0.01" min="0" name="client_price" id="client_price"
+                                               value="{{ old('client_price', $case->client_price) }}"
+                                               class="form-control @error('client_price') is-invalid @enderror"
+                                               placeholder="np. 2500.00">
+                                        @error('client_price')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                        <div class="form-check mt-2">
+                                            <input type="checkbox" class="form-check-input" name="client_price_confirmed" id="client_price_confirmed" value="1"
+                                                   @checked(old('client_price_confirmed', $case->client_price_confirmed_at ? '1' : '') == '1')>
+                                            <label class="form-check-label" for="client_price_confirmed">Potwierdzone ze szkołą</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="instructor_fee" class="form-label">Wynagrodzenie instruktora (brutto)</label>
+                                        <input type="number" step="0.01" min="0" name="instructor_fee" id="instructor_fee"
+                                               value="{{ old('instructor_fee', $case->instructor_fee) }}"
+                                               class="form-control @error('instructor_fee') is-invalid @enderror"
+                                               placeholder="np. 1200.00">
+                                        @error('instructor_fee')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                        <div class="form-check mt-2">
+                                            <input type="checkbox" class="form-check-input" name="instructor_fee_confirmed" id="instructor_fee_confirmed" value="1"
+                                                   @checked(old('instructor_fee_confirmed', $case->instructor_fee_confirmed_at ? '1' : '') == '1')>
+                                            <label class="form-check-label" for="instructor_fee_confirmed">Potwierdzone z instruktorem</label>
+                                        </div>
+                                        <div class="form-text">Zmiana trenera lub kwoty cofa potwierdzenie, jeśli nie zaznaczysz go ponownie.</div>
+                                    </div>
+                                </div>
+
+                                <div class="form-check mb-2">
+                                    <input type="checkbox" class="form-check-input" name="schedule_time_known" id="schedule_time_known" value="1"
+                                           @checked(old('schedule_time_known', $case->schedule_time_known ? '1' : '') == '1')
+                                           @disabled($negotiationLocked)
+                                           onchange="document.getElementById('negotiation-start').type = this.checked ? 'datetime-local' : 'date'; document.getElementById('negotiation-end').type = this.checked ? 'datetime-local' : 'date';">
+                                    <label class="form-check-label" for="schedule_time_known">Godzina jest już znana</label>
+                                </div>
+                                @if($negotiationLocked)
+                                    <input type="hidden" name="schedule_time_known" value="{{ $case->schedule_time_known ? '1' : '0' }}">
+                                @endif
+
+                                <div class="row g-3 mb-3">
+                                    <div class="col-md-6">
+                                        <label for="negotiation-start" class="form-label">Początek szkolenia</label>
+                                        <input
+                                            type="{{ old('schedule_time_known', $case->schedule_time_known ? '1' : '') == '1' ? 'datetime-local' : 'date' }}"
+                                            name="start_date"
+                                            id="negotiation-start"
+                                            value="{{ old('start_date', $case->datetimeLocalValue($case->start_date, (bool) old('schedule_time_known', $case->schedule_time_known))) }}"
+                                            class="form-control @error('start_date') is-invalid @enderror"
+                                            @disabled($negotiationLocked)>
+                                        @error('start_date')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                        @if($negotiationLocked)
+                                            <input type="hidden" name="start_date" value="{{ $case->datetimeLocalValue($case->start_date, (bool) $case->schedule_time_known) }}">
+                                        @endif
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="negotiation-end" class="form-label">Koniec szkolenia</label>
+                                        <input
+                                            type="{{ old('schedule_time_known', $case->schedule_time_known ? '1' : '') == '1' ? 'datetime-local' : 'date' }}"
+                                            name="end_date"
+                                            id="negotiation-end"
+                                            value="{{ old('end_date', $case->datetimeLocalValue($case->end_date, (bool) old('schedule_time_known', $case->schedule_time_known))) }}"
+                                            class="form-control @error('end_date') is-invalid @enderror"
+                                            @disabled($negotiationLocked)>
+                                        @error('end_date')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                        @if($negotiationLocked)
+                                            <input type="hidden" name="end_date" value="{{ $case->datetimeLocalValue($case->end_date, (bool) $case->schedule_time_known) }}">
+                                        @endif
+                                    </div>
+                                </div>
+                                <div class="form-text mb-3">Można zapisać sam początek. Koniec wymaga początku. Wpisanie terminu nie tworzy szkolenia.</div>
+
+                                <button type="submit" class="btn btn-primary">Zapisz ustalenia</button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <div class="card mb-4">
+                        <div class="card-header fw-semibold">Szkolenie (realizacja)</div>
                         <div class="card-body">
                             @if($case->course)
                                 <p class="mb-1">
@@ -186,12 +316,15 @@
                                     </a>
                                 </p>
                                 @if($case->course->start_date)
-                                    <p class="text-secondary small mb-3">
+                                    <p class="text-secondary small mb-1">
                                         {{ $case->formatLocal($case->course->start_date) }}
                                         @if($case->course->end_date)
                                             – {{ $case->formatLocal($case->course->end_date) }}
                                         @endif
                                     </p>
+                                @endif
+                                @if($case->course->instructor)
+                                    <p class="text-secondary small mb-3">Trener: {{ $case->course->instructor->full_title_name }}</p>
                                 @endif
                                 @if($case->linkedCourseOfferMismatch())
                                     <div class="alert alert-warning py-2 small">
@@ -200,6 +333,7 @@
                                 @endif
                                 <div class="d-flex flex-wrap gap-2">
                                     <a href="{{ route('courses.show', $case->course) }}" class="btn btn-outline-primary btn-sm">Otwórz szkolenie</a>
+                                    <a href="{{ route('courses.edit', $case->course) }}" class="btn btn-outline-secondary btn-sm">Edytuj termin / trenera</a>
                                     <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#closedTrainingCaseReplaceCourseModal">
                                         Zmień powiązanie
                                     </button>
@@ -215,11 +349,28 @@
                                 <div class="d-flex flex-wrap gap-2 mb-3">
                                     <a href="{{ route('closed-training-cases.create-course', $case) }}" class="btn btn-primary btn-sm">Utwórz szkolenie ze sprawy</a>
                                 </div>
+                                @if(session('course_bind_mismatch'))
+                                    <div class="alert alert-warning">
+                                        <p class="mb-2 fw-semibold">Szkolenie różni się od ustaleń na sprawie:</p>
+                                        <ul class="mb-3">
+                                            @foreach(session('course_bind_mismatch') as $line)
+                                                <li>{{ $line }}</li>
+                                            @endforeach
+                                        </ul>
+                                        <p class="small mb-3">Po powiązaniu źródłem realizacji będzie szkolenie. Ustalenia na sprawie zostaną historyczne.</p>
+                                        <form method="POST" action="{{ route('closed-training-cases.course.bind', $case) }}">
+                                            @csrf
+                                            <input type="hidden" name="course_id" value="{{ session('course_bind_id', old('course_id')) }}">
+                                            <input type="hidden" name="confirm_mismatch" value="1">
+                                            <button type="submit" class="btn btn-warning">Potwierdź powiązanie mimo różnic</button>
+                                        </form>
+                                    </div>
+                                @endif
                                 <form method="POST" action="{{ route('closed-training-cases.course.bind', $case) }}" class="row g-2 align-items-end">
                                     @csrf
                                     <div class="col-sm-8">
                                         <label for="course_id" class="form-label">Powiąż istniejące (ID szkolenia)</label>
-                                        <input type="number" name="course_id" id="course_id" min="1" value="{{ old('course_id') }}" class="form-control @error('course_id') is-invalid @enderror" placeholder="np. 578" required>
+                                        <input type="number" name="course_id" id="course_id" min="1" value="{{ old('course_id', session('course_bind_id')) }}" class="form-control @error('course_id') is-invalid @enderror" placeholder="np. 578" required>
                                         @error('course_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
                                     </div>
                                     <div class="col-sm-4">

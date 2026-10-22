@@ -50,6 +50,7 @@ class ClosedTrainingCase extends Model
         'training_offer_id',
         'status',
         'assignee_user_id',
+        'instructor_id',
         'topic',
         'offer_url',
         'preferred_format',
@@ -61,6 +62,13 @@ class ClosedTrainingCase extends Model
         'institution_type',
         'institution_type_other',
         'message',
+        'client_price',
+        'client_price_confirmed_at',
+        'instructor_fee',
+        'instructor_fee_confirmed_at',
+        'start_date',
+        'end_date',
+        'schedule_time_known',
         'submitted_payload',
         'consent_at',
         'next_action',
@@ -72,6 +80,13 @@ class ClosedTrainingCase extends Model
         'consent_at' => 'datetime',
         'next_action_at' => 'datetime',
         'closed_at' => 'datetime',
+        'client_price' => 'decimal:2',
+        'client_price_confirmed_at' => 'datetime',
+        'instructor_fee' => 'decimal:2',
+        'instructor_fee_confirmed_at' => 'datetime',
+        'start_date' => 'datetime',
+        'end_date' => 'datetime',
+        'schedule_time_known' => 'boolean',
         'submitted_payload' => 'array',
     ];
 
@@ -85,6 +100,11 @@ class ClosedTrainingCase extends Model
         return $this->belongsTo(User::class, 'assignee_user_id');
     }
 
+    public function instructor(): BelongsTo
+    {
+        return $this->belongsTo(Instructor::class);
+    }
+
     public function events(): HasMany
     {
         return $this->hasMany(ClosedTrainingCaseEvent::class)->orderBy('happened_at')->orderBy('id');
@@ -93,6 +113,15 @@ class ClosedTrainingCase extends Model
     public function course(): HasOne
     {
         return $this->hasOne(Course::class, 'closed_training_case_id');
+    }
+
+    public function isLinkedToCourse(): bool
+    {
+        if ($this->relationLoaded('course')) {
+            return $this->course !== null;
+        }
+
+        return $this->course()->exists();
     }
 
     public function linkedCourseOfferMismatch(): bool
@@ -106,6 +135,72 @@ class ClosedTrainingCase extends Model
         $courseOfferId = $course->training_offer_id !== null ? (int) $course->training_offer_id : null;
 
         return $caseOfferId !== $courseOfferId;
+    }
+
+    public function linkedCourseInstructorMismatch(): bool
+    {
+        $course = $this->relationLoaded('course') ? $this->course : $this->course()->first();
+        if (! $course || $this->instructor_id === null) {
+            return false;
+        }
+
+        return (int) $this->instructor_id !== (int) $course->instructor_id;
+    }
+
+    public function linkedCourseScheduleMismatch(): bool
+    {
+        $course = $this->relationLoaded('course') ? $this->course : $this->course()->first();
+        if (! $course || ($this->start_date === null && $this->end_date === null)) {
+            return false;
+        }
+
+        $caseStart = $this->start_date?->format('Y-m-d H:i');
+        $caseEnd = $this->end_date?->format('Y-m-d H:i');
+        $courseStart = $course->start_date?->format('Y-m-d H:i');
+        $courseEnd = $course->end_date?->format('Y-m-d H:i');
+
+        return $caseStart !== $courseStart || $caseEnd !== $courseEnd;
+    }
+
+    public function formatMoney(null|string|float $amount): string
+    {
+        if ($amount === null || $amount === '') {
+            return '—';
+        }
+
+        return number_format((float) $amount, 2, ',', ' ').' PLN brutto';
+    }
+
+    public function formatScheduleRange(?Carbon $start, ?Carbon $end, bool $timeKnown): string
+    {
+        if (! $start) {
+            return '—';
+        }
+
+        $format = $timeKnown ? 'd.m.Y H:i' : 'd.m.Y';
+        $label = $this->formatLocal($start, $format) ?? '—';
+        if ($end) {
+            $label .= ' – '.($this->formatLocal($end, $format) ?? '');
+        }
+
+        if (! $timeKnown) {
+            $label .= ' (godzina do ustalenia)';
+        }
+
+        return $label;
+    }
+
+    public function datetimeLocalValue(?Carbon $moment, bool $timeKnown): string
+    {
+        if (! $moment) {
+            return '';
+        }
+
+        $local = $moment->timezone('Europe/Warsaw');
+
+        return $timeKnown
+            ? $local->format('Y-m-d\TH:i')
+            : $local->format('Y-m-d');
     }
 
     public static function statusOptions(): array

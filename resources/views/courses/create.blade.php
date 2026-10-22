@@ -34,7 +34,11 @@
                         'category',
                         $sourceCase ? 'closed' : (optional($sourceOffer)->default_course_category ?? 'open')
                     );
-                    $defaultInstructorId = old('instructor_id', optional($sourceOffer)->instructor_id ?? '');
+                    $caseInstructorId = $sourceCase?->instructor_id;
+                    $defaultInstructorId = old(
+                        'instructor_id',
+                        $caseInstructorId ?: (optional($sourceOffer)->instructor_id ?? '')
+                    );
                     $copyImageDefault = old('copy_image_from_offer', $sourceOffer && $sourceOffer->image ? '1' : '0');
                     $defaultLiveRoomMode = old('live_room_mode', 'embed_pnedu');
                     $defaultTitle = old(
@@ -43,8 +47,14 @@
                             ? $caseTopic
                             : ($sourceClickMeeting['name'] ?? optional($sourceOffer)->title ?? '')
                     );
-                    $defaultStartDate = old('start_date', $sourceClickMeeting['start_date'] ?? '');
-                    $defaultEndDate = old('end_date', $sourceClickMeeting['end_date'] ?? '');
+                    $caseStartPrefill = $sourceCase?->start_date
+                        ? $sourceCase->start_date->timezone('Europe/Warsaw')->format('Y-m-d\TH:i')
+                        : '';
+                    $caseEndPrefill = $sourceCase?->end_date
+                        ? $sourceCase->end_date->timezone('Europe/Warsaw')->format('Y-m-d\TH:i')
+                        : '';
+                    $defaultStartDate = old('start_date', $caseStartPrefill !== '' ? $caseStartPrefill : ($sourceClickMeeting['start_date'] ?? ''));
+                    $defaultEndDate = old('end_date', $caseEndPrefill !== '' ? $caseEndPrefill : ($sourceClickMeeting['end_date'] ?? ''));
                     $defaultPlatform = old('platform', $sourceClickMeeting['platform'] ?? '');
                     $defaultMeetingLink = old('meeting_link', $sourceClickMeeting['meeting_link'] ?? '');
                     $defaultClickMeetingEventId = old(

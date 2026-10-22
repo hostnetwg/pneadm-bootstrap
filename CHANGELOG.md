@@ -6,6 +6,7 @@ Krótka numeracja panelu. Szczegóły zawsze w `docs/`. Nowy numer wersji (np. 1
 
 Windykacja: masowe przypomnienia po wyciągu oraz doprecyzowanie wyszukiwania przelewów i danych sprawy.
 
+- **Hotfix 2026-10-22:** na [Sprawach szkoleń zamkniętych](/closed-training-cases) ustalenia negocjacyjne: instruktor, cena ryczałtowa dla szkoły i wynagrodzenie (PLN brutto) z potwierdzeniami, opcjonalny termin (dzień lub z godziną). Po powiązaniu ze szkoleniem trener/termin z `courses`; ceny nadal na sprawie. Prefill przy tworzeniu szkolenia ze sprawy. Kanon: [operations-os/CURRENT.md](docs/operations-os/CURRENT.md), DEC-OPS-013
 - **Hotfix 2026-10-21:** na [Sprawach szkoleń zamkniętych](/closed-training-cases) kolumna **Symbol** `[SZ-{id}]` (ten sam co w temacie e-maila do szkoły); na karcie przy tytule; wyszukiwanie po `SZ-3` / `[SZ-3]` / id. Kanon: [operations-os/CURRENT.md](docs/operations-os/CURRENT.md)
 - **Hotfix 2026-10-21:** na [Ofertach szkoleń](/training-offers) kolejność ustawiasz przeciąganiem wierszy albo strzałkami (jak przy kursach online); zapisuje `sort_order` na katalogu i karuzeli pnedu.pl. Bez wyszukiwania i przy filtrze „Wszystkie”. Kanon: [TRAINING_OFFERS.md](docs/TRAINING_OFFERS.md)
 - **Hotfix 2026-10-21:** na [Windykacji](/accounting/collections) w kolumnie Termin dla spraw zamkniętych „X dni po terminie” liczy się do daty wpłaty / zamknięcia (nie do dziś); otwarte nadal względem dziś. Kanon: [WINDYKACJA.md](docs/WINDYKACJA.md)

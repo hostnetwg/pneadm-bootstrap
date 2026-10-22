@@ -965,7 +965,7 @@ class CoursesController extends Controller
                 ->with('error', 'Ta sprawa jest już powiązana ze szkoleniem. Odłącz je albo otwórz istniejące szkolenie.');
         }
 
-        $closedTrainingCase->loadMissing('trainingOffer.instructor');
+        $closedTrainingCase->loadMissing(['trainingOffer.instructor', 'instructor']);
 
         return view('courses.create', $this->courseCreateFormData(
             sourceOffer: $closedTrainingCase->trainingOffer,

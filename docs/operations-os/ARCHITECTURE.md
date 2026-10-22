@@ -47,7 +47,7 @@ Sens obiektu, bez projektu kolumn:
 - zgoda: fakt i czas,
 - osobna historia zdarzeń pisana przez operatora ADM.
 
-Pola ceny, terminów i rund negocjacji należą do etapu 2. Nie ma dziś tabeli szkół — placówka zostaje tekstem, dopóki powtarzalność klientów nie wymusi katalogu.
+Pola negocjacyjne etapu 2 są na `closed_training_cases` (DEC-OPS-013): instruktor, cena ryczałtowa szkoły, wynagrodzenie, potwierdzenia, start/end. Bez tabeli rund. Po powiązaniu ze szkoleniem źródłem realizacji trenera/terminu jest `courses`. Nie ma dziś tabeli szkół — placówka zostaje tekstem, dopóki powtarzalność klientów nie wymusi katalogu.
 
 ### Odrzucone na ten moment
 

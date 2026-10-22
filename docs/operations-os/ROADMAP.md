@@ -24,9 +24,7 @@ Poza etapem: cena, terminy negocjacji, trener jako aktor, brief, tworzenie `cour
 
 ### 2. Negocjacja po stronie PNE
 
-Nadal tylko ADM. PNE zapisuje wskazanego trenera, propozycje terminów, ustalenia ceny i odpowiedź szkoły. Zakończenie sprawy. Przy sukcesie człowiek otwiera istniejący formularz „Utwórz szkolenie z oferty” albo wiąże już istniejące `courses`.
-
-To oddaje największą ulgę pamięci zanim powstanie konto trenera. Waldemar i tak dziś przenosi odpowiedź trenera z maila.
+**W kodzie (2026-10-22, DEC-OPS-013).** Nadal tylko ADM. Na karcie sprawy: instruktor, cena ryczałtowa szkoły, wynagrodzenie instruktora, potwierdzenia, termin (dzień lub z godziną). Przy sukcesie: „Utwórz szkolenie ze sprawy” (prefill) albo powiązanie istniejącego `courses`. Bez automatycznego tworzenia szkolenia z terminu.
 
 ### 3. Powiązanie konta trenera
 

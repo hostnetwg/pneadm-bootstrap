@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\ClosedTrainingCase;
 use App\Models\ClosedTrainingCaseEvent;
 use App\Models\Course;
+use App\Models\Instructor;
 use App\Models\User;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Carbon;
@@ -205,6 +206,196 @@ class ClosedTrainingCaseService
     }
 
     /**
+     * @param  array{
+     *     instructor_id: ?int,
+     *     client_price: ?string,
+     *     client_price_confirmed: bool,
+     *     instructor_fee: ?string,
+     *     instructor_fee_confirmed: bool,
+     *     start_date: ?Carbon,
+     *     end_date: ?Carbon,
+     *     schedule_time_known: bool
+     * }  $attributes
+     */
+    public function updateNegotiation(ClosedTrainingCase $case, array $attributes, User $user): void
+    {
+        if ($case->isLinkedToCourse()) {
+            $forbidden = [];
+            $requestedInstructorId = $attributes['instructor_id'];
+            $currentInstructorId = $case->instructor_id !== null ? (int) $case->instructor_id : null;
+            if ($requestedInstructorId !== $currentInstructorId) {
+                $forbidden['instructor_id'] = 'Po powiązaniu ze szkoleniem trenera zmieniasz w edycji szkolenia.';
+            }
+            $requestedStart = $attributes['start_date']?->format('Y-m-d H:i');
+            $requestedEnd = $attributes['end_date']?->format('Y-m-d H:i');
+            if ($requestedStart !== $case->start_date?->format('Y-m-d H:i')
+                || $requestedEnd !== $case->end_date?->format('Y-m-d H:i')
+                || (bool) $attributes['schedule_time_known'] !== (bool) $case->schedule_time_known) {
+                $forbidden['start_date'] = 'Po powiązaniu ze szkoleniem termin zmieniasz w edycji szkolenia.';
+            }
+            if ($forbidden !== []) {
+                throw ValidationException::withMessages($forbidden);
+            }
+
+            $attributes['instructor_id'] = $currentInstructorId;
+            $attributes['start_date'] = $case->start_date;
+            $attributes['end_date'] = $case->end_date;
+            $attributes['schedule_time_known'] = (bool) $case->schedule_time_known;
+        }
+
+        $beforeInstructorId = $case->instructor_id !== null ? (int) $case->instructor_id : null;
+        $beforeClientPrice = $this->normalizeMoney($case->client_price);
+        $beforeInstructorFee = $this->normalizeMoney($case->instructor_fee);
+        $beforeClientConfirmed = $case->client_price_confirmed_at !== null;
+        $beforeFeeConfirmed = $case->instructor_fee_confirmed_at !== null;
+        $beforeStart = $case->start_date?->format('Y-m-d H:i');
+        $beforeEnd = $case->end_date?->format('Y-m-d H:i');
+        $beforeTimeKnown = (bool) $case->schedule_time_known;
+        $beforeInstructorLabel = $this->instructorLabel($case->instructor);
+
+        $newInstructorId = $attributes['instructor_id'];
+        $newClientPrice = $this->normalizeMoney($attributes['client_price']);
+        $newInstructorFee = $this->normalizeMoney($attributes['instructor_fee']);
+        $newStart = $attributes['start_date'];
+        $newEnd = $attributes['end_date'];
+        $newTimeKnown = (bool) $attributes['schedule_time_known'];
+
+        $clientPriceChanged = $beforeClientPrice !== $newClientPrice;
+        $instructorFeeChanged = $beforeInstructorFee !== $newInstructorFee;
+        $instructorChanged = $beforeInstructorId !== $newInstructorId;
+
+        $wantClientConfirmed = (bool) $attributes['client_price_confirmed'];
+        $wantFeeConfirmed = (bool) $attributes['instructor_fee_confirmed'];
+
+        if ($newClientPrice === null) {
+            $clientConfirmedAt = null;
+        } elseif ($clientPriceChanged) {
+            $clientConfirmedAt = $wantClientConfirmed ? now() : null;
+        } else {
+            $clientConfirmedAt = $wantClientConfirmed
+                ? ($case->client_price_confirmed_at ?? now())
+                : null;
+        }
+
+        if ($newInstructorFee === null) {
+            $feeConfirmedAt = null;
+        } elseif ($instructorChanged || $instructorFeeChanged) {
+            $feeConfirmedAt = $wantFeeConfirmed ? now() : null;
+        } else {
+            $feeConfirmedAt = $wantFeeConfirmed
+                ? ($case->instructor_fee_confirmed_at ?? now())
+                : null;
+        }
+
+        $case->instructor_id = $newInstructorId;
+        $case->client_price = $newClientPrice;
+        $case->client_price_confirmed_at = $clientConfirmedAt;
+        $case->instructor_fee = $newInstructorFee;
+        $case->instructor_fee_confirmed_at = $feeConfirmedAt;
+        $case->start_date = $newStart;
+        $case->end_date = $newEnd;
+        $case->schedule_time_known = $newTimeKnown;
+
+        $afterClientConfirmed = $case->client_price_confirmed_at !== null;
+        $afterFeeConfirmed = $case->instructor_fee_confirmed_at !== null;
+        $afterStart = $case->start_date?->format('Y-m-d H:i');
+        $afterEnd = $case->end_date?->format('Y-m-d H:i');
+
+        $unchanged = $beforeInstructorId === $newInstructorId
+            && $beforeClientPrice === $newClientPrice
+            && $beforeInstructorFee === $newInstructorFee
+            && $beforeClientConfirmed === $afterClientConfirmed
+            && $beforeFeeConfirmed === $afterFeeConfirmed
+            && $beforeStart === $afterStart
+            && $beforeEnd === $afterEnd
+            && $beforeTimeKnown === $newTimeKnown;
+
+        if ($unchanged) {
+            return;
+        }
+
+        $case->save();
+        $case->unsetRelation('instructor');
+        $case->load('instructor');
+
+        $case->events()->create([
+            'user_id' => $user->id,
+            'event_type' => ClosedTrainingCaseEvent::TYPE_UPDATED,
+            'body' => $this->negotiationChangeSummary(
+                beforeInstructorLabel: $beforeInstructorLabel,
+                beforeClientPrice: $beforeClientPrice,
+                beforeClientConfirmed: $beforeClientConfirmed,
+                beforeInstructorFee: $beforeInstructorFee,
+                beforeFeeConfirmed: $beforeFeeConfirmed,
+                beforeStart: $beforeStart,
+                beforeEnd: $beforeEnd,
+                beforeTimeKnown: $beforeTimeKnown,
+                case: $case,
+            ),
+            'happened_at' => now(),
+        ]);
+    }
+
+    /**
+     * Po powiązaniu: jeśli trener na szkoleniu różni się od ustaleń / potwierdzonego fee — cofnij potwierdzenie wynagrodzenia.
+     */
+    public function syncFeeConfirmationWithLinkedCourse(ClosedTrainingCase $case): void
+    {
+        $course = $case->relationLoaded('course') ? $case->course : $case->course()->first();
+        if (! $course || $case->instructor_fee_confirmed_at === null) {
+            return;
+        }
+
+        $courseInstructorId = $course->instructor_id !== null ? (int) $course->instructor_id : null;
+        $caseInstructorId = $case->instructor_id !== null ? (int) $case->instructor_id : null;
+
+        if ($courseInstructorId === $caseInstructorId) {
+            return;
+        }
+
+        $case->instructor_fee_confirmed_at = null;
+        $case->save();
+        $case->events()->create([
+            'user_id' => null,
+            'event_type' => ClosedTrainingCaseEvent::TYPE_UPDATED,
+            'body' => 'Cofnięto potwierdzenie wynagrodzenia instruktora — trener na powiązanym szkoleniu różni się od ustaleń na sprawie.',
+            'happened_at' => now(),
+        ]);
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function courseLinkDiffLines(ClosedTrainingCase $case, Course $course): array
+    {
+        $lines = [];
+
+        $caseInstructor = $case->instructor_id
+            ? (Instructor::query()->find($case->instructor_id)?->full_title_name
+                ?? Instructor::query()->find($case->instructor_id)?->first_name)
+            : null;
+        $courseInstructor = $course->instructor
+            ? ($course->instructor->full_title_name ?? trim($course->instructor->first_name.' '.$course->instructor->last_name))
+            : null;
+        $caseInstructorId = $case->instructor_id !== null ? (int) $case->instructor_id : null;
+        $courseInstructorId = $course->instructor_id !== null ? (int) $course->instructor_id : null;
+        if ($caseInstructorId !== $courseInstructorId) {
+            $lines[] = 'Trener: '.($caseInstructor ?: 'brak na sprawie').' → '.($courseInstructor ?: 'brak na szkoleniu').'.';
+        }
+
+        $caseStart = $case->start_date?->format('Y-m-d H:i');
+        $caseEnd = $case->end_date?->format('Y-m-d H:i');
+        $courseStart = $course->start_date?->format('Y-m-d H:i');
+        $courseEnd = $course->end_date?->format('Y-m-d H:i');
+        if (($caseStart !== null || $caseEnd !== null) && ($caseStart !== $courseStart || $caseEnd !== $courseEnd)) {
+            $lines[] = 'Termin sprawy: '.$case->formatScheduleRange($case->start_date, $case->end_date, (bool) $case->schedule_time_known)
+                .' → szkolenie: '.$case->formatScheduleRange($course->start_date, $course->end_date, true).'.';
+        }
+
+        return $lines;
+    }
+
+    /**
      * @param  'create'|'bind'|'replace'  $via
      */
     public function linkCourse(ClosedTrainingCase $case, Course $course, User $user, string $via = 'bind'): void
@@ -242,10 +433,24 @@ class ClosedTrainingCaseService
                 $course->closed_training_case_id = $case->id;
                 $course->save();
 
+                $case->unsetRelation('course');
+                $case->setRelation('course', $course);
+
+                $feeNote = '';
+                if ($case->instructor_fee_confirmed_at !== null) {
+                    $courseInstructorId = $course->instructor_id !== null ? (int) $course->instructor_id : null;
+                    $caseInstructorId = $case->instructor_id !== null ? (int) $case->instructor_id : null;
+                    if ($courseInstructorId !== $caseInstructorId) {
+                        $case->instructor_fee_confirmed_at = null;
+                        $case->save();
+                        $feeNote = ' Cofnięto potwierdzenie wynagrodzenia (inny trener na szkoleniu).';
+                    }
+                }
+
                 $case->events()->create([
                     'user_id' => $user->id,
                     'event_type' => ClosedTrainingCaseEvent::TYPE_UPDATED,
-                    'body' => $this->courseLinkSummary($course, $via, $existing),
+                    'body' => $this->courseLinkSummary($course, $via, $existing).$feeNote,
                     'happened_at' => now(),
                 ]);
             });
@@ -269,10 +474,19 @@ class ClosedTrainingCaseService
             $course->closed_training_case_id = null;
             $course->save();
 
+            $extra = '';
+            if ($case->instructor_fee_confirmed_at !== null) {
+                $case->instructor_fee_confirmed_at = null;
+                $case->save();
+                $extra = ' Cofnięto potwierdzenie wynagrodzenia — sprawdź ponownie trenera, termin i warunki.';
+            } else {
+                $extra = ' Sprawdź ponownie trenera, termin i wynagrodzenie na sprawie.';
+            }
+
             $case->events()->create([
                 'user_id' => $user->id,
                 'event_type' => ClosedTrainingCaseEvent::TYPE_UPDATED,
-                'body' => $this->courseUnlinkSummary($course, $reason),
+                'body' => $this->courseUnlinkSummary($course, $reason).$extra,
                 'happened_at' => now(),
             ]);
         });
@@ -303,10 +517,19 @@ class ClosedTrainingCaseService
             $course->closed_training_case_id = null;
             $course->save();
 
+            $extra = '';
+            if ($case->instructor_fee_confirmed_at !== null) {
+                $case->instructor_fee_confirmed_at = null;
+                $case->save();
+                $extra = ' Cofnięto potwierdzenie wynagrodzenia — sprawdź ponownie trenera, termin i warunki.';
+            } else {
+                $extra = ' Sprawdź ponownie trenera, termin i wynagrodzenie na sprawie.';
+            }
+
             $case->events()->create([
                 'user_id' => $user?->id,
                 'event_type' => ClosedTrainingCaseEvent::TYPE_UPDATED,
-                'body' => $this->courseUnlinkSummary($course, 'soft_delete'),
+                'body' => $this->courseUnlinkSummary($course, 'soft_delete').$extra,
                 'happened_at' => now(),
             ]);
         });
@@ -425,5 +648,83 @@ class ClosedTrainingCaseService
         $value = trim((string) $value);
 
         return $value === '' ? 'brak' : $value;
+    }
+
+    private function normalizeMoney(null|string|float|int $value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        if (is_string($value)) {
+            $value = str_replace([' ', ','], ['', '.'], trim($value));
+        }
+
+        if (! is_numeric($value)) {
+            return null;
+        }
+
+        return number_format((float) $value, 2, '.', '');
+    }
+
+    private function instructorLabel(?Instructor $instructor): string
+    {
+        if (! $instructor) {
+            return 'brak';
+        }
+
+        $name = trim((string) ($instructor->full_title_name ?? ($instructor->first_name.' '.$instructor->last_name)));
+
+        return $name !== '' ? $name : 'brak';
+    }
+
+    private function negotiationChangeSummary(
+        string $beforeInstructorLabel,
+        ?string $beforeClientPrice,
+        bool $beforeClientConfirmed,
+        ?string $beforeInstructorFee,
+        bool $beforeFeeConfirmed,
+        ?string $beforeStart,
+        ?string $beforeEnd,
+        bool $beforeTimeKnown,
+        ClosedTrainingCase $case,
+    ): string {
+        $parts = ['Ustalenia negocjacyjne.'];
+
+        $afterInstructorLabel = $this->instructorLabel($case->instructor);
+        if ($beforeInstructorLabel !== $afterInstructorLabel) {
+            $parts[] = 'Trener: '.$beforeInstructorLabel.' → '.$afterInstructorLabel.'.';
+        }
+
+        $afterClient = $this->normalizeMoney($case->client_price);
+        if ($beforeClientPrice !== $afterClient) {
+            $parts[] = 'Cena dla szkoły: '.$case->formatMoney($beforeClientPrice).' → '.$case->formatMoney($afterClient).'.';
+        }
+        $afterClientConfirmed = $case->client_price_confirmed_at !== null;
+        if ($beforeClientConfirmed !== $afterClientConfirmed) {
+            $parts[] = $afterClientConfirmed
+                ? 'Potwierdzono cenę dla szkoły.'
+                : 'Cofnięto potwierdzenie ceny dla szkoły.';
+        }
+
+        $afterFee = $this->normalizeMoney($case->instructor_fee);
+        if ($beforeInstructorFee !== $afterFee) {
+            $parts[] = 'Wynagrodzenie instruktora: '.$case->formatMoney($beforeInstructorFee).' → '.$case->formatMoney($afterFee).'.';
+        }
+        $afterFeeConfirmed = $case->instructor_fee_confirmed_at !== null;
+        if ($beforeFeeConfirmed !== $afterFeeConfirmed) {
+            $parts[] = $afterFeeConfirmed
+                ? 'Potwierdzono wynagrodzenie instruktora.'
+                : 'Cofnięto potwierdzenie wynagrodzenia instruktora.';
+        }
+
+        $afterStart = $case->start_date?->format('Y-m-d H:i');
+        $afterEnd = $case->end_date?->format('Y-m-d H:i');
+        $afterTimeKnown = (bool) $case->schedule_time_known;
+        if ($beforeStart !== $afterStart || $beforeEnd !== $afterEnd || $beforeTimeKnown !== $afterTimeKnown) {
+            $parts[] = 'Termin: '.$case->formatScheduleRange($case->start_date, $case->end_date, $afterTimeKnown).'.';
+        }
+
+        return implode(' ', $parts);
     }
 }

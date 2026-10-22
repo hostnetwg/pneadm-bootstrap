@@ -2,7 +2,7 @@
 
 Statusy: **Proposed** (rekomendacja Cursora, czeka na Waldemara), **Accepted**, **Superseded**.
 
-Przyjęte: DEC-OPS-002, DEC-OPS-006, DEC-OPS-007, DEC-OPS-008, DEC-OPS-009, DEC-OPS-010, DEC-OPS-011, DEC-OPS-012. Nazwa przedsięwzięcia (DEC-OPS-001) zostaje robocza. DEC-OPS-003, DEC-OPS-004 i DEC-OPS-005 czekają. Etap 1 jest w kodzie.
+Przyjęte: DEC-OPS-002, DEC-OPS-006, DEC-OPS-007, DEC-OPS-008, DEC-OPS-009, DEC-OPS-010, DEC-OPS-011, DEC-OPS-012, DEC-OPS-013. Nazwa przedsięwzięcia (DEC-OPS-001) zostaje robocza. DEC-OPS-003, DEC-OPS-004 i DEC-OPS-005 czekają. Etap 1 i 2 (pola negocjacyjne) są w kodzie.
 
 ## DEC-OPS-001 — Nazwa przedsięwzięcia
 
@@ -95,3 +95,11 @@ Przyjęte: DEC-OPS-002, DEC-OPS-006, DEC-OPS-007, DEC-OPS-008, DEC-OPS-009, DEC-
 - Treść: z karty sprawy szkolenia zamkniętego można wysłać e-mail wyłącznie na aktualny adres kontaktowy sprawy. From: `info@system.pnedu.pl`, Reply-To: `kontakt@pnedu.pl`, nazwa: Platforma Nowoczesnej Edukacji. Temat zawiera identyfikator `[SZ-{id}]`. Po udanej wysyłce pełna treść ląduje w historii. Błąd wysyłki nie tworzy wpisu „wysłano” i nie zmienia statusu ani następnego działania. ADM nie odbiera poczty. Odpowiedzi szkoły czyta się w skrzynce `kontakt@pnedu.pl` i w razie potrzeby dopisuje ręcznie. Bez CC, BCC, załączników, szablonów, wysyłki do trenera i automatycznego workflow.
 - Uzasadnienie: korespondencja ma zostać przy sprawie, bez budowania skrzynki w ADM. From zostaje jak w pozostałych mailach systemowych panelu, żeby nie psuć dostarczalności.
 - Przyjęcie: Waldemar, 2026-10-18 (From `info@system.pnedu.pl`).
+
+## DEC-OPS-013 — Pola negocjacyjne na sprawie (etap 2)
+
+- Status: Accepted
+- Data: 2026-10-22
+- Treść: na `closed_training_cases` są opcjonalne: `instructor_id`, `client_price` + `client_price_confirmed_at`, `instructor_fee` + `instructor_fee_confirmed_at`, `start_date` / `end_date`, `schedule_time_known`. Cena klienta = ryczałt za całe szkolenie zamknięte, PLN brutto. Wynagrodzenie = kwota PLN brutto (bez %/godzinowych). Jedna bieżąca kwota + historia `TYPE_UPDATED`; bez tabeli rund. Termin może być samym dniem (`schedule_time_known=false`). Po powiązaniu z `courses` aktualny trener i termin pochodzą ze szkolenia; pola sprawy historyczne i zablokowane po stronie serwera; ceny nadal na sprawie. Zmiana kwoty lub trenera cofa odpowiednie potwierdzenie. Odpięcie / soft delete szkolenia nie przywraca potwierdzeń — czyści potwierdzenie wynagrodzenia i prosi o weryfikację. Wpisanie terminu nie tworzy szkolenia. Prefill „Utwórz ze sprawy” bierze trenera i daty ze sprawy.
+- Uzasadnienie: ulga pamięci przy negocjacji przed powstaniem `courses`, bez BPM i bez portalu trenera.
+- Przyjęcie: Waldemar, 2026-10-22 (odpowiedzi: ryczałt, brutto, kwota PLN, dzień bez godziny OK, odpięcie bez cichego kopiowania).
