@@ -225,11 +225,20 @@ class ClosedTrainingCaseTest extends TestCase
     public function test_case_list_shows_contact_person_phone_and_email_prominently(): void
     {
         $user = User::factory()->create(['is_active' => true]);
+        $offer = TrainingOffer::query()->create([
+            'title' => 'Oferta z info na liście',
+            'slug' => 'oferta-z-info-na-liscie-'.uniqid(),
+        ]);
         $this->makeCase([
             'topic' => 'Sprawa z wyróżnionym kontaktem',
             'contact_name' => 'Anna Kowalska',
             'contact_phone' => '501 234 567',
             'contact_email' => 'anna.kontakt@example.com',
+            'institution' => 'SP nr 7 Testowa',
+            'institution_type' => ClosedTrainingCase::INSTITUTION_PRIMARY,
+            'institution_www' => 'https://sp7.example.edu.pl',
+            'preferred_format' => ClosedTrainingCase::FORMAT_ONLINE,
+            'training_offer_id' => $offer->id,
         ]);
 
         $this->actingAs($user)
@@ -240,7 +249,13 @@ class ClosedTrainingCaseTest extends TestCase
             ->assertSee('501 234 567')
             ->assertSee('anna.kontakt@example.com')
             ->assertSee('tel:501234567', false)
-            ->assertSee('mailto:anna.kontakt@example.com', false);
+            ->assertSee('mailto:anna.kontakt@example.com', false)
+            ->assertSee('bi-info-circle', false)
+            ->assertSee('caseInquiryDetailsModal', false)
+            ->assertSee('data-institution="SP nr 7 Testowa"', false)
+            ->assertSee('data-www="https://sp7.example.edu.pl"', false)
+            ->assertSee('data-offer="Oferta z info na liście"', false)
+            ->assertSee('Następne działanie');
     }
 
     public function test_case_list_shows_negotiation_summary_compactly(): void

@@ -68,8 +68,8 @@
                                     </a>
                                 </th>
                                 <th>Temat / placówka</th>
-                                <th style="min-width: 11rem;" title="Osoba do kontaktu ze szkoły">Kontakt</th>
-                                <th style="min-width: 14rem;" title="Termin, instruktor (wynagrodzenie), cena dla szkoły. Zielone / ✓ = potwierdzone">Ustalenia</th>
+                                <th style="width: 9.5rem; max-width: 9.5rem;" title="Osoba do kontaktu ze szkoły; (i) = szczegóły placówki i oferty">Kontakt</th>
+                                <th style="width: 10rem; max-width: 10rem;" title="Termin, instruktor (wynagrodzenie), cena dla szkoły. Zielone / ✓ = potwierdzone">Ustalenia</th>
                                 <th style="min-width: 8rem;" title="Status, potem data ostatniego wpisu i opiekun; sortowanie po dacie">
                                     <a href="{{ $activitySortUrl }}" class="text-decoration-none text-dark">
                                         Ostatni wpis
@@ -80,7 +80,7 @@
                                         @endif
                                     </a>
                                 </th>
-                                <th>Następne działanie</th>
+                                <th style="min-width: 16rem;">Następne działanie</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -90,6 +90,10 @@
                                     $instructor = $case->listInstructorName();
                                     $fee = $case->instructor_fee;
                                     $price = $case->client_price;
+                                    $offerTitle = $case->trainingOffer?->title;
+                                    $offerUrl = $case->trainingOffer
+                                        ? route('training-offers.show', $case->trainingOffer)
+                                        : '';
                                 @endphp
                                 <tr>
                                     <td>
@@ -105,11 +109,28 @@
                                             <div class="text-muted text-truncate" style="max-width: 18rem;" title="{{ $messagePreview }}">{{ \Illuminate\Support\Str::limit($messagePreview, 80) }}</div>
                                         @endif
                                     </td>
-                                    <td style="min-width: 11rem;">
+                                    <td style="width: 9.5rem; max-width: 9.5rem;">
                                         <div class="border-start border-3 border-primary ps-2 py-1">
-                                            <div class="fw-semibold text-dark">{{ $case->contact_name ?: '—' }}</div>
+                                            <div class="d-flex align-items-start justify-content-between gap-1">
+                                                <div class="fw-semibold text-dark text-break">{{ $case->contact_name ?: '—' }}</div>
+                                                <button type="button"
+                                                        class="btn btn-link p-0 lh-1 flex-shrink-0 text-primary"
+                                                        data-bs-toggle="modal"
+                                                        data-bs-target="#caseInquiryDetailsModal"
+                                                        data-symbol="{{ $case->referenceCode() }}"
+                                                        data-institution="{{ $case->institution ?: '—' }}"
+                                                        data-institution-type="{{ $case->institutionTypeLabel() }}"
+                                                        data-www="{{ $case->institution_www ?: '' }}"
+                                                        data-format="{{ $case->preferredFormatLabel() }}"
+                                                        data-offer="{{ $offerTitle ?: '—' }}"
+                                                        data-offer-url="{{ $offerUrl }}"
+                                                        title="Szczegóły placówki i oferty"
+                                                        aria-label="Szczegóły placówki i oferty">
+                                                    <i class="bi bi-info-circle" aria-hidden="true"></i>
+                                                </button>
+                                            </div>
                                             @if(filled($case->contact_phone))
-                                                <div class="mt-1">
+                                                <div class="mt-1 text-break">
                                                     <a href="tel:{{ preg_replace('/\s+/', '', $case->contact_phone) }}"
                                                        class="text-decoration-none fw-semibold text-dark"
                                                        title="Zadzwoń">
@@ -118,7 +139,7 @@
                                                 </div>
                                             @endif
                                             @if(filled($case->contact_email))
-                                                <div class="{{ filled($case->contact_phone) ? '' : 'mt-1' }}">
+                                                <div class="{{ filled($case->contact_phone) ? '' : 'mt-1' }} text-break">
                                                     <a href="mailto:{{ $case->contact_email }}"
                                                        class="text-decoration-none text-primary"
                                                        title="Napisz e-mail">
@@ -130,11 +151,11 @@
                                             @endif
                                         </div>
                                     </td>
-                                    <td class="font-monospace" style="font-size: 0.8rem; line-height: 1.35;">
-                                        <div class="{{ $schedule === '—' ? 'text-muted' : '' }}" title="{{ $case->listScheduleLabel() }}">
+                                    <td style="width: 10rem; max-width: 10rem; line-height: 1.35;">
+                                        <div class="{{ $schedule === '—' ? 'text-muted' : '' }} text-break" title="{{ $case->listScheduleLabel() }}">
                                             <span class="text-muted">TERMIN:</span> {{ $schedule }}
                                         </div>
-                                        <div title="{{ $case->course ? 'Instruktor ze powiązanego szkolenia' : 'Instruktor z ustaleń na sprawie' }}">
+                                        <div class="text-break" title="{{ $case->course ? 'Instruktor ze powiązanego szkolenia' : 'Instruktor z ustaleń na sprawie' }}">
                                             @if($instructor === '—')
                                                 <span class="text-muted">—</span>
                                             @else
@@ -146,7 +167,7 @@
                                                 @endif
                                             @endif
                                         </div>
-                                        <div class="{{ $price === null ? 'text-muted' : '' }} {{ $case->client_price_confirmed_at ? 'text-success fw-semibold' : '' }}"
+                                        <div class="text-break {{ $price === null ? 'text-muted' : '' }} {{ $case->client_price_confirmed_at ? 'text-success fw-semibold' : '' }}"
                                              title="Cena dla szkoły{{ $case->client_price_confirmed_at ? ' — potwierdzona' : '' }}">
                                             <span class="{{ $case->client_price_confirmed_at ? 'text-success' : 'text-muted' }}">CENA:</span>
                                             {{ $case->formatMoneyList($price) }}@if($case->client_price_confirmed_at) ✓@endif
@@ -167,8 +188,8 @@
                                             {{ $case->assignee?->name ?: '—' }}
                                         </div>
                                     </td>
-                                    <td class="{{ $case->nextActionIsOverdue() ? 'text-danger' : '' }}" style="max-width: 12rem;">
-                                        <div class="text-truncate" title="{{ $case->next_action }}">{{ $case->next_action ?: '—' }}</div>
+                                    <td class="{{ $case->nextActionIsOverdue() ? 'text-danger' : '' }}" style="min-width: 16rem;">
+                                        <div style="white-space: normal;" title="{{ $case->next_action }}">{{ $case->next_action ?: '—' }}</div>
                                         @if($case->next_action_at)
                                             <div class="text-muted">{{ $case->formatLocal($case->next_action_at) }}</div>
                                         @endif
@@ -187,4 +208,91 @@
             <div class="mt-3">{{ $cases->links() }}</div>
         </div>
     </div>
+
+    <div class="modal fade" id="caseInquiryDetailsModal" tabindex="-1" aria-labelledby="caseInquiryDetailsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="caseInquiryDetailsModalLabel">Szczegóły zapytania</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+                </div>
+                <div class="modal-body">
+                    <dl class="row mb-0 small">
+                        <dt class="col-sm-4 text-muted">Nazwa szkoły</dt>
+                        <dd class="col-sm-8" id="caseInquiryInstitution">—</dd>
+                        <dt class="col-sm-4 text-muted">Rodzaj szkoły</dt>
+                        <dd class="col-sm-8" id="caseInquiryInstitutionType">—</dd>
+                        <dt class="col-sm-4 text-muted">WWW</dt>
+                        <dd class="col-sm-8" id="caseInquiryWww">—</dd>
+                        <dt class="col-sm-4 text-muted">Forma</dt>
+                        <dd class="col-sm-8" id="caseInquiryFormat">—</dd>
+                        <dt class="col-sm-4 text-muted">Oferta</dt>
+                        <dd class="col-sm-8" id="caseInquiryOffer">—</dd>
+                    </dl>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Zamknij</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('caseInquiryDetailsModal')?.addEventListener('show.bs.modal', (event) => {
+            const button = event.relatedTarget;
+            if (!(button instanceof HTMLElement)) {
+                return;
+            }
+
+            const symbol = button.getAttribute('data-symbol') || '';
+            const title = document.getElementById('caseInquiryDetailsModalLabel');
+            if (title) {
+                title.textContent = symbol ? `Szczegóły zapytania [${symbol}]` : 'Szczegóły zapytania';
+            }
+
+            const setText = (id, value) => {
+                const el = document.getElementById(id);
+                if (el) {
+                    el.textContent = value && value.trim() !== '' ? value : '—';
+                }
+            };
+
+            setText('caseInquiryInstitution', button.getAttribute('data-institution'));
+            setText('caseInquiryInstitutionType', button.getAttribute('data-institution-type'));
+            setText('caseInquiryFormat', button.getAttribute('data-format'));
+
+            const wwwEl = document.getElementById('caseInquiryWww');
+            const www = (button.getAttribute('data-www') || '').trim();
+            if (wwwEl) {
+                if (www === '') {
+                    wwwEl.textContent = '—';
+                } else {
+                    wwwEl.replaceChildren();
+                    const link = document.createElement('a');
+                    link.href = www;
+                    link.target = '_blank';
+                    link.rel = 'noopener noreferrer';
+                    link.textContent = www;
+                    wwwEl.appendChild(link);
+                }
+            }
+
+            const offerEl = document.getElementById('caseInquiryOffer');
+            const offer = (button.getAttribute('data-offer') || '').trim();
+            const offerUrl = (button.getAttribute('data-offer-url') || '').trim();
+            if (offerEl) {
+                if (offer === '' || offer === '—') {
+                    offerEl.textContent = '—';
+                } else if (offerUrl !== '') {
+                    offerEl.replaceChildren();
+                    const link = document.createElement('a');
+                    link.href = offerUrl;
+                    link.textContent = offer;
+                    offerEl.appendChild(link);
+                } else {
+                    offerEl.textContent = offer;
+                }
+            }
+        });
+    </script>
 </x-app-layout>
