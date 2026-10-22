@@ -273,6 +273,41 @@ class ClosedTrainingCaseTest extends TestCase
             ->assertSee('Ustaliliśmy termin szkolenia.');
     }
 
+    public function test_operator_can_edit_note_channel_and_party(): void
+    {
+        $user = User::factory()->create(['is_active' => true]);
+        $case = $this->makeCase([
+            'topic' => 'Sprawa z edycją notatki',
+            'contact_name' => 'Ewa Klient',
+        ]);
+
+        $this->actingAs($user)
+            ->post(route('closed-training-cases.notes.store', $case), [
+                'body' => 'Pierwsza wersja notatki.',
+                'note_channel' => ClosedTrainingCaseEvent::NOTE_CHANNEL_PHONE,
+                'note_party' => ClosedTrainingCaseEvent::NOTE_PARTY_CLIENT,
+            ])
+            ->assertRedirect();
+
+        $note = $case->events()->where('event_type', ClosedTrainingCaseEvent::TYPE_NOTE)->first();
+        $this->assertNotNull($note);
+
+        $this->actingAs($user)
+            ->put(route('closed-training-cases.events.update', [$case, $note]), [
+                'body' => 'Poprawiona notatka.',
+                'note_channel' => ClosedTrainingCaseEvent::NOTE_CHANNEL_EMAIL,
+                'note_party' => '',
+            ])
+            ->assertRedirect(route('closed-training-cases.show', $case));
+
+        $note->refresh();
+        $this->assertSame('Poprawiona notatka.', $note->body);
+        $this->assertSame(ClosedTrainingCaseEvent::NOTE_CHANNEL_EMAIL, $note->note_channel);
+        $this->assertNull($note->note_party);
+        $this->assertNull($note->note_party_name);
+        $this->assertSame('E-mail', $note->noteContextLabel());
+    }
+
     public function test_operator_can_set_scheduled_and_delivered_status(): void
     {
         $user = User::factory()->create(['is_active' => true]);

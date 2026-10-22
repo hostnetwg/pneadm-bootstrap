@@ -29,41 +29,27 @@ class ClosedTrainingCaseService
      */
     public function addNote(ClosedTrainingCase $case, User $user, array $attributes): ClosedTrainingCaseEvent
     {
-        $channel = $attributes['note_channel'] ?? null;
-        $channelOther = null;
-        if ($channel === ClosedTrainingCaseEvent::NOTE_CHANNEL_OTHER) {
-            $channelOther = $this->blankToNull($attributes['note_channel_other'] ?? null);
-        } elseif ($channel !== null && $channel !== '') {
-            $channelOther = null;
-        } else {
-            $channel = null;
-        }
-
-        $party = $attributes['note_party'] ?? null;
-        $partyName = null;
-        if ($party === ClosedTrainingCaseEvent::NOTE_PARTY_INSTRUCTOR) {
-            $name = $case->listInstructorName();
-            $partyName = $name === '—' ? null : $name;
-        } elseif ($party === ClosedTrainingCaseEvent::NOTE_PARTY_CLIENT) {
-            $partyName = $this->blankToNull($case->contact_name);
-        } else {
-            $party = null;
-        }
+        $context = $this->resolveNoteContext($case, $attributes);
 
         return $case->events()->create([
             'user_id' => $user->id,
             'event_type' => ClosedTrainingCaseEvent::TYPE_NOTE,
             'body' => $attributes['body'],
-            'note_channel' => $channel,
-            'note_channel_other' => $channelOther,
-            'note_party' => $party,
-            'note_party_name' => $partyName,
+            'note_channel' => $context['note_channel'],
+            'note_channel_other' => $context['note_channel_other'],
+            'note_party' => $context['note_party'],
+            'note_party_name' => $context['note_party_name'],
             'happened_at' => now(),
         ]);
     }
 
-    public function updateEvent(ClosedTrainingCaseEvent $event, string $body): ClosedTrainingCaseEvent
+    /**
+     * @param  array{body?: ?string, note_channel?: ?string, note_channel_other?: ?string, note_party?: ?string}  $attributes
+     */
+    public function updateEvent(ClosedTrainingCaseEvent $event, array $attributes): ClosedTrainingCaseEvent
     {
+        $body = trim((string) ($attributes['body'] ?? ''));
+
         if ($event->event_type === ClosedTrainingCaseEvent::TYPE_EMAIL_SENT) {
             $parts = preg_split("/\n\n/", $body, 2);
             $meta = trim((string) ($parts[0] ?? ''));
@@ -72,6 +58,21 @@ class ClosedTrainingCaseService
         }
 
         $event->body = $body === '' ? null : $body;
+
+        if ($event->event_type === ClosedTrainingCaseEvent::TYPE_NOTE) {
+            $case = $event->relationLoaded('caseRecord')
+                ? $event->caseRecord
+                : $event->caseRecord()->with(['instructor', 'course.instructor'])->first();
+
+            if ($case) {
+                $context = $this->resolveNoteContext($case, $attributes);
+                $event->note_channel = $context['note_channel'];
+                $event->note_channel_other = $context['note_channel_other'];
+                $event->note_party = $context['note_party'];
+                $event->note_party_name = $context['note_party_name'];
+            }
+        }
+
         $event->save();
 
         return $event;
@@ -852,5 +853,40 @@ class ClosedTrainingCaseService
         $value = trim((string) $value);
 
         return $value === '' ? null : $value;
+    }
+
+    /**
+     * @param  array{note_channel?: ?string, note_channel_other?: ?string, note_party?: ?string}  $attributes
+     * @return array{note_channel: ?string, note_channel_other: ?string, note_party: ?string, note_party_name: ?string}
+     */
+    private function resolveNoteContext(ClosedTrainingCase $case, array $attributes): array
+    {
+        $channel = $attributes['note_channel'] ?? null;
+        $channelOther = null;
+        if ($channel === ClosedTrainingCaseEvent::NOTE_CHANNEL_OTHER) {
+            $channelOther = $this->blankToNull($attributes['note_channel_other'] ?? null);
+        } elseif ($channel !== null && $channel !== '') {
+            $channelOther = null;
+        } else {
+            $channel = null;
+        }
+
+        $party = $attributes['note_party'] ?? null;
+        $partyName = null;
+        if ($party === ClosedTrainingCaseEvent::NOTE_PARTY_INSTRUCTOR) {
+            $name = $case->listInstructorName();
+            $partyName = $name === '—' ? null : $name;
+        } elseif ($party === ClosedTrainingCaseEvent::NOTE_PARTY_CLIENT) {
+            $partyName = $this->blankToNull($case->contact_name);
+        } else {
+            $party = null;
+        }
+
+        return [
+            'note_channel' => $channel,
+            'note_channel_other' => $channelOther,
+            'note_party' => $party,
+            'note_party_name' => $partyName,
+        ];
     }
 }

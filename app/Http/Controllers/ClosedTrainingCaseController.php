@@ -443,11 +443,24 @@ class ClosedTrainingCaseController extends Controller
 
         $max = $event->event_type === ClosedTrainingCaseEvent::TYPE_EMAIL_SENT ? 20000 : 3000;
 
-        $data = $request->validate([
+        $rules = [
             'body' => "nullable|string|max:{$max}",
-        ]);
+        ];
 
-        $this->cases->updateEvent($event, trim((string) ($data['body'] ?? '')));
+        if ($event->event_type === ClosedTrainingCaseEvent::TYPE_NOTE) {
+            $rules['note_channel'] = ['nullable', 'string', Rule::in(array_keys(ClosedTrainingCaseEvent::noteChannelOptions()))];
+            $rules['note_channel_other'] = 'nullable|string|max:100';
+            $rules['note_party'] = ['nullable', 'string', Rule::in(array_keys(ClosedTrainingCaseEvent::notePartyOptions()))];
+        }
+
+        $data = $request->validate($rules);
+
+        $this->cases->updateEvent($event, [
+            'body' => trim((string) ($data['body'] ?? '')),
+            'note_channel' => $data['note_channel'] ?? null,
+            'note_channel_other' => $data['note_channel_other'] ?? null,
+            'note_party' => $data['note_party'] ?? null,
+        ]);
 
         return redirect()
             ->route('closed-training-cases.show', $closedTrainingCase)

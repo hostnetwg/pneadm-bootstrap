@@ -6,6 +6,7 @@ Krótka numeracja panelu. Szczegóły zawsze w `docs/`. Nowy numer wersji (np. 1
 
 Windykacja: masowe przypomnienia po wyciągu oraz doprecyzowanie wyszukiwania przelewów i danych sprawy.
 
+- **Hotfix 2026-10-22:** przy edycji notatki na [sprawie szkolenia zamkniętego](/closed-training-cases) można zmienić formę kontaktu i „z kim” (jak przy dodawaniu). Kanon: [operations-os/CURRENT.md](docs/operations-os/CURRENT.md)
 - **Hotfix 2026-10-22:** na karcie [sprawy szkolenia zamkniętego](/closed-training-cases) przy rozjeździe terminu/trenera ze szkoleniem jest **Synchronizuj** (kopiuje dane ze szkolenia na sprawę). Kanon: [operations-os/CURRENT.md](docs/operations-os/CURRENT.md)
 - **Hotfix 2026-10-22:** na [Sprawach szkoleń zamkniętych](/closed-training-cases): notatki z opcjonalną formą kontaktu i „z kim” (kolory w historii), sticky formularz notatki; wynagrodzenie instruktora brutto/netto. Kanon: [operations-os/CURRENT.md](docs/operations-os/CURRENT.md)
 - **Hotfix 2026-10-22:** na [Sprawach szkoleń zamkniętych](/closed-training-cases) nowe statusy: **Zaplanowana**, **Przeprowadzona**, **Anulowana** (niedogadane; poza Otwartymi, z datą zamknięcia). **Zamknięta** = zakończone pozytywnie. Kanon: [operations-os/CURRENT.md](docs/operations-os/CURRENT.md)

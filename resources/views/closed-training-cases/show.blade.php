@@ -423,7 +423,11 @@
                                                 data-event-update-url="{{ route('closed-training-cases.events.update', [$case, $event]) }}"
                                                 data-event-label="{{ $event->typeLabel() }}"
                                                 data-event-body-id="closed-training-case-event-body-{{ $event->id }}"
-                                                data-event-is-email="{{ $event->event_type === \App\Models\ClosedTrainingCaseEvent::TYPE_EMAIL_SENT ? '1' : '0' }}">
+                                                data-event-is-email="{{ $event->event_type === \App\Models\ClosedTrainingCaseEvent::TYPE_EMAIL_SENT ? '1' : '0' }}"
+                                                data-event-is-note="{{ $event->event_type === \App\Models\ClosedTrainingCaseEvent::TYPE_NOTE ? '1' : '0' }}"
+                                                data-note-channel="{{ $event->note_channel ?? '' }}"
+                                                data-note-channel-other="{{ $event->note_channel_other ?? '' }}"
+                                                data-note-party="{{ $event->note_party ?? '' }}">
                                                 Edytuj
                                             </button>
                                             <button type="button"
@@ -647,6 +651,44 @@
                             <label for="closedTrainingCaseEventEditMeta" class="form-label">Nagłówek e-maila</label>
                             <textarea id="closedTrainingCaseEventEditMeta" class="form-control" rows="4" readonly></textarea>
                         </div>
+                        <div class="d-none" id="closedTrainingCaseEventEditNoteContextWrap">
+                            <div class="mb-3">
+                                <label for="closedTrainingCaseEventEditNoteChannel" class="form-label">Forma kontaktu</label>
+                                <select name="note_channel" id="closedTrainingCaseEventEditNoteChannel" class="form-select">
+                                    <option value="">Bez oznaczenia</option>
+                                    @foreach(\App\Models\ClosedTrainingCaseEvent::noteChannelOptions() as $value => $label)
+                                        <option value="{{ $value }}">{{ $label }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="mb-3 d-none" id="closedTrainingCaseEventEditNoteChannelOtherWrap">
+                                <label for="closedTrainingCaseEventEditNoteChannelOther" class="form-label">Doprecyzowanie formy</label>
+                                <input type="text"
+                                       name="note_channel_other"
+                                       id="closedTrainingCaseEventEditNoteChannelOther"
+                                       maxlength="100"
+                                       class="form-control"
+                                       placeholder="np. SMS, spotkanie">
+                            </div>
+                            <div class="mb-3">
+                                <label for="closedTrainingCaseEventEditNoteParty" class="form-label">Z kim</label>
+                                <select name="note_party" id="closedTrainingCaseEventEditNoteParty" class="form-select">
+                                    <option value="">Bez oznaczenia</option>
+                                    @php
+                                        $editInstructorOptionLabel = $case->listInstructorName();
+                                        $editInstructorOptionLabel = $editInstructorOptionLabel === '—'
+                                            ? 'Trener (brak na sprawie)'
+                                            : 'Trener: '.$editInstructorOptionLabel;
+                                        $editClientOptionLabel = filled($case->contact_name)
+                                            ? 'Zamawiający: '.$case->contact_name
+                                            : 'Zamawiający (brak osoby)';
+                                    @endphp
+                                    <option value="instructor">{{ $editInstructorOptionLabel }}</option>
+                                    <option value="client">{{ $editClientOptionLabel }}</option>
+                                </select>
+                                <div class="form-text">Opcjonalnie. Puste = notatka nie z rozmowy z trenerem ani zamawiającym.</div>
+                            </div>
+                        </div>
                         <label for="closedTrainingCaseEventEditBody" class="form-label">Treść</label>
                         <textarea name="body" id="closedTrainingCaseEventEditBody" rows="10" class="form-control"></textarea>
                     </div>
@@ -741,7 +783,27 @@
             const editBody = document.getElementById('closedTrainingCaseEventEditBody');
             const editMetaWrap = document.getElementById('closedTrainingCaseEventEditMetaWrap');
             const editMeta = document.getElementById('closedTrainingCaseEventEditMeta');
+            const editNoteWrap = document.getElementById('closedTrainingCaseEventEditNoteContextWrap');
+            const editNoteChannel = document.getElementById('closedTrainingCaseEventEditNoteChannel');
+            const editNoteChannelOtherWrap = document.getElementById('closedTrainingCaseEventEditNoteChannelOtherWrap');
+            const editNoteChannelOther = document.getElementById('closedTrainingCaseEventEditNoteChannelOther');
+            const editNoteParty = document.getElementById('closedTrainingCaseEventEditNoteParty');
             let editingEmail = false;
+
+            function syncEditNoteChannelOtherVisibility() {
+                if (!editNoteChannel || !editNoteChannelOtherWrap) {
+                    return;
+                }
+                if (editNoteChannel.value === 'other') {
+                    editNoteChannelOtherWrap.classList.remove('d-none');
+                } else {
+                    editNoteChannelOtherWrap.classList.add('d-none');
+                }
+            }
+
+            if (editNoteChannel) {
+                editNoteChannel.addEventListener('change', syncEditNoteChannelOtherVisibility);
+            }
 
             if (editModal && editForm && editType && editBody && editMetaWrap && editMeta) {
                 editModal.addEventListener('show.bs.modal', function (event) {
@@ -752,6 +814,7 @@
 
                     destroyEditEditor();
                     editingEmail = button.getAttribute('data-event-is-email') === '1';
+                    const editingNote = button.getAttribute('data-event-is-note') === '1';
                     editForm.action = button.getAttribute('data-event-update-url') || '#';
                     editType.textContent = button.getAttribute('data-event-label') || '—';
 
@@ -765,6 +828,22 @@
                         editMeta.value = '';
                         editBody.value = rawBody;
                         editMetaWrap.classList.add('d-none');
+                    }
+
+                    if (editNoteWrap && editNoteChannel && editNoteChannelOther && editNoteParty) {
+                        if (editingNote) {
+                            editNoteWrap.classList.remove('d-none');
+                            editNoteChannel.value = button.getAttribute('data-note-channel') || '';
+                            editNoteChannelOther.value = button.getAttribute('data-note-channel-other') || '';
+                            editNoteParty.value = button.getAttribute('data-note-party') || '';
+                            syncEditNoteChannelOtherVisibility();
+                        } else {
+                            editNoteWrap.classList.add('d-none');
+                            editNoteChannel.value = '';
+                            editNoteChannelOther.value = '';
+                            editNoteParty.value = '';
+                            syncEditNoteChannelOtherVisibility();
+                        }
                     }
                 });
 
