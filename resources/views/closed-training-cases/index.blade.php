@@ -68,6 +68,7 @@
                                     </a>
                                 </th>
                                 <th>Temat / placówka</th>
+                                <th style="min-width: 11rem;" title="Osoba do kontaktu ze szkoły">Kontakt</th>
                                 <th style="min-width: 14rem;" title="Termin, instruktor (wynagrodzenie), cena dla szkoły. Zielone / ✓ = potwierdzone">Ustalenia</th>
                                 <th style="min-width: 7rem;" title="Sortowanie po dacie ostatniego wpisu w historii">
                                     <a href="{{ $activitySortUrl }}" class="text-decoration-none text-dark">
@@ -100,11 +101,36 @@
                                     </td>
                                     <td style="min-width: 12rem; max-width: 18rem;">
                                         <a href="{{ route('closed-training-cases.show', $case) }}" class="fw-semibold text-decoration-none">{{ $case->trainingTopicLabel() }}</a>
-                                        <div class="text-muted">{{ $case->institution ?: '—' }} · {{ $case->contact_name }}</div>
+                                        <div class="text-muted">{{ $case->institution ?: '—' }}</div>
                                         @php($messagePreview = trim(preg_replace('/\s+/u', ' ', (string) $case->message)))
                                         @if($messagePreview !== '')
                                             <div class="text-muted text-truncate" style="max-width: 18rem;" title="{{ $messagePreview }}">{{ \Illuminate\Support\Str::limit($messagePreview, 80) }}</div>
                                         @endif
+                                    </td>
+                                    <td style="min-width: 11rem;">
+                                        <div class="border-start border-3 border-primary ps-2 py-1">
+                                            <div class="fw-semibold text-dark">{{ $case->contact_name ?: '—' }}</div>
+                                            @if(filled($case->contact_phone))
+                                                <div class="mt-1">
+                                                    <a href="tel:{{ preg_replace('/\s+/', '', $case->contact_phone) }}"
+                                                       class="text-decoration-none fw-semibold text-dark"
+                                                       title="Zadzwoń">
+                                                        <i class="bi bi-telephone-fill text-primary me-1" aria-hidden="true"></i>{{ $case->contact_phone }}
+                                                    </a>
+                                                </div>
+                                            @endif
+                                            @if(filled($case->contact_email))
+                                                <div class="{{ filled($case->contact_phone) ? '' : 'mt-1' }}">
+                                                    <a href="mailto:{{ $case->contact_email }}"
+                                                       class="text-decoration-none text-primary"
+                                                       title="Napisz e-mail">
+                                                        <i class="bi bi-envelope-fill me-1" aria-hidden="true"></i>{{ $case->contact_email }}
+                                                    </a>
+                                                </div>
+                                            @elseif(! filled($case->contact_phone))
+                                                <div class="text-muted small mt-1">Brak telefonu i e-maila</div>
+                                            @endif
+                                        </div>
                                     </td>
                                     <td class="font-monospace" style="font-size: 0.8rem; line-height: 1.35;">
                                         <div class="{{ $schedule === '—' ? 'text-muted' : '' }}" title="{{ $case->listScheduleLabel() }}">
@@ -146,7 +172,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="7" class="text-muted p-4">Brak spraw dla tego filtra.</td>
+                                    <td colspan="8" class="text-muted p-4">Brak spraw dla tego filtra.</td>
                                 </tr>
                             @endforelse
                         </tbody>

@@ -35,6 +35,7 @@ class ClosedTrainingCaseTest extends TestCase
                 'topic' => 'Szkolenie rady przykładowej',
                 'contact_name' => 'Osoba kontaktowa',
                 'contact_email' => 'szkola@example.com',
+                'contact_phone' => '501 234 567',
                 'institution' => 'Przykładowa placówka',
                 'institution_type' => ClosedTrainingCase::INSTITUTION_PRIMARY,
                 'institution_type_other' => 'Poradnia, która nie powinna zostać',
@@ -208,12 +209,35 @@ class ClosedTrainingCaseTest extends TestCase
             ->get(route('closed-training-cases.index'))
             ->assertOk()
             ->assertSee('Symbol')
+            ->assertSee('Kontakt')
             ->assertSee('Ustalenia')
             ->assertSee('Ostatni wpis')
             ->assertSee('['.$case->referenceCode().']', false)
             ->assertSee('Szkolenie rady przykładowej')
+            ->assertSee('Osoba poprawiona')
             ->assertSee('Telefon: prośba o termin w listopadzie.')
             ->assertSee('Oczekuje');
+    }
+
+    public function test_case_list_shows_contact_person_phone_and_email_prominently(): void
+    {
+        $user = User::factory()->create(['is_active' => true]);
+        $this->makeCase([
+            'topic' => 'Sprawa z wyróżnionym kontaktem',
+            'contact_name' => 'Anna Kowalska',
+            'contact_phone' => '501 234 567',
+            'contact_email' => 'anna.kontakt@example.com',
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('closed-training-cases.index', ['status' => 'all']))
+            ->assertOk()
+            ->assertSee('Kontakt')
+            ->assertSee('Anna Kowalska')
+            ->assertSee('501 234 567')
+            ->assertSee('anna.kontakt@example.com')
+            ->assertSee('tel:501234567', false)
+            ->assertSee('mailto:anna.kontakt@example.com', false);
     }
 
     public function test_case_list_shows_negotiation_summary_compactly(): void
