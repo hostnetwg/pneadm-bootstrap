@@ -85,8 +85,16 @@ class ClosedTrainingCaseTest extends TestCase
         $this->actingAs($user)
             ->post(route('closed-training-cases.notes.store', $case), [
                 'body' => 'Ustalono, że szkoła oddzwoni po radzie.',
+                'note_channel' => ClosedTrainingCaseEvent::NOTE_CHANNEL_PHONE,
+                'note_party' => ClosedTrainingCaseEvent::NOTE_PARTY_CLIENT,
             ])
             ->assertRedirect(route('closed-training-cases.show', $case));
+
+        $note = $case->events()->where('event_type', ClosedTrainingCaseEvent::TYPE_NOTE)->first();
+        $this->assertNotNull($note);
+        $this->assertSame(ClosedTrainingCaseEvent::NOTE_CHANNEL_PHONE, $note->note_channel);
+        $this->assertSame(ClosedTrainingCaseEvent::NOTE_PARTY_CLIENT, $note->note_party);
+        $this->assertSame('Osoba kontaktowa', $note->note_party_name);
 
         $this->actingAs($user)
             ->put(route('closed-training-cases.contact.update', $case), [
@@ -221,6 +229,48 @@ class ClosedTrainingCaseTest extends TestCase
             ->assertSee('Oczekuje')
             ->assertSee('(7)', false)
             ->assertSee('title="Liczba działań w historii sprawy"', false);
+    }
+
+    public function test_note_can_store_optional_channel_and_party_with_history_context(): void
+    {
+        $user = User::factory()->create(['is_active' => true]);
+        $instructor = Instructor::query()->create([
+            'title' => 'mgr',
+            'first_name' => 'Jan',
+            'last_name' => 'Trenerski',
+            'email' => 'trener.'.uniqid().'@example.com',
+            'is_active' => true,
+        ]);
+        $case = $this->makeCase([
+            'topic' => 'Sprawa z notatką kontekstową',
+            'contact_name' => 'Anna Nowak',
+            'instructor_id' => $instructor->id,
+        ]);
+
+        $this->actingAs($user)
+            ->post(route('closed-training-cases.notes.store', $case), [
+                'body' => 'Ustaliliśmy termin szkolenia.',
+                'note_channel' => ClosedTrainingCaseEvent::NOTE_CHANNEL_OTHER,
+                'note_channel_other' => 'SMS',
+                'note_party' => ClosedTrainingCaseEvent::NOTE_PARTY_INSTRUCTOR,
+            ])
+            ->assertRedirect(route('closed-training-cases.show', $case));
+
+        $note = $case->events()->where('event_type', ClosedTrainingCaseEvent::TYPE_NOTE)->first();
+        $this->assertNotNull($note);
+        $this->assertSame(ClosedTrainingCaseEvent::NOTE_CHANNEL_OTHER, $note->note_channel);
+        $this->assertSame('SMS', $note->note_channel_other);
+        $this->assertSame(ClosedTrainingCaseEvent::NOTE_PARTY_INSTRUCTOR, $note->note_party);
+        $this->assertStringContainsString('Trenerski', (string) $note->note_party_name);
+        $this->assertSame('bg-info-subtle', $note->historyItemClass());
+        $this->assertSame('Inny: SMS · Trener: '.$note->note_party_name, $note->noteContextLabel());
+
+        $this->actingAs($user)
+            ->get(route('closed-training-cases.show', $case))
+            ->assertOk()
+            ->assertSee('Inny: SMS · Trener:', false)
+            ->assertSee('bg-info-subtle', false)
+            ->assertSee('Ustaliliśmy termin szkolenia.');
     }
 
     public function test_operator_can_set_scheduled_and_delivered_status(): void
@@ -366,7 +416,7 @@ class ClosedTrainingCaseTest extends TestCase
             ->assertSee('TERMIN:')
             ->assertSee('2026-11-04 16:00', false)
             ->assertSee('Trenerowska')
-            ->assertSee('1 500 PLN', false)
+            ->assertSee('1 500 PLN brutto', false)
             ->assertDontSee('(1 500 PLN)', false)
             ->assertSee('CENA:')
             ->assertSee('3 000 PLN', false)
@@ -960,6 +1010,7 @@ class ClosedTrainingCaseTest extends TestCase
                 'client_price' => '2500.50',
                 'client_price_confirmed' => '1',
                 'instructor_fee' => '1200',
+                'instructor_fee_basis' => ClosedTrainingCase::FEE_BASIS_GROSS,
                 'instructor_fee_confirmed' => '1',
                 'start_date' => '2026-11-10',
                 'end_date' => '2026-11-10',
@@ -972,6 +1023,7 @@ class ClosedTrainingCaseTest extends TestCase
         $this->assertSame('2500.50', (string) $case->client_price);
         $this->assertNotNull($case->client_price_confirmed_at);
         $this->assertSame('1200.00', (string) $case->instructor_fee);
+        $this->assertSame(ClosedTrainingCase::FEE_BASIS_GROSS, $case->instructor_fee_basis);
         $this->assertNotNull($case->instructor_fee_confirmed_at);
         $this->assertFalse((bool) $case->schedule_time_known);
         $this->assertTrue(
@@ -983,6 +1035,7 @@ class ClosedTrainingCaseTest extends TestCase
                 'instructor_id' => $instructor->id,
                 'client_price' => '2600',
                 'instructor_fee' => '1200',
+                'instructor_fee_basis' => ClosedTrainingCase::FEE_BASIS_NET,
                 'instructor_fee_confirmed' => '1',
                 'start_date' => '2026-11-10',
                 'end_date' => '',
@@ -993,7 +1046,11 @@ class ClosedTrainingCaseTest extends TestCase
         $case->refresh();
         $this->assertSame('2600.00', (string) $case->client_price);
         $this->assertNull($case->client_price_confirmed_at);
+        $this->assertSame(ClosedTrainingCase::FEE_BASIS_NET, $case->instructor_fee_basis);
         $this->assertNotNull($case->instructor_fee_confirmed_at);
+        $this->assertTrue(
+            $case->events()->where('body', 'like', '%1 200 PLN brutto → 1 200 PLN netto%')->exists()
+        );
     }
 
     public function test_changing_instructor_clears_fee_confirmation_unless_reconfirmed(): void
@@ -1021,6 +1078,7 @@ class ClosedTrainingCaseTest extends TestCase
             ->put(route('closed-training-cases.negotiation.update', $case), [
                 'instructor_id' => $second->id,
                 'instructor_fee' => '1000',
+                'instructor_fee_basis' => ClosedTrainingCase::FEE_BASIS_GROSS,
                 'start_date' => '',
                 'end_date' => '',
             ])
@@ -1070,6 +1128,7 @@ class ClosedTrainingCaseTest extends TestCase
             ->put(route('closed-training-cases.negotiation.update', $case), [
                 'instructor_id' => $other->id,
                 'client_price' => '2000',
+                'instructor_fee_basis' => ClosedTrainingCase::FEE_BASIS_GROSS,
                 'start_date' => '2026-12-02T09:00',
                 'end_date' => '2026-12-02T11:00',
                 'schedule_time_known' => '1',
@@ -1082,6 +1141,7 @@ class ClosedTrainingCaseTest extends TestCase
                 'client_price' => '2100',
                 'client_price_confirmed' => '1',
                 'instructor_fee' => '900',
+                'instructor_fee_basis' => ClosedTrainingCase::FEE_BASIS_GROSS,
                 'start_date' => '2026-12-01T09:00',
                 'end_date' => '2026-12-01T11:00',
                 'schedule_time_known' => '1',

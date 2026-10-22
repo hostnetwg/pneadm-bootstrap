@@ -248,6 +248,7 @@ class ClosedTrainingCaseController extends Controller
             'client_price' => ['nullable', 'numeric', 'min:0', 'max:999999.99'],
             'client_price_confirmed' => ['nullable', 'boolean'],
             'instructor_fee' => ['nullable', 'numeric', 'min:0', 'max:999999.99'],
+            'instructor_fee_basis' => ['required', Rule::in(array_keys(ClosedTrainingCase::instructorFeeBasisOptions()))],
             'instructor_fee_confirmed' => ['nullable', 'boolean'],
             'start_date' => ['nullable', 'string', 'max:32'],
             'end_date' => ['nullable', 'string', 'max:32'],
@@ -256,6 +257,8 @@ class ClosedTrainingCaseController extends Controller
             'instructor_id.exists' => 'Wybierz instruktora z listy.',
             'client_price.numeric' => 'Cena dla szkoły musi być liczbą.',
             'instructor_fee.numeric' => 'Wynagrodzenie musi być liczbą.',
+            'instructor_fee_basis.required' => 'Wybierz brutto albo netto.',
+            'instructor_fee_basis.in' => 'Wybierz brutto albo netto.',
         ]);
 
         $timeKnown = $request->boolean('schedule_time_known');
@@ -288,6 +291,7 @@ class ClosedTrainingCaseController extends Controller
             'client_price' => $data['client_price'] ?? null,
             'client_price_confirmed' => $request->boolean('client_price_confirmed'),
             'instructor_fee' => $data['instructor_fee'] ?? null,
+            'instructor_fee_basis' => $data['instructor_fee_basis'],
             'instructor_fee_confirmed' => $request->boolean('instructor_fee_confirmed'),
             'start_date' => $start,
             'end_date' => $end,
@@ -402,11 +406,19 @@ class ClosedTrainingCaseController extends Controller
     {
         $data = $request->validate([
             'body' => 'required|string|max:3000',
+            'note_channel' => ['nullable', 'string', Rule::in(array_keys(ClosedTrainingCaseEvent::noteChannelOptions()))],
+            'note_channel_other' => 'nullable|string|max:100',
+            'note_party' => ['nullable', 'string', Rule::in(array_keys(ClosedTrainingCaseEvent::notePartyOptions()))],
         ], [
             'body.required' => 'Wpisz treść notatki.',
         ]);
 
-        $this->cases->addNote($closedTrainingCase, $request->user(), $data['body']);
+        $this->cases->addNote($closedTrainingCase, $request->user(), [
+            'body' => $data['body'],
+            'note_channel' => $data['note_channel'] ?? null,
+            'note_channel_other' => $data['note_channel_other'] ?? null,
+            'note_party' => $data['note_party'] ?? null,
+        ]);
 
         return redirect()
             ->route('closed-training-cases.show', $closedTrainingCase)

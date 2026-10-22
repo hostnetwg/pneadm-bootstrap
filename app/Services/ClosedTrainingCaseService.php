@@ -24,12 +24,40 @@ class ClosedTrainingCaseService
         ]);
     }
 
-    public function addNote(ClosedTrainingCase $case, User $user, string $body): ClosedTrainingCaseEvent
+    /**
+     * @param  array{body: string, note_channel?: ?string, note_channel_other?: ?string, note_party?: ?string}  $attributes
+     */
+    public function addNote(ClosedTrainingCase $case, User $user, array $attributes): ClosedTrainingCaseEvent
     {
+        $channel = $attributes['note_channel'] ?? null;
+        $channelOther = null;
+        if ($channel === ClosedTrainingCaseEvent::NOTE_CHANNEL_OTHER) {
+            $channelOther = $this->blankToNull($attributes['note_channel_other'] ?? null);
+        } elseif ($channel !== null && $channel !== '') {
+            $channelOther = null;
+        } else {
+            $channel = null;
+        }
+
+        $party = $attributes['note_party'] ?? null;
+        $partyName = null;
+        if ($party === ClosedTrainingCaseEvent::NOTE_PARTY_INSTRUCTOR) {
+            $name = $case->listInstructorName();
+            $partyName = $name === '—' ? null : $name;
+        } elseif ($party === ClosedTrainingCaseEvent::NOTE_PARTY_CLIENT) {
+            $partyName = $this->blankToNull($case->contact_name);
+        } else {
+            $party = null;
+        }
+
         return $case->events()->create([
             'user_id' => $user->id,
             'event_type' => ClosedTrainingCaseEvent::TYPE_NOTE,
-            'body' => $body,
+            'body' => $attributes['body'],
+            'note_channel' => $channel,
+            'note_channel_other' => $channelOther,
+            'note_party' => $party,
+            'note_party_name' => $partyName,
             'happened_at' => now(),
         ]);
     }
@@ -211,6 +239,7 @@ class ClosedTrainingCaseService
      *     client_price: ?string,
      *     client_price_confirmed: bool,
      *     instructor_fee: ?string,
+     *     instructor_fee_basis: string,
      *     instructor_fee_confirmed: bool,
      *     start_date: ?Carbon,
      *     end_date: ?Carbon,
@@ -246,6 +275,7 @@ class ClosedTrainingCaseService
         $beforeInstructorId = $case->instructor_id !== null ? (int) $case->instructor_id : null;
         $beforeClientPrice = $this->normalizeMoney($case->client_price);
         $beforeInstructorFee = $this->normalizeMoney($case->instructor_fee);
+        $beforeFeeBasis = $case->instructor_fee_basis ?: ClosedTrainingCase::FEE_BASIS_GROSS;
         $beforeClientConfirmed = $case->client_price_confirmed_at !== null;
         $beforeFeeConfirmed = $case->instructor_fee_confirmed_at !== null;
         $beforeStart = $case->start_date?->format('Y-m-d H:i');
@@ -256,12 +286,16 @@ class ClosedTrainingCaseService
         $newInstructorId = $attributes['instructor_id'];
         $newClientPrice = $this->normalizeMoney($attributes['client_price']);
         $newInstructorFee = $this->normalizeMoney($attributes['instructor_fee']);
+        $newFeeBasis = $attributes['instructor_fee_basis'] === ClosedTrainingCase::FEE_BASIS_NET
+            ? ClosedTrainingCase::FEE_BASIS_NET
+            : ClosedTrainingCase::FEE_BASIS_GROSS;
         $newStart = $attributes['start_date'];
         $newEnd = $attributes['end_date'];
         $newTimeKnown = (bool) $attributes['schedule_time_known'];
 
         $clientPriceChanged = $beforeClientPrice !== $newClientPrice;
         $instructorFeeChanged = $beforeInstructorFee !== $newInstructorFee;
+        $feeBasisChanged = $beforeFeeBasis !== $newFeeBasis;
         $instructorChanged = $beforeInstructorId !== $newInstructorId;
 
         $wantClientConfirmed = (bool) $attributes['client_price_confirmed'];
@@ -279,7 +313,7 @@ class ClosedTrainingCaseService
 
         if ($newInstructorFee === null) {
             $feeConfirmedAt = null;
-        } elseif ($instructorChanged || $instructorFeeChanged) {
+        } elseif ($instructorChanged || $instructorFeeChanged || $feeBasisChanged) {
             $feeConfirmedAt = $wantFeeConfirmed ? now() : null;
         } else {
             $feeConfirmedAt = $wantFeeConfirmed
@@ -291,6 +325,7 @@ class ClosedTrainingCaseService
         $case->client_price = $newClientPrice;
         $case->client_price_confirmed_at = $clientConfirmedAt;
         $case->instructor_fee = $newInstructorFee;
+        $case->instructor_fee_basis = $newFeeBasis;
         $case->instructor_fee_confirmed_at = $feeConfirmedAt;
         $case->start_date = $newStart;
         $case->end_date = $newEnd;
@@ -304,6 +339,7 @@ class ClosedTrainingCaseService
         $unchanged = $beforeInstructorId === $newInstructorId
             && $beforeClientPrice === $newClientPrice
             && $beforeInstructorFee === $newInstructorFee
+            && $beforeFeeBasis === $newFeeBasis
             && $beforeClientConfirmed === $afterClientConfirmed
             && $beforeFeeConfirmed === $afterFeeConfirmed
             && $beforeStart === $afterStart
@@ -326,6 +362,7 @@ class ClosedTrainingCaseService
                 beforeClientPrice: $beforeClientPrice,
                 beforeClientConfirmed: $beforeClientConfirmed,
                 beforeInstructorFee: $beforeInstructorFee,
+                beforeFeeBasis: $beforeFeeBasis,
                 beforeFeeConfirmed: $beforeFeeConfirmed,
                 beforeStart: $beforeStart,
                 beforeEnd: $beforeEnd,
@@ -683,6 +720,7 @@ class ClosedTrainingCaseService
         ?string $beforeClientPrice,
         bool $beforeClientConfirmed,
         ?string $beforeInstructorFee,
+        string $beforeFeeBasis,
         bool $beforeFeeConfirmed,
         ?string $beforeStart,
         ?string $beforeEnd,
@@ -708,8 +746,14 @@ class ClosedTrainingCaseService
         }
 
         $afterFee = $this->normalizeMoney($case->instructor_fee);
-        if ($beforeInstructorFee !== $afterFee) {
-            $parts[] = 'Wynagrodzenie instruktora: '.$case->formatMoney($beforeInstructorFee).' → '.$case->formatMoney($afterFee).'.';
+        $afterFeeBasis = $case->instructor_fee_basis ?: ClosedTrainingCase::FEE_BASIS_GROSS;
+        $beforeFeeLabel = ClosedTrainingCase::instructorFeeBasisOptions()[$beforeFeeBasis] ?? $beforeFeeBasis;
+        $afterFeeLabel = ClosedTrainingCase::instructorFeeBasisOptions()[$afterFeeBasis] ?? $afterFeeBasis;
+        if ($beforeInstructorFee !== $afterFee || $beforeFeeBasis !== $afterFeeBasis) {
+            $parts[] = 'Wynagrodzenie instruktora: '
+                .$case->formatMoneyList($beforeInstructorFee).' '.$beforeFeeLabel
+                .' → '
+                .$case->formatMoneyList($afterFee).' '.$afterFeeLabel.'.';
         }
         $afterFeeConfirmed = $case->instructor_fee_confirmed_at !== null;
         if ($beforeFeeConfirmed !== $afterFeeConfirmed) {
@@ -726,5 +770,12 @@ class ClosedTrainingCaseService
         }
 
         return implode(' ', $parts);
+    }
+
+    private function blankToNull(?string $value): ?string
+    {
+        $value = trim((string) $value);
+
+        return $value === '' ? null : $value;
     }
 }

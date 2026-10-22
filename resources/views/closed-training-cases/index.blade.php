@@ -88,7 +88,6 @@
                                 @php
                                     $schedule = $case->listScheduleLabelCompact();
                                     $instructor = $case->listInstructorName();
-                                    $fee = $case->instructor_fee;
                                     $price = $case->client_price;
                                     $offerTitle = $case->trainingOffer?->title;
                                     $offerUrl = $case->trainingOffer
@@ -165,10 +164,10 @@
                                                 <span class="text-muted">—</span>
                                             @else
                                                 <div>{{ $instructor }}</div>
-                                                @if($fee !== null)
+                                                @if($case->instructor_fee !== null)
                                                     <div class="{{ $case->instructor_fee_confirmed_at ? 'text-success fw-semibold' : 'text-muted' }}"
-                                                         title="Wynagrodzenie instruktora{{ $case->instructor_fee_confirmed_at ? ' — potwierdzone' : '' }}">
-                                                        {{ $case->formatMoneyList($fee) }}@if($case->instructor_fee_confirmed_at) ✓@endif
+                                                         title="Wynagrodzenie instruktora ({{ $case->instructorFeeBasisLabel() }}){{ $case->instructor_fee_confirmed_at ? ' — potwierdzone' : '' }}">
+                                                        {{ $case->formatInstructorFeeList() }}@if($case->instructor_fee_confirmed_at) ✓@endif
                                                     </div>
                                                 @endif
                                             @endif

@@ -243,18 +243,29 @@
                                         </div>
                                     </div>
                                     <div class="col-md-6">
-                                        <label for="instructor_fee" class="form-label">Wynagrodzenie instruktora (brutto)</label>
-                                        <input type="number" step="0.01" min="0" name="instructor_fee" id="instructor_fee"
-                                               value="{{ old('instructor_fee', $case->instructor_fee) }}"
-                                               class="form-control @error('instructor_fee') is-invalid @enderror"
-                                               placeholder="np. 1200.00">
-                                        @error('instructor_fee')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                        <label for="instructor_fee" class="form-label">Wynagrodzenie instruktora</label>
+                                        <div class="input-group">
+                                            <input type="number" step="0.01" min="0" name="instructor_fee" id="instructor_fee"
+                                                   value="{{ old('instructor_fee', $case->instructor_fee) }}"
+                                                   class="form-control @error('instructor_fee') is-invalid @enderror"
+                                                   placeholder="np. 1200.00">
+                                            <select name="instructor_fee_basis" id="instructor_fee_basis"
+                                                    class="form-select @error('instructor_fee_basis') is-invalid @enderror"
+                                                    style="max-width: 7.5rem;"
+                                                    aria-label="Brutto lub netto">
+                                                @foreach(\App\Models\ClosedTrainingCase::instructorFeeBasisOptions() as $value => $label)
+                                                    <option value="{{ $value }}" @selected(old('instructor_fee_basis', $case->instructor_fee_basis ?: 'gross') === $value)>{{ $label }}</option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                        @error('instructor_fee')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
+                                        @error('instructor_fee_basis')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
                                         <div class="form-check mt-2">
                                             <input type="checkbox" class="form-check-input" name="instructor_fee_confirmed" id="instructor_fee_confirmed" value="1"
                                                    @checked(old('instructor_fee_confirmed', $case->instructor_fee_confirmed_at ? '1' : '') == '1')>
                                             <label class="form-check-label" for="instructor_fee_confirmed">Potwierdzone z instruktorem</label>
                                         </div>
-                                        <div class="form-text">Zmiana trenera lub kwoty cofa potwierdzenie, jeśli nie zaznaczysz go ponownie.</div>
+                                        <div class="form-text">Zmiana trenera, kwoty lub brutto/netto cofa potwierdzenie, jeśli nie zaznaczysz go ponownie.</div>
                                     </div>
                                 </div>
 
@@ -385,10 +396,13 @@
                         <div class="card-header fw-semibold">Historia</div>
                         <ul class="list-group list-group-flush">
                             @foreach($case->events->sortByDesc('happened_at') as $event)
-                                <li class="list-group-item">
+                                <li class="list-group-item {{ $event->historyItemClass() }}">
                                     <div class="d-flex justify-content-between gap-3 align-items-start">
                                         <div>
                                             <strong>{{ $event->typeLabel() }}</strong>
+                                            @if($event->noteContextLabel())
+                                                <span class="text-secondary"> · {{ $event->noteContextLabel() }}</span>
+                                            @endif
                                             <div class="text-secondary small">{{ $case->formatLocal($event->happened_at) }} · {{ $event->user?->name ?: 'pnedu.pl' }}</div>
                                         </div>
                                         <script type="application/json" id="closed-training-case-event-body-{{ $event->id }}">@json($event->body ?? '')</script>
@@ -428,6 +442,60 @@
                 </div>
 
                 <div class="col-lg-5">
+                    <form method="POST"
+                          action="{{ route('closed-training-cases.notes.store', $case) }}"
+                          class="card mb-4 position-sticky shadow-sm"
+                          style="top: 1rem; z-index: 1020; max-height: calc(100vh - 2rem); overflow-y: auto;"
+                          x-data="{ channel: '{{ old('note_channel', '') }}' }">
+                        @csrf
+                        <div class="card-header fw-semibold">Notatka</div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label for="note_channel" class="form-label">Forma kontaktu</label>
+                                <select name="note_channel" id="note_channel" class="form-select @error('note_channel') is-invalid @enderror" x-model="channel">
+                                    <option value="">Bez oznaczenia</option>
+                                    @foreach(\App\Models\ClosedTrainingCaseEvent::noteChannelOptions() as $value => $label)
+                                        <option value="{{ $value }}" @selected(old('note_channel') === $value)>{{ $label }}</option>
+                                    @endforeach
+                                </select>
+                                @error('note_channel')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                            </div>
+                            <div class="mb-3" x-show="channel === 'other'" x-cloak>
+                                <label for="note_channel_other" class="form-label">Doprecyzowanie formy</label>
+                                <input type="text"
+                                       name="note_channel_other"
+                                       id="note_channel_other"
+                                       value="{{ old('note_channel_other') }}"
+                                       maxlength="100"
+                                       class="form-control @error('note_channel_other') is-invalid @enderror"
+                                       placeholder="np. SMS, spotkanie">
+                                @error('note_channel_other')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                            </div>
+                            <div class="mb-3">
+                                <label for="note_party" class="form-label">Z kim</label>
+                                <select name="note_party" id="note_party" class="form-select @error('note_party') is-invalid @enderror">
+                                    <option value="">Bez oznaczenia</option>
+                                    @php
+                                        $instructorOptionLabel = $case->listInstructorName();
+                                        $instructorOptionLabel = $instructorOptionLabel === '—'
+                                            ? 'Trener (brak na sprawie)'
+                                            : 'Trener: '.$instructorOptionLabel;
+                                        $clientOptionLabel = filled($case->contact_name)
+                                            ? 'Zamawiający: '.$case->contact_name
+                                            : 'Zamawiający (brak osoby)';
+                                    @endphp
+                                    <option value="instructor" @selected(old('note_party') === 'instructor')>{{ $instructorOptionLabel }}</option>
+                                    <option value="client" @selected(old('note_party') === 'client')>{{ $clientOptionLabel }}</option>
+                                </select>
+                                @error('note_party')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                <div class="form-text">Opcjonalnie. Puste = notatka nie z rozmowy z trenerem ani zamawiającym.</div>
+                            </div>
+                            <textarea name="body" rows="4" class="form-control @error('body') is-invalid @enderror" placeholder="Ustalenie z rozmowy, bez zmiany statusu.">{{ old('body') }}</textarea>
+                            @error('body')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                            <button type="submit" class="btn btn-outline-primary mt-3">Dodaj notatkę</button>
+                        </div>
+                    </form>
+
                     <form method="POST" action="{{ route('closed-training-cases.update', $case) }}" class="card mb-4">
                         @csrf
                         @method('PUT')
@@ -497,15 +565,6 @@
                         </div>
                     </div>
 
-                    <form method="POST" action="{{ route('closed-training-cases.notes.store', $case) }}" class="card">
-                        @csrf
-                        <div class="card-header fw-semibold">Notatka</div>
-                        <div class="card-body">
-                            <textarea name="body" rows="4" class="form-control @error('body') is-invalid @enderror" placeholder="Ustalenie z rozmowy, bez zmiany statusu.">{{ old('body') }}</textarea>
-                            @error('body')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                            <button type="submit" class="btn btn-outline-primary mt-3">Dodaj notatkę</button>
-                        </div>
-                    </form>
                 </div>
             </div>
     </div>

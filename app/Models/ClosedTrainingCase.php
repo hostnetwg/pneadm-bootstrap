@@ -51,6 +51,10 @@ class ClosedTrainingCase extends Model
 
     public const INSTITUTION_OTHER = 'other';
 
+    public const FEE_BASIS_GROSS = 'gross';
+
+    public const FEE_BASIS_NET = 'net';
+
     protected $fillable = [
         'source',
         'training_offer_id',
@@ -71,6 +75,7 @@ class ClosedTrainingCase extends Model
         'client_price',
         'client_price_confirmed_at',
         'instructor_fee',
+        'instructor_fee_basis',
         'instructor_fee_confirmed_at',
         'start_date',
         'end_date',
@@ -280,6 +285,34 @@ class ClosedTrainingCase extends Model
             : number_format($value, 2, ',', ' ');
 
         return $formatted.' PLN';
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public static function instructorFeeBasisOptions(): array
+    {
+        return [
+            self::FEE_BASIS_GROSS => 'brutto',
+            self::FEE_BASIS_NET => 'netto',
+        ];
+    }
+
+    public function instructorFeeBasisLabel(): string
+    {
+        return self::instructorFeeBasisOptions()[$this->instructor_fee_basis] ?? 'brutto';
+    }
+
+    /**
+     * Wynagrodzenie na liście: "1 500 PLN brutto".
+     */
+    public function formatInstructorFeeList(): string
+    {
+        if ($this->instructor_fee === null || $this->instructor_fee === '') {
+            return '—';
+        }
+
+        return $this->formatMoneyList($this->instructor_fee).' '.$this->instructorFeeBasisLabel();
     }
 
     public function lastActivityAt(): ?Carbon
