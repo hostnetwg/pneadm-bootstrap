@@ -29,7 +29,8 @@ class ClosedTrainingCaseController extends Controller
         $search = trim((string) $request->query('q', ''));
 
         $cases = ClosedTrainingCase::query()
-            ->with('assignee')
+            ->with(['assignee', 'instructor', 'course.instructor'])
+            ->withMax('events as last_event_at', 'happened_at')
             ->when($status === 'open', fn ($query) => $query->where('status', '!=', ClosedTrainingCase::STATUS_CLOSED))
             ->when(array_key_exists($status, ClosedTrainingCase::statusOptions()), fn ($query) => $query->where('status', $status))
             ->when($search !== '', function ($query) use ($search) {

@@ -171,6 +171,15 @@ class ClosedTrainingCase extends Model
         return number_format((float) $amount, 2, ',', ' ').' PLN brutto';
     }
 
+    public function formatMoneyCompact(null|string|float $amount): string
+    {
+        if ($amount === null || $amount === '') {
+            return '—';
+        }
+
+        return number_format((float) $amount, 2, ',', ' ').' zł';
+    }
+
     public function formatScheduleRange(?Carbon $start, ?Carbon $end, bool $timeKnown): string
     {
         if (! $start) {
@@ -188,6 +197,79 @@ class ClosedTrainingCase extends Model
         }
 
         return $label;
+    }
+
+    /**
+     * Aktualny trener do listy: po powiązaniu ze szkolenia, inaczej ze sprawy.
+     */
+    public function listInstructorName(): string
+    {
+        $course = $this->relationLoaded('course') ? $this->course : null;
+        $instructor = $course?->instructor ?? $this->instructor;
+        if (! $instructor) {
+            return '—';
+        }
+
+        $name = trim((string) ($instructor->full_title_name ?? ($instructor->first_name.' '.$instructor->last_name)));
+
+        return $name !== '' ? $name : '—';
+    }
+
+    /**
+     * Aktualny termin do listy: po powiązaniu ze szkolenia, inaczej ze sprawy.
+     */
+    public function listScheduleLabel(): string
+    {
+        $course = $this->relationLoaded('course') ? $this->course : null;
+        if ($course?->start_date) {
+            return $this->formatScheduleRange($course->start_date, $course->end_date, true);
+        }
+
+        return $this->formatScheduleRange($this->start_date, $this->end_date, (bool) $this->schedule_time_known);
+    }
+
+    public function listScheduleLabelCompact(): string
+    {
+        $course = $this->relationLoaded('course') ? $this->course : null;
+        if ($course?->start_date) {
+            $start = $this->formatLocal($course->start_date, 'd.m.Y H:i') ?? '—';
+            if ($course->end_date) {
+                $sameDay = $course->start_date->timezone('Europe/Warsaw')->isSameDay($course->end_date->timezone('Europe/Warsaw'));
+                $start .= '–'.($this->formatLocal($course->end_date, $sameDay ? 'H:i' : 'd.m.Y H:i') ?? '');
+            }
+
+            return $start;
+        }
+
+        if (! $this->start_date) {
+            return '—';
+        }
+
+        $timeKnown = (bool) $this->schedule_time_known;
+        $start = $this->formatLocal($this->start_date, $timeKnown ? 'd.m.Y H:i' : 'd.m.Y') ?? '—';
+        if ($this->end_date) {
+            $sameDay = $this->start_date->timezone('Europe/Warsaw')->isSameDay($this->end_date->timezone('Europe/Warsaw'));
+            if ($timeKnown) {
+                $start .= '–'.($this->formatLocal($this->end_date, $sameDay ? 'H:i' : 'd.m.Y H:i') ?? '');
+            } elseif (! $sameDay) {
+                $start .= '–'.($this->formatLocal($this->end_date, 'd.m.Y') ?? '');
+            }
+        }
+        if (! $timeKnown) {
+            $start .= ' · bez godz.';
+        }
+
+        return $start;
+    }
+
+    public function lastActivityAt(): ?Carbon
+    {
+        $eventAt = $this->last_event_at ?? null;
+        if ($eventAt) {
+            return $eventAt instanceof Carbon ? $eventAt : Carbon::parse($eventAt);
+        }
+
+        return $this->updated_at ?? $this->created_at;
     }
 
     public function datetimeLocalValue(?Carbon $moment, bool $timeKnown): string

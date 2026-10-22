@@ -208,11 +208,44 @@ class ClosedTrainingCaseTest extends TestCase
             ->get(route('closed-training-cases.index'))
             ->assertOk()
             ->assertSee('Symbol')
+            ->assertSee('Instruktor')
+            ->assertSee('Termin')
+            ->assertSee('Kwoty')
+            ->assertSee('Ostatni wpis')
             ->assertSee('['.$case->referenceCode().']', false)
             ->assertSee('Szkolenie rady przykładowej')
-            ->assertSee('Wiadomość')
             ->assertSee('Telefon: prośba o termin w listopadzie.')
             ->assertSee('Oczekuje');
+    }
+
+    public function test_case_list_shows_negotiation_summary_compactly(): void
+    {
+        $user = User::factory()->create(['is_active' => true]);
+        $instructor = Instructor::query()->create([
+            'first_name' => 'Lista',
+            'last_name' => 'Trenerowska',
+            'email' => 'lista.'.uniqid().'@example.com',
+            'is_active' => true,
+        ]);
+        $case = $this->makeCase([
+            'topic' => 'Sprawa z podsumowaniem na liście',
+            'instructor_id' => $instructor->id,
+            'client_price' => 2500,
+            'client_price_confirmed_at' => now(),
+            'instructor_fee' => 900,
+            'start_date' => '2026-11-15 00:00:00',
+            'schedule_time_known' => false,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('closed-training-cases.index', ['status' => 'all']))
+            ->assertOk()
+            ->assertSee('Trenerowska')
+            ->assertSee('15.11.2026')
+            ->assertSee('bez godz.')
+            ->assertSee('S: 2 500,00 zł')
+            ->assertSee('T: 900,00 zł')
+            ->assertSee('✓', false);
     }
 
     public function test_operator_can_find_a_case_by_email_reference_symbol(): void
