@@ -119,6 +119,7 @@
                                                         data-symbol="{{ $case->referenceCode() }}"
                                                         data-institution="{{ $case->institution ?: '—' }}"
                                                         data-institution-type="{{ $case->institutionTypeLabel() }}"
+                                                        data-council-size="{{ $case->pedagogical_council_size ?: '—' }}"
                                                         data-www="{{ $case->institution_www ?: '' }}"
                                                         data-format="{{ $case->preferredFormatLabel() }}"
                                                         data-offer="{{ $offerTitle ?: '—' }}"
@@ -223,6 +224,8 @@
                         <dd class="col-sm-8" id="caseInquiryInstitution">—</dd>
                         <dt class="col-sm-4 text-muted">Rodzaj szkoły</dt>
                         <dd class="col-sm-8" id="caseInquiryInstitutionType">—</dd>
+                        <dt class="col-sm-4 text-muted">Rada pedagogiczna</dt>
+                        <dd class="col-sm-8" id="caseInquiryCouncilSize">—</dd>
                         <dt class="col-sm-4 text-muted">WWW</dt>
                         <dd class="col-sm-8" id="caseInquiryWww">—</dd>
                         <dt class="col-sm-4 text-muted">Forma</dt>
@@ -260,6 +263,11 @@
 
             setText('caseInquiryInstitution', button.getAttribute('data-institution'));
             setText('caseInquiryInstitutionType', button.getAttribute('data-institution-type'));
+            const councilSize = (button.getAttribute('data-council-size') || '').trim();
+            setText(
+                'caseInquiryCouncilSize',
+                councilSize === '' || councilSize === '—' ? '—' : councilSize+' osób'
+            );
             setText('caseInquiryFormat', button.getAttribute('data-format'));
 
             const wwwEl = document.getElementById('caseInquiryWww');

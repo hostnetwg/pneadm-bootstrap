@@ -102,6 +102,7 @@ class ClosedTrainingCaseTest extends TestCase
                 'contact_email' => 'poprawiony@example.com',
                 'contact_phone' => '500600700',
                 'institution' => 'Poprawiona nazwa placówki',
+                'pedagogical_council_size' => '48',
                 'institution_www' => 'szkola.edu.pl',
             ])
             ->assertRedirect(route('closed-training-cases.show', $case))
@@ -110,6 +111,7 @@ class ClosedTrainingCaseTest extends TestCase
         $case->refresh();
         $this->assertSame('Osoba poprawiona', $case->contact_name);
         $this->assertSame('poprawiony@example.com', $case->contact_email);
+        $this->assertSame(48, (int) $case->pedagogical_council_size);
         $this->assertSame('szkola@example.com', $case->submitted_payload['contact_email']);
         $this->assertSame('Osoba kontaktowa', $case->submitted_payload['contact_name']);
 

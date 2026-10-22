@@ -145,7 +145,7 @@ class ClosedTrainingCaseService
     }
 
     /**
-     * @param  array{contact_name: string, contact_email: ?string, contact_phone: ?string, institution: ?string, institution_type: ?string, institution_type_other: ?string, preferred_format: ?string, training_offer_id: ?int, offer_url: ?string}  $attributes
+     * @param  array{contact_name: string, contact_email: ?string, contact_phone: ?string, institution: ?string, pedagogical_council_size: ?int, institution_type: ?string, institution_type_other: ?string, preferred_format: ?string, training_offer_id: ?int, offer_url: ?string}  $attributes
      */
     public function updateContact(ClosedTrainingCase $case, array $attributes, User $user): void
     {
@@ -154,6 +154,7 @@ class ClosedTrainingCaseService
             'contact_email' => $case->contact_email,
             'contact_phone' => $case->contact_phone,
             'institution' => $case->institution,
+            'pedagogical_council_size' => $case->pedagogical_council_size,
             'institution_www' => $case->institution_www,
             'institution_type' => $case->institution_type,
             'institution_type_other' => $case->institution_type_other,
@@ -169,6 +170,7 @@ class ClosedTrainingCaseService
         $case->contact_email = $attributes['contact_email'];
         $case->contact_phone = $attributes['contact_phone'];
         $case->institution = $attributes['institution'];
+        $case->pedagogical_council_size = $attributes['pedagogical_council_size'];
         $case->institution_www = $attributes['institution_www'];
         $case->institution_type = $attributes['institution_type'];
         $case->institution_type_other = $attributes['institution_type_other'];
@@ -181,6 +183,7 @@ class ClosedTrainingCaseService
             'contact_email' => $case->contact_email,
             'contact_phone' => $case->contact_phone,
             'institution' => $case->institution,
+            'pedagogical_council_size' => $case->pedagogical_council_size,
             'institution_www' => $case->institution_www,
             'institution_type' => $case->institution_type,
             'institution_type_other' => $case->institution_type_other,
@@ -195,6 +198,7 @@ class ClosedTrainingCaseService
             'contact_email',
             'contact_phone',
             'institution',
+            'pedagogical_council_size',
             'institution_www',
             'institution_type',
             'institution_type_other',
@@ -734,6 +738,16 @@ class ClosedTrainingCaseService
 
         if ($before['institution'] !== $case->institution) {
             $parts[] = 'Nazwa szkoły / placówki: '.$this->contactValue($before['institution']).' → '.$this->contactValue($case->institution).'.';
+        }
+
+        $beforeCouncil = $before['pedagogical_council_size'] ?? null;
+        $afterCouncil = $case->pedagogical_council_size;
+        if ((string) $beforeCouncil !== (string) $afterCouncil) {
+            $parts[] = 'Liczba osób w radzie pedagogicznej: '
+                .$this->contactValue($beforeCouncil !== null ? (string) $beforeCouncil : null)
+                .' → '
+                .$this->contactValue($afterCouncil !== null ? (string) $afterCouncil : null)
+                .'.';
         }
 
         if ($before['institution_www'] !== $case->institution_www) {

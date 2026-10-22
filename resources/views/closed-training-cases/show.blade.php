@@ -70,6 +70,22 @@
                                     @error('institution')<div class="invalid-feedback">{{ $message }}</div>@enderror
                                 </div>
                                 <div class="mb-3">
+                                    <label for="pedagogical_council_size" class="form-label">Liczba osób w radzie pedagogicznej</label>
+                                    <input type="number"
+                                           name="pedagogical_council_size"
+                                           id="pedagogical_council_size"
+                                           value="{{ old('pedagogical_council_size', $case->pedagogical_council_size) }}"
+                                           min="1"
+                                           max="9999"
+                                           step="1"
+                                           inputmode="numeric"
+                                           class="form-control @error('pedagogical_council_size') is-invalid @enderror"
+                                           style="max-width: 10rem;"
+                                           placeholder="np. 42">
+                                    <div class="form-text">Opcjonalnie. Ile osób liczy rada pedagogiczna.</div>
+                                    @error('pedagogical_council_size')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                </div>
+                                <div class="mb-3">
                                     <label for="institution_www" class="form-label">WWW</label>
                                     <input type="text" name="institution_www" id="institution_www" value="{{ old('institution_www', $case->institution_www) }}" maxlength="2048" placeholder="https://szkola.edu.pl" inputmode="url" autocomplete="url" class="form-control @error('institution_www') is-invalid @enderror">
                                     <div class="form-text">Adres strony szkoły / placówki.</div>

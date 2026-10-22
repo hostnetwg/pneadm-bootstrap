@@ -101,6 +101,7 @@ class ClosedTrainingCaseController extends Controller
             'contact_email' => 'nullable|email|max:255',
             'contact_phone' => 'nullable|string|max:50',
             'institution' => 'nullable|string|max:255',
+            'pedagogical_council_size' => 'nullable|integer|min:1|max:9999',
             'institution_www' => 'nullable|url|max:2048',
             'institution_type' => ['required', Rule::in(array_keys(ClosedTrainingCase::institutionTypeOptions()))],
             'institution_type_other' => ['nullable', 'string', 'max:255', Rule::requiredIf(
@@ -118,6 +119,8 @@ class ClosedTrainingCaseController extends Controller
             'institution_type.required' => 'Wybierz rodzaj placówki.',
             'institution_type.in' => 'Wybierz rodzaj placówki.',
             'institution_type_other.required' => 'Podaj rodzaj placówki.',
+            'pedagogical_council_size.integer' => 'Podaj liczbę osób w radzie pedagogicznej.',
+            'pedagogical_council_size.min' => 'Liczba osób w radzie musi być co najmniej 1.',
             'message.required' => 'Opisz, czego dotyczy sprawa.',
         ]);
 
@@ -132,6 +135,7 @@ class ClosedTrainingCaseController extends Controller
             'contact_email' => $data['contact_email'] ?? null,
             'contact_phone' => $data['contact_phone'] ?? null,
             'institution' => $data['institution'] ?? null,
+            'pedagogical_council_size' => isset($data['pedagogical_council_size']) ? (int) $data['pedagogical_council_size'] : null,
             'institution_www' => $data['institution_www'] ?? null,
             'institution_type' => $data['institution_type'],
             'institution_type_other' => $data['institution_type_other'] ?? null,
@@ -335,6 +339,10 @@ class ClosedTrainingCaseController extends Controller
 
     public function updateContact(Request $request, ClosedTrainingCase $closedTrainingCase): RedirectResponse
     {
+        if ($request->input('pedagogical_council_size') === '') {
+            $request->merge(['pedagogical_council_size' => null]);
+        }
+
         $request->merge([
             'contact_name' => trim((string) $request->input('contact_name')),
             'contact_email' => $this->blankToNull($request->input('contact_email')),
@@ -360,6 +368,7 @@ class ClosedTrainingCaseController extends Controller
             'contact_email' => 'nullable|email|max:255',
             'contact_phone' => 'nullable|string|max:50',
             'institution' => 'nullable|string|max:255',
+            'pedagogical_council_size' => 'nullable|integer|min:1|max:9999',
             'institution_www' => 'nullable|url|max:2048',
             'institution_type' => ['nullable', Rule::in(array_keys(ClosedTrainingCase::institutionTypeOptions()))],
             'institution_type_other' => ['nullable', 'string', 'max:255', Rule::requiredIf(
@@ -373,6 +382,8 @@ class ClosedTrainingCaseController extends Controller
             'institution_www.url' => 'Podaj poprawny adres strony WWW.',
             'institution_type.in' => 'Wybierz rodzaj placówki.',
             'institution_type_other.required' => 'Podaj rodzaj placówki.',
+            'pedagogical_council_size.integer' => 'Podaj liczbę osób w radzie pedagogicznej.',
+            'pedagogical_council_size.min' => 'Liczba osób w radzie musi być co najmniej 1.',
             'preferred_format.in' => 'Wybierz formę szkolenia.',
             'training_offer_id.exists' => 'Wybierz ofertę z katalogu.',
         ]);
@@ -396,6 +407,7 @@ class ClosedTrainingCaseController extends Controller
             'contact_email' => $data['contact_email'] ?? null,
             'contact_phone' => $data['contact_phone'] ?? null,
             'institution' => $data['institution'] ?? null,
+            'pedagogical_council_size' => isset($data['pedagogical_council_size']) ? (int) $data['pedagogical_council_size'] : null,
             'institution_www' => $data['institution_www'] ?? null,
             'institution_type' => $typeData['institution_type'],
             'institution_type_other' => $typeData['institution_type_other'],
