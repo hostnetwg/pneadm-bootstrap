@@ -68,8 +68,8 @@
                                     </a>
                                 </th>
                                 <th>Temat / placówka</th>
-                                <th style="width: 12rem; max-width: 13rem;" title="Osoba do kontaktu ze szkoły; (i) = szczegóły placówki i oferty">Kontakt</th>
-                                <th style="width: 12.5rem; max-width: 14rem;" title="Termin, instruktor (wynagrodzenie), cena dla szkoły. Zielone / ✓ = potwierdzone">Ustalenia</th>
+                                <th style="width: 14rem; max-width: 15.5rem;" title="Osoba do kontaktu ze szkoły; (i) = szczegóły placówki i oferty">Kontakt</th>
+                                <th style="width: 14.5rem; max-width: 16rem;" title="Termin, instruktor (wynagrodzenie), cena dla szkoły. Zielone / ✓ = potwierdzone">Ustalenia</th>
                                 <th style="min-width: 8rem;" title="Status, potem data ostatniego wpisu i opiekun; sortowanie po dacie">
                                     <a href="{{ $activitySortUrl }}" class="text-decoration-none text-dark">
                                         Ostatni wpis
@@ -109,7 +109,7 @@
                                             <div class="text-muted text-truncate" style="max-width: 18rem;" title="{{ $messagePreview }}">{{ \Illuminate\Support\Str::limit($messagePreview, 80) }}</div>
                                         @endif
                                     </td>
-                                    <td style="width: 12rem; max-width: 13rem;">
+                                    <td style="width: 14rem; max-width: 15.5rem;">
                                         <div class="border-start border-3 border-primary ps-2 py-1">
                                             <div class="d-flex align-items-start justify-content-between gap-1">
                                                 <div class="fw-semibold text-dark text-break">{{ $case->contact_name ?: '—' }}</div>
@@ -151,7 +151,7 @@
                                             @endif
                                         </div>
                                     </td>
-                                    <td style="width: 12.5rem; max-width: 14rem; line-height: 1.35;">
+                                    <td style="width: 14.5rem; max-width: 16rem; line-height: 1.35;">
                                         <div class="{{ $schedule === '—' ? 'text-muted' : '' }} text-break" title="{{ $case->listScheduleLabel() }}">
                                             <span class="text-muted">TERMIN:</span> {{ $schedule }}
                                         </div>
