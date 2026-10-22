@@ -15,6 +15,10 @@
             <div class="card mb-4">
                 <div class="card-body">
                     <form method="GET" action="{{ route('closed-training-cases.index') }}" class="row g-3 align-items-end">
+                        @if($sort)
+                            <input type="hidden" name="sort" value="{{ $sort }}">
+                            <input type="hidden" name="dir" value="{{ $dir }}">
+                        @endif
                         <div class="col-md-5">
                             <label for="q" class="form-label">Szukaj</label>
                             <input type="text" name="q" id="q" value="{{ $search }}" class="form-control" placeholder="SZ-3, temat, placówka, osoba, e-mail">
@@ -31,21 +35,50 @@
                         </div>
                         <div class="col-md-4 d-flex gap-2">
                             <button type="submit" class="btn btn-outline-primary">Filtruj</button>
-                            <a href="{{ route('closed-training-cases.index') }}" class="btn btn-outline-secondary">Wyczyść</a>
+                            <a href="{{ route('closed-training-cases.index', array_filter(['sort' => $sort, 'dir' => $sort ? $dir : null])) }}" class="btn btn-outline-secondary">Wyczyść</a>
                         </div>
                     </form>
                 </div>
             </div>
+
+            @php
+                $sortBase = array_filter([
+                    'q' => $search !== '' ? $search : null,
+                    'status' => $status !== 'open' ? $status : null,
+                ]);
+                $symbolDir = ($sort === 'id' && $dir === 'asc') ? 'desc' : 'asc';
+                $activityDir = ($sort === 'last_activity' && $dir === 'desc') ? 'asc' : 'desc';
+                $symbolSortUrl = route('closed-training-cases.index', array_merge($sortBase, ['sort' => 'id', 'dir' => $symbolDir]));
+                $activitySortUrl = route('closed-training-cases.index', array_merge($sortBase, ['sort' => 'last_activity', 'dir' => $activityDir]));
+            @endphp
 
             <div class="card">
                 <div class="table-responsive">
                     <table class="table table-hover align-middle mb-0 small">
                         <thead>
                             <tr>
-                                <th style="width: 4.5rem;" title="Identyfikator w temacie e-maila do szkoły">Symbol</th>
+                                <th style="width: 5.5rem;" title="Sortowanie po numerze sprawy (id)">
+                                    <a href="{{ $symbolSortUrl }}" class="text-decoration-none text-dark">
+                                        Symbol
+                                        @if($sort === 'id')
+                                            <i class="bi bi-caret-{{ $dir === 'asc' ? 'up' : 'down' }}-fill" aria-hidden="true"></i>
+                                        @else
+                                            <i class="bi bi-caret-down text-muted" aria-hidden="true"></i>
+                                        @endif
+                                    </a>
+                                </th>
                                 <th>Temat / placówka</th>
                                 <th style="min-width: 14rem;" title="Termin, instruktor (wynagrodzenie), cena dla szkoły. Zielone / ✓ = potwierdzone">Ustalenia</th>
-                                <th style="min-width: 6.5rem;" title="Ostatni wpis w historii sprawy">Ostatni wpis</th>
+                                <th style="min-width: 7rem;" title="Sortowanie po dacie ostatniego wpisu w historii">
+                                    <a href="{{ $activitySortUrl }}" class="text-decoration-none text-dark">
+                                        Ostatni wpis
+                                        @if($sort === 'last_activity')
+                                            <i class="bi bi-caret-{{ $dir === 'asc' ? 'up' : 'down' }}-fill" aria-hidden="true"></i>
+                                        @else
+                                            <i class="bi bi-caret-down text-muted" aria-hidden="true"></i>
+                                        @endif
+                                    </a>
+                                </th>
                                 <th>Status</th>
                                 <th>Opiekun</th>
                                 <th>Następne działanie</th>

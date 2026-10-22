@@ -21,14 +21,20 @@ use Illuminate\View\View;
 
 class ClosedTrainingCaseController extends Controller
 {
+    public const LIST_SORT_PREFERENCE_KEY = 'closed_training_cases_list';
+
+    /** @var list<string> */
+    private const LIST_SORT_COLUMNS = ['id', 'last_activity'];
+
     public function __construct(private readonly ClosedTrainingCaseService $cases) {}
 
     public function index(Request $request): View
     {
         $status = (string) $request->query('status', 'open');
         $search = trim((string) $request->query('q', ''));
+        [$sort, $dir] = $this->resolveListSort($request);
 
-        $cases = ClosedTrainingCase::query()
+        $query = ClosedTrainingCase::query()
             ->with(['assignee', 'instructor', 'course.instructor'])
             ->withMax('events as last_event_at', 'happened_at')
             ->when($status === 'open', fn ($query) => $query->where('status', '!=', ClosedTrainingCase::STATUS_CLOSED))
@@ -46,18 +52,29 @@ class ClosedTrainingCaseController extends Controller
                         $inner->orWhere('id', (int) $search);
                     }
                 });
-            })
-            ->orderByRaw('CASE WHEN status = ? THEN 1 ELSE 0 END', [ClosedTrainingCase::STATUS_CLOSED])
-            ->orderByRaw('next_action_at IS NULL')
-            ->orderBy('next_action_at')
-            ->orderByDesc('id')
-            ->paginate(25)
-            ->withQueryString();
+            });
+
+        if ($sort === 'id') {
+            $query->orderBy('closed_training_cases.id', $dir);
+        } elseif ($sort === 'last_activity') {
+            $query->orderByRaw(
+                'COALESCE(last_event_at, closed_training_cases.updated_at) '.$dir
+            )->orderBy('closed_training_cases.id', $dir);
+        } else {
+            $query->orderByRaw('CASE WHEN status = ? THEN 1 ELSE 0 END', [ClosedTrainingCase::STATUS_CLOSED])
+                ->orderByRaw('next_action_at IS NULL')
+                ->orderBy('next_action_at')
+                ->orderByDesc('id');
+        }
+
+        $cases = $query->paginate(25)->withQueryString();
 
         return view('closed-training-cases.index', [
             'cases' => $cases,
             'status' => $status,
             'search' => $search,
+            'sort' => $sort,
+            'dir' => $dir,
         ]);
     }
 
@@ -606,6 +623,44 @@ class ClosedTrainingCaseController extends Controller
         if ((int) $event->closed_training_case_id !== (int) $case->id) {
             abort(404);
         }
+    }
+
+    /**
+     * @return array{0: ?string, 1: string} [sort column or null for default, direction]
+     */
+    private function resolveListSort(Request $request): array
+    {
+        $user = $request->user();
+        $preferences = is_array($user?->preferences) ? $user->preferences : [];
+        $saved = is_array($preferences[self::LIST_SORT_PREFERENCE_KEY] ?? null)
+            ? $preferences[self::LIST_SORT_PREFERENCE_KEY]
+            : [];
+
+        $requestedSort = $request->query('sort');
+        $hasExplicitSort = is_string($requestedSort) && in_array($requestedSort, self::LIST_SORT_COLUMNS, true);
+
+        if ($hasExplicitSort) {
+            $dir = strtolower((string) $request->query('dir', 'desc')) === 'asc' ? 'asc' : 'desc';
+            if ($user) {
+                $preferences[self::LIST_SORT_PREFERENCE_KEY] = [
+                    'sort' => $requestedSort,
+                    'dir' => $dir,
+                ];
+                $user->preferences = $preferences;
+                $user->save();
+            }
+
+            return [$requestedSort, $dir];
+        }
+
+        $savedSort = $saved['sort'] ?? null;
+        if (is_string($savedSort) && in_array($savedSort, self::LIST_SORT_COLUMNS, true)) {
+            $dir = ($saved['dir'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
+
+            return [$savedSort, $dir];
+        }
+
+        return [null, 'desc'];
     }
 
     private function blankToNull(?string $value): ?string

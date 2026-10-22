@@ -248,6 +248,70 @@ class ClosedTrainingCaseTest extends TestCase
             ->assertSee('✓', false);
     }
 
+    public function test_case_list_sort_by_symbol_id_is_remembered_in_user_preferences(): void
+    {
+        $user = User::factory()->create(['is_active' => true]);
+        $older = $this->makeCase(['topic' => 'Sprawa starsza sort']);
+        $newer = $this->makeCase(['topic' => 'Sprawa nowsza sort']);
+
+        $this->actingAs($user)
+            ->get(route('closed-training-cases.index', [
+                'status' => 'all',
+                'sort' => 'id',
+                'dir' => 'asc',
+            ]))
+            ->assertOk();
+
+        $html = $this->actingAs($user)
+            ->get(route('closed-training-cases.index', ['status' => 'all']))
+            ->assertOk()
+            ->getContent();
+
+        $this->assertLessThan(
+            strpos($html, 'Sprawa nowsza sort'),
+            strpos($html, 'Sprawa starsza sort')
+        );
+
+        $user->refresh();
+        $this->assertSame('id', data_get($user->preferences, 'closed_training_cases_list.sort'));
+        $this->assertSame('asc', data_get($user->preferences, 'closed_training_cases_list.dir'));
+        $this->assertSame($older->id, min($older->id, $newer->id));
+    }
+
+    public function test_case_list_sort_by_last_activity(): void
+    {
+        $user = User::factory()->create(['is_active' => true]);
+        $quiet = $this->makeCase(['topic' => 'Sprawa cicha aktywność']);
+        $active = $this->makeCase(['topic' => 'Sprawa głośna aktywność']);
+
+        $active->events()->create([
+            'user_id' => $user->id,
+            'event_type' => ClosedTrainingCaseEvent::TYPE_NOTE,
+            'body' => 'Późniejsza notatka',
+            'happened_at' => now()->addDay(),
+        ]);
+        $quiet->events()->create([
+            'user_id' => $user->id,
+            'event_type' => ClosedTrainingCaseEvent::TYPE_NOTE,
+            'body' => 'Wcześniejsza notatka',
+            'happened_at' => now()->subDay(),
+        ]);
+
+        $html = $this->actingAs($user)
+            ->get(route('closed-training-cases.index', [
+                'status' => 'all',
+                'sort' => 'last_activity',
+                'dir' => 'desc',
+            ]))
+            ->assertOk()
+            ->getContent();
+
+        $this->assertLessThan(
+            strpos($html, 'Sprawa cicha aktywność'),
+            strpos($html, 'Sprawa głośna aktywność')
+        );
+    }
+
     public function test_operator_can_find_a_case_by_email_reference_symbol(): void
     {
         $user = User::factory()->create(['is_active' => true]);

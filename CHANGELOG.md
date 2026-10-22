@@ -6,6 +6,7 @@ Krótka numeracja panelu. Szczegóły zawsze w `docs/`. Nowy numer wersji (np. 1
 
 Windykacja: masowe przypomnienia po wyciągu oraz doprecyzowanie wyszukiwania przelewów i danych sprawy.
 
+- **Hotfix 2026-10-22:** na liście [Spraw szkoleń zamkniętych](/closed-training-cases) sortowanie po **Symbol** (id) i **Ostatni wpis**; ostatni wybór zapamiętany w preferencjach operatora. Kanon: [operations-os/CURRENT.md](docs/operations-os/CURRENT.md)
 - **Hotfix 2026-10-22:** na liście [Spraw szkoleń zamkniętych](/closed-training-cases) kolumna **Ustalenia** w jednej komórce: TERMIN, instruktor (wynagrodzenie), CENA (✓ gdy potwierdzone); osobno ostatni wpis. Kanon: [operations-os/CURRENT.md](docs/operations-os/CURRENT.md)
 - **Hotfix 2026-10-22:** na [Sprawach szkoleń zamkniętych](/closed-training-cases) ustalenia negocjacyjne: instruktor, cena ryczałtowa dla szkoły i wynagrodzenie (PLN brutto) z potwierdzeniami, opcjonalny termin (dzień lub z godziną). Po powiązaniu ze szkoleniem trener/termin z `courses`; ceny nadal na sprawie. Prefill przy tworzeniu szkolenia ze sprawy. Kanon: [operations-os/CURRENT.md](docs/operations-os/CURRENT.md), DEC-OPS-013
 - **Hotfix 2026-10-21:** na [Sprawach szkoleń zamkniętych](/closed-training-cases) kolumna **Symbol** `[SZ-{id}]` (ten sam co w temacie e-maila do szkoły); na karcie przy tytule; wyszukiwanie po `SZ-3` / `[SZ-3]` / id. Kanon: [operations-os/CURRENT.md](docs/operations-os/CURRENT.md)
