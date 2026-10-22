@@ -473,11 +473,42 @@
                 <div class="col-lg-5">
                     <form method="POST"
                           action="{{ route('closed-training-cases.notes.store', $case) }}"
-                          class="card mb-4 position-sticky shadow-sm"
-                          style="top: 1rem; z-index: 1020; max-height: calc(100vh - 2rem); overflow-y: auto;"
-                          x-data="{ channel: '{{ old('note_channel', '') }}' }">
+                          class="card mb-4 shadow-sm"
+                          :class="{ 'position-sticky': !pinned }"
+                          :style="pinned
+                              ? 'max-height: none; overflow-y: visible;'
+                              : 'top: 1rem; z-index: 1020; max-height: calc(100vh - 2rem); overflow-y: auto;'"
+                          x-data="{
+                              channel: '{{ old('note_channel', '') }}',
+                              pinned: false,
+                              storageKey: 'closed_training_case_note_pinned',
+                              init() {
+                                  try {
+                                      this.pinned = window.localStorage.getItem(this.storageKey) === '1';
+                                  } catch (e) {
+                                      this.pinned = false;
+                                  }
+                              },
+                              togglePin() {
+                                  this.pinned = !this.pinned;
+                                  try {
+                                      window.localStorage.setItem(this.storageKey, this.pinned ? '1' : '0');
+                                  } catch (e) {}
+                              }
+                          }">
                         @csrf
-                        <div class="card-header fw-semibold">Notatka</div>
+                        <div class="card-header fw-semibold d-flex align-items-center justify-content-between gap-2">
+                            <span>Notatka</span>
+                            <button type="button"
+                                    class="btn btn-sm btn-outline-secondary"
+                                    @click="togglePin()"
+                                    :title="pinned ? 'Odepnij — znów pływa przy przewijaniu' : 'Przypnij — zostaje na swoim miejscu'"
+                                    :aria-pressed="pinned ? 'true' : 'false'"
+                                    :aria-label="pinned ? 'Odepnij notatkę' : 'Przypnij notatkę'">
+                                <i class="bi" :class="pinned ? 'bi-pin-angle-fill' : 'bi-pin-angle'" aria-hidden="true"></i>
+                                <span x-text="pinned ? 'Odepnij' : 'Przypnij'"></span>
+                            </button>
+                        </div>
                         <div class="card-body">
                             <div class="mb-3">
                                 <label for="note_channel" class="form-label">Forma kontaktu</label>
