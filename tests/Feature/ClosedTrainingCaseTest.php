@@ -208,9 +208,7 @@ class ClosedTrainingCaseTest extends TestCase
             ->get(route('closed-training-cases.index'))
             ->assertOk()
             ->assertSee('Symbol')
-            ->assertSee('Instruktor')
-            ->assertSee('Termin')
-            ->assertSee('Kwoty')
+            ->assertSee('Ustalenia')
             ->assertSee('Ostatni wpis')
             ->assertSee('['.$case->referenceCode().']', false)
             ->assertSee('Szkolenie rady przykładowej')
@@ -222,6 +220,7 @@ class ClosedTrainingCaseTest extends TestCase
     {
         $user = User::factory()->create(['is_active' => true]);
         $instructor = Instructor::query()->create([
+            'title' => 'dr',
             'first_name' => 'Lista',
             'last_name' => 'Trenerowska',
             'email' => 'lista.'.uniqid().'@example.com',
@@ -230,21 +229,22 @@ class ClosedTrainingCaseTest extends TestCase
         $case = $this->makeCase([
             'topic' => 'Sprawa z podsumowaniem na liście',
             'instructor_id' => $instructor->id,
-            'client_price' => 2500,
+            'client_price' => 3000,
             'client_price_confirmed_at' => now(),
-            'instructor_fee' => 900,
-            'start_date' => '2026-11-15 00:00:00',
-            'schedule_time_known' => false,
+            'instructor_fee' => 1500,
+            'start_date' => Carbon::parse('2026-11-04 16:00:00', 'Europe/Warsaw'),
+            'schedule_time_known' => true,
         ]);
 
         $this->actingAs($user)
             ->get(route('closed-training-cases.index', ['status' => 'all']))
             ->assertOk()
+            ->assertSee('TERMIN:')
+            ->assertSee('2026-11-04 16:00', false)
             ->assertSee('Trenerowska')
-            ->assertSee('15.11.2026')
-            ->assertSee('bez godz.')
-            ->assertSee('S: 2 500,00 zł')
-            ->assertSee('T: 900,00 zł')
+            ->assertSee('(1 500 PLN)', false)
+            ->assertSee('CENA:')
+            ->assertSee('3 000 PLN', false)
             ->assertSee('✓', false);
     }
 

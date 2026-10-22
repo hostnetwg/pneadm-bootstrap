@@ -44,9 +44,7 @@
                             <tr>
                                 <th style="width: 4.5rem;" title="Identyfikator w temacie e-maila do szkoły">Symbol</th>
                                 <th>Temat / placówka</th>
-                                <th style="min-width: 8rem;">Instruktor</th>
-                                <th style="min-width: 9rem;">Termin</th>
-                                <th style="min-width: 8.5rem;" title="Szkoła = ryczałt brutto; trener = wynagrodzenie. ✓ = potwierdzone">Kwoty</th>
+                                <th style="min-width: 14rem;" title="Termin, instruktor (wynagrodzenie), cena dla szkoły. Zielone / ✓ = potwierdzone">Ustalenia</th>
                                 <th style="min-width: 6.5rem;" title="Ostatni wpis w historii sprawy">Ostatni wpis</th>
                                 <th>Status</th>
                                 <th>Opiekun</th>
@@ -55,6 +53,12 @@
                         </thead>
                         <tbody>
                             @forelse($cases as $case)
+                                @php
+                                    $schedule = $case->listScheduleLabelCompact();
+                                    $instructor = $case->listInstructorName();
+                                    $fee = $case->instructor_fee;
+                                    $price = $case->client_price;
+                                @endphp
                                 <tr>
                                     <td>
                                         <a href="{{ route('closed-training-cases.show', $case) }}"
@@ -69,30 +73,26 @@
                                             <div class="text-muted text-truncate" style="max-width: 18rem;" title="{{ $messagePreview }}">{{ \Illuminate\Support\Str::limit($messagePreview, 80) }}</div>
                                         @endif
                                     </td>
-                                    <td>
-                                        <span title="{{ $case->course ? 'Ze powiązanego szkolenia' : 'Z ustaleń na sprawie' }}">
-                                            {{ \Illuminate\Support\Str::limit($case->listInstructorName(), 28) }}
-                                        </span>
-                                        @if($case->course)
-                                            <div class="text-muted" style="font-size: 0.7rem;">ze szkolenia</div>
-                                        @endif
-                                    </td>
-                                    <td>
-                                        <span class="{{ $case->listScheduleLabelCompact() === '—' ? 'text-muted' : '' }}"
-                                              title="{{ $case->listScheduleLabel() }}">
-                                            {{ $case->listScheduleLabelCompact() }}
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <div class="{{ $case->client_price === null ? 'text-muted' : '' }} {{ $case->client_price_confirmed_at ? 'text-success fw-semibold' : '' }}"
-                                             title="Cena dla szkoły{{ $case->client_price_confirmed_at ? ' — potwierdzona' : '' }}">
-                                            @if($case->client_price_confirmed_at)<span class="me-1" aria-hidden="true">✓</span>@endif
-                                            S: {{ $case->formatMoneyCompact($case->client_price) }}
+                                    <td class="font-monospace" style="font-size: 0.8rem; line-height: 1.35;">
+                                        <div class="{{ $schedule === '—' ? 'text-muted' : '' }}" title="{{ $case->listScheduleLabel() }}">
+                                            <span class="text-muted">TERMIN:</span> {{ $schedule }}
                                         </div>
-                                        <div class="{{ $case->instructor_fee === null ? 'text-muted' : '' }} {{ $case->instructor_fee_confirmed_at ? 'text-success fw-semibold' : '' }}"
-                                             title="Wynagrodzenie instruktora{{ $case->instructor_fee_confirmed_at ? ' — potwierdzone' : '' }}">
-                                            @if($case->instructor_fee_confirmed_at)<span class="me-1" aria-hidden="true">✓</span>@endif
-                                            T: {{ $case->formatMoneyCompact($case->instructor_fee) }}
+                                        <div title="{{ $case->course ? 'Instruktor ze powiązanego szkolenia' : 'Instruktor z ustaleń na sprawie' }}">
+                                            @if($instructor === '—')
+                                                <span class="text-muted">—</span>
+                                            @else
+                                                {{ $instructor }}@if($fee !== null)
+                                                    <span class="{{ $case->instructor_fee_confirmed_at ? 'text-success fw-semibold' : 'text-muted' }}"
+                                                          title="Wynagrodzenie{{ $case->instructor_fee_confirmed_at ? ' — potwierdzone' : '' }}">
+                                                        ({{ $case->formatMoneyList($fee) }}@if($case->instructor_fee_confirmed_at) ✓@endif)
+                                                    </span>
+                                                @endif
+                                            @endif
+                                        </div>
+                                        <div class="{{ $price === null ? 'text-muted' : '' }} {{ $case->client_price_confirmed_at ? 'text-success fw-semibold' : '' }}"
+                                             title="Cena dla szkoły{{ $case->client_price_confirmed_at ? ' — potwierdzona' : '' }}">
+                                            <span class="{{ $case->client_price_confirmed_at ? 'text-success' : 'text-muted' }}">CENA:</span>
+                                            {{ $case->formatMoneyList($price) }}@if($case->client_price_confirmed_at) ✓@endif
                                         </div>
                                     </td>
                                     <td class="text-nowrap text-muted">
@@ -113,7 +113,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="9" class="text-muted p-4">Brak spraw dla tego filtra.</td>
+                                    <td colspan="7" class="text-muted p-4">Brak spraw dla tego filtra.</td>
                                 </tr>
                             @endforelse
                         </tbody>

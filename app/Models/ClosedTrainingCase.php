@@ -232,10 +232,10 @@ class ClosedTrainingCase extends Model
     {
         $course = $this->relationLoaded('course') ? $this->course : null;
         if ($course?->start_date) {
-            $start = $this->formatLocal($course->start_date, 'd.m.Y H:i') ?? '—';
+            $start = $this->formatLocal($course->start_date, 'Y-m-d H:i') ?? '—';
             if ($course->end_date) {
                 $sameDay = $course->start_date->timezone('Europe/Warsaw')->isSameDay($course->end_date->timezone('Europe/Warsaw'));
-                $start .= '–'.($this->formatLocal($course->end_date, $sameDay ? 'H:i' : 'd.m.Y H:i') ?? '');
+                $start .= '–'.($this->formatLocal($course->end_date, $sameDay ? 'H:i' : 'Y-m-d H:i') ?? '');
             }
 
             return $start;
@@ -246,20 +246,34 @@ class ClosedTrainingCase extends Model
         }
 
         $timeKnown = (bool) $this->schedule_time_known;
-        $start = $this->formatLocal($this->start_date, $timeKnown ? 'd.m.Y H:i' : 'd.m.Y') ?? '—';
+        $start = $this->formatLocal($this->start_date, $timeKnown ? 'Y-m-d H:i' : 'Y-m-d') ?? '—';
         if ($this->end_date) {
             $sameDay = $this->start_date->timezone('Europe/Warsaw')->isSameDay($this->end_date->timezone('Europe/Warsaw'));
             if ($timeKnown) {
-                $start .= '–'.($this->formatLocal($this->end_date, $sameDay ? 'H:i' : 'd.m.Y H:i') ?? '');
+                $start .= '–'.($this->formatLocal($this->end_date, $sameDay ? 'H:i' : 'Y-m-d H:i') ?? '');
             } elseif (! $sameDay) {
-                $start .= '–'.($this->formatLocal($this->end_date, 'd.m.Y') ?? '');
+                $start .= '–'.($this->formatLocal($this->end_date, 'Y-m-d') ?? '');
             }
-        }
-        if (! $timeKnown) {
-            $start .= ' · bez godz.';
         }
 
         return $start;
+    }
+
+    /**
+     * Kwota w stylu listy: "1500 PLN" (bez zbędnych ,00 gdy całkowita).
+     */
+    public function formatMoneyList(null|string|float $amount): string
+    {
+        if ($amount === null || $amount === '') {
+            return '—';
+        }
+
+        $value = (float) $amount;
+        $formatted = fmod($value, 1.0) === 0.0
+            ? number_format($value, 0, ',', ' ')
+            : number_format($value, 2, ',', ' ');
+
+        return $formatted.' PLN';
     }
 
     public function lastActivityAt(): ?Carbon
