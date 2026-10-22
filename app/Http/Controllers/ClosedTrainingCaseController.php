@@ -231,6 +231,15 @@ class ClosedTrainingCaseController extends Controller
                 : 'Sprawa nie miała powiązanego szkolenia.');
     }
 
+    public function syncNegotiationFromCourse(Request $request, ClosedTrainingCase $closedTrainingCase): RedirectResponse
+    {
+        $this->cases->syncNegotiationFromLinkedCourse($closedTrainingCase, $request->user());
+
+        return redirect()
+            ->route('closed-training-cases.show', $closedTrainingCase)
+            ->with('success', 'Zsynchronizowano trenera i termin ze szkolenia na sprawę.');
+    }
+
     public function updateNegotiation(Request $request, ClosedTrainingCase $closedTrainingCase): RedirectResponse
     {
         if ($request->input('client_price') === '') {

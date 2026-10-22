@@ -401,6 +401,81 @@ class ClosedTrainingCaseService
     }
 
     /**
+     * Skopiuj trenera i termin ze powiązanego szkolenia na pola sprawy (po rozjeździe).
+     */
+    public function syncNegotiationFromLinkedCourse(ClosedTrainingCase $case, User $user): void
+    {
+        $course = $case->relationLoaded('course')
+            ? $case->course
+            : $case->course()->with('instructor')->first();
+
+        if (! $course) {
+            throw ValidationException::withMessages([
+                'course' => 'Sprawa nie jest powiązana ze szkoleniem.',
+            ]);
+        }
+
+        $beforeInstructorId = $case->instructor_id !== null ? (int) $case->instructor_id : null;
+        $beforeInstructorLabel = $this->instructorLabel($case->instructor);
+        $beforeStart = $case->start_date?->format('Y-m-d H:i');
+        $beforeEnd = $case->end_date?->format('Y-m-d H:i');
+        $beforeTimeKnown = (bool) $case->schedule_time_known;
+        $beforeFeeConfirmed = $case->instructor_fee_confirmed_at !== null;
+
+        $newInstructorId = $course->instructor_id !== null ? (int) $course->instructor_id : null;
+        $newStart = $course->start_date;
+        $newEnd = $course->end_date;
+
+        $instructorChanged = $beforeInstructorId !== $newInstructorId;
+        $scheduleChanged = $beforeStart !== $newStart?->format('Y-m-d H:i')
+            || $beforeEnd !== $newEnd?->format('Y-m-d H:i')
+            || $beforeTimeKnown !== true;
+
+        if (! $instructorChanged && ! $scheduleChanged) {
+            return;
+        }
+
+        $case->instructor_id = $newInstructorId;
+        $case->start_date = $newStart;
+        $case->end_date = $newEnd;
+        $case->schedule_time_known = true;
+
+        $feeNote = '';
+        if ($instructorChanged && $beforeFeeConfirmed) {
+            $case->instructor_fee_confirmed_at = null;
+            $feeNote = ' Cofnięto potwierdzenie wynagrodzenia (zmiana trenera ze szkolenia).';
+        }
+
+        $case->save();
+        $case->unsetRelation('instructor');
+        $case->load('instructor');
+
+        $parts = ['Zsynchronizowano ustalenia ze szkoleniem #'.$course->id.'.'];
+        $afterInstructorLabel = $this->instructorLabel($case->instructor);
+        if ($beforeInstructorLabel !== $afterInstructorLabel) {
+            $parts[] = 'Trener: '.$beforeInstructorLabel.' → '.$afterInstructorLabel.'.';
+        }
+        if ($scheduleChanged) {
+            $parts[] = 'Termin: '
+                .$case->formatScheduleRange(
+                    $beforeStart ? Carbon::parse($beforeStart) : null,
+                    $beforeEnd ? Carbon::parse($beforeEnd) : null,
+                    $beforeTimeKnown
+                )
+                .' → '
+                .$case->formatScheduleRange($case->start_date, $case->end_date, true)
+                .'.';
+        }
+
+        $case->events()->create([
+            'user_id' => $user->id,
+            'event_type' => ClosedTrainingCaseEvent::TYPE_UPDATED,
+            'body' => implode(' ', $parts).$feeNote,
+            'happened_at' => now(),
+        ]);
+    }
+
+    /**
      * @return list<string>
      */
     public function courseLinkDiffLines(ClosedTrainingCase $case, Course $course): array

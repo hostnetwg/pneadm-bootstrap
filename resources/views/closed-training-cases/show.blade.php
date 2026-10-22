@@ -200,7 +200,16 @@
                                     </p>
                                     @if($case->linkedCourseInstructorMismatch() || $case->linkedCourseScheduleMismatch())
                                         <div class="alert alert-warning py-2 small mt-2 mb-0">
-                                            Ustalenia na sprawie różnią się od szkolenia — źródłem realizacji jest szkolenie. Sprawdź dostępność i warunki przy zmianie terminu lub trenera.
+                                            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+                                                <div>
+                                                    Ustalenia na sprawie różnią się od szkolenia — źródłem realizacji jest szkolenie.
+                                                    Przycisk <strong>Synchronizuj</strong> nadpisze trenera i termin na sprawie danymi ze szkolenia.
+                                                </div>
+                                                <form method="POST" action="{{ route('closed-training-cases.course.sync-negotiation', $case) }}" class="m-0">
+                                                    @csrf
+                                                    <button type="submit" class="btn btn-sm btn-warning">Synchronizuj</button>
+                                                </form>
+                                            </div>
                                         </div>
                                     @endif
                                 </div>

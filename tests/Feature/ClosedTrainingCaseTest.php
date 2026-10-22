@@ -1178,6 +1178,68 @@ class ClosedTrainingCaseTest extends TestCase
             ->assertSee('2026-11-20T10:00', false);
     }
 
+    public function test_sync_negotiation_from_linked_course_copies_schedule_and_instructor(): void
+    {
+        $user = User::factory()->create(['is_active' => true]);
+        $caseInstructor = Instructor::query()->create([
+            'first_name' => 'Sprawa',
+            'last_name' => 'Trener',
+            'email' => 'sprawa.'.uniqid().'@example.com',
+            'is_active' => true,
+        ]);
+        $courseInstructor = Instructor::query()->create([
+            'first_name' => 'Kurs',
+            'last_name' => 'Trener',
+            'email' => 'kurs.'.uniqid().'@example.com',
+            'is_active' => true,
+        ]);
+        $case = $this->makeCase([
+            'instructor_id' => $caseInstructor->id,
+            'instructor_fee' => 900,
+            'instructor_fee_confirmed_at' => now(),
+            'start_date' => '2026-11-01 09:00:00',
+            'end_date' => '2026-11-01 11:00:00',
+            'schedule_time_known' => true,
+        ]);
+        $course = $this->makeCourse([
+            'instructor_id' => $courseInstructor->id,
+            'start_date' => '2026-12-15 14:00:00',
+            'end_date' => '2026-12-15 16:00:00',
+        ]);
+
+        $this->actingAs($user)
+            ->post(route('closed-training-cases.course.bind', $case), [
+                'course_id' => $course->id,
+                'confirm_mismatch' => '1',
+            ])
+            ->assertRedirect();
+
+        $case->refresh();
+        $this->assertTrue($case->linkedCourseScheduleMismatch());
+        $this->assertTrue($case->linkedCourseInstructorMismatch());
+
+        $this->actingAs($user)
+            ->get(route('closed-training-cases.show', $case))
+            ->assertOk()
+            ->assertSee('Synchronizuj');
+
+        $this->actingAs($user)
+            ->post(route('closed-training-cases.course.sync-negotiation', $case))
+            ->assertRedirect(route('closed-training-cases.show', $case));
+
+        $case->refresh();
+        $this->assertSame($courseInstructor->id, (int) $case->instructor_id);
+        $this->assertSame('2026-12-15 14:00', $case->start_date?->format('Y-m-d H:i'));
+        $this->assertSame('2026-12-15 16:00', $case->end_date?->format('Y-m-d H:i'));
+        $this->assertTrue((bool) $case->schedule_time_known);
+        $this->assertNull($case->instructor_fee_confirmed_at);
+        $this->assertFalse($case->linkedCourseScheduleMismatch());
+        $this->assertFalse($case->linkedCourseInstructorMismatch());
+        $this->assertTrue(
+            $case->events()->where('body', 'like', 'Zsynchronizowano ustalenia ze szkoleniem%')->exists()
+        );
+    }
+
     public function test_unbind_clears_fee_confirmation_and_keeps_case_fields(): void
     {
         $user = User::factory()->create(['is_active' => true]);
