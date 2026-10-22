@@ -38,7 +38,7 @@ class ClosedTrainingCaseController extends Controller
             ->with(['assignee', 'instructor', 'course.instructor', 'trainingOffer'])
             ->withCount('events')
             ->withMax('events as last_event_at', 'happened_at')
-            ->when($status === 'open', fn ($query) => $query->where('status', '!=', ClosedTrainingCase::STATUS_CLOSED))
+            ->when($status === 'open', fn ($query) => $query->whereNotIn('status', ClosedTrainingCase::terminalStatuses()))
             ->when(array_key_exists($status, ClosedTrainingCase::statusOptions()), fn ($query) => $query->where('status', $status))
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($inner) use ($search) {
@@ -62,7 +62,10 @@ class ClosedTrainingCaseController extends Controller
                 'COALESCE(last_event_at, closed_training_cases.updated_at) '.$dir
             )->orderBy('closed_training_cases.id', $dir);
         } else {
-            $query->orderByRaw('CASE WHEN status = ? THEN 1 ELSE 0 END', [ClosedTrainingCase::STATUS_CLOSED])
+            $query->orderByRaw(
+                'CASE WHEN status IN ('.implode(',', array_fill(0, count(ClosedTrainingCase::terminalStatuses()), '?')).') THEN 1 ELSE 0 END',
+                ClosedTrainingCase::terminalStatuses()
+            )
                 ->orderByRaw('next_action_at IS NULL')
                 ->orderBy('next_action_at')
                 ->orderByDesc('id');

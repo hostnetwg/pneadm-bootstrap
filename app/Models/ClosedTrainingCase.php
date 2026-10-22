@@ -25,6 +25,12 @@ class ClosedTrainingCase extends Model
 
     public const STATUS_WAITING = 'waiting';
 
+    public const STATUS_SCHEDULED = 'scheduled';
+
+    public const STATUS_DELIVERED = 'delivered';
+
+    public const STATUS_CANCELLED = 'cancelled';
+
     public const STATUS_CLOSED = 'closed';
 
     public const FORMAT_ONLINE = 'online';
@@ -305,8 +311,29 @@ class ClosedTrainingCase extends Model
             self::STATUS_NEW => 'Nowa',
             self::STATUS_IN_PROGRESS => 'W toku',
             self::STATUS_WAITING => 'Oczekuje',
+            self::STATUS_SCHEDULED => 'Zaplanowana',
+            self::STATUS_DELIVERED => 'Przeprowadzona',
+            self::STATUS_CANCELLED => 'Anulowana',
             self::STATUS_CLOSED => 'Zamknięta',
         ];
+    }
+
+    /**
+     * Statusy końcowe — poza filtrem „Otwarte”, z closed_at, bez zaległego następnego działania.
+     *
+     * @return list<string>
+     */
+    public static function terminalStatuses(): array
+    {
+        return [
+            self::STATUS_CANCELLED,
+            self::STATUS_CLOSED,
+        ];
+    }
+
+    public function isTerminal(): bool
+    {
+        return in_array($this->status, self::terminalStatuses(), true);
     }
 
     public static function formatOptions(): array
@@ -358,6 +385,9 @@ class ClosedTrainingCase extends Model
             self::STATUS_NEW => 'text-bg-primary',
             self::STATUS_IN_PROGRESS => 'text-bg-info',
             self::STATUS_WAITING => 'text-bg-warning',
+            self::STATUS_SCHEDULED => 'text-bg-success',
+            self::STATUS_DELIVERED => 'text-bg-dark',
+            self::STATUS_CANCELLED => 'text-bg-danger',
             self::STATUS_CLOSED => 'text-bg-secondary',
             default => 'text-bg-light',
         };
@@ -556,7 +586,7 @@ class ClosedTrainingCase extends Model
 
     public function nextActionIsOverdue(): bool
     {
-        if ($this->status === self::STATUS_CLOSED || $this->next_action_at === null) {
+        if ($this->isTerminal() || $this->next_action_at === null) {
             return false;
         }
 

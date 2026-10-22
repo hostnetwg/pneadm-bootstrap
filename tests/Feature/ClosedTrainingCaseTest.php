@@ -223,6 +223,87 @@ class ClosedTrainingCaseTest extends TestCase
             ->assertSee('title="Liczba działań w historii sprawy"', false);
     }
 
+    public function test_operator_can_set_scheduled_and_delivered_status(): void
+    {
+        $user = User::factory()->create(['is_active' => true]);
+        $case = $this->makeCase(['topic' => 'Sprawa do zaplanowania']);
+
+        $this->actingAs($user)
+            ->get(route('closed-training-cases.show', $case))
+            ->assertOk()
+            ->assertSee('Zaplanowana')
+            ->assertSee('Przeprowadzona')
+            ->assertSee('Anulowana')
+            ->assertSee('value="scheduled"', false)
+            ->assertSee('value="delivered"', false)
+            ->assertSee('value="cancelled"', false);
+
+        $this->actingAs($user)
+            ->put(route('closed-training-cases.update', $case), [
+                'status' => ClosedTrainingCase::STATUS_SCHEDULED,
+                'assignee_user_id' => $user->id,
+                'next_action' => 'Potwierdzić salę.',
+                'next_action_at' => '2026-11-01 10:00',
+            ])
+            ->assertRedirect(route('closed-training-cases.show', $case));
+
+        $case->refresh();
+        $this->assertSame(ClosedTrainingCase::STATUS_SCHEDULED, $case->status);
+        $this->assertNull($case->closed_at);
+
+        $this->actingAs($user)
+            ->put(route('closed-training-cases.update', $case), [
+                'status' => ClosedTrainingCase::STATUS_DELIVERED,
+                'assignee_user_id' => $user->id,
+                'next_action' => 'Wysłać ankietę.',
+                'next_action_at' => null,
+            ])
+            ->assertRedirect(route('closed-training-cases.show', $case));
+
+        $case->refresh();
+        $this->assertSame(ClosedTrainingCase::STATUS_DELIVERED, $case->status);
+        $this->assertNull($case->closed_at);
+        $this->assertTrue(
+            $case->events()->where('body', 'like', '%Status: Zaplanowana → Przeprowadzona%')->exists()
+        );
+
+        $this->actingAs($user)
+            ->get(route('closed-training-cases.index', ['status' => 'all']))
+            ->assertOk()
+            ->assertSee('Przeprowadzona');
+    }
+
+    public function test_cancelled_status_sets_closed_at_and_is_hidden_from_open_list(): void
+    {
+        $user = User::factory()->create(['is_active' => true]);
+        $case = $this->makeCase(['topic' => 'Sprawa niedogadana']);
+
+        $this->actingAs($user)
+            ->put(route('closed-training-cases.update', $case), [
+                'status' => ClosedTrainingCase::STATUS_CANCELLED,
+                'assignee_user_id' => $user->id,
+                'next_action' => 'Szkoła zrezygnowała.',
+                'next_action_at' => now()->subDay()->format('Y-m-d H:i'),
+            ])
+            ->assertRedirect(route('closed-training-cases.show', $case));
+
+        $case->refresh();
+        $this->assertSame(ClosedTrainingCase::STATUS_CANCELLED, $case->status);
+        $this->assertNotNull($case->closed_at);
+        $this->assertFalse($case->nextActionIsOverdue());
+
+        $this->actingAs($user)
+            ->get(route('closed-training-cases.index'))
+            ->assertOk()
+            ->assertDontSee('Sprawa niedogadana');
+
+        $this->actingAs($user)
+            ->get(route('closed-training-cases.index', ['status' => 'cancelled']))
+            ->assertOk()
+            ->assertSee('Sprawa niedogadana')
+            ->assertSee('Anulowana');
+    }
+
     public function test_case_list_shows_contact_person_phone_and_email_prominently(): void
     {
         $user = User::factory()->create(['is_active' => true]);

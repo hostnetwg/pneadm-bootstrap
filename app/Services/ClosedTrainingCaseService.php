@@ -86,7 +86,7 @@ class ClosedTrainingCaseService
         $case->next_action = $attributes['next_action'];
         $case->next_action_at = $attributes['next_action_at'];
 
-        if ($case->status === ClosedTrainingCase::STATUS_CLOSED) {
+        if ($case->isTerminal()) {
             $case->closed_at ??= now();
         } else {
             $case->closed_at = null;
