@@ -70,7 +70,7 @@
                                 <th>Temat / placówka</th>
                                 <th style="min-width: 11rem;" title="Osoba do kontaktu ze szkoły">Kontakt</th>
                                 <th style="min-width: 14rem;" title="Termin, instruktor (wynagrodzenie), cena dla szkoły. Zielone / ✓ = potwierdzone">Ustalenia</th>
-                                <th style="min-width: 7rem;" title="Sortowanie po dacie ostatniego wpisu w historii">
+                                <th style="min-width: 8rem;" title="Status, potem data ostatniego wpisu i opiekun; sortowanie po dacie">
                                     <a href="{{ $activitySortUrl }}" class="text-decoration-none text-dark">
                                         Ostatni wpis
                                         @if($sort === 'last_activity')
@@ -80,8 +80,6 @@
                                         @endif
                                     </a>
                                 </th>
-                                <th>Status</th>
-                                <th>Opiekun</th>
                                 <th>Następne działanie</th>
                             </tr>
                         </thead>
@@ -154,15 +152,21 @@
                                             {{ $case->formatMoneyList($price) }}@if($case->client_price_confirmed_at) ✓@endif
                                         </div>
                                     </td>
-                                    <td class="text-nowrap text-muted">
-                                        @if($case->lastActivityAt())
-                                            {{ $case->formatLocal($case->lastActivityAt()) }}
-                                        @else
-                                            —
-                                        @endif
+                                    <td class="text-nowrap">
+                                        <div class="mb-1">
+                                            <span class="badge {{ $case->statusBadgeClass() }}">{{ $case->statusLabel() }}</span>
+                                        </div>
+                                        <div class="text-muted">
+                                            @if($case->lastActivityAt())
+                                                {{ $case->formatLocal($case->lastActivityAt()) }}
+                                            @else
+                                                —
+                                            @endif
+                                        </div>
+                                        <div class="{{ $case->assignee ? 'text-dark' : 'text-muted' }}" title="Opiekun sprawy">
+                                            {{ $case->assignee?->name ?: '—' }}
+                                        </div>
                                     </td>
-                                    <td><span class="badge {{ $case->statusBadgeClass() }}">{{ $case->statusLabel() }}</span></td>
-                                    <td>{{ $case->assignee?->name ?: '—' }}</td>
                                     <td class="{{ $case->nextActionIsOverdue() ? 'text-danger' : '' }}" style="max-width: 12rem;">
                                         <div class="text-truncate" title="{{ $case->next_action }}">{{ $case->next_action ?: '—' }}</div>
                                         @if($case->next_action_at)
@@ -172,7 +176,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="8" class="text-muted p-4">Brak spraw dla tego filtra.</td>
+                                    <td colspan="6" class="text-muted p-4">Brak spraw dla tego filtra.</td>
                                 </tr>
                             @endforelse
                         </tbody>

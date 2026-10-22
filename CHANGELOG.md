@@ -6,6 +6,7 @@ Krótka numeracja panelu. Szczegóły zawsze w `docs/`. Nowy numer wersji (np. 1
 
 Windykacja: masowe przypomnienia po wyciągu oraz doprecyzowanie wyszukiwania przelewów i danych sprawy.
 
+- **Hotfix 2026-10-22:** na liście [Spraw szkoleń zamkniętych](/closed-training-cases) w kolumnie **Ostatni wpis**: status (badge), data i opiekun (bez osobnych kolumn Status / Opiekun). Kanon: [operations-os/CURRENT.md](docs/operations-os/CURRENT.md)
 - **Hotfix 2026-10-22:** na liście [Spraw szkoleń zamkniętych](/closed-training-cases) kolumna **Kontakt**: imię i nazwisko, telefon i e-mail (linki `tel:` / `mailto:`). Kanon: [operations-os/CURRENT.md](docs/operations-os/CURRENT.md)
 - **Hotfix 2026-10-22:** na liście [Spraw szkoleń zamkniętych](/closed-training-cases) sortowanie po **Symbol** (id) i **Ostatni wpis**; ostatni wybór zapamiętany w preferencjach operatora. Kanon: [operations-os/CURRENT.md](docs/operations-os/CURRENT.md)
 - **Hotfix 2026-10-22:** na liście [Spraw szkoleń zamkniętych](/closed-training-cases) kolumna **Ustalenia** w jednej komórce: TERMIN, instruktor (wynagrodzenie), CENA (✓ gdy potwierdzone); osobno ostatni wpis. Kanon: [operations-os/CURRENT.md](docs/operations-os/CURRENT.md)

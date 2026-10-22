@@ -215,6 +215,9 @@ class ClosedTrainingCaseTest extends TestCase
             ->assertSee('['.$case->referenceCode().']', false)
             ->assertSee('Szkolenie rady przykładowej')
             ->assertSee('Osoba poprawiona')
+            ->assertSee('Operator Test')
+            ->assertDontSee('>Opiekun<', false)
+            ->assertDontSee('>Status<', false)
             ->assertSee('Telefon: prośba o termin w listopadzie.')
             ->assertSee('Oczekuje');
     }
