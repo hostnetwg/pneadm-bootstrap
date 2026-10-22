@@ -263,6 +263,8 @@ class ClosedTrainingCaseTest extends TestCase
         $this->assertSame(ClosedTrainingCaseEvent::NOTE_PARTY_INSTRUCTOR, $note->note_party);
         $this->assertStringContainsString('Trenerski', (string) $note->note_party_name);
         $this->assertSame('bg-info-subtle', $note->historyItemClass());
+        $this->assertSame('bg-secondary-subtle', (new ClosedTrainingCaseEvent(['event_type' => ClosedTrainingCaseEvent::TYPE_UPDATED]))->historyItemClass());
+        $this->assertSame('bg-success-subtle', (new ClosedTrainingCaseEvent(['event_type' => ClosedTrainingCaseEvent::TYPE_EMAIL_SENT]))->historyItemClass());
         $this->assertSame('Inny: SMS · Trener: '.$note->note_party_name, $note->noteContextLabel());
 
         $this->actingAs($user)

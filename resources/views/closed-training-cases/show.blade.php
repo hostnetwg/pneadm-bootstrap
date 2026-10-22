@@ -403,9 +403,9 @@
 
                     <div class="card">
                         <div class="card-header fw-semibold">Historia</div>
-                        <ul class="list-group list-group-flush">
+                        <ul class="list-group border-0 p-1 mb-0" style="display: flex; flex-direction: column; gap: 2px;">
                             @foreach($case->events->sortByDesc('happened_at') as $event)
-                                <li class="list-group-item {{ $event->historyItemClass() }}">
+                                <li class="list-group-item rounded border {{ $event->historyItemClass() }}">
                                     <div class="d-flex justify-content-between gap-3 align-items-start">
                                         <div>
                                             <strong>{{ $event->typeLabel() }}</strong>

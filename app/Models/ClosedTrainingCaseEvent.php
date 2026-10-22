@@ -133,13 +133,14 @@ class ClosedTrainingCaseEvent extends Model
 
     public function historyItemClass(): string
     {
-        if ($this->event_type !== self::TYPE_NOTE) {
-            return '';
-        }
-
-        return match ($this->note_party) {
-            self::NOTE_PARTY_INSTRUCTOR => 'bg-info-subtle',
-            self::NOTE_PARTY_CLIENT => 'bg-warning-subtle',
+        return match ($this->event_type) {
+            self::TYPE_UPDATED => 'bg-secondary-subtle',
+            self::TYPE_EMAIL_SENT => 'bg-success-subtle',
+            self::TYPE_NOTE => match ($this->note_party) {
+                self::NOTE_PARTY_INSTRUCTOR => 'bg-info-subtle',
+                self::NOTE_PARTY_CLIENT => 'bg-warning-subtle',
+                default => '',
+            },
             default => '',
         };
     }
