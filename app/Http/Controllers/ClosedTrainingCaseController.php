@@ -36,6 +36,7 @@ class ClosedTrainingCaseController extends Controller
 
         $query = ClosedTrainingCase::query()
             ->with(['assignee', 'instructor', 'course.instructor', 'trainingOffer'])
+            ->withCount('events')
             ->withMax('events as last_event_at', 'happened_at')
             ->when($status === 'open', fn ($query) => $query->where('status', '!=', ClosedTrainingCase::STATUS_CLOSED))
             ->when(array_key_exists($status, ClosedTrainingCase::statusOptions()), fn ($query) => $query->where('status', $status))

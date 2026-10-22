@@ -68,9 +68,9 @@
                                     </a>
                                 </th>
                                 <th>Temat / placówka</th>
-                                <th style="width: 14rem; max-width: 15.5rem;" title="Osoba do kontaktu ze szkoły; (i) = szczegóły placówki i oferty">Kontakt</th>
-                                <th style="width: 14.5rem; max-width: 16rem;" title="Termin, instruktor (wynagrodzenie), cena dla szkoły. Zielone / ✓ = potwierdzone">Ustalenia</th>
-                                <th style="min-width: 8rem;" title="Status, potem data ostatniego wpisu i opiekun; sortowanie po dacie">
+                                <th style="width: 14rem; max-width: 15.5rem;" title="Osoba do kontaktu, na dole cena dla szkoły; (i) = szczegóły placówki i oferty">Kontakt</th>
+                                <th style="width: 14.5rem; max-width: 16rem;" title="Termin, instruktor i wynagrodzenie pod nazwiskiem. Zielone / ✓ = potwierdzone">Ustalenia</th>
+                                <th style="min-width: 8rem;" title="Status z liczbą wpisów w historii, data ostatniego wpisu i opiekun; sortowanie po dacie">
                                     <a href="{{ $activitySortUrl }}" class="text-decoration-none text-dark">
                                         Ostatni wpis
                                         @if($sort === 'last_activity')
@@ -149,6 +149,11 @@
                                             @elseif(! filled($case->contact_phone))
                                                 <div class="text-muted small mt-1">Brak telefonu i e-maila</div>
                                             @endif
+                                            <div class="mt-2 text-break {{ $price === null ? 'text-muted' : '' }} {{ $case->client_price_confirmed_at ? 'text-success fw-semibold' : '' }}"
+                                                 title="Cena dla szkoły{{ $case->client_price_confirmed_at ? ' — potwierdzona' : '' }}">
+                                                <span class="{{ $case->client_price_confirmed_at ? 'text-success' : 'text-muted' }}">CENA:</span>
+                                                {{ $case->formatMoneyList($price) }}@if($case->client_price_confirmed_at) ✓@endif
+                                            </div>
                                         </div>
                                     </td>
                                     <td style="width: 14.5rem; max-width: 16rem; line-height: 1.35;">
@@ -159,23 +164,20 @@
                                             @if($instructor === '—')
                                                 <span class="text-muted">—</span>
                                             @else
-                                                {{ $instructor }}@if($fee !== null)
-                                                    <span class="{{ $case->instructor_fee_confirmed_at ? 'text-success fw-semibold' : 'text-muted' }}"
-                                                          title="Wynagrodzenie{{ $case->instructor_fee_confirmed_at ? ' — potwierdzone' : '' }}">
-                                                        ({{ $case->formatMoneyList($fee) }}@if($case->instructor_fee_confirmed_at) ✓@endif)
-                                                    </span>
+                                                <div>{{ $instructor }}</div>
+                                                @if($fee !== null)
+                                                    <div class="{{ $case->instructor_fee_confirmed_at ? 'text-success fw-semibold' : 'text-muted' }}"
+                                                         title="Wynagrodzenie instruktora{{ $case->instructor_fee_confirmed_at ? ' — potwierdzone' : '' }}">
+                                                        {{ $case->formatMoneyList($fee) }}@if($case->instructor_fee_confirmed_at) ✓@endif
+                                                    </div>
                                                 @endif
                                             @endif
-                                        </div>
-                                        <div class="text-break {{ $price === null ? 'text-muted' : '' }} {{ $case->client_price_confirmed_at ? 'text-success fw-semibold' : '' }}"
-                                             title="Cena dla szkoły{{ $case->client_price_confirmed_at ? ' — potwierdzona' : '' }}">
-                                            <span class="{{ $case->client_price_confirmed_at ? 'text-success' : 'text-muted' }}">CENA:</span>
-                                            {{ $case->formatMoneyList($price) }}@if($case->client_price_confirmed_at) ✓@endif
                                         </div>
                                     </td>
                                     <td class="text-nowrap">
                                         <div class="mb-1">
                                             <span class="badge {{ $case->statusBadgeClass() }}">{{ $case->statusLabel() }}</span>
+                                            <span class="text-muted" title="Liczba działań w historii sprawy">({{ (int) $case->events_count }})</span>
                                         </div>
                                         <div class="text-muted">
                                             @if($case->lastActivityAt())

@@ -217,9 +217,10 @@ class ClosedTrainingCaseTest extends TestCase
             ->assertSee('Osoba poprawiona')
             ->assertSee('Operator Test')
             ->assertDontSee('>Opiekun<', false)
-            ->assertDontSee('>Status<', false)
             ->assertSee('Telefon: prośba o termin w listopadzie.')
-            ->assertSee('Oczekuje');
+            ->assertSee('Oczekuje')
+            ->assertSee('(7)', false)
+            ->assertSee('title="Liczba działań w historii sprawy"', false);
     }
 
     public function test_case_list_shows_contact_person_phone_and_email_prominently(): void
@@ -284,7 +285,8 @@ class ClosedTrainingCaseTest extends TestCase
             ->assertSee('TERMIN:')
             ->assertSee('2026-11-04 16:00', false)
             ->assertSee('Trenerowska')
-            ->assertSee('(1 500 PLN)', false)
+            ->assertSee('1 500 PLN', false)
+            ->assertDontSee('(1 500 PLN)', false)
             ->assertSee('CENA:')
             ->assertSee('3 000 PLN', false)
             ->assertSee('✓', false);
