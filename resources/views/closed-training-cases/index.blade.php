@@ -67,7 +67,7 @@
                                         @endif
                                     </a>
                                 </th>
-                                <th>Temat / placówka</th>
+                                <th style="min-width: 15rem;">Temat / placówka</th>
                                 <th style="width: 14rem; max-width: 15.5rem;" title="Osoba do kontaktu, na dole cena dla szkoły; (i) = szczegóły placówki i oferty">Kontakt</th>
                                 <th style="width: 14.5rem; max-width: 16rem;" title="Termin, instruktor i wynagrodzenie pod nazwiskiem. Zielone / ✓ = potwierdzone">Ustalenia</th>
                                 <th style="min-width: 8rem;" title="Status z liczbą wpisów w historii, data ostatniego wpisu i opiekun; sortowanie po dacie">
@@ -80,7 +80,7 @@
                                         @endif
                                     </a>
                                 </th>
-                                <th style="min-width: 16rem;">Następne działanie</th>
+                                <th style="min-width: 12rem;">Następne działanie</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -101,12 +101,12 @@
                                            class="font-monospace text-decoration-none fw-semibold"
                                            title="Ten sam symbol jest w temacie e-maila do szkoły">[{{ $case->referenceCode() }}]</a>
                                     </td>
-                                    <td style="min-width: 12rem; max-width: 18rem;">
+                                    <td style="min-width: 15rem; max-width: 22rem;">
                                         <a href="{{ route('closed-training-cases.show', $case) }}" class="fw-semibold text-decoration-none">{{ $case->trainingTopicLabel() }}</a>
                                         <div class="text-muted">{{ $case->institution ?: '—' }}</div>
                                         @php($messagePreview = trim(preg_replace('/\s+/u', ' ', (string) $case->message)))
                                         @if($messagePreview !== '')
-                                            <div class="text-muted text-truncate" style="max-width: 18rem;" title="{{ $messagePreview }}">{{ \Illuminate\Support\Str::limit($messagePreview, 80) }}</div>
+                                            <div class="text-muted text-truncate" style="max-width: 22rem;" title="{{ $messagePreview }}">{{ \Illuminate\Support\Str::limit($messagePreview, 100) }}</div>
                                         @endif
                                     </td>
                                     <td style="width: 14rem; max-width: 15.5rem;">
@@ -190,7 +190,7 @@
                                             {{ $case->assignee?->name ?: '—' }}
                                         </div>
                                     </td>
-                                    <td class="{{ $case->nextActionIsOverdue() ? 'text-danger' : '' }}" style="min-width: 16rem;">
+                                    <td class="{{ $case->nextActionIsOverdue() ? 'text-danger' : '' }}" style="min-width: 12rem; max-width: 14rem;">
                                         <div style="white-space: normal;" title="{{ $case->next_action }}">{{ $case->next_action ?: '—' }}</div>
                                         @if($case->next_action_at)
                                             <div class="text-muted">{{ $case->formatLocal($case->next_action_at) }}</div>
