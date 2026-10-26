@@ -1171,6 +1171,31 @@ class ProjectController extends Controller
         return $pdf->download($filename);
     }
 
+    public function exportProjectChatgptPdf(string $project): Response
+    {
+        $item = DemoTikWebinarProject::requireProject($project);
+        $snapshot = DemoTikWebinarProject::chatgptProjectSnapshot($item);
+        $topic = trim((string) ($item['topic'] ?? 'webinar'));
+        $slug = str($topic)->slug('_')->limit(40, '')->toString() ?: 'webinar';
+        $filename = 'growth_projekt_zatwierdzone_'.$slug.'.pdf';
+        $pendingNames = collect($snapshot['materials_pending'])
+            ->map(fn (array $row): string => $row['name'])
+            ->values()
+            ->all();
+
+        $pdf = Pdf::loadView('growth-os.projects.partials.project-chatgpt-export-pdf', [
+            'title' => 'Aktualny stan projektu webinaru — zatwierdzone elementy',
+            'topic' => $topic,
+            'hint' => 'Wgraj ten PDF na ChatGPT.com (lub wklej treść) i poproś o kolejny materiał, np. opis YouTube, brief grafiki albo post Facebook. Są tu tylko elementy już zatwierdzone oraz meta kampanii.',
+            'snapshot' => $snapshot,
+            'snapshotJson' => json_encode($snapshot, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR),
+            'pendingNames' => $pendingNames,
+            'generatedAt' => now()->timezone(config('app.timezone'))->format('Y-m-d H:i'),
+        ])->setPaper('a4', 'portrait');
+
+        return $pdf->download($filename);
+    }
+
     public function requestMaterialAi(Request $request, string $project, string $material): RedirectResponse
     {
         abort_unless(MaterialDraftTask::supports($material), 404);

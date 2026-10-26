@@ -235,6 +235,11 @@ Szczegóły provision PNEDU: [FORM_ORDERS_PNEDU_PROVISION.md](./FORM_ORDERS_PNED
 - `sail artisan test --filter=test_facebook_refine_sends_the_unsaved_post`
 - Ręcznie: na poście Facebook widać „Poproś AI o nowy szkic” i „Popraw mój szkic”. Nie klikać przy włączonym AI bez potrzeby.
 
+## Weryfikacja PNE Growth OS — PDF stanu projektu do ChatGPT (2026-10-26)
+
+- `sail artisan test --filter=GrowthOsProjectChatgptPdfTest`
+- Ręcznie: `/growth/projects/…` — przycisk „Zapisz do PDF aktualny stan projektu”; PDF ma kampanię, zatwierdzony kierunek/koncepcję i zatwierdzone materiały + JSON.
+
 ## Weryfikacja PNE Growth OS — scenariusz: bez YouTube + PDF ChatGPT (2026-10-06)
 
 - `sail artisan test --filter='GrowthOsMaterialAiDraftTest::test_host_script'`

@@ -2394,6 +2394,88 @@ class DemoTikWebinarProject
     }
 
     /**
+     * Snapshot of project facts plus only approved direction, concept and materials — for offline ChatGPT / PDF export.
+     *
+     * @param  array<string, mixed>  $project
+     * @return array{
+     *     purpose: string,
+     *     exported_at: string,
+     *     timezone: string,
+     *     campaign: array<string, mixed>,
+     *     direction: array{approved: bool, fields: array<string, string>|null},
+     *     concept: array{approved: bool, fields: array<string, mixed>|null},
+     *     materials_approved: list<array{key: string, name: string, kind: string, status: string, draft: string}>,
+     *     materials_pending: list<array{key: string, name: string, kind: string, status: string}>,
+     *     materials_skipped: list<array{key: string, name: string}>
+     * }
+     */
+    public static function chatgptProjectSnapshot(array $project): array
+    {
+        $goal = (string) ($project['goal'] ?? '');
+        $directionApproved = self::directionIsApproved($project);
+        $conceptApproved = isset(($project['completed_steps'] ?? [])['concept']);
+        $approved = [];
+        $pending = [];
+        $skipped = [];
+
+        foreach ($project['materials'] ?? [] as $material) {
+            if (! is_array($material)) {
+                continue;
+            }
+            $key = (string) ($material['id'] ?? '');
+            if ($key === '') {
+                continue;
+            }
+            $row = [
+                'key' => $key,
+                'name' => (string) ($material['name'] ?? $key),
+                'kind' => (string) ($material['kind'] ?? ''),
+                'status' => (string) ($material['status'] ?? ''),
+            ];
+            if (self::isMaterialSkipped($material)) {
+                $skipped[] = ['key' => $key, 'name' => $row['name']];
+            } elseif (in_array($row['status'], ['APPROVED', 'PUBLISHED'], true)) {
+                $approved[] = $row + ['draft' => trim((string) ($material['draft'] ?? ''))];
+            } else {
+                $pending[] = $row;
+            }
+        }
+
+        return [
+            'purpose' => 'Aktualny stan zatwierdzonych elementów webinaru PNE Growth OS — do pracy w zewnętrznym AI (np. ChatGPT.com) nad kolejnymi materiałami.',
+            'exported_at' => now()->timezone(config('app.timezone'))->toIso8601String(),
+            'timezone' => (string) config('app.timezone'),
+            'campaign' => [
+                'topic' => (string) ($project['topic'] ?? ''),
+                'type' => (string) ($project['type'] ?? ''),
+                'goal' => (string) (collect(self::goals())->firstWhere('value', $goal)['label'] ?? $goal),
+                'live_date' => (string) ($project['live_date'] ?? ''),
+                'live_time' => (string) ($project['live_time'] ?? ''),
+                'live_label' => self::liveLabel($project),
+                'host_name' => self::aiHostName($project),
+                'address_form' => AddressFormPolicy::fromProject($project),
+                'registration_url' => trim((string) ($project['registration_url'] ?? '')),
+                'youtube_live_url' => trim((string) ($project['youtube_live_url'] ?? '')),
+            ],
+            'direction' => [
+                'approved' => $directionApproved,
+                'fields' => $directionApproved
+                    ? self::fingerprintDirection(is_array($project['direction'] ?? null) ? $project['direction'] : [])
+                    : null,
+            ],
+            'concept' => [
+                'approved' => $conceptApproved,
+                'fields' => $conceptApproved
+                    ? self::fingerprintConcept(is_array($project['concept'] ?? null) ? $project['concept'] : [])
+                    : null,
+            ],
+            'materials_approved' => $approved,
+            'materials_pending' => $pending,
+            'materials_skipped' => $skipped,
+        ];
+    }
+
+    /**
      * @param  array<string, mixed>  $project
      */
     private static function aiHostName(array $project): string

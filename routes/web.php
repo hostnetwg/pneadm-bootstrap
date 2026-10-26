@@ -92,6 +92,8 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
             ->whereNumber('campaign')
             ->name('projects.destroy');
         Route::get('/projects/{project}', [GrowthOsProjectController::class, 'show'])->name('projects.show');
+        Route::get('/projects/{project}/chatgpt-pdf', [GrowthOsProjectController::class, 'exportProjectChatgptPdf'])
+            ->name('projects.chatgpt-pdf');
         Route::put('/projects/{project}/host', [GrowthOsProjectController::class, 'updateHost'])->name('projects.host.update');
         Route::put('/projects/{project}/schedule', [GrowthOsProjectController::class, 'updateSchedule'])->name('projects.schedule.update');
         Route::put('/projects/{project}/links', [GrowthOsProjectController::class, 'updateLinks'])->name('projects.links.update');

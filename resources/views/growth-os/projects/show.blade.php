@@ -101,6 +101,20 @@
                 <div class="text-lg-end">
                     <div class="fw-semibold">{{ $health['days_label'] }}</div>
                     <div class="{{ $health['critical_count'] > 0 ? 'text-danger' : 'text-success' }}">{{ $health['critical_label'] }}</div>
+                    <div class="mt-3">
+                        <a
+                            href="{{ route('growth.projects.chatgpt-pdf', $project['id']) }}"
+                            class="btn btn-outline-secondary btn-sm"
+                            title="Zapisz do PDF aktualny stan projektu"
+                            aria-label="Zapisz do PDF aktualny stan projektu"
+                        >
+                            <i class="bi bi-file-earmark-pdf" aria-hidden="true"></i>
+                            Zapisz do PDF aktualny stan projektu
+                        </a>
+                        <div class="form-text text-lg-end mt-1">
+                            Zatwierdzone elementy — do ChatGPT.com / zewnętrznego AI.
+                        </div>
+                    </div>
                 </div>
             </div>
         </section>
