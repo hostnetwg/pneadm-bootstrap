@@ -651,6 +651,12 @@ final class MaterialDraftTask implements GrowthAiTask
             throw GrowthAiException::invalidResponse('empty_required_field');
         }
 
+        $draft = $this->scrubDisallowedUrls($draft, $input);
+        $changeSummary = $this->scrubDisallowedUrls($changeSummary, $input);
+        if ($draft === '' || $changeSummary === '') {
+            throw GrowthAiException::invalidResponse('empty_required_field');
+        }
+
         $this->assertSafeOutput($draft."\n".$changeSummary, $input);
 
         return new MaterialDraftResult(
@@ -778,10 +784,25 @@ final class MaterialDraftTask implements GrowthAiTask
             throw GrowthAiException::invalidResponse('unexpected_fields');
         }
 
-        $subjects = array_map(static fn (mixed $subject): string => self::upperFirstLetter(trim((string) $subject)), $response->payload['subject_options']);
-        $preheader = self::upperFirstLetter(trim((string) $response->payload['preheader']));
-        $body = AiListFormatter::lineBreaks((string) $response->payload['body']);
-        $changeSummary = AiListFormatter::lineBreaks((string) $response->payload['change_summary']);
+        $subjects = array_map(
+            fn (mixed $subject): string => $this->scrubDisallowedUrls(
+                self::upperFirstLetter(trim((string) $subject)),
+                $input,
+            ),
+            $response->payload['subject_options'],
+        );
+        $preheader = $this->scrubDisallowedUrls(
+            self::upperFirstLetter(trim((string) $response->payload['preheader'])),
+            $input,
+        );
+        $body = $this->scrubDisallowedUrls(
+            AiListFormatter::lineBreaks((string) $response->payload['body']),
+            $input,
+        );
+        $changeSummary = $this->scrubDisallowedUrls(
+            AiListFormatter::lineBreaks((string) $response->payload['change_summary']),
+            $input,
+        );
 
         if (in_array('', $subjects, true) || $preheader === '' || $body === '' || $changeSummary === '') {
             throw GrowthAiException::invalidResponse('empty_required_field');
@@ -840,6 +861,9 @@ final class MaterialDraftTask implements GrowthAiTask
                 $fields[$key] = AiListFormatter::lineBreaks($fields[$key]);
             }
         }
+        foreach (array_keys($fields) as $key) {
+            $fields[$key] = $this->scrubDisallowedUrls($fields[$key], $input);
+        }
         if ($fields['headline'] === '' || $fields['visual_direction'] === '' || $fields['change_summary'] === '') {
             throw GrowthAiException::invalidResponse('empty_required_field');
         }
@@ -873,12 +897,26 @@ final class MaterialDraftTask implements GrowthAiTask
     /**
      * @param  array<string, mixed>  $input
      */
+    private function scrubDisallowedUrls(string $text, array $input): string
+    {
+        $allowedUrls = ProhibitedData::urls(json_encode($input, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR));
+        $replacement = in_array($this->materialKey, [self::FACEBOOK_MATERIAL_KEY, self::HOST_SCRIPT_MATERIAL_KEY], true)
+            ? self::LINK_PLACEHOLDER
+            : '';
+
+        return ProhibitedData::replaceDisallowedUrls($text, $allowedUrls, $replacement);
+    }
+
+    /**
+     * @param  array<string, mixed>  $input
+     */
     private function assertSafeOutput(string $output, array $input): void
     {
         if (ProhibitedData::containsIgnoringDates($output)) {
             throw GrowthAiException::invalidResponse('prohibited_output_data');
         }
 
+        // Unexpected URLs are scrubbed earlier. Remaining URLs must already be allow-listed in the input.
         $allowedUrls = ProhibitedData::urls(json_encode($input, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR));
         foreach (ProhibitedData::urls($output) as $url) {
             if (! in_array($url, $allowedUrls, true)) {

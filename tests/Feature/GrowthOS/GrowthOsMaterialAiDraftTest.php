@@ -1253,6 +1253,24 @@ class GrowthOsMaterialAiDraftTest extends TestCase
         $this->assertStringNotContainsString(MaterialDraftTask::LINK_PLACEHOLDER, $this->provider->instructions);
     }
 
+    public function test_main_mail_strips_unexpected_urls_instead_of_failing(): void
+    {
+        $user = $this->readyProject();
+        $payload = $this->mailPayload();
+        $payload['body'] = "Zapraszam na webinar.\n\nWięcej: https://random-site.example/webinar\nwww.spam.pl/x\n\nZ pozdrowieniami,\nZespół PNE";
+        $payload['preheader'] = 'Szczegóły na https://evil.example/page';
+        $this->provider->payload = $payload;
+
+        $this->requestFor($user, self::MAIL)->assertSessionHas('success');
+
+        $draft = $this->proposal(self::MAIL)['draft'];
+        $this->assertStringNotContainsString('https://random-site.example', $draft);
+        $this->assertStringNotContainsString('www.spam.pl', $draft);
+        $this->assertStringNotContainsString('https://evil.example', $draft);
+        $this->assertStringContainsString('Zapraszam na webinar.', $draft);
+        $this->assertStringContainsString('Zespół PNE', $draft);
+    }
+
     public function test_main_mail_refine_sends_the_unsaved_fields_and_iterate_uses_the_proposal(): void
     {
         $user = $this->readyProject();
