@@ -28,18 +28,20 @@ Nie dodajemy nowego cookie. Kod jest przechowywany w istniejącej sesji Laravel.
 
 ## Kolejność wdrożenia
 
-1. Wdrożyć `pnedu`.
-2. Wyczyścić cache aplikacji:
+Najpierw front `pnedu`:
 
 ```bash
-sail artisan optimize:clear
+cd /home/srv66127/domains/pnedu.pl/app
+git pull --ff-only origin main
+/opt/alt/php82/usr/bin/php artisan optimize:clear
 ```
 
-3. Wdrożyć `pneadm`.
-4. Wyczyścić cache aplikacji:
+Następnie panel `pneadm`:
 
 ```bash
-sail artisan optimize:clear
+cd /home/srv66127/domains/adm.pnedu.pl/pneadm
+git pull --ff-only origin main
+/opt/alt/php82/usr/bin/php artisan optimize:clear
 ```
 
 Nie jest wymagany restart workerów do samego zapisu atrybucji.
