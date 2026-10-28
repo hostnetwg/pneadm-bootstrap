@@ -73,6 +73,7 @@ Najważniejsze miejsca w kodzie:
 - `app/Http/Controllers/OnlineCourseStorefrontController.php`,
 - `app/Http/Controllers/ProductCheckoutController.php`,
 - `app/Http/Controllers/CertificateController.php`,
+- `app/Services/OrderCampaignAttributionService.php` — first-party kod kampanii w bieżącej sesji zamówienia, niezależny od zgody GA,
 - `app/Services/MarketingAttributionService.php`,
 - `app/Services/MarketingCampaignLinkResolver.php`,
 - `app/Services/MarketingCampaignLinkTracker.php`,

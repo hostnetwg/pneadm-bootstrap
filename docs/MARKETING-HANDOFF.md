@@ -70,7 +70,7 @@ sail artisan migrate   # tylko migracje bazy pnedu (users itd.)
 - **Zliczanie (pnedu):** `MarketingCampaignLinkTracker` + middleware `CaptureMarketingSource` + skrócony link `/l/{code}`
 - **Wyświetlanie (adm):** kolumna **Wejś.** na `/marketing-campaigns`
 - **Deduplikacja:** max 1× gość / kampania / dzień (cache + cookie `pne_funnel_sid`)
-- **Zgoda cookies:** licznik Wejś. **nie** czeka na baner analityczny. Zapis atrybucji UTM (cookie/sesja) nadal tylko po zgodzie
+- **Zgoda cookies:** licznik Wejś. i operacyjny kod kampanii zamówienia **nie** czekają na baner analityczny. Kod zamówienia jest trzymany tylko w bieżącej sesji Laravel; cookie `pne_marketing`, pełne UTM i GA/GTM nadal wymagają zgody
 - **Dane historyczne:** tylko od wdrożenia — starsze kliknięcia nie są backfillowane. Luka 8–28.09.2026 (bramka zgody) też bez backfillu
 
 ### 3.3 Filtr okresu na liście kampanii (wariant 2)
@@ -92,6 +92,14 @@ sail artisan migrate   # tylko migracje bazy pnedu (users itd.)
 ### 3.5 Świadoma decyzja (bez zmian w kodzie)
 
 - Badge **„nieznana kampania”** przy zamówieniu (`fb_source` bez dopasowania w `marketing_campaigns`) — np. stare linki, ID Meta zamiast kodu kampanii. **Zostawione jak jest.**
+
+### 3.6 Operacyjna atrybucja zamówień (28.10.2026)
+
+- `OrderCampaignAttributionService` przechwytuje `utm_campaign` / `fb` / `fb_source` do sesji Laravel niezależnie od zgody GA.
+- Formularz i zapis odroczony/PayU/Paynow korzystają z tej sesji do `form_orders.fb_source`.
+- Brak nowego trwałego cookie; po zgodzie dotychczasowe `MarketingAttributionService` i 7-dniowe `pne_marketing` działają bez zmian.
+- Przycisk zgody nie musi przeładowywać formularza, aby zamówienie zachowało kod kampanii.
+- Historycznych pustych `fb_source` nie uzupełniamy automatycznie — brak wiarygodnego klucza do backfillu.
 
 ---
 

@@ -145,14 +145,19 @@
                             @endif
                         </div>
                         <div class="card-body p-0" style="max-height: 600px; overflow-y: auto;">
+                            <div class="small text-muted px-3 py-2 border-bottom bg-body-tertiary">
+                                <strong>Złoż.</strong> — nieanulowane zamówienia przypisane do kampanii.
+                                <strong>Fakt.</strong> — zamówienia z nadanym numerem faktury; nie oznacza opłaconych transakcji.
+                                Okres jest ustalany według daty złożenia zamówienia.
+                            </div>
                             <table class="table table-sm table-hover mb-0">
                                 <thead class="table-light sticky-top">
                                     <tr>
                                         <th>Kod</th>
                                         <th>Kampania</th>
                                         <th class="text-end" title="Kliknięcia w link kampanii (UTM / /l/{kod}), max 1× gość/kampania/dzień">Wejś.</th>
-                                        <th class="text-end">Złoż.</th>
-                                        <th class="text-end">Fakt.</th>
+                                        <th class="text-end" title="Nieanulowane zamówienia przypisane do kampanii">Złoż.</th>
+                                        <th class="text-end" title="Zamówienia z nadanym numerem faktury; nie liczba opłaconych transakcji">Fakt.</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -167,7 +172,7 @@
                                             </td>
                                             <td class="text-end">{{ number_format((int) ($campaign->link_entries ?? 0), 0, ',', ' ') }}</td>
                                             <td class="text-end">{{ (int) $campaign->orders_submitted }}</td>
-                                            <td class="text-end">{{ (int) $campaign->orders_paid }}</td>
+                                            <td class="text-end">{{ (int) ($campaign->orders_invoiced ?? $campaign->orders_paid ?? 0) }}</td>
                                         </tr>
                                     @empty
                                         <tr><td colspan="5" class="text-center text-muted py-3">Brak danych</td></tr>

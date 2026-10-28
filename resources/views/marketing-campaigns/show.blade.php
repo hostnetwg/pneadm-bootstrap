@@ -122,7 +122,10 @@
                                     </div>
                                 </div>
                             </div>
-                            <p class="small text-muted mt-2 mb-0">Liczniki za całą historię kampanii.</p>
+                            <p class="small text-muted mt-2 mb-0">
+                                Liczniki za całą historię kampanii. „Zamówień” oznacza rekordy zamówień,
+                                a nie liczbę opłaconych transakcji ani uczestników.
+                            </p>
                         </div>
                     </div>
                 </div>

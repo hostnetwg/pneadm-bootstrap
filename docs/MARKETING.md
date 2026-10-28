@@ -114,7 +114,12 @@ Implementacja przekierowania: `pnedu` → `GET /l/{campaign_code}` (`MarketingCa
 
 Generator: `App\Services\MarketingCampaignUrlBuilder`.
 
-Atrybucja na froncie: `pnedu/app/Services/MarketingAttributionService.php` — priorytet query: `utm_campaign` → `fb` → `fb_source`; okno **7 dni** (cookie `pne_marketing` + sesja).
+Atrybucja na froncie ma dwie rozdzielone warstwy:
+
+- **operacyjna zamówienia** — `OrderCampaignAttributionService`, priorytet query `utm_campaign` → `fb` → `fb_source`; zapisuje sam kod kampanii w bieżącej sesji Laravel i przekazuje go do `form_orders.fb_source` także bez zgody analitycznej;
+- **analityczna** — `MarketingAttributionService`; sesja `marketing.attribution` i cookie `pne_marketing` z oknem **7 dni** nadal działają wyłącznie po zgodzie analitycznej.
+
+Atrybucja operacyjna nie uruchamia GA/GTM, nie tworzy nowego trwałego cookie i nie zmienia raportów historycznych Google Analytics.
 
 **Miejsce konwersji (osobno od kampanii):** linki z panelu klienta (sidebar „Aktualna oferta”) używają `?entry=dashboard_sidebar` — zapis w sesji (`OrderEntryPlacementService`), bez nadpisywania `fb_source`. Pole `form_orders.conversion_placement`; filtr i statystyki na `/form-orders` w adm.
 
@@ -133,12 +138,14 @@ Atrybucja na froncie: `pnedu/app/Services/MarketingAttributionService.php` — p
 - **`/courses` (kolumna Lejek):** 🛒 i FV = **cała historia** szkolenia; wejścia i % CR = ostatnie `MARKETING_FUNNEL_STATS_DAYS` (domyślnie 30). Dzięki temu 🛒 jest zbliżone do „przetworzone + do obsługi”, a CR nie miesza okien (CR liczone z zamówień w tym samym okresie co widoki). Dane Lejek (oraz U/FV / billing zamkniętych) **dociągane AJAX** po pierwszym HTML: `GET /courses/index-stats` — live, bez cache. Wiersze nieaktywnych szkoleń (`is_active = 0`) są wizualnie przygaszone (`course-row-inactive`); zakończone aktywne zostają przy `table-secondary`.
 - **`Marketing → Lejek konwersji`:** wszystkie etapy w wybranym okresie.
 
+W tabeli kampanii na lejku **Złoż.** oznacza nieanulowane zamówienia przypisane przez `fb_source`, a **Fakt.** — rekordy z nadanym `invoice_number`, nie opłacone transakcje. Okres obu liczników jest ustalany według `form_orders.order_date`.
+
 Serwis: `App\Services\CourseFunnelStatsService` (`statsForCourses(..., ordersAllTime: true)` na liście szkoleń).  
 UI: `Marketing → Lejek konwersji`, kolumna „Lejek” na `/courses`.
 
 **Opt-out zespołu (pnedu + adm):** przełączniki na **Ustawienia → Analityka** (`/settings/analityka`) lub linki `?pne_skip_funnel=1&token=…` / `?pne_skip_analytics=1&token=…` (`MARKETING_FUNNEL_SKIP_TOKEN` w `.env` obu projektów). Lejek OFF wyłącza zliczanie wejść w `course_page_stats_daily` i eventy GA `course_view` / `order_form_view`. GA/GTM OFF pomija ładowanie GA4 i GTM na pnedu.pl. **Wyłączenie trwa do ręcznego ON** — cookie ma techniczny TTL (`MARKETING_FUNNEL_SKIP_COOKIE_DAYS`, domyślnie 365 dni), ale jest **odnawiane przy każdej wizycie** na pnedu.pl i w panelu adm, więc nie wygasa samo po roku.
 
-**Wejścia z linku kampanii** (`marketing_campaign_stats_daily`, kolumna **Wejś.**): liczone przy pierwszym wejściu z `utm_campaign` / `fb` / `fb_source` w URL lub po skróconym `/l/{kod}` — osobno dla każdej kampanii, max 1× gość/kampania/dzień. Ten sam gość może tego samego dnia zliczyć **kilka różnych** kampanii. Licznik działa **bez** zgody na cookies analityczne (własny lejek; „Tylko niezbędne” też się liczy). Zapis UTM do cookie `pne_marketing` i sesji zamówienia nadal tylko po zgodzie na analitykę. Respektuje opt-out lejka (`pne_skip_funnel=1` blokuje też wejścia z linków). Dane tylko od wdrożenia licznika (brak backfillu). Kliknięcia z maili między 8 a 28 września 2026, które wpadły na stronę bez cookie analitycznego, nie zostały zapisane i nie da się ich dociągnąć wstecz.
+**Wejścia z linku kampanii** (`marketing_campaign_stats_daily`, kolumna **Wejś.**): liczone przy pierwszym wejściu z `utm_campaign` / `fb` / `fb_source` w URL lub po skróconym `/l/{kod}` — osobno dla każdej kampanii, max 1× gość/kampania/dzień. Ten sam gość może tego samego dnia zliczyć **kilka różnych** kampanii. Licznik działa **bez** zgody na cookies analityczne (własny lejek; „Tylko niezbędne” też się liczy). Kod kampanii potrzebny do obsługi zamówienia jest zachowywany w bieżącej sesji niezależnie od zgody; pełny zapis UTM do cookie `pne_marketing` i 7-dniowa atrybucja analityczna nadal wymagają zgody. Respektuje opt-out lejka (`pne_skip_funnel=1` blokuje też wejścia z linków). Dane tylko od wdrożenia licznika (brak backfillu). Kliknięcia z maili między 8 a 28 września 2026, które wpadły na stronę bez cookie analitycznego, nie zostały zapisane i nie da się ich dociągnąć wstecz.
 
 **Lista kampanii — filtr okresu** (`MarketingCampaignStatsService`):
 
@@ -150,6 +157,8 @@ UI: `Marketing → Lejek konwersji`, kolumna „Lejek” na `/courses`.
 | `only_with_activity` | `1` | Ukryj kampanie bez Wejś./Zam. w okresie |
 
 W trybie okresu: kolumny **Wejś. (okres)** / **Zam. (okres)**, pasek sum u góry, domyślne sortowanie wg wybranej metryki. Zamówienia w okresie — ta sama logika operacyjna co w lejku (`CourseFunnelStatsService`).
+
+**Znaczenie „Zam.”:** liczba rekordów `form_orders` z `fb_source = campaign_code`. Nie jest to liczba opłaconych transakcji ani uczestników; jedno zamówienie może zawierać wiele osób.
 
 **Sortowanie Wejś.:** subquery `SUM(link_entries)` (Laravel 11 nie ma `orderBySum()` na relacji).
 

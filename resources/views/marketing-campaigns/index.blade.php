@@ -64,7 +64,7 @@
                     <h3 class="h4 mb-1 fw-semibold">Kampanie marketingowe</h3>
                     <p class="small text-muted mb-0">
                         <strong>Wejście</strong> — kliknięcia w link kampanii (UTM / skrócony <code>/l/</code>, max 1× gość/kampania/dzień).
-                        <strong>Zam.</strong> — zamówienia z kodem kampanii (logika jak w lejku konwersji).
+                        <strong>Zam.</strong> — rekordy zamówień z kodem kampanii (nie opłacone transakcje ani liczba uczestników; jedno zamówienie może obejmować wiele osób).
                         <strong>Konw.</strong> — współczynnik konwersji (zamówienia ÷ wejścia).
                         @if($periodActive)
                             <span class="d-block mt-1">Tryb <strong>okresu</strong> — kolumny Wejś./Zam. dotyczą wybranego przedziału dat.</span>
@@ -234,7 +234,7 @@
                                             Wejś.@if($periodActive)<span class="text-muted fw-normal"> (okres)</span>@endif {!! $sortIcon('link_entries_count') !!}
                                         </a>
                                     </th>
-                                    <th class="text-center" title="{{ $periodActive ? 'Zamówienia w wybranym okresie' : 'Zamówienia — cała historia' }}">
+                                    <th class="text-center" title="{{ $periodActive ? 'Rekordy zamówień z kodem kampanii w wybranym okresie; nie liczba płatności ani uczestników' : 'Rekordy zamówień z kodem kampanii — cała historia; nie liczba płatności ani uczestników' }}">
                                         <a href="{{ $sortLink('orders_count') }}" class="text-dark text-decoration-none">
                                             Zam.@if($periodActive)<span class="text-muted fw-normal"> (okres)</span>@endif {!! $sortIcon('orders_count') !!}
                                         </a>

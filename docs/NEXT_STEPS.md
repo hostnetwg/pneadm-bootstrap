@@ -1,7 +1,13 @@
 # Następne Kroki
 
-Data utworzenia/aktualizacji: 2026-10-09
+Data utworzenia/aktualizacji: 2026-10-28
 Status: plan roboczy, do potwierdzenia przez właściciela
+
+## Ostatnio (2026-10-28) — Operacyjna atrybucja kampanii zamówień
+
+Kod kampanii z pełnego UTM, legacy `fb` i `/l/{kod}` jest zachowywany w bieżącej sesji Laravel także bez zgody GA. Formularz odroczony, PayU i Paynow zapisują go w `form_orders.fb_source`; `pne_marketing` i GA/GTM nadal wymagają zgody. Bez migracji i nowego cookie. Kolumna „Zam.” w panelu została opisana jako liczba rekordów zamówień, nie płatności ani uczestników. Kanon: [MARKETING.md](./MARKETING.md), deploy: [2026-10-operational-campaign-attribution-deploy.md](./deploy/2026-10-operational-campaign-attribution-deploy.md).
+
+Następny krok po produkcji: przez 7–14 dni porównać udział nowych zamówień z pustym `fb_source` oraz CR aktywnych kampanii. Historycznych braków nie uzupełniać automatycznie bez wiarygodnego klucza.
 
 ## Ostatnio (2026-10-09) — Faktura sprawy windykacyjnej a zamówienie
 
