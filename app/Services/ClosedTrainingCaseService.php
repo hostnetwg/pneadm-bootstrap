@@ -85,6 +85,7 @@ class ClosedTrainingCaseService
 
     /**
      * @param  list<string>|string  $toEmails
+     * @param  'school'|'test'|'scheduled_notice'|'instructor'  $kind
      */
     public function recordSchoolEmailSent(
         ClosedTrainingCase $case,
@@ -92,8 +93,7 @@ class ClosedTrainingCaseService
         array|string $toEmails,
         string $subject,
         string $body,
-        bool $isTest = false,
-        bool $isScheduledNotice = false,
+        string $kind = 'school',
     ): ClosedTrainingCaseEvent {
         $recipients = is_array($toEmails) ? $toEmails : [$toEmails];
         $recipients = array_values(array_unique(array_filter(array_map(
@@ -102,13 +102,12 @@ class ClosedTrainingCaseService
         ))));
         $toLine = implode(', ', $recipients);
 
-        if ($isTest) {
-            $header = 'E-mail testowy (nie do szkoły)';
-        } elseif ($isScheduledNotice) {
-            $header = 'E-mail: info o terminie szkolenia';
-        } else {
-            $header = 'E-mail wysłany do szkoły';
-        }
+        $header = match ($kind) {
+            'test' => 'E-mail testowy (nie do szkoły)',
+            'scheduled_notice' => 'E-mail: info o terminie szkolenia',
+            'instructor' => 'E-mail do prowadzącego',
+            default => 'E-mail wysłany do szkoły',
+        };
 
         return $case->events()->create([
             'user_id' => $user->id,

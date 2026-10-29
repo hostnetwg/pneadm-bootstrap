@@ -961,6 +961,98 @@ class ClosedTrainingCaseTest extends TestCase
         );
     }
 
+    public function test_operator_can_email_instructor_and_notify_on_school_send(): void
+    {
+        Mail::fake();
+
+        $user = User::factory()->create(['is_active' => true]);
+        $instructor = Instructor::query()->create([
+            'title' => 'mgr',
+            'first_name' => 'Jacek',
+            'last_name' => 'Krzyzak',
+            'email' => 'jacek.trener.'.uniqid('', true).'@example.com',
+            'phone' => '502 145 752',
+            'is_active' => true,
+        ]);
+        $case = $this->makeCase([
+            'contact_name' => 'Anna Dyrektor',
+            'contact_email' => 'szkola@example.com',
+            'contact_phone' => '501 111 222',
+            'institution' => 'SP Przykład',
+            'status' => ClosedTrainingCase::STATUS_IN_PROGRESS,
+            'instructor_id' => $instructor->id,
+            'client_price' => '2500.00',
+            'topic' => 'Zagrożenie przemocą i atak w szkole',
+            'message' => 'Proszę o kontakt w sprawie terminu.',
+            'preferred_format' => ClosedTrainingCase::FORMAT_ONLINE,
+        ]);
+
+        $this->actingAs($user)
+            ->post(route('closed-training-cases.email.prepare-instructor', $case), [
+                'share_contacts' => '0',
+            ])
+            ->assertRedirect(route('closed-training-cases.show', $case).'#closed-training-case-email')
+            ->assertSessionHas('email_draft');
+
+        $draft = session('email_draft');
+        $this->assertSame('instructor', $draft['send_mode']);
+        $this->assertStringContainsString('Prośba o termin', $draft['subject']);
+        $this->assertStringNotContainsString('2500', $draft['body']);
+        $this->assertStringNotContainsString('szkola@example.com', $draft['body']);
+        $this->assertStringContainsString('nie kontaktować się bezpośrednio ze szkołą', $draft['body']);
+
+        $this->actingAs($user)
+            ->post(route('closed-training-cases.email.send', $case), [
+                'email_subject' => $draft['subject'],
+                'email_body' => $draft['body'],
+                'send_mode' => 'instructor',
+                'email_intent' => 'instructor_brief',
+                'share_contacts' => '0',
+            ])
+            ->assertRedirect(route('closed-training-cases.show', $case))
+            ->assertSessionHas('success');
+
+        Mail::assertSent(ClosedTrainingCaseSchoolMail::class, function (ClosedTrainingCaseSchoolMail $mail) use ($instructor) {
+            return $mail->hasTo(strtolower($instructor->email))
+                && ! $mail->hasTo('szkola@example.com')
+                && ! str_contains($mail->htmlBody, '2500');
+        });
+
+        $this->assertTrue(
+            $case->events()
+                ->where('event_type', ClosedTrainingCaseEvent::TYPE_EMAIL_SENT)
+                ->where('body', 'like', 'E-mail do prowadzącego%')
+                ->exists()
+        );
+        $this->assertSame(ClosedTrainingCase::STATUS_IN_PROGRESS, $case->fresh()->status);
+
+        Mail::fake();
+
+        $this->actingAs($user)
+            ->post(route('closed-training-cases.email.send', $case), [
+                'email_subject' => 'Propozycja dla szkoły',
+                'email_body' => '<p>Koszt 2500 zł brutto.</p>',
+                'send_mode' => 'school',
+                'email_recipients' => ['szkola@example.com'],
+                'email_intent' => 'general',
+                'notify_instructor' => '1',
+                'share_contacts' => '1',
+            ])
+            ->assertRedirect(route('closed-training-cases.show', $case))
+            ->assertSessionHas('success');
+
+        Mail::assertSent(ClosedTrainingCaseSchoolMail::class, 2);
+        Mail::assertSent(ClosedTrainingCaseSchoolMail::class, function (ClosedTrainingCaseSchoolMail $mail) {
+            return $mail->hasTo('szkola@example.com') && str_contains($mail->htmlBody, '2500');
+        });
+        Mail::assertSent(ClosedTrainingCaseSchoolMail::class, function (ClosedTrainingCaseSchoolMail $mail) use ($instructor) {
+            return $mail->hasTo(strtolower($instructor->email))
+                && ! str_contains($mail->htmlBody, '2500')
+                && str_contains($mail->htmlBody, 'szkola@example.com')
+                && str_contains($mail->htmlBody, 'Anna Dyrektor');
+        });
+    }
+
     public function test_scheduled_onsite_notice_does_not_require_meeting_link(): void
     {
         Mail::fake();

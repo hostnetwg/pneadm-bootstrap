@@ -9,6 +9,7 @@ use App\Models\Course;
 use App\Models\Instructor;
 use App\Models\TrainingOffer;
 use App\Models\User;
+use App\Services\ClosedTrainingCaseCoordinationEmailBuilder;
 use App\Services\ClosedTrainingCaseScheduledEmailBuilder;
 use App\Services\ClosedTrainingCaseService;
 use Illuminate\Http\RedirectResponse;
@@ -30,6 +31,7 @@ class ClosedTrainingCaseController extends Controller
     public function __construct(
         private readonly ClosedTrainingCaseService $cases,
         private readonly ClosedTrainingCaseScheduledEmailBuilder $scheduledEmailBuilder,
+        private readonly ClosedTrainingCaseCoordinationEmailBuilder $coordinationEmailBuilder,
     ) {}
 
     public function index(Request $request): View
@@ -201,6 +203,9 @@ class ClosedTrainingCaseController extends Controller
             'instructors' => $this->instructorsForSelect($closedTrainingCase),
             'negotiationLocked' => $closedTrainingCase->isLinkedToCourse(),
             'canPrepareScheduledEmail' => $this->scheduledEmailBuilder->canPrepare($closedTrainingCase),
+            'canEmailInstructor' => $this->coordinationEmailBuilder->canEmailInstructor($closedTrainingCase),
+            'instructorEmail' => $this->coordinationEmailBuilder->instructorEmail($closedTrainingCase),
+            'coordinationInstructor' => $this->coordinationEmailBuilder->coordinationInstructor($closedTrainingCase),
             'emailDraft' => session('email_draft'),
         ]);
     }
@@ -530,28 +535,68 @@ class ClosedTrainingCaseController extends Controller
                 'subject' => $draft['subject'],
                 'body' => $draft['html'],
                 'intent' => 'scheduled_notice',
+                'send_mode' => 'school',
+                'share_contacts' => false,
+            ]);
+    }
+
+    public function prepareSchoolProposalEmail(Request $request, ClosedTrainingCase $closedTrainingCase): RedirectResponse
+    {
+        $share = $request->boolean('share_contacts');
+        $draft = $this->coordinationEmailBuilder->buildSchoolProposal($closedTrainingCase, $share);
+
+        return redirect()
+            ->route('closed-training-cases.show', $closedTrainingCase)
+            ->withFragment('closed-training-case-email')
+            ->with('success', 'Przygotowano propozycję dla szkoły. Edytuj treść przed wysyłką.')
+            ->with('email_draft', [
+                'subject' => $draft['subject'],
+                'body' => $draft['html'],
+                'intent' => 'general',
+                'send_mode' => 'school',
+                'share_contacts' => $share,
+            ]);
+    }
+
+    public function prepareInstructorEmail(Request $request, ClosedTrainingCase $closedTrainingCase): RedirectResponse
+    {
+        $share = $request->boolean('share_contacts');
+        $draft = $this->coordinationEmailBuilder->buildInstructorBrief($closedTrainingCase, $share);
+        if ($draft['ok'] !== true) {
+            return redirect()
+                ->route('closed-training-cases.show', $closedTrainingCase)
+                ->with('error', $draft['error']);
+        }
+
+        return redirect()
+            ->route('closed-training-cases.show', $closedTrainingCase)
+            ->withFragment('closed-training-case-email')
+            ->with('success', 'Przygotowano e-mail do prowadzącego (bez ceny). Edytuj i wyślij.')
+            ->with('email_draft', [
+                'subject' => $draft['subject'],
+                'body' => $draft['html'],
+                'intent' => 'instructor_brief',
+                'send_mode' => 'instructor',
+                'share_contacts' => $share,
             ]);
     }
 
     public function sendEmail(Request $request, ClosedTrainingCase $closedTrainingCase): RedirectResponse
     {
-        if (! $closedTrainingCase->hasAnyContactEmail()) {
-            return redirect()
-                ->route('closed-training-cases.show', $closedTrainingCase)
-                ->with('error', 'Sprawa nie ma poprawnego adresu e-mail. Uzupełnij go w danych zapytania.');
-        }
-
         $allowedSchool = $closedTrainingCase->contactEmailList();
         $allowedTest = ClosedTrainingCase::testEmailRecipients();
+        $instructorEmail = $this->coordinationEmailBuilder->instructorEmail($closedTrainingCase);
 
         $data = $request->validate([
             'email_subject' => 'required|string|max:255',
             'email_body' => 'required|string|max:20000',
-            'send_mode' => ['required', Rule::in(['school', 'test'])],
+            'send_mode' => ['required', Rule::in(['school', 'test', 'instructor'])],
             'email_recipients' => ['nullable', 'array'],
             'email_recipients.*' => ['string', 'email', Rule::in($allowedSchool)],
             'test_recipient' => ['nullable', 'string', 'email', Rule::in($allowedTest)],
-            'email_intent' => ['nullable', Rule::in(['general', 'scheduled_notice'])],
+            'email_intent' => ['nullable', Rule::in(['general', 'scheduled_notice', 'instructor_brief'])],
+            'notify_instructor' => ['nullable', 'boolean'],
+            'share_contacts' => ['nullable', 'boolean'],
         ], [
             'email_subject.required' => 'Podaj temat wiadomości.',
             'email_body.required' => 'Wpisz treść wiadomości.',
@@ -560,10 +605,24 @@ class ClosedTrainingCaseController extends Controller
             'test_recipient.in' => 'Wybierz dozwolony adres testowy.',
         ]);
 
-        $isTest = $data['send_mode'] === 'test';
+        $sendMode = $data['send_mode'];
+        $isTest = $sendMode === 'test';
+        $isInstructorOnly = $sendMode === 'instructor';
         $isScheduledNotice = ($data['email_intent'] ?? 'general') === 'scheduled_notice';
+        $notifyInstructor = $request->boolean('notify_instructor');
+        $shareContacts = $request->boolean('share_contacts');
 
-        if ($isTest) {
+        if ($isInstructorOnly || ($notifyInstructor && $sendMode === 'school')) {
+            if ($instructorEmail === null) {
+                throw ValidationException::withMessages([
+                    'notify_instructor' => 'Brak e-maila prowadzącego. Przypisz instruktora z adresem e-mail.',
+                ]);
+            }
+        }
+
+        if ($isInstructorOnly) {
+            $recipients = [$instructorEmail];
+        } elseif ($isTest) {
             $testRecipient = strtolower(trim((string) ($data['test_recipient'] ?? '')));
             if ($testRecipient === '' || ! in_array($testRecipient, $allowedTest, true)) {
                 throw ValidationException::withMessages([
@@ -572,6 +631,11 @@ class ClosedTrainingCaseController extends Controller
             }
             $recipients = [$testRecipient];
         } else {
+            if ($allowedSchool === []) {
+                return redirect()
+                    ->route('closed-training-cases.show', $closedTrainingCase)
+                    ->with('error', 'Sprawa nie ma poprawnego adresu e-mail szkoły. Uzupełnij go w danych zapytania.');
+            }
             $recipients = array_values(array_unique(array_map(
                 static fn (string $email): string => strtolower(trim($email)),
                 $data['email_recipients'] ?? []
@@ -607,25 +671,62 @@ class ClosedTrainingCaseController extends Controller
                 ->with('error', 'Nie udało się wysłać e-maila. Sprawa i historia nie zostały zmienione.');
         }
 
+        $kind = match (true) {
+            $isTest => 'test',
+            $isInstructorOnly => 'instructor',
+            $isScheduledNotice => 'scheduled_notice',
+            default => 'school',
+        };
+
         $this->cases->recordSchoolEmailSent(
             $closedTrainingCase,
             $request->user(),
             $recipients,
             $subject,
             $body,
-            $isTest,
-            $isScheduledNotice && ! $isTest,
+            $kind,
         );
 
-        if ($isScheduledNotice && ! $isTest) {
+        $extraMessages = [];
+
+        if ($notifyInstructor && $sendMode === 'school' && ! $isTest && $instructorEmail !== null) {
+            $brief = $this->coordinationEmailBuilder->buildInstructorBrief($closedTrainingCase, $shareContacts);
+            if ($brief['ok'] === true) {
+                try {
+                    Mail::to($instructorEmail)->send(new ClosedTrainingCaseSchoolMail($brief['html'], $brief['subject']));
+                    $this->cases->recordSchoolEmailSent(
+                        $closedTrainingCase,
+                        $request->user(),
+                        [$instructorEmail],
+                        $brief['subject'],
+                        $brief['html'],
+                        'instructor',
+                    );
+                    $extraMessages[] = 'Wysłano też bezpieczny brief do prowadzącego ('.$instructorEmail.').';
+                } catch (\Throwable $exception) {
+                    Log::warning('Closed training case instructor notify email failed', [
+                        'case_id' => $closedTrainingCase->id,
+                        'message' => $exception->getMessage(),
+                    ]);
+                    $extraMessages[] = 'E-mail do szkoły wyszedł, ale powiadomienie prowadzącego nie — sprawdź SMTP i wyślij trybem „Tylko do prowadzącego”.';
+                }
+            }
+        }
+
+        if ($isScheduledNotice && $sendMode === 'school') {
             $this->cases->markScheduledAfterSchoolNotice($closedTrainingCase, $request->user());
         }
 
         $toLabel = implode(', ', $recipients);
-        $success = $isTest
-            ? 'Wysłano e-mail testowy do '.$toLabel.'. Status sprawy bez zmian.'
-            : 'E-mail został wysłany do '.$toLabel.'.'
-                .($isScheduledNotice ? ' Status ustawiony na Zaplanowana.' : '');
+        $success = match (true) {
+            $isTest => 'Wysłano e-mail testowy do '.$toLabel.'. Status sprawy bez zmian.',
+            $isInstructorOnly => 'E-mail został wysłany do prowadzącego ('.$toLabel.').',
+            default => 'E-mail został wysłany do '.$toLabel.'.'
+                .($isScheduledNotice ? ' Status ustawiony na Zaplanowana.' : ''),
+        };
+        if ($extraMessages !== []) {
+            $success .= ' '.implode(' ', $extraMessages);
+        }
 
         return redirect()
             ->route('closed-training-cases.show', $closedTrainingCase)

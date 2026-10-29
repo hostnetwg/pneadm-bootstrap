@@ -608,6 +608,9 @@
 
                     @php
                         $emailDraft = $emailDraft ?? null;
+                        $canEmailInstructor = $canEmailInstructor ?? false;
+                        $instructorEmail = $instructorEmail ?? null;
+                        $coordinationInstructor = $coordinationInstructor ?? null;
                         $emailIntent = old('email_intent', is_array($emailDraft) ? ($emailDraft['intent'] ?? 'general') : 'general');
                         $emailSubjectDefault = old('email_subject', is_array($emailDraft) ? ($emailDraft['subject'] ?? $case->defaultSchoolEmailSubject()) : $case->defaultSchoolEmailSubject());
                         $emailBodyDefault = old(
@@ -621,20 +624,46 @@
                         if (! is_array($oldRecipients)) {
                             $oldRecipients = array_values($contactChoices);
                         }
-                        $oldSendMode = old('send_mode', 'school');
+                        $oldSendMode = old(
+                            'send_mode',
+                            is_array($emailDraft) ? ($emailDraft['send_mode'] ?? 'school') : 'school'
+                        );
                         $oldTestRecipient = old('test_recipient', \App\Models\ClosedTrainingCase::TEST_EMAIL_RECIPIENTS[0]);
+                        $oldShareContacts = (string) old(
+                            'share_contacts',
+                            is_array($emailDraft) && ! empty($emailDraft['share_contacts']) ? '1' : ''
+                        ) === '1';
+                        $oldNotifyInstructor = (string) old('notify_instructor', '') === '1';
+                        $canShowEmailForm = $case->hasAnyContactEmail() || $canEmailInstructor;
                     @endphp
                     <div class="card mb-4" id="closed-training-case-email">
                         <div class="card-header fw-semibold">Wyślij e-mail</div>
                         <div class="card-body">
-                            @if($case->hasAnyContactEmail())
+                            @if($canShowEmailForm)
+                                <div class="d-flex flex-wrap gap-2 mb-3">
+                                    @if($case->hasAnyContactEmail())
+                                        <form method="POST" action="{{ route('closed-training-cases.email.prepare-school-proposal', $case) }}" class="d-inline">
+                                            @csrf
+                                            <input type="hidden" name="share_contacts" value="{{ $oldShareContacts ? '1' : '0' }}" data-share-sync>
+                                            <button type="submit" class="btn btn-outline-secondary btn-sm">Przygotuj propozycję dla szkoły</button>
+                                        </form>
+                                    @endif
+                                    @if($canEmailInstructor)
+                                        <form method="POST" action="{{ route('closed-training-cases.email.prepare-instructor', $case) }}" class="d-inline">
+                                            @csrf
+                                            <input type="hidden" name="share_contacts" value="{{ $oldShareContacts ? '1' : '0' }}" data-share-sync>
+                                            <button type="submit" class="btn btn-outline-secondary btn-sm">Przygotuj mail do prowadzącego</button>
+                                        </form>
+                                    @endif
+                                </div>
+
                                 <form method="POST" action="{{ route('closed-training-cases.email.send', $case) }}" id="closed-training-case-email-form">
                                     @csrf
                                     <input type="hidden" name="email_intent" id="email_intent" value="{{ $emailIntent }}">
 
-                                    <div class="mb-3">
+                                    <div class="mb-3" id="school-recipients-wrap">
                                         <label class="form-label d-block">Odbiorcy szkoły</label>
-                                        @foreach($contactChoices as $key => $email)
+                                        @forelse($contactChoices as $key => $email)
                                             <div class="form-check">
                                                 <input class="form-check-input"
                                                        type="checkbox"
@@ -653,9 +682,35 @@
                                                     @endif
                                                 </label>
                                             </div>
-                                        @endforeach
+                                        @empty
+                                            <p class="small text-secondary mb-0">Brak e-maili szkoły — możesz wysłać tylko do prowadzącego.</p>
+                                        @endforelse
                                         @error('email_recipients')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
-                                        <div class="form-text">Odpowiedź przyjdzie na kontakt@pnedu.pl.</div>
+                                    </div>
+
+                                    @if($canEmailInstructor)
+                                        <div class="mb-3" id="instructor-recipient-info">
+                                            <label class="form-label d-block">Prowadzący</label>
+                                            <p class="mb-1">
+                                                {{ $coordinationInstructor?->full_title_name }}
+                                                &lt;{{ $instructorEmail }}&gt;
+                                            </p>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" name="notify_instructor" id="notify_instructor" value="1" @checked($oldNotifyInstructor)>
+                                                <label class="form-check-label" for="notify_instructor">
+                                                    Przy wysyłce do szkoły — wyślij też bezpieczny brief do prowadzącego (bez ceny)
+                                                </label>
+                                            </div>
+                                            @error('notify_instructor')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
+                                        </div>
+                                    @endif
+
+                                    <div class="form-check mb-3">
+                                        <input class="form-check-input" type="checkbox" name="share_contacts" id="share_contacts" value="1" @checked($oldShareContacts)>
+                                        <label class="form-check-label" for="share_contacts">
+                                            Połącz kontakty (opcjonalnie): w briefie dla trenera dane szkoły; w propozycji dla szkoły — telefon prowadzącego
+                                        </label>
+                                        <div class="form-text">Ułatwia ustalenie terminu, ale strony mogą dogadać się poza PNE. Ceny i tak nie wysyłamy trenerowi.</div>
                                     </div>
 
                                     <div class="mb-3">
@@ -673,10 +728,18 @@
 
                                     <fieldset class="mb-3">
                                         <legend class="form-label fs-6 mb-2">Wysyłka</legend>
-                                        <div class="form-check">
-                                            <input class="form-check-input" type="radio" name="send_mode" id="send_mode_school" value="school" @checked($oldSendMode === 'school')>
-                                            <label class="form-check-label" for="send_mode_school">Do zaznaczonych adresów szkoły</label>
-                                        </div>
+                                        @if($case->hasAnyContactEmail())
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="radio" name="send_mode" id="send_mode_school" value="school" @checked($oldSendMode === 'school' || (! in_array($oldSendMode, ['instructor', 'test'], true) && $case->hasAnyContactEmail()))>
+                                                <label class="form-check-label" for="send_mode_school">Do zaznaczonych adresów szkoły</label>
+                                            </div>
+                                        @endif
+                                        @if($canEmailInstructor)
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="radio" name="send_mode" id="send_mode_instructor" value="instructor" @checked($oldSendMode === 'instructor' || (! $case->hasAnyContactEmail() && $oldSendMode !== 'test'))>
+                                                <label class="form-check-label" for="send_mode_instructor">Tylko do prowadzącego</label>
+                                            </div>
+                                        @endif
                                         <div class="form-check">
                                             <input class="form-check-input" type="radio" name="send_mode" id="send_mode_test" value="test" @checked($oldSendMode === 'test')>
                                             <label class="form-check-label" for="send_mode_test">Test (bez zmiany statusu)</label>
@@ -694,14 +757,18 @@
 
                                     @if($emailIntent === 'scheduled_notice')
                                         <div class="alert alert-info py-2 small">
-                                            Tryb: info o terminie. Po wysyłce do szkoły status zostanie ustawiony na <strong>Zaplanowana</strong>. Test nie zmienia statusu.
+                                            Tryb: info o terminie. Po wysyłce do szkoły status zostanie ustawiony na <strong>Zaplanowana</strong>. Test / mail do prowadzącego nie zmienia statusu.
+                                        </div>
+                                    @elseif($emailIntent === 'instructor_brief')
+                                        <div class="alert alert-info py-2 small">
+                                            Tryb: brief dla prowadzącego (bez ceny). Odpowiedzi trafią na kontakt@pnedu.pl.
                                         </div>
                                     @endif
 
                                     <button type="submit" class="btn btn-primary" id="closed-training-email-submit">Wyślij e-mail</button>
                                 </form>
                             @else
-                                <p class="mb-0 text-secondary">Brak poprawnego adresu e-mail w sprawie. Uzupełnij go w danych zapytania, żeby wysłać wiadomość.</p>
+                                <p class="mb-0 text-secondary">Brak e-maila szkoły i prowadzącego. Uzupełnij kontakt szkoły albo przypisz instruktora z adresem e-mail.</p>
                             @endif
                         </div>
                     </div>
@@ -885,25 +952,63 @@
             }
 
             const sendModeSchool = document.getElementById('send_mode_school');
+            const sendModeInstructor = document.getElementById('send_mode_instructor');
             const sendModeTest = document.getElementById('send_mode_test');
             const testRecipientWrap = document.getElementById('test-recipient-wrap');
+            const schoolRecipientsWrap = document.getElementById('school-recipients-wrap');
+            const notifyInstructor = document.getElementById('notify_instructor');
+            const shareContacts = document.getElementById('share_contacts');
             const emailSubmit = document.getElementById('closed-training-email-submit');
+            const emailIntent = document.getElementById('email_intent');
             function syncEmailSendMode() {
                 const isTest = !!(sendModeTest && sendModeTest.checked);
+                const isInstructor = !!(sendModeInstructor && sendModeInstructor.checked);
                 if (testRecipientWrap) {
                     testRecipientWrap.classList.toggle('d-none', !isTest);
                 }
+                if (schoolRecipientsWrap) {
+                    schoolRecipientsWrap.classList.toggle('d-none', isInstructor);
+                }
+                if (notifyInstructor) {
+                    notifyInstructor.disabled = isInstructor || isTest;
+                    if (isInstructor || isTest) {
+                        notifyInstructor.checked = false;
+                    }
+                }
                 if (emailSubmit) {
-                    emailSubmit.textContent = isTest ? 'Wyślij test' : 'Wyślij e-mail';
+                    if (isTest) {
+                        emailSubmit.textContent = 'Wyślij test';
+                    } else if (isInstructor) {
+                        emailSubmit.textContent = 'Wyślij do prowadzącego';
+                    } else {
+                        emailSubmit.textContent = 'Wyślij e-mail';
+                    }
+                }
+                if (isInstructor && emailIntent && emailIntent.value === 'general') {
+                    emailIntent.value = 'instructor_brief';
                 }
             }
             if (sendModeSchool) {
                 sendModeSchool.addEventListener('change', syncEmailSendMode);
             }
+            if (sendModeInstructor) {
+                sendModeInstructor.addEventListener('change', syncEmailSendMode);
+            }
             if (sendModeTest) {
                 sendModeTest.addEventListener('change', syncEmailSendMode);
             }
             syncEmailSendMode();
+
+            function syncShareHiddenFields() {
+                const on = !!(shareContacts && shareContacts.checked);
+                document.querySelectorAll('[data-share-sync]').forEach(function (input) {
+                    input.value = on ? '1' : '0';
+                });
+            }
+            if (shareContacts) {
+                shareContacts.addEventListener('change', syncShareHiddenFields);
+                syncShareHiddenFields();
+            }
 
             function readEventBody(button) {
                 const bodyId = button.getAttribute('data-event-body-id');

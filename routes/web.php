@@ -472,6 +472,10 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
     Route::post('/closed-training-cases/{closedTrainingCase}/email', [ClosedTrainingCaseController::class, 'sendEmail'])->name('closed-training-cases.email.send');
     Route::post('/closed-training-cases/{closedTrainingCase}/email/prepare-scheduled', [ClosedTrainingCaseController::class, 'prepareScheduledEmail'])
         ->name('closed-training-cases.email.prepare-scheduled');
+    Route::post('/closed-training-cases/{closedTrainingCase}/email/prepare-school-proposal', [ClosedTrainingCaseController::class, 'prepareSchoolProposalEmail'])
+        ->name('closed-training-cases.email.prepare-school-proposal');
+    Route::post('/closed-training-cases/{closedTrainingCase}/email/prepare-instructor', [ClosedTrainingCaseController::class, 'prepareInstructorEmail'])
+        ->name('closed-training-cases.email.prepare-instructor');
     Route::get('/closed-training-cases/{closedTrainingCase}/create-course', [CoursesController::class, 'createFromClosedTrainingCase'])
         ->name('closed-training-cases.create-course');
     Route::post('/closed-training-cases/{closedTrainingCase}/course', [ClosedTrainingCaseController::class, 'bindCourse'])
