@@ -55,6 +55,12 @@ class ClosedTrainingCase extends Model
 
     public const FEE_BASIS_NET = 'net';
 
+    /** @var list<string> */
+    public const TEST_EMAIL_RECIPIENTS = [
+        'waldemar.grabowski@hostnet.pl',
+        'luman0599@gmail.com',
+    ];
+
     protected $fillable = [
         'source',
         'training_offer_id',
@@ -66,6 +72,8 @@ class ClosedTrainingCase extends Model
         'preferred_format',
         'contact_name',
         'contact_email',
+        'contact_email_alt1',
+        'contact_email_alt2',
         'contact_phone',
         'institution',
         'pedagogical_council_size',
@@ -503,6 +511,56 @@ class ClosedTrainingCase extends Model
         return filter_var($email, FILTER_VALIDATE_EMAIL) ? $email : null;
     }
 
+    /**
+     * Adresy kontaktu szkoły: główny + opcjonalne dodatkowe (unikalne, tylko poprawne).
+     *
+     * @return array<string, string> key: primary|alt1|alt2 → e-mail
+     */
+    public function contactEmailChoices(): array
+    {
+        $choices = [];
+        $seen = [];
+
+        foreach ([
+            'primary' => $this->contact_email,
+            'alt1' => $this->contact_email_alt1,
+            'alt2' => $this->contact_email_alt2,
+        ] as $key => $raw) {
+            $email = strtolower(trim((string) $raw));
+            if ($email === '' || ! filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                continue;
+            }
+            if (isset($seen[$email])) {
+                continue;
+            }
+            $seen[$email] = true;
+            $choices[$key] = $email;
+        }
+
+        return $choices;
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function contactEmailList(): array
+    {
+        return array_values($this->contactEmailChoices());
+    }
+
+    public function hasAnyContactEmail(): bool
+    {
+        return $this->contactEmailChoices() !== [];
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function testEmailRecipients(): array
+    {
+        return self::TEST_EMAIL_RECIPIENTS;
+    }
+
     public static function emailReference(int $id): string
     {
         return '[SZ-'.$id.']';
@@ -540,9 +598,7 @@ class ClosedTrainingCase extends Model
 
     public function hasContactEmail(): bool
     {
-        $email = trim((string) $this->contact_email);
-
-        return $email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL) !== false;
+        return $this->hasAnyContactEmail();
     }
 
     public function defaultSchoolEmailSubject(): string

@@ -470,6 +470,8 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
         ->name('closed-training-cases.negotiation.update');
     Route::post('/closed-training-cases/{closedTrainingCase}/notes', [ClosedTrainingCaseController::class, 'storeNote'])->name('closed-training-cases.notes.store');
     Route::post('/closed-training-cases/{closedTrainingCase}/email', [ClosedTrainingCaseController::class, 'sendEmail'])->name('closed-training-cases.email.send');
+    Route::post('/closed-training-cases/{closedTrainingCase}/email/prepare-scheduled', [ClosedTrainingCaseController::class, 'prepareScheduledEmail'])
+        ->name('closed-training-cases.email.prepare-scheduled');
     Route::get('/closed-training-cases/{closedTrainingCase}/create-course', [CoursesController::class, 'createFromClosedTrainingCase'])
         ->name('closed-training-cases.create-course');
     Route::post('/closed-training-cases/{closedTrainingCase}/course', [ClosedTrainingCaseController::class, 'bindCourse'])

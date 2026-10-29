@@ -723,6 +723,9 @@ class ClosedTrainingCaseTest extends TestCase
             ->post(route('closed-training-cases.email.send', $case), [
                 'email_subject' => 'Ustalenie terminu',
                 'email_body' => $htmlBody,
+                'send_mode' => 'school',
+                'email_recipients' => ['szkola@example.com'],
+                'email_intent' => 'general',
             ])
             ->assertRedirect(route('closed-training-cases.show', $case))
             ->assertSessionHas('success');
@@ -775,12 +778,15 @@ class ClosedTrainingCaseTest extends TestCase
 
         $pending = Mockery::mock();
         $pending->shouldReceive('send')->once()->andThrow(new \RuntimeException('smtp down'));
-        Mail::shouldReceive('to')->once()->with('szkola@example.com')->andReturn($pending);
+        Mail::shouldReceive('to')->once()->with(['szkola@example.com'])->andReturn($pending);
 
         $this->actingAs($user)
             ->post(route('closed-training-cases.email.send', $case), [
                 'email_subject' => 'Próba',
                 'email_body' => 'Treść próby.',
+                'send_mode' => 'school',
+                'email_recipients' => ['szkola@example.com'],
+                'email_intent' => 'general',
             ])
             ->assertRedirect(route('closed-training-cases.show', $case))
             ->assertSessionHas('error');
@@ -815,12 +821,193 @@ class ClosedTrainingCaseTest extends TestCase
             ->post(route('closed-training-cases.email.send', $case), [
                 'email_subject' => 'Nie powinno wyjść',
                 'email_body' => 'Treść.',
+                'send_mode' => 'school',
+                'email_recipients' => ['szkola@example.com'],
+                'email_intent' => 'general',
             ])
             ->assertRedirect(route('closed-training-cases.show', $case))
             ->assertSessionHas('error');
 
         Mail::assertNothingSent();
         $this->assertFalse($case->events()->where('event_type', ClosedTrainingCaseEvent::TYPE_EMAIL_SENT)->exists());
+    }
+
+    public function test_operator_can_save_extra_contact_emails_and_send_to_several(): void
+    {
+        Mail::fake();
+
+        $user = User::factory()->create(['is_active' => true]);
+        $case = $this->makeCase([
+            'contact_email' => 'sekretariat@example.com',
+            'status' => ClosedTrainingCase::STATUS_IN_PROGRESS,
+        ]);
+
+        $this->actingAs($user)
+            ->put(route('closed-training-cases.contact.update', $case), [
+                'contact_name' => 'Osoba',
+                'contact_email' => 'sekretariat@example.com',
+                'contact_email_alt1' => 'dyrektor@example.com',
+                'contact_email_alt2' => 'zastepca@example.com',
+            ])
+            ->assertRedirect(route('closed-training-cases.show', $case));
+
+        $case->refresh();
+        $this->assertSame('dyrektor@example.com', $case->contact_email_alt1);
+        $this->assertSame('zastepca@example.com', $case->contact_email_alt2);
+
+        $this->actingAs($user)
+            ->post(route('closed-training-cases.email.send', $case), [
+                'email_subject' => 'Do dwóch osób',
+                'email_body' => '<p>Treść do szkoły.</p>',
+                'send_mode' => 'school',
+                'email_recipients' => ['sekretariat@example.com', 'dyrektor@example.com'],
+                'email_intent' => 'general',
+            ])
+            ->assertRedirect(route('closed-training-cases.show', $case))
+            ->assertSessionHas('success');
+
+        Mail::assertSent(ClosedTrainingCaseSchoolMail::class, function (ClosedTrainingCaseSchoolMail $mail) {
+            return $mail->hasTo('sekretariat@example.com') && $mail->hasTo('dyrektor@example.com');
+        });
+
+        $event = $case->events()->where('event_type', ClosedTrainingCaseEvent::TYPE_EMAIL_SENT)->first();
+        $this->assertNotNull($event);
+        $this->assertStringContainsString('Do: sekretariat@example.com, dyrektor@example.com', $event->body);
+        $this->assertSame(ClosedTrainingCase::STATUS_IN_PROGRESS, $case->fresh()->status);
+    }
+
+    public function test_scheduled_notice_email_sets_status_and_test_does_not(): void
+    {
+        Mail::fake();
+
+        $user = User::factory()->create(['is_active' => true]);
+        $instructor = Instructor::query()->create([
+            'first_name' => 'Roman',
+            'last_name' => 'Lorens',
+            'title' => 'dr',
+            'email' => 'roman.lorens.'.uniqid('', true).'@example.com',
+            'is_active' => true,
+        ]);
+        $case = $this->makeCase([
+            'contact_email' => 'szkola@example.com',
+            'status' => ClosedTrainingCase::STATUS_IN_PROGRESS,
+            'topic' => 'Odpowiedzialność prawna',
+        ]);
+        $start = Carbon::parse('2026-10-29 17:00:00', 'Europe/Warsaw');
+        $course = $this->makeCourse([
+            'title' => 'Odpowiedzialność prawna nauczyciela',
+            'type' => 'online',
+            'category' => 'closed',
+            'instructor_id' => $instructor->id,
+            'start_date' => $start,
+            'end_date' => $start->copy()->addHours(2),
+            'closed_training_case_id' => $case->id,
+        ]);
+        $course->onlineDetails()->create([
+            'platform' => 'ClickMeeting',
+            'meeting_link' => 'https://pnedu.clickmeeting.com/przyklad-link',
+            'clickmeeting_event_id' => '12345',
+        ]);
+
+        $this->actingAs($user)
+            ->post(route('closed-training-cases.email.prepare-scheduled', $case))
+            ->assertRedirect(route('closed-training-cases.show', $case).'#closed-training-case-email')
+            ->assertSessionHas('email_draft');
+
+        $draft = session('email_draft');
+        $this->assertIsArray($draft);
+        $this->assertSame('scheduled_notice', $draft['intent']);
+        $this->assertStringContainsString('Szkolenie zaplanowane', $draft['subject']);
+        $this->assertStringContainsString('https://pnedu.clickmeeting.com/przyklad-link', $draft['body']);
+        $this->assertStringContainsString('29.10.2026', $draft['body']);
+
+        $this->actingAs($user)
+            ->post(route('closed-training-cases.email.send', $case), [
+                'email_subject' => $draft['subject'],
+                'email_body' => $draft['body'],
+                'send_mode' => 'test',
+                'test_recipient' => 'luman0599@gmail.com',
+                'email_intent' => 'scheduled_notice',
+                'email_recipients' => ['szkola@example.com'],
+            ])
+            ->assertRedirect(route('closed-training-cases.show', $case))
+            ->assertSessionHas('success');
+
+        Mail::assertSent(ClosedTrainingCaseSchoolMail::class, function (ClosedTrainingCaseSchoolMail $mail) {
+            return $mail->hasTo('luman0599@gmail.com') && ! $mail->hasTo('szkola@example.com');
+        });
+        $this->assertSame(ClosedTrainingCase::STATUS_IN_PROGRESS, $case->fresh()->status);
+        $testEvent = $case->events()->where('event_type', ClosedTrainingCaseEvent::TYPE_EMAIL_SENT)->latest('id')->first();
+        $this->assertStringContainsString('E-mail testowy', (string) $testEvent?->body);
+
+        $this->actingAs($user)
+            ->post(route('closed-training-cases.email.send', $case), [
+                'email_subject' => $draft['subject'],
+                'email_body' => $draft['body'],
+                'send_mode' => 'school',
+                'email_recipients' => ['szkola@example.com'],
+                'email_intent' => 'scheduled_notice',
+            ])
+            ->assertRedirect(route('closed-training-cases.show', $case))
+            ->assertSessionHas('success');
+
+        $case->refresh();
+        $this->assertSame(ClosedTrainingCase::STATUS_SCHEDULED, $case->status);
+        $this->assertTrue(
+            $case->events()
+                ->where('event_type', ClosedTrainingCaseEvent::TYPE_EMAIL_SENT)
+                ->where('body', 'like', 'E-mail: info o terminie szkolenia%')
+                ->exists()
+        );
+    }
+
+    public function test_scheduled_onsite_notice_does_not_require_meeting_link(): void
+    {
+        Mail::fake();
+
+        $user = User::factory()->create(['is_active' => true]);
+        $case = $this->makeCase([
+            'contact_email' => 'szkola@example.com',
+            'status' => ClosedTrainingCase::STATUS_WAITING,
+        ]);
+        $start = Carbon::parse('2026-11-05 09:00:00', 'Europe/Warsaw');
+        $course = $this->makeCourse([
+            'title' => 'Szkolenie stacjonarne RP',
+            'type' => 'offline',
+            'category' => 'closed',
+            'start_date' => $start,
+            'end_date' => $start->copy()->addHours(3),
+            'closed_training_case_id' => $case->id,
+        ]);
+        $course->location()->create([
+            'location_name' => 'Sala konferencyjna',
+            'address' => 'ul. Szkolna 1',
+            'postal_code' => '00-001',
+            'post_office' => 'Warszawa',
+            'country' => 'PL',
+        ]);
+
+        $this->actingAs($user)
+            ->post(route('closed-training-cases.email.prepare-scheduled', $case))
+            ->assertRedirect(route('closed-training-cases.show', $case).'#closed-training-case-email')
+            ->assertSessionHas('email_draft');
+
+        $draft = session('email_draft');
+        $this->assertStringContainsString('potwierdzenie terminu', $draft['subject']);
+        $this->assertStringContainsString('stacjonarnie', $draft['body']);
+        $this->assertStringContainsString('Sala konferencyjna', $draft['body']);
+
+        $this->actingAs($user)
+            ->post(route('closed-training-cases.email.send', $case), [
+                'email_subject' => $draft['subject'],
+                'email_body' => $draft['body'],
+                'send_mode' => 'school',
+                'email_recipients' => ['szkola@example.com'],
+                'email_intent' => 'scheduled_notice',
+            ])
+            ->assertRedirect(route('closed-training-cases.show', $case));
+
+        $this->assertSame(ClosedTrainingCase::STATUS_SCHEDULED, $case->fresh()->status);
     }
 
     public function test_operator_can_edit_and_delete_history_events(): void

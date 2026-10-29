@@ -9,6 +9,7 @@ use App\Models\Course;
 use App\Models\Instructor;
 use App\Models\TrainingOffer;
 use App\Models\User;
+use App\Services\ClosedTrainingCaseScheduledEmailBuilder;
 use App\Services\ClosedTrainingCaseService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -26,7 +27,10 @@ class ClosedTrainingCaseController extends Controller
     /** @var list<string> */
     private const LIST_SORT_COLUMNS = ['id', 'last_activity'];
 
-    public function __construct(private readonly ClosedTrainingCaseService $cases) {}
+    public function __construct(
+        private readonly ClosedTrainingCaseService $cases,
+        private readonly ClosedTrainingCaseScheduledEmailBuilder $scheduledEmailBuilder,
+    ) {}
 
     public function index(Request $request): View
     {
@@ -45,7 +49,9 @@ class ClosedTrainingCaseController extends Controller
                     $inner->where('topic', 'like', "%{$search}%")
                         ->orWhere('institution', 'like', "%{$search}%")
                         ->orWhere('contact_name', 'like', "%{$search}%")
-                        ->orWhere('contact_email', 'like', "%{$search}%");
+                        ->orWhere('contact_email', 'like', "%{$search}%")
+                        ->orWhere('contact_email_alt1', 'like', "%{$search}%")
+                        ->orWhere('contact_email_alt2', 'like', "%{$search}%");
 
                     if (preg_match('/^\[?\s*SZ-(\d+)\s*\]?$/iu', $search, $matches)) {
                         $inner->orWhere('id', (int) $matches[1]);
@@ -172,6 +178,8 @@ class ClosedTrainingCaseController extends Controller
             'trainingOffer',
             'events.user',
             'course.instructor',
+            'course.onlineDetails',
+            'course.location',
         ]);
 
         $this->cases->syncFeeConfirmationWithLinkedCourse($closedTrainingCase);
@@ -182,6 +190,8 @@ class ClosedTrainingCaseController extends Controller
             'trainingOffer',
             'events.user',
             'course.instructor',
+            'course.onlineDetails',
+            'course.location',
         ]);
 
         return view('closed-training-cases.show', [
@@ -190,6 +200,8 @@ class ClosedTrainingCaseController extends Controller
             'offers' => $this->offersForCase($closedTrainingCase),
             'instructors' => $this->instructorsForSelect($closedTrainingCase),
             'negotiationLocked' => $closedTrainingCase->isLinkedToCourse(),
+            'canPrepareScheduledEmail' => $this->scheduledEmailBuilder->canPrepare($closedTrainingCase),
+            'emailDraft' => session('email_draft'),
         ]);
     }
 
@@ -346,6 +358,8 @@ class ClosedTrainingCaseController extends Controller
         $request->merge([
             'contact_name' => trim((string) $request->input('contact_name')),
             'contact_email' => $this->blankToNull($request->input('contact_email')),
+            'contact_email_alt1' => $this->blankToNull($request->input('contact_email_alt1')),
+            'contact_email_alt2' => $this->blankToNull($request->input('contact_email_alt2')),
             'contact_phone' => $this->blankToNull($request->input('contact_phone')),
             'institution' => $this->blankToNull($request->input('institution')),
             'institution_www' => $this->normalizeWww($request->input('institution_www')),
@@ -366,6 +380,8 @@ class ClosedTrainingCaseController extends Controller
         $data = $request->validate([
             'contact_name' => 'required|string|max:255',
             'contact_email' => 'nullable|email|max:255',
+            'contact_email_alt1' => 'nullable|email|max:255',
+            'contact_email_alt2' => 'nullable|email|max:255',
             'contact_phone' => 'nullable|string|max:50',
             'institution' => 'nullable|string|max:255',
             'pedagogical_council_size' => 'nullable|integer|min:1|max:9999',
@@ -379,6 +395,8 @@ class ClosedTrainingCaseController extends Controller
         ], [
             'contact_name.required' => 'Podaj osobę kontaktową.',
             'contact_email.email' => 'Podaj poprawny adres e-mail.',
+            'contact_email_alt1.email' => 'Podaj poprawny dodatkowy adres e-mail.',
+            'contact_email_alt2.email' => 'Podaj poprawny drugi dodatkowy adres e-mail.',
             'institution_www.url' => 'Podaj poprawny adres strony WWW.',
             'institution_type.in' => 'Wybierz rodzaj placówki.',
             'institution_type_other.required' => 'Podaj rodzaj placówki.',
@@ -405,6 +423,8 @@ class ClosedTrainingCaseController extends Controller
         $this->cases->updateContact($closedTrainingCase, [
             'contact_name' => $data['contact_name'],
             'contact_email' => $data['contact_email'] ?? null,
+            'contact_email_alt1' => $data['contact_email_alt1'] ?? null,
+            'contact_email_alt2' => $data['contact_email_alt2'] ?? null,
             'contact_phone' => $data['contact_phone'] ?? null,
             'institution' => $data['institution'] ?? null,
             'pedagogical_council_size' => isset($data['pedagogical_council_size']) ? (int) $data['pedagogical_council_size'] : null,
@@ -492,23 +512,78 @@ class ClosedTrainingCaseController extends Controller
             ->with('success', 'Wpis historii został usunięty.');
     }
 
+    public function prepareScheduledEmail(
+        ClosedTrainingCase $closedTrainingCase,
+    ): RedirectResponse {
+        $draft = $this->scheduledEmailBuilder->build($closedTrainingCase);
+        if ($draft['ok'] !== true) {
+            return redirect()
+                ->route('closed-training-cases.show', $closedTrainingCase)
+                ->with('error', $draft['error']);
+        }
+
+        return redirect()
+            ->route('closed-training-cases.show', $closedTrainingCase)
+            ->withFragment('closed-training-case-email')
+            ->with('success', 'Przygotowano treść e-maila z terminem. Sprawdź odbiorców i wyślij lub najpierw przetestuj.')
+            ->with('email_draft', [
+                'subject' => $draft['subject'],
+                'body' => $draft['html'],
+                'intent' => 'scheduled_notice',
+            ]);
+    }
+
     public function sendEmail(Request $request, ClosedTrainingCase $closedTrainingCase): RedirectResponse
     {
-        if (! $closedTrainingCase->hasContactEmail()) {
+        if (! $closedTrainingCase->hasAnyContactEmail()) {
             return redirect()
                 ->route('closed-training-cases.show', $closedTrainingCase)
                 ->with('error', 'Sprawa nie ma poprawnego adresu e-mail. Uzupełnij go w danych zapytania.');
         }
 
+        $allowedSchool = $closedTrainingCase->contactEmailList();
+        $allowedTest = ClosedTrainingCase::testEmailRecipients();
+
         $data = $request->validate([
             'email_subject' => 'required|string|max:255',
             'email_body' => 'required|string|max:20000',
+            'send_mode' => ['required', Rule::in(['school', 'test'])],
+            'email_recipients' => ['nullable', 'array'],
+            'email_recipients.*' => ['string', 'email', Rule::in($allowedSchool)],
+            'test_recipient' => ['nullable', 'string', 'email', Rule::in($allowedTest)],
+            'email_intent' => ['nullable', Rule::in(['general', 'scheduled_notice'])],
         ], [
             'email_subject.required' => 'Podaj temat wiadomości.',
             'email_body.required' => 'Wpisz treść wiadomości.',
+            'send_mode.required' => 'Wybierz tryb wysyłki.',
+            'email_recipients.*.in' => 'Wybierz adres spośród zapisanych przy sprawie.',
+            'test_recipient.in' => 'Wybierz dozwolony adres testowy.',
         ]);
 
-        $toEmail = trim((string) $closedTrainingCase->contact_email);
+        $isTest = $data['send_mode'] === 'test';
+        $isScheduledNotice = ($data['email_intent'] ?? 'general') === 'scheduled_notice';
+
+        if ($isTest) {
+            $testRecipient = strtolower(trim((string) ($data['test_recipient'] ?? '')));
+            if ($testRecipient === '' || ! in_array($testRecipient, $allowedTest, true)) {
+                throw ValidationException::withMessages([
+                    'test_recipient' => 'Wybierz adres testowy.',
+                ]);
+            }
+            $recipients = [$testRecipient];
+        } else {
+            $recipients = array_values(array_unique(array_map(
+                static fn (string $email): string => strtolower(trim($email)),
+                $data['email_recipients'] ?? []
+            )));
+            $recipients = array_values(array_intersect($recipients, $allowedSchool));
+            if ($recipients === []) {
+                throw ValidationException::withMessages([
+                    'email_recipients' => 'Zaznacz co najmniej jednego odbiorcę ze szkoły.',
+                ]);
+            }
+        }
+
         $subject = $closedTrainingCase->withCaseReferenceInSubject($data['email_subject']);
         $body = ClosedTrainingCase::sanitizeSchoolEmailHtml($data['email_body']);
 
@@ -519,7 +594,7 @@ class ClosedTrainingCaseController extends Controller
         }
 
         try {
-            Mail::to($toEmail)->send(new ClosedTrainingCaseSchoolMail($body, $subject));
+            Mail::to($recipients)->send(new ClosedTrainingCaseSchoolMail($body, $subject));
         } catch (\Throwable $exception) {
             Log::warning('Closed training case school email failed', [
                 'case_id' => $closedTrainingCase->id,
@@ -535,14 +610,26 @@ class ClosedTrainingCaseController extends Controller
         $this->cases->recordSchoolEmailSent(
             $closedTrainingCase,
             $request->user(),
-            $toEmail,
+            $recipients,
             $subject,
             $body,
+            $isTest,
+            $isScheduledNotice && ! $isTest,
         );
+
+        if ($isScheduledNotice && ! $isTest) {
+            $this->cases->markScheduledAfterSchoolNotice($closedTrainingCase, $request->user());
+        }
+
+        $toLabel = implode(', ', $recipients);
+        $success = $isTest
+            ? 'Wysłano e-mail testowy do '.$toLabel.'. Status sprawy bez zmian.'
+            : 'E-mail został wysłany do '.$toLabel.'.'
+                .($isScheduledNotice ? ' Status ustawiony na Zaplanowana.' : '');
 
         return redirect()
             ->route('closed-training-cases.show', $closedTrainingCase)
-            ->with('success', 'E-mail został wysłany do '.$toEmail.'.');
+            ->with('success', $success);
     }
 
     /**

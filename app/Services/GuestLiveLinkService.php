@@ -8,7 +8,8 @@ use Illuminate\Support\Str;
 
 /**
  * Sekretny link osadzonego live bez konta pnedu — tylko szkolenia zamknięte + CM „Dla wszystkich”.
- * Pokazujemy go w ADM (karta + panel live). Maila do dyrektora jeszcze nie generujemy ani nie wysyłamy.
+ * Pokazujemy go w ADM (karta + panel live). E-mail z terminem ze sprawy preferuje meeting_link ClickMeeting;
+ * ten link jest fallbackiem, gdy meeting_link jest pusty.
  */
 class GuestLiveLinkService
 {
@@ -94,7 +95,7 @@ class GuestLiveLinkService
     private function hint(Course $course, bool $eligible, ?string $url): string
     {
         if ($eligible && $url) {
-            return 'Skopiuj i wyślij dyrektorowi z własnej skrzynki. Na wejściu nauczyciel podaje imię, nazwisko i e-mail. Nie publikujemy tego na pnedu.pl. Maila z ADM jeszcze nie wysyłamy.';
+            return 'Możesz skopiować ręcznie albo użyć „Przygotuj e-mail z terminem” na sprawie (fallback, gdy brak meeting_link). Na wejściu nauczyciel podaje imię, nazwisko i e-mail. Nie publikujemy tego na pnedu.pl.';
         }
         if ($eligible && $url === null) {
             return 'Brak adresu pnedu.pl w konfiguracji panelu (PNEDU_FRONTEND_URL) — nie da się złożyć linku.';

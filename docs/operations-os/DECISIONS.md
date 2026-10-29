@@ -90,11 +90,11 @@ Przyjęte: DEC-OPS-002, DEC-OPS-006, DEC-OPS-007, DEC-OPS-008, DEC-OPS-009, DEC-
 
 ## DEC-OPS-012 — E-mail do szkoły z karty sprawy
 
-- Status: Accepted
+- Status: Accepted (uzupełnione 2026-10-29)
 - Data: 2026-10-18
-- Treść: z karty sprawy szkolenia zamkniętego można wysłać e-mail wyłącznie na aktualny adres kontaktowy sprawy. From: `info@system.pnedu.pl`, Reply-To: `kontakt@pnedu.pl`, nazwa: Platforma Nowoczesnej Edukacji. Temat zawiera identyfikator `[SZ-{id}]`. Po udanej wysyłce pełna treść ląduje w historii. Błąd wysyłki nie tworzy wpisu „wysłano” i nie zmienia statusu ani następnego działania. ADM nie odbiera poczty. Odpowiedzi szkoły czyta się w skrzynce `kontakt@pnedu.pl` i w razie potrzeby dopisuje ręcznie. Bez CC, BCC, załączników, szablonów, wysyłki do trenera i automatycznego workflow.
-- Uzasadnienie: korespondencja ma zostać przy sprawie, bez budowania skrzynki w ADM. From zostaje jak w pozostałych mailach systemowych panelu, żeby nie psuć dostarczalności.
-- Przyjęcie: Waldemar, 2026-10-18 (From `info@system.pnedu.pl`).
+- Treść: z karty sprawy szkolenia zamkniętego można wysłać e-mail na adresy kontaktowe sprawy: **główny** (`contact_email`) oraz do **2 dodatkowych** (`contact_email_alt1`, `contact_email_alt2`). Przy wysyłce operator zaznacza checkboxami odbiorców. From: `info@system.pnedu.pl`, Reply-To: `kontakt@pnedu.pl`, nazwa: Platforma Nowoczesnej Edukacji. Temat zawiera identyfikator `[SZ-{id}]`. Po udanej wysyłce pełna treść ląduje w historii. Błąd wysyłki nie tworzy wpisu „wysłano” i nie zmienia statusu ani następnego działania. ADM nie odbiera poczty. Odpowiedzi szkoły czyta się w skrzynce `kontakt@pnedu.pl` i w razie potrzeby dopisuje ręcznie. Bez BCC, załączników i wysyłki do trenera. **Szablon „info o terminie”**: prefill + edycja; online z linkiem ClickMeeting (`meeting_link`, fallback `live/{token}`); stacjonarny bez linku; po wysyłce do szkoły status → **Zaplanowana**. **Wysyłka testowa** na stałe adresy operatorskie (bez zmiany statusu).
+- Uzasadnienie: korespondencja ma zostać przy sprawie, bez budowania skrzynki w ADM. From zostaje jak w pozostałych mailach systemowych panelu, żeby nie psuć dostarczalności. Kilka adresów = sekretariat + dyrektor bez obchodzenia walidacji `type=email`.
+- Przyjęcie: Waldemar, 2026-10-18 (From `info@system.pnedu.pl`). Uzupełnienie 2026-10-29: dodatkowe e-maile, szablon terminu, test, status Zaplanowana.
 
 ## DEC-OPS-013 — Pola negocjacyjne na sprawie (etap 2)
 

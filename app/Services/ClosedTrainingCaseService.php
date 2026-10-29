@@ -83,19 +83,57 @@ class ClosedTrainingCaseService
         $event->delete();
     }
 
+    /**
+     * @param  list<string>|string  $toEmails
+     */
     public function recordSchoolEmailSent(
         ClosedTrainingCase $case,
         User $user,
-        string $toEmail,
+        array|string $toEmails,
         string $subject,
         string $body,
+        bool $isTest = false,
+        bool $isScheduledNotice = false,
     ): ClosedTrainingCaseEvent {
+        $recipients = is_array($toEmails) ? $toEmails : [$toEmails];
+        $recipients = array_values(array_unique(array_filter(array_map(
+            static fn (string $email): string => strtolower(trim($email)),
+            $recipients
+        ))));
+        $toLine = implode(', ', $recipients);
+
+        if ($isTest) {
+            $header = 'E-mail testowy (nie do szkoły)';
+        } elseif ($isScheduledNotice) {
+            $header = 'E-mail: info o terminie szkolenia';
+        } else {
+            $header = 'E-mail wysłany do szkoły';
+        }
+
         return $case->events()->create([
             'user_id' => $user->id,
             'event_type' => ClosedTrainingCaseEvent::TYPE_EMAIL_SENT,
-            'body' => "E-mail wysłany do szkoły\nDo: {$toEmail}\nTemat: {$subject}\n\n{$body}",
+            'body' => "{$header}\nDo: {$toLine}\nTemat: {$subject}\n\n{$body}",
             'happened_at' => now(),
         ]);
+    }
+
+    public function markScheduledAfterSchoolNotice(ClosedTrainingCase $case, User $user): void
+    {
+        if ($case->status === ClosedTrainingCase::STATUS_SCHEDULED) {
+            return;
+        }
+
+        if ($case->isTerminal()) {
+            return;
+        }
+
+        $this->updateHandling($case, [
+            'status' => ClosedTrainingCase::STATUS_SCHEDULED,
+            'assignee_user_id' => $case->assignee_user_id,
+            'next_action' => $case->next_action,
+            'next_action_at' => $case->next_action_at?->format('Y-m-d H:i'),
+        ], $user);
     }
 
     /**
@@ -145,13 +183,15 @@ class ClosedTrainingCaseService
     }
 
     /**
-     * @param  array{contact_name: string, contact_email: ?string, contact_phone: ?string, institution: ?string, pedagogical_council_size: ?int, institution_type: ?string, institution_type_other: ?string, preferred_format: ?string, training_offer_id: ?int, offer_url: ?string}  $attributes
+     * @param  array{contact_name: string, contact_email: ?string, contact_email_alt1: ?string, contact_email_alt2: ?string, contact_phone: ?string, institution: ?string, pedagogical_council_size: ?int, institution_type: ?string, institution_type_other: ?string, preferred_format: ?string, training_offer_id: ?int, offer_url: ?string}  $attributes
      */
     public function updateContact(ClosedTrainingCase $case, array $attributes, User $user): void
     {
         $before = [
             'contact_name' => $case->contact_name,
             'contact_email' => $case->contact_email,
+            'contact_email_alt1' => $case->contact_email_alt1,
+            'contact_email_alt2' => $case->contact_email_alt2,
             'contact_phone' => $case->contact_phone,
             'institution' => $case->institution,
             'pedagogical_council_size' => $case->pedagogical_council_size,
@@ -168,6 +208,8 @@ class ClosedTrainingCaseService
 
         $case->contact_name = $attributes['contact_name'];
         $case->contact_email = $attributes['contact_email'];
+        $case->contact_email_alt1 = $attributes['contact_email_alt1'] ?? null;
+        $case->contact_email_alt2 = $attributes['contact_email_alt2'] ?? null;
         $case->contact_phone = $attributes['contact_phone'];
         $case->institution = $attributes['institution'];
         $case->pedagogical_council_size = $attributes['pedagogical_council_size'];
@@ -181,6 +223,8 @@ class ClosedTrainingCaseService
         $after = [
             'contact_name' => $case->contact_name,
             'contact_email' => $case->contact_email,
+            'contact_email_alt1' => $case->contact_email_alt1,
+            'contact_email_alt2' => $case->contact_email_alt2,
             'contact_phone' => $case->contact_phone,
             'institution' => $case->institution,
             'pedagogical_council_size' => $case->pedagogical_council_size,
@@ -196,6 +240,8 @@ class ClosedTrainingCaseService
         foreach ([
             'contact_name',
             'contact_email',
+            'contact_email_alt1',
+            'contact_email_alt2',
             'contact_phone',
             'institution',
             'pedagogical_council_size',
@@ -730,6 +776,16 @@ class ClosedTrainingCaseService
 
         if ($before['contact_email'] !== $case->contact_email) {
             $parts[] = 'E-mail: '.$this->contactValue($before['contact_email']).' → '.$this->contactValue($case->contact_email).'.';
+        }
+
+        if (($before['contact_email_alt1'] ?? null) !== $case->contact_email_alt1) {
+            $parts[] = 'E-mail dodatkowy 1: '.$this->contactValue($before['contact_email_alt1'] ?? null)
+                .' → '.$this->contactValue($case->contact_email_alt1).'.';
+        }
+
+        if (($before['contact_email_alt2'] ?? null) !== $case->contact_email_alt2) {
+            $parts[] = 'E-mail dodatkowy 2: '.$this->contactValue($before['contact_email_alt2'] ?? null)
+                .' → '.$this->contactValue($case->contact_email_alt2).'.';
         }
 
         if ($before['contact_phone'] !== $case->contact_phone) {

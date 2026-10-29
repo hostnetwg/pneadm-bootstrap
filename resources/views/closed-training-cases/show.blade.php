@@ -55,9 +55,21 @@
                                     @error('contact_name')<div class="invalid-feedback">{{ $message }}</div>@enderror
                                 </div>
                                 <div class="mb-3">
-                                    <label for="contact_email" class="form-label">E-mail</label>
+                                    <label for="contact_email" class="form-label">E-mail (główny)</label>
                                     <input type="email" name="contact_email" id="contact_email" value="{{ old('contact_email', $case->contact_email) }}" maxlength="255" class="form-control @error('contact_email') is-invalid @enderror">
                                     @error('contact_email')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                </div>
+                                <div class="mb-3">
+                                    <label for="contact_email_alt1" class="form-label">E-mail dodatkowy 1</label>
+                                    <input type="email" name="contact_email_alt1" id="contact_email_alt1" value="{{ old('contact_email_alt1', $case->contact_email_alt1) }}" maxlength="255" class="form-control @error('contact_email_alt1') is-invalid @enderror" placeholder="np. dyrektor@szkola.edu.pl">
+                                    <div class="form-text">Opcjonalnie — drugi adres (np. dyrektor).</div>
+                                    @error('contact_email_alt1')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                </div>
+                                <div class="mb-3">
+                                    <label for="contact_email_alt2" class="form-label">E-mail dodatkowy 2</label>
+                                    <input type="email" name="contact_email_alt2" id="contact_email_alt2" value="{{ old('contact_email_alt2', $case->contact_email_alt2) }}" maxlength="255" class="form-control @error('contact_email_alt2') is-invalid @enderror" placeholder="np. sekretariat@szkola.edu.pl">
+                                    <div class="form-text">Opcjonalnie — trzeci adres.</div>
+                                    @error('contact_email_alt2')<div class="invalid-feedback">{{ $message }}</div>@enderror
                                 </div>
                                 <div class="mb-3">
                                     <label for="contact_phone" class="form-label">Telefon</label>
@@ -377,8 +389,19 @@
                                         Odłącz
                                     </button>
                                 </div>
+                                @if($canPrepareScheduledEmail ?? false)
+                                    <form method="POST" action="{{ route('closed-training-cases.email.prepare-scheduled', $case) }}" class="mt-3">
+                                        @csrf
+                                        <button type="submit" class="btn btn-success btn-sm">
+                                            Przygotuj e-mail z terminem
+                                        </button>
+                                    </form>
+                                    <p class="form-text mb-0 mt-2">Wstawi temat i treść do formularza po prawej. Po wysłaniu do szkoły status przejdzie na Zaplanowana.</p>
+                                @elseif($case->course && ($case->course->type ?? '') === 'online')
+                                    <p class="form-text text-warning mb-0 mt-3">Aby przygotować e-mail z linkiem, uzupełnij link ClickMeeting (meeting_link) albo włącz gościnny live na pnedu.pl.</p>
+                                @endif
                                 @if($case->status !== \App\Models\ClosedTrainingCase::STATUS_CLOSED)
-                                    <p class="form-text mb-0 mt-3">Status sprawy nie zmienia się automatycznie. Możesz zamknąć sprawę w panelu Obsługa.</p>
+                                    <p class="form-text mb-0 mt-3">Zwykły e-mail nie zmienia statusu. E-mail z terminem (do szkoły) ustawia status Zaplanowana.</p>
                                 @endif
                             @else
                                 <p class="text-secondary mb-3">Brak powiązanego szkolenia. Po uzgodnieniu terminu utwórz rekord albo powiąż istniejący.</p>
@@ -583,30 +606,99 @@
                         </div>
                     </form>
 
-                    <div class="card mb-4">
+                    @php
+                        $emailDraft = $emailDraft ?? null;
+                        $emailIntent = old('email_intent', is_array($emailDraft) ? ($emailDraft['intent'] ?? 'general') : 'general');
+                        $emailSubjectDefault = old('email_subject', is_array($emailDraft) ? ($emailDraft['subject'] ?? $case->defaultSchoolEmailSubject()) : $case->defaultSchoolEmailSubject());
+                        $emailBodyDefault = old(
+                            'email_body',
+                            is_array($emailDraft)
+                                ? ($emailDraft['body'] ?? \App\Models\ClosedTrainingCase::defaultSchoolEmailBodyHtml())
+                                : \App\Models\ClosedTrainingCase::defaultSchoolEmailBodyHtml()
+                        );
+                        $contactChoices = $case->contactEmailChoices();
+                        $oldRecipients = old('email_recipients');
+                        if (! is_array($oldRecipients)) {
+                            $oldRecipients = array_values($contactChoices);
+                        }
+                        $oldSendMode = old('send_mode', 'school');
+                        $oldTestRecipient = old('test_recipient', \App\Models\ClosedTrainingCase::TEST_EMAIL_RECIPIENTS[0]);
+                    @endphp
+                    <div class="card mb-4" id="closed-training-case-email">
                         <div class="card-header fw-semibold">Wyślij e-mail</div>
                         <div class="card-body">
-                            @if($case->hasContactEmail())
+                            @if($case->hasAnyContactEmail())
                                 <form method="POST" action="{{ route('closed-training-cases.email.send', $case) }}" id="closed-training-case-email-form">
                                     @csrf
+                                    <input type="hidden" name="email_intent" id="email_intent" value="{{ $emailIntent }}">
+
                                     <div class="mb-3">
-                                        <label class="form-label">Do</label>
-                                        <input type="text" class="form-control" value="{{ $case->contact_email }}" readonly>
-                                        <div class="form-text">Adres z danych zapytania. Odpowiedź przyjdzie na kontakt@pnedu.pl.</div>
+                                        <label class="form-label d-block">Odbiorcy szkoły</label>
+                                        @foreach($contactChoices as $key => $email)
+                                            <div class="form-check">
+                                                <input class="form-check-input"
+                                                       type="checkbox"
+                                                       name="email_recipients[]"
+                                                       id="email_recipient_{{ $key }}"
+                                                       value="{{ $email }}"
+                                                       @checked(in_array($email, $oldRecipients, true))>
+                                                <label class="form-check-label" for="email_recipient_{{ $key }}">
+                                                    {{ $email }}
+                                                    @if($key === 'primary')
+                                                        <span class="text-secondary">(główny)</span>
+                                                    @elseif($key === 'alt1')
+                                                        <span class="text-secondary">(dodatkowy 1)</span>
+                                                    @else
+                                                        <span class="text-secondary">(dodatkowy 2)</span>
+                                                    @endif
+                                                </label>
+                                            </div>
+                                        @endforeach
+                                        @error('email_recipients')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
+                                        <div class="form-text">Odpowiedź przyjdzie na kontakt@pnedu.pl.</div>
                                     </div>
+
                                     <div class="mb-3">
                                         <label for="email_subject" class="form-label">Temat</label>
-                                        <input type="text" name="email_subject" id="email_subject" value="{{ old('email_subject', $case->defaultSchoolEmailSubject()) }}" maxlength="255" required class="form-control @error('email_subject') is-invalid @enderror">
+                                        <input type="text" name="email_subject" id="email_subject" value="{{ $emailSubjectDefault }}" maxlength="255" required class="form-control @error('email_subject') is-invalid @enderror">
                                         @error('email_subject')<div class="invalid-feedback">{{ $message }}</div>@enderror
                                         <div class="form-text">Identyfikator {{ $case->referenceCode() }} zostanie dopisany, jeśli go usuniesz.</div>
                                     </div>
                                     <div class="mb-3">
                                         <label for="email_body" class="form-label">Treść</label>
-                                        <textarea name="email_body" id="email_body" rows="12" class="form-control @error('email_body') is-invalid @enderror">{!! \App\Models\ClosedTrainingCase::sanitizeSchoolEmailHtml((string) old('email_body', \App\Models\ClosedTrainingCase::defaultSchoolEmailBodyHtml())) !!}</textarea>
+                                        <textarea name="email_body" id="email_body" rows="12" class="form-control @error('email_body') is-invalid @enderror">{!! \App\Models\ClosedTrainingCase::sanitizeSchoolEmailHtml((string) $emailBodyDefault) !!}</textarea>
                                         @error('email_body')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                                        <div class="form-text">Stopka jest już w treści. Możesz ją edytować.</div>
+                                        <div class="form-text">Stopka jest już w treści. Możesz ją edytować przed wysyłką.</div>
                                     </div>
-                                    <button type="submit" class="btn btn-primary">Wyślij e-mail</button>
+
+                                    <fieldset class="mb-3">
+                                        <legend class="form-label fs-6 mb-2">Wysyłka</legend>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" name="send_mode" id="send_mode_school" value="school" @checked($oldSendMode === 'school')>
+                                            <label class="form-check-label" for="send_mode_school">Do zaznaczonych adresów szkoły</label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" name="send_mode" id="send_mode_test" value="test" @checked($oldSendMode === 'test')>
+                                            <label class="form-check-label" for="send_mode_test">Test (bez zmiany statusu)</label>
+                                        </div>
+                                        <div class="ms-4 mt-2" id="test-recipient-wrap">
+                                            <label for="test_recipient" class="form-label">Adres testowy</label>
+                                            <select name="test_recipient" id="test_recipient" class="form-select form-select-sm @error('test_recipient') is-invalid @enderror" style="max-width: 22rem;">
+                                                @foreach(\App\Models\ClosedTrainingCase::testEmailRecipients() as $testEmail)
+                                                    <option value="{{ $testEmail }}" @selected($oldTestRecipient === $testEmail)>{{ $testEmail }}</option>
+                                                @endforeach
+                                            </select>
+                                            @error('test_recipient')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                        </div>
+                                    </fieldset>
+
+                                    @if($emailIntent === 'scheduled_notice')
+                                        <div class="alert alert-info py-2 small">
+                                            Tryb: info o terminie. Po wysyłce do szkoły status zostanie ustawiony na <strong>Zaplanowana</strong>. Test nie zmienia statusu.
+                                        </div>
+                                    @endif
+
+                                    <button type="submit" class="btn btn-primary" id="closed-training-email-submit">Wyślij e-mail</button>
                                 </form>
                             @else
                                 <p class="mb-0 text-secondary">Brak poprawnego adresu e-mail w sprawie. Uzupełnij go w danych zapytania, żeby wysłać wiadomość.</p>
@@ -791,6 +883,27 @@
                     window.tinymce.triggerSave();
                 });
             }
+
+            const sendModeSchool = document.getElementById('send_mode_school');
+            const sendModeTest = document.getElementById('send_mode_test');
+            const testRecipientWrap = document.getElementById('test-recipient-wrap');
+            const emailSubmit = document.getElementById('closed-training-email-submit');
+            function syncEmailSendMode() {
+                const isTest = !!(sendModeTest && sendModeTest.checked);
+                if (testRecipientWrap) {
+                    testRecipientWrap.classList.toggle('d-none', !isTest);
+                }
+                if (emailSubmit) {
+                    emailSubmit.textContent = isTest ? 'Wyślij test' : 'Wyślij e-mail';
+                }
+            }
+            if (sendModeSchool) {
+                sendModeSchool.addEventListener('change', syncEmailSendMode);
+            }
+            if (sendModeTest) {
+                sendModeTest.addEventListener('change', syncEmailSendMode);
+            }
+            syncEmailSendMode();
 
             function readEventBody(button) {
                 const bodyId = button.getAttribute('data-event-body-id');
