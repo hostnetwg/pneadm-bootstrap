@@ -130,6 +130,19 @@
                         @error('message')<div class="invalid-feedback">{{ $message }}</div>@enderror
                     </div>
 
+                    <div class="mb-3">
+                        <label for="inquired_at" class="form-label">Data pierwszego zapytania <span class="text-danger">*</span></label>
+                        <input type="datetime-local"
+                               name="inquired_at"
+                               id="inquired_at"
+                               value="{{ old('inquired_at') }}"
+                               required
+                               class="form-control @error('inquired_at') is-invalid @enderror"
+                               style="max-width: 16rem;">
+                        <div class="form-text">Kiedy szkoła pierwszy raz zapytała (telefon, mail poza formularzem itd.).</div>
+                        @error('inquired_at')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                    </div>
+
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label for="assignee_user_id" class="form-label">Opiekun</label>

@@ -26,7 +26,7 @@ class ClosedTrainingCaseController extends Controller
     public const LIST_SORT_PREFERENCE_KEY = 'closed_training_cases_list';
 
     /** @var list<string> */
-    private const LIST_SORT_COLUMNS = ['id', 'last_activity'];
+    private const LIST_SORT_COLUMNS = ['id', 'last_activity', 'inquired_at'];
 
     public function __construct(
         private readonly ClosedTrainingCaseService $cases,
@@ -65,6 +65,10 @@ class ClosedTrainingCaseController extends Controller
 
         if ($sort === 'id') {
             $query->orderBy('closed_training_cases.id', $dir);
+        } elseif ($sort === 'inquired_at') {
+            $query->orderByRaw('closed_training_cases.inquired_at IS NULL')
+                ->orderBy('closed_training_cases.inquired_at', $dir)
+                ->orderBy('closed_training_cases.id', $dir);
         } elseif ($sort === 'last_activity') {
             $query->orderByRaw(
                 'COALESCE(last_event_at, closed_training_cases.updated_at) '.$dir
@@ -117,6 +121,7 @@ class ClosedTrainingCaseController extends Controller
             )],
             'preferred_format' => ['nullable', Rule::in(array_keys(ClosedTrainingCase::formatOptions()))],
             'message' => 'required|string|max:3000',
+            'inquired_at' => 'required|date',
             'assignee_user_id' => ['nullable', 'integer', Rule::exists('users', 'id')],
             'next_action' => 'nullable|string|max:1000',
             'next_action_at' => 'nullable|date',
@@ -130,6 +135,8 @@ class ClosedTrainingCaseController extends Controller
             'pedagogical_council_size.integer' => 'Podaj liczbę osób w radzie pedagogicznej.',
             'pedagogical_council_size.min' => 'Liczba osób w radzie musi być co najmniej 1.',
             'message.required' => 'Opisz, czego dotyczy sprawa.',
+            'inquired_at.required' => 'Podaj datę pierwszego zapytania.',
+            'inquired_at.date' => 'Podaj poprawną datę pierwszego zapytania.',
         ]);
 
         $data = $this->normalizeInstitutionType($data);
@@ -148,6 +155,7 @@ class ClosedTrainingCaseController extends Controller
             'institution_type' => $data['institution_type'],
             'institution_type_other' => $data['institution_type_other'] ?? null,
             'message' => $data['message'],
+            'inquired_at' => Carbon::parse($data['inquired_at']),
             'submitted_payload' => ClosedTrainingCase::submittedSnapshot([
                 'contact_name' => $data['contact_name'],
                 'contact_email' => $data['contact_email'] ?? null,
@@ -397,6 +405,7 @@ class ClosedTrainingCaseController extends Controller
             )],
             'preferred_format' => ['nullable', Rule::in(array_keys(ClosedTrainingCase::formatOptions()))],
             'training_offer_id' => ['nullable', 'integer', Rule::exists('training_offers', 'id')],
+            'inquired_at' => 'required|date',
         ], [
             'contact_name.required' => 'Podaj osobę kontaktową.',
             'contact_email.email' => 'Podaj poprawny adres e-mail.',
@@ -409,6 +418,8 @@ class ClosedTrainingCaseController extends Controller
             'pedagogical_council_size.min' => 'Liczba osób w radzie musi być co najmniej 1.',
             'preferred_format.in' => 'Wybierz formę szkolenia.',
             'training_offer_id.exists' => 'Wybierz ofertę z katalogu.',
+            'inquired_at.required' => 'Podaj datę pierwszego zapytania.',
+            'inquired_at.date' => 'Podaj poprawną datę pierwszego zapytania.',
         ]);
 
         if ($request->exists('institution_type')) {
@@ -441,6 +452,7 @@ class ClosedTrainingCaseController extends Controller
                 : $closedTrainingCase->preferred_format,
             'training_offer_id' => $offerData['training_offer_id'],
             'offer_url' => $offerData['offer_url'],
+            'inquired_at' => Carbon::parse($data['inquired_at']),
         ], $request->user());
 
         return redirect()

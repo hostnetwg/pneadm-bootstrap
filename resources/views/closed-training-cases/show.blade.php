@@ -132,6 +132,18 @@
                                     @error('preferred_format')<div class="invalid-feedback">{{ $message }}</div>@enderror
                                 </div>
                                 <div class="mb-3">
+                                    <label for="inquired_at" class="form-label">Data pierwszego zapytania <span class="text-danger">*</span></label>
+                                    <input type="datetime-local"
+                                           name="inquired_at"
+                                           id="inquired_at"
+                                           value="{{ old('inquired_at', $case->inquired_at?->timezone('Europe/Warsaw')->format('Y-m-d\TH:i')) }}"
+                                           required
+                                           class="form-control @error('inquired_at') is-invalid @enderror"
+                                           style="max-width: 16rem;">
+                                    <div class="form-text">Z formularza pnedu = moment wysłania. Przy wpisie ręcznym = data kontaktu.</div>
+                                    @error('inquired_at')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                </div>
+                                <div class="mb-3">
                                     <label for="training_offer_id" class="form-label">Oferta</label>
                                     <select name="training_offer_id" id="training_offer_id" class="form-select @error('training_offer_id') is-invalid @enderror">
                                         <option value="">Brak powiązania z ofertą</option>
@@ -177,6 +189,8 @@
                             <dl class="row mb-0">
                                 <dt class="col-sm-4">Zgoda z formularza</dt>
                                 <dd class="col-sm-8">{{ $case->consent_at ? $case->formatLocal($case->consent_at) : 'Brak (wpis ręczny albo inny kanał)' }}</dd>
+                                <dt class="col-sm-4">Pierwsze zapytanie</dt>
+                                <dd class="col-sm-8">{{ $case->inquired_at ? $case->formatLocal($case->inquired_at) : '—' }}</dd>
                             </dl>
                         </div>
                     </div>

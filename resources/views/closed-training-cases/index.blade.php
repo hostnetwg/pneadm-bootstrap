@@ -47,8 +47,10 @@
                     'status' => $status !== 'open' ? $status : null,
                 ]);
                 $symbolDir = ($sort === 'id' && $dir === 'asc') ? 'desc' : 'asc';
+                $inquiryDir = ($sort === 'inquired_at' && $dir === 'desc') ? 'asc' : 'desc';
                 $activityDir = ($sort === 'last_activity' && $dir === 'desc') ? 'asc' : 'desc';
                 $symbolSortUrl = route('closed-training-cases.index', array_merge($sortBase, ['sort' => 'id', 'dir' => $symbolDir]));
+                $inquirySortUrl = route('closed-training-cases.index', array_merge($sortBase, ['sort' => 'inquired_at', 'dir' => $inquiryDir]));
                 $activitySortUrl = route('closed-training-cases.index', array_merge($sortBase, ['sort' => 'last_activity', 'dir' => $activityDir]));
             @endphp
 
@@ -61,6 +63,16 @@
                                     <a href="{{ $symbolSortUrl }}" class="text-decoration-none text-dark">
                                         Symbol
                                         @if($sort === 'id')
+                                            <i class="bi bi-caret-{{ $dir === 'asc' ? 'up' : 'down' }}-fill" aria-hidden="true"></i>
+                                        @else
+                                            <i class="bi bi-caret-down text-muted" aria-hidden="true"></i>
+                                        @endif
+                                    </a>
+                                </th>
+                                <th style="width: 7.5rem;" title="Data pierwszego zapytania (formularz albo wpis ręczny)">
+                                    <a href="{{ $inquirySortUrl }}" class="text-decoration-none text-dark">
+                                        Zapytanie
+                                        @if($sort === 'inquired_at')
                                             <i class="bi bi-caret-{{ $dir === 'asc' ? 'up' : 'down' }}-fill" aria-hidden="true"></i>
                                         @else
                                             <i class="bi bi-caret-down text-muted" aria-hidden="true"></i>
@@ -99,6 +111,14 @@
                                         <a href="{{ route('closed-training-cases.show', $case) }}"
                                            class="font-monospace text-decoration-none fw-semibold"
                                            title="Ten sam symbol jest w temacie e-maila do szkoły">[{{ $case->referenceCode() }}]</a>
+                                    </td>
+                                    <td class="text-nowrap {{ $case->inquired_at ? '' : 'text-muted' }}" title="Data pierwszego zapytania">
+                                        @if($case->inquired_at)
+                                            {{ $case->formatLocal($case->inquired_at, 'd.m.Y') }}
+                                            <div class="text-muted">{{ $case->formatLocal($case->inquired_at, 'H:i') }}</div>
+                                        @else
+                                            —
+                                        @endif
                                     </td>
                                     <td style="min-width: 15rem; max-width: 22rem;">
                                         <a href="{{ route('closed-training-cases.show', $case) }}" class="fw-semibold text-decoration-none">{{ $case->trainingTopicLabel() }}</a>
@@ -199,7 +219,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="6" class="text-muted p-4">Brak spraw dla tego filtra.</td>
+                                    <td colspan="7" class="text-muted p-4">Brak spraw dla tego filtra.</td>
                                 </tr>
                             @endforelse
                         </tbody>

@@ -182,7 +182,7 @@ class ClosedTrainingCaseService
     }
 
     /**
-     * @param  array{contact_name: string, contact_email: ?string, contact_email_alt1: ?string, contact_email_alt2: ?string, contact_phone: ?string, institution: ?string, pedagogical_council_size: ?int, institution_type: ?string, institution_type_other: ?string, preferred_format: ?string, training_offer_id: ?int, offer_url: ?string}  $attributes
+     * @param  array{contact_name: string, contact_email: ?string, contact_email_alt1: ?string, contact_email_alt2: ?string, contact_phone: ?string, institution: ?string, pedagogical_council_size: ?int, institution_type: ?string, institution_type_other: ?string, preferred_format: ?string, training_offer_id: ?int, offer_url: ?string, inquired_at: Carbon}  $attributes
      */
     public function updateContact(ClosedTrainingCase $case, array $attributes, User $user): void
     {
@@ -200,6 +200,7 @@ class ClosedTrainingCaseService
             'preferred_format' => $case->preferred_format,
             'training_offer_id' => $case->training_offer_id,
             'offer_url' => $case->offer_url,
+            'inquired_at' => $case->inquired_at?->format('Y-m-d H:i'),
             'institution_type_label' => $case->institutionTypeLabel(),
             'format_label' => $case->preferredFormatLabel(),
             'offer_label' => $case->trainingOffer?->title ?: 'brak',
@@ -218,6 +219,7 @@ class ClosedTrainingCaseService
         $case->preferred_format = $attributes['preferred_format'];
         $case->training_offer_id = $attributes['training_offer_id'];
         $case->offer_url = $attributes['offer_url'];
+        $case->inquired_at = $attributes['inquired_at'];
 
         $after = [
             'contact_name' => $case->contact_name,
@@ -233,6 +235,7 @@ class ClosedTrainingCaseService
             'preferred_format' => $case->preferred_format,
             'training_offer_id' => $case->training_offer_id,
             'offer_url' => $case->offer_url,
+            'inquired_at' => $case->inquired_at?->format('Y-m-d H:i'),
         ];
 
         $unchanged = true;
@@ -250,6 +253,7 @@ class ClosedTrainingCaseService
             'preferred_format',
             'training_offer_id',
             'offer_url',
+            'inquired_at',
         ] as $field) {
             if ((string) $before[$field] !== (string) $after[$field]) {
                 $unchanged = false;
@@ -785,6 +789,13 @@ class ClosedTrainingCaseService
         if (($before['contact_email_alt2'] ?? null) !== $case->contact_email_alt2) {
             $parts[] = 'E-mail dodatkowy 2: '.$this->contactValue($before['contact_email_alt2'] ?? null)
                 .' → '.$this->contactValue($case->contact_email_alt2).'.';
+        }
+
+        $beforeInquired = $before['inquired_at'] ?? null;
+        $afterInquired = $case->inquired_at?->format('Y-m-d H:i');
+        if ((string) $beforeInquired !== (string) $afterInquired) {
+            $parts[] = 'Data pierwszego zapytania: '.$this->contactValue($beforeInquired)
+                .' → '.$this->contactValue($afterInquired).'.';
         }
 
         if ($before['contact_phone'] !== $case->contact_phone) {

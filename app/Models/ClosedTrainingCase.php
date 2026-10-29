@@ -91,6 +91,7 @@ class ClosedTrainingCase extends Model
         'schedule_time_known',
         'submitted_payload',
         'consent_at',
+        'inquired_at',
         'next_action',
         'next_action_at',
         'closed_at',
@@ -98,6 +99,7 @@ class ClosedTrainingCase extends Model
 
     protected $casts = [
         'consent_at' => 'datetime',
+        'inquired_at' => 'datetime',
         'next_action_at' => 'datetime',
         'closed_at' => 'datetime',
         'client_price' => 'decimal:2',

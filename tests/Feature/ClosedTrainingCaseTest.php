@@ -41,6 +41,7 @@ class ClosedTrainingCaseTest extends TestCase
                 'institution_type_other' => 'Poradnia, która nie powinna zostać',
                 'preferred_format' => ClosedTrainingCase::FORMAT_ONLINE,
                 'message' => 'Telefon: prośba o termin w listopadzie.',
+                'inquired_at' => '2026-10-15T14:30',
                 'next_action' => 'Oddzwonić i potwierdzić potrzeby.',
                 'next_action_at' => '2026-10-21 09:00',
             ])
@@ -51,6 +52,8 @@ class ClosedTrainingCaseTest extends TestCase
         $this->assertSame(ClosedTrainingCase::SOURCE_MANUAL, $case->source);
         $this->assertSame(ClosedTrainingCase::STATUS_NEW, $case->status);
         $this->assertNull($case->consent_at);
+        $this->assertNotNull($case->inquired_at);
+        $this->assertSame('2026-10-15 14:30', $case->inquired_at->format('Y-m-d H:i'));
         $this->assertSame('Oddzwonić i potwierdzić potrzeby.', $case->next_action);
         $this->assertSame(ClosedTrainingCase::INSTITUTION_PRIMARY, $case->institution_type);
         $this->assertNull($case->institution_type_other);
@@ -104,6 +107,7 @@ class ClosedTrainingCaseTest extends TestCase
                 'institution' => 'Poprawiona nazwa placówki',
                 'pedagogical_council_size' => '48',
                 'institution_www' => 'szkola.edu.pl',
+                'inquired_at' => '2026-10-15T14:30',
             ])
             ->assertRedirect(route('closed-training-cases.show', $case))
             ->assertSessionHas('success', 'Zapisano dane zapytania.');
@@ -135,6 +139,7 @@ class ClosedTrainingCaseTest extends TestCase
             ->put(route('closed-training-cases.contact.update', $case), [
                 'contact_name' => '',
                 'contact_email' => 'nie-email',
+                'inquired_at' => '2026-10-15T14:30',
             ])
             ->assertSessionHasErrors(['contact_name', 'contact_email']);
 
@@ -145,6 +150,7 @@ class ClosedTrainingCaseTest extends TestCase
                 'contact_phone' => '',
                 'institution' => '',
                 'institution_www' => '',
+                'inquired_at' => '2026-10-15T14:30',
             ])
             ->assertRedirect(route('closed-training-cases.show', $case));
 
@@ -169,6 +175,7 @@ class ClosedTrainingCaseTest extends TestCase
                 'institution_type_other' => 'Ten tekst nie może zostać',
                 'preferred_format' => ClosedTrainingCase::FORMAT_ONSITE,
                 'training_offer_id' => $offer->id,
+                'inquired_at' => '2026-10-15T14:30',
             ])
             ->assertRedirect(route('closed-training-cases.show', $case));
 
@@ -191,6 +198,7 @@ class ClosedTrainingCaseTest extends TestCase
                 'institution_type' => ClosedTrainingCase::INSTITUTION_OTHER,
                 'preferred_format' => ClosedTrainingCase::FORMAT_ONSITE,
                 'training_offer_id' => $offer->id,
+                'inquired_at' => '2026-10-15T14:30',
             ])
             ->assertSessionHasErrors(['institution_type_other']);
 
@@ -201,6 +209,7 @@ class ClosedTrainingCaseTest extends TestCase
                 'institution_type_other' => 'Poradnia psychologiczno-pedagogiczna',
                 'preferred_format' => '',
                 'training_offer_id' => '',
+                'inquired_at' => '2026-10-15T14:30',
             ])
             ->assertRedirect(route('closed-training-cases.show', $case));
 
@@ -615,6 +624,7 @@ class ClosedTrainingCaseTest extends TestCase
                 'topic' => 'Szkolenie bez rodzaju',
                 'contact_name' => 'Osoba kontaktowa',
                 'message' => 'Telefon.',
+                'inquired_at' => '2026-10-15T10:00',
             ])
             ->assertSessionHasErrors(['institution_type']);
 
@@ -624,8 +634,18 @@ class ClosedTrainingCaseTest extends TestCase
                 'contact_name' => 'Osoba kontaktowa',
                 'message' => 'Telefon w sprawie poradni.',
                 'institution_type' => ClosedTrainingCase::INSTITUTION_OTHER,
+                'inquired_at' => '2026-10-15T10:00',
             ])
             ->assertSessionHasErrors(['institution_type_other']);
+
+        $this->actingAs($user)
+            ->post(route('closed-training-cases.store'), [
+                'topic' => 'Szkolenie bez daty zapytania',
+                'contact_name' => 'Osoba kontaktowa',
+                'message' => 'Telefon.',
+                'institution_type' => ClosedTrainingCase::INSTITUTION_PRIMARY,
+            ])
+            ->assertSessionHasErrors(['inquired_at']);
 
         $this->actingAs($user)
             ->post(route('closed-training-cases.store'), [
@@ -634,6 +654,7 @@ class ClosedTrainingCaseTest extends TestCase
                 'message' => 'Telefon w sprawie poradni.',
                 'institution_type' => ClosedTrainingCase::INSTITUTION_OTHER,
                 'institution_type_other' => 'Poradnia psychologiczno-pedagogiczna',
+                'inquired_at' => '2026-10-15T10:00',
             ])
             ->assertRedirect();
 
@@ -848,6 +869,7 @@ class ClosedTrainingCaseTest extends TestCase
                 'contact_email' => 'sekretariat@example.com',
                 'contact_email_alt1' => 'dyrektor@example.com',
                 'contact_email_alt2' => 'zastepca@example.com',
+                'inquired_at' => $case->inquired_at->timezone('Europe/Warsaw')->format('Y-m-d\TH:i'),
             ])
             ->assertRedirect(route('closed-training-cases.show', $case));
 
@@ -1616,6 +1638,7 @@ class ClosedTrainingCaseTest extends TestCase
             'topic' => 'Sprawa testowa',
             'contact_name' => 'Osoba',
             'message' => 'Treść zapytania.',
+            'inquired_at' => now()->subDay(),
         ], $overrides));
     }
 
