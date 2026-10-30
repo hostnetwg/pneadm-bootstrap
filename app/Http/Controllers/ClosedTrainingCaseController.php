@@ -144,6 +144,7 @@ class ClosedTrainingCaseController extends Controller
         $case = ClosedTrainingCase::query()->create([
             'source' => ClosedTrainingCase::SOURCE_MANUAL,
             'status' => ClosedTrainingCase::STATUS_NEW,
+            'waiting_on' => ClosedTrainingCase::WAITING_ON_PNE,
             'topic' => $data['topic'],
             'preferred_format' => $data['preferred_format'] ?? null,
             'contact_name' => $data['contact_name'],
@@ -346,6 +347,7 @@ class ClosedTrainingCaseController extends Controller
         $data = $request->validate([
             'status' => ['required', Rule::in(array_keys(ClosedTrainingCase::statusOptions()))],
             'assignee_user_id' => ['nullable', 'integer', Rule::exists('users', 'id')],
+            'waiting_on' => ['nullable', Rule::in(array_keys(ClosedTrainingCase::waitingOnOptions()))],
             'next_action' => 'nullable|string|max:1000',
             'next_action_at' => 'nullable|date',
         ]);
@@ -353,6 +355,7 @@ class ClosedTrainingCaseController extends Controller
         $this->cases->updateHandling($closedTrainingCase, [
             'status' => $data['status'],
             'assignee_user_id' => $data['assignee_user_id'] ?? null,
+            'waiting_on' => $this->blankToNull($data['waiting_on'] ?? null),
             'next_action' => $this->blankToNull($data['next_action'] ?? null),
             'next_action_at' => $data['next_action_at'] ?? null,
         ], $request->user());
@@ -609,6 +612,8 @@ class ClosedTrainingCaseController extends Controller
             'email_intent' => ['nullable', Rule::in(['general', 'scheduled_notice', 'instructor_brief'])],
             'notify_instructor' => ['nullable', 'boolean'],
             'share_contacts' => ['nullable', 'boolean'],
+            'update_waiting_on' => ['nullable', 'boolean'],
+            'suggested_waiting_on' => ['nullable', Rule::in(array_keys(ClosedTrainingCase::waitingOnOptions()))],
         ], [
             'email_subject.required' => 'Podaj temat wiadomości.',
             'email_body.required' => 'Wpisz treść wiadomości.',
@@ -623,6 +628,8 @@ class ClosedTrainingCaseController extends Controller
         $isScheduledNotice = ($data['email_intent'] ?? 'general') === 'scheduled_notice';
         $notifyInstructor = $request->boolean('notify_instructor');
         $shareContacts = $request->boolean('share_contacts');
+        $updateWaitingOn = $request->boolean('update_waiting_on');
+        $suggestedWaitingOn = $this->blankToNull($data['suggested_waiting_on'] ?? null);
 
         if ($isInstructorOnly || ($notifyInstructor && $sendMode === 'school')) {
             if ($instructorEmail === null) {
@@ -727,6 +734,11 @@ class ClosedTrainingCaseController extends Controller
 
         if ($isScheduledNotice && $sendMode === 'school') {
             $this->cases->markScheduledAfterSchoolNotice($closedTrainingCase, $request->user());
+        }
+
+        if ($updateWaitingOn && ! $isTest && $suggestedWaitingOn !== null) {
+            $this->cases->updateWaitingOnAfterEmail($closedTrainingCase, $request->user(), $suggestedWaitingOn);
+            $extraMessages[] = 'Zmieniono „czyj ruch” na '.$closedTrainingCase->fresh()->waitingOnLabel().'.';
         }
 
         $toLabel = implode(', ', $recipients);

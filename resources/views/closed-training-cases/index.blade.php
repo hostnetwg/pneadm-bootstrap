@@ -92,7 +92,7 @@
                                         @endif
                                     </a>
                                 </th>
-                                <th style="min-width: 12rem;">Następne działanie</th>
+                                <th style="min-width: 14rem;" title="Czyj ruch + co trzeba zrobić">Ruch</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -210,7 +210,10 @@
                                             {{ $case->assignee?->name ?: '—' }}
                                         </div>
                                     </td>
-                                    <td class="{{ $case->nextActionIsOverdue() ? 'text-danger' : '' }}" style="min-width: 12rem; max-width: 14rem;">
+                                    <td class="{{ $case->nextActionIsOverdue() ? 'text-danger' : '' }}" style="min-width: 14rem; max-width: 16rem;">
+                                        <div class="mb-1">
+                                            <span class="badge {{ $case->waitingOnBadgeClass() }}">{{ $case->waitingOnLabel() }}</span>
+                                        </div>
                                         <div style="white-space: normal;" title="{{ $case->next_action }}">{{ $case->next_action ?: '—' }}</div>
                                         @if($case->next_action_at)
                                             <div class="text-muted">{{ $case->formatLocal($case->next_action_at) }}</div>

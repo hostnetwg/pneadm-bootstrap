@@ -607,6 +607,17 @@
                                 </select>
                             </div>
                             <div class="mb-3">
+                                <label for="waiting_on" class="form-label">Czyj ruch</label>
+                                <select name="waiting_on" id="waiting_on" class="form-select @error('waiting_on') is-invalid @enderror">
+                                    <option value="">—</option>
+                                    @foreach(\App\Models\ClosedTrainingCase::waitingOnOptions() as $value => $label)
+                                        <option value="{{ $value }}" @selected(old('waiting_on', $case->waiting_on) === $value)>{{ $label }}</option>
+                                    @endforeach
+                                </select>
+                                @error('waiting_on')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                <div class="form-text">Kto ma wykonać następny ruch: PNE, szkoła albo prowadzący.</div>
+                            </div>
+                            <div class="mb-3">
                                 <label for="next_action" class="form-label">Następne działanie</label>
                                 <textarea name="next_action" id="next_action" rows="3" class="form-control @error('next_action') is-invalid @enderror">{{ old('next_action', $case->next_action) }}</textarea>
                                 @error('next_action')<div class="invalid-feedback">{{ $message }}</div>@enderror
@@ -718,6 +729,14 @@
                                             @error('notify_instructor')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
                                         </div>
                                     @endif
+
+                                    <div class="form-check mb-3" id="email-waiting-on-wrap">
+                                        <input class="form-check-input" type="checkbox" name="update_waiting_on" id="update_waiting_on" value="1" checked>
+                                        <input type="hidden" name="suggested_waiting_on" id="suggested_waiting_on" value="{{ \App\Models\ClosedTrainingCase::WAITING_ON_SCHOOL }}">
+                                        <label class="form-check-label" for="update_waiting_on" id="update_waiting_on_label">
+                                            Po wysyłce ustaw „czyj ruch” na Szkoła
+                                        </label>
+                                    </div>
 
                                     <div class="form-check mb-3">
                                         <input class="form-check-input" type="checkbox" name="share_contacts" id="share_contacts" value="1" @checked($oldShareContacts)>
@@ -971,6 +990,9 @@
             const testRecipientWrap = document.getElementById('test-recipient-wrap');
             const schoolRecipientsWrap = document.getElementById('school-recipients-wrap');
             const notifyInstructor = document.getElementById('notify_instructor');
+            const updateWaitingOnWrap = document.getElementById('email-waiting-on-wrap');
+            const updateWaitingOnLabel = document.getElementById('update_waiting_on_label');
+            const suggestedWaitingOn = document.getElementById('suggested_waiting_on');
             const shareContacts = document.getElementById('share_contacts');
             const emailSubmit = document.getElementById('closed-training-email-submit');
             const emailIntent = document.getElementById('email_intent');
@@ -1001,6 +1023,19 @@
                 if (isInstructor && emailIntent && emailIntent.value === 'general') {
                     emailIntent.value = 'instructor_brief';
                 }
+                if (updateWaitingOnWrap) {
+                    updateWaitingOnWrap.classList.toggle('d-none', isTest);
+                }
+                const willNotifyInstructor = !!(notifyInstructor && notifyInstructor.checked && !notifyInstructor.disabled);
+                if (suggestedWaitingOn && updateWaitingOnLabel) {
+                    if (isInstructor || willNotifyInstructor) {
+                        suggestedWaitingOn.value = 'instructor';
+                        updateWaitingOnLabel.textContent = 'Po wysyłce ustaw „czyj ruch” na Prowadzący';
+                    } else {
+                        suggestedWaitingOn.value = 'school';
+                        updateWaitingOnLabel.textContent = 'Po wysyłce ustaw „czyj ruch” na Szkoła';
+                    }
+                }
             }
             if (sendModeSchool) {
                 sendModeSchool.addEventListener('change', syncEmailSendMode);
@@ -1010,6 +1045,9 @@
             }
             if (sendModeTest) {
                 sendModeTest.addEventListener('change', syncEmailSendMode);
+            }
+            if (notifyInstructor) {
+                notifyInstructor.addEventListener('change', syncEmailSendMode);
             }
             syncEmailSendMode();
 

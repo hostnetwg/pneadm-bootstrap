@@ -74,11 +74,11 @@ Przyjęte: DEC-OPS-002, DEC-OPS-006, DEC-OPS-007, DEC-OPS-008, DEC-OPS-009, DEC-
 
 ## DEC-OPS-010 — Krótki status, osobno od następnego działania
 
-- Status: Accepted
+- Status: Accepted (uzupełnione 2026-10-30)
 - Data: 2026-10-17
-- Treść: status etapu 1 nie odtwarza kroków negocjacji. Słownik jest krótki i ogólny, w rodzaju: nowa, w toku, oczekuje, zamknięta. Nazwy na ekranie można doprecyzować przy implementacji. Status nie jest krokiem procesu. Bieżąca sytuacja wynika z następnego działania, jego terminu i historii. Przykład: status „oczekuje”, a następne działanie „jeżeli trener nie odpowie do 21.10, skontaktować się ponownie”. Nie dodajemy teraz statusów typu „czekamy na trenera” albo „szkoła analizuje”. Osobne pole „na kogo czekamy” dochodzi tylko wtedy, gdy praktyka pokaże taką potrzebę.
+- Treść: status etapu 1 nie odtwarza kroków negocjacji. Słownik jest krótki i ogólny, w rodzaju: nowa, w toku, oczekuje, zamknięta. Nazwy na ekranie można doprecyzować przy implementacji. Status nie jest krokiem procesu. Bieżąca sytuacja wynika z następnego działania, jego terminu i historii. Przykład: status „oczekuje”, a następne działanie „jeżeli trener nie odpowie do 21.10, skontaktować się ponownie”. Nie dodajemy statusów typu „czekamy na trenera” albo „szkoła analizuje”. Po praktyce z obsługą spraw doszło osobne pole **Czyj ruch** (`waiting_on`: PNE / Szkoła / Prowadzący / puste), widoczne na liście razem z następnym działaniem. Nowe sprawy domyślnie mają ruch PNE; wysyłka e-maila może opcjonalnie ustawić ruch na szkołę albo prowadzącego.
 - Uzasadnienie: kilkanaście statusów zbudowałoby ukryty workflow. Konsultacja 2026-10-17, przyjęte przez Waldemara.
-- Przyjęcie: Waldemar, 2026-10-17.
+- Przyjęcie: Waldemar, 2026-10-17. Uzupełnienie 2026-10-30: Waldemar potwierdził słownik PNE / Szkoła / Prowadzący / puste oraz checkbox podpowiedzi po wysyłce e-maila.
 
 ## DEC-OPS-011 — Najpierw praktyka, potem abstrakcja
 

@@ -55,6 +55,12 @@ class ClosedTrainingCase extends Model
 
     public const FEE_BASIS_NET = 'net';
 
+    public const WAITING_ON_PNE = 'pne';
+
+    public const WAITING_ON_SCHOOL = 'school';
+
+    public const WAITING_ON_INSTRUCTOR = 'instructor';
+
     /** @var list<string> */
     public const TEST_EMAIL_RECIPIENTS = [
         'waldemar.grabowski@hostnet.pl',
@@ -94,6 +100,7 @@ class ClosedTrainingCase extends Model
         'inquired_at',
         'next_action',
         'next_action_at',
+        'waiting_on',
         'closed_at',
     ];
 
@@ -361,6 +368,34 @@ class ClosedTrainingCase extends Model
             self::STATUS_CANCELLED => 'Anulowana',
             self::STATUS_CLOSED => 'Zamknięta',
         ];
+    }
+
+    public static function waitingOnOptions(): array
+    {
+        return [
+            self::WAITING_ON_PNE => 'PNE',
+            self::WAITING_ON_SCHOOL => 'Szkoła',
+            self::WAITING_ON_INSTRUCTOR => 'Prowadzący',
+        ];
+    }
+
+    public function waitingOnLabel(): string
+    {
+        if ($this->waiting_on === null || $this->waiting_on === '') {
+            return '—';
+        }
+
+        return self::waitingOnOptions()[$this->waiting_on] ?? $this->waiting_on;
+    }
+
+    public function waitingOnBadgeClass(): string
+    {
+        return match ($this->waiting_on) {
+            self::WAITING_ON_PNE => 'text-bg-primary',
+            self::WAITING_ON_SCHOOL => 'text-bg-warning',
+            self::WAITING_ON_INSTRUCTOR => 'text-bg-success',
+            default => 'text-bg-secondary',
+        };
     }
 
     /**

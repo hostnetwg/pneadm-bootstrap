@@ -130,25 +130,43 @@ class ClosedTrainingCaseService
         $this->updateHandling($case, [
             'status' => ClosedTrainingCase::STATUS_SCHEDULED,
             'assignee_user_id' => $case->assignee_user_id,
+            'waiting_on' => $case->waiting_on,
+            'next_action' => $case->next_action,
+            'next_action_at' => $case->next_action_at?->format('Y-m-d H:i'),
+        ], $user);
+    }
+
+    public function updateWaitingOnAfterEmail(ClosedTrainingCase $case, User $user, string $waitingOn): void
+    {
+        if (! array_key_exists($waitingOn, ClosedTrainingCase::waitingOnOptions())) {
+            return;
+        }
+
+        $this->updateHandling($case, [
+            'status' => $case->status,
+            'assignee_user_id' => $case->assignee_user_id,
+            'waiting_on' => $waitingOn,
             'next_action' => $case->next_action,
             'next_action_at' => $case->next_action_at?->format('Y-m-d H:i'),
         ], $user);
     }
 
     /**
-     * @param  array{status: string, assignee_user_id: ?int, next_action: ?string, next_action_at: ?string}  $attributes
+     * @param  array{status: string, assignee_user_id: ?int, waiting_on?: ?string, next_action: ?string, next_action_at: ?string}  $attributes
      */
     public function updateHandling(ClosedTrainingCase $case, array $attributes, User $user): void
     {
         $before = [
             'status' => $case->status,
             'assignee_user_id' => $case->assignee_user_id,
+            'waiting_on' => $case->waiting_on,
             'next_action' => $case->next_action,
             'next_action_at' => $case->next_action_at?->format('Y-m-d H:i'),
         ];
 
         $case->status = $attributes['status'];
         $case->assignee_user_id = $attributes['assignee_user_id'];
+        $case->waiting_on = $attributes['waiting_on'] ?? $case->waiting_on;
         $case->next_action = $attributes['next_action'];
         $case->next_action_at = $attributes['next_action_at'];
 
@@ -161,6 +179,7 @@ class ClosedTrainingCaseService
         $after = [
             'status' => $case->status,
             'assignee_user_id' => $case->assignee_user_id,
+            'waiting_on' => $case->waiting_on,
             'next_action' => $case->next_action,
             'next_action_at' => $case->next_action_at?->format('Y-m-d H:i'),
         ];
@@ -738,7 +757,7 @@ class ClosedTrainingCaseService
     }
 
     /**
-     * @param  array{status: string, assignee_user_id: ?int, next_action: ?string, next_action_at: ?string}  $before
+     * @param  array{status: string, assignee_user_id: ?int, waiting_on?: ?string, next_action: ?string, next_action_at: ?string}  $before
      */
     private function changeSummary(array $before, ClosedTrainingCase $case): string
     {
@@ -750,6 +769,14 @@ class ClosedTrainingCaseService
 
         if ((int) $before['assignee_user_id'] !== (int) $case->assignee_user_id) {
             $parts[] = 'Opiekun: '.($case->assignee?->name ?: 'nieprzypisany').'.';
+        }
+
+        if (($before['waiting_on'] ?? null) !== $case->waiting_on) {
+            $beforeWaitingOn = $before['waiting_on'] ?? null;
+            $beforeLabel = $beforeWaitingOn
+                ? (ClosedTrainingCase::waitingOnOptions()[$beforeWaitingOn] ?? $beforeWaitingOn)
+                : 'brak';
+            $parts[] = 'Czyj ruch: '.$beforeLabel.' → '.$case->waitingOnLabel().'.';
         }
 
         if ((string) $before['next_action'] !== (string) $case->next_action) {

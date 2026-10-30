@@ -76,6 +76,7 @@ class ClosedTrainingCaseTest extends TestCase
             ->put(route('closed-training-cases.update', $case), [
                 'status' => ClosedTrainingCase::STATUS_WAITING,
                 'assignee_user_id' => $user->id,
+                'waiting_on' => ClosedTrainingCase::WAITING_ON_SCHOOL,
                 'next_action' => 'Jeżeli nie będzie odpowiedzi, zadzwonić ponownie.',
                 'next_action_at' => '2026-10-21 09:00',
             ])
@@ -83,6 +84,7 @@ class ClosedTrainingCaseTest extends TestCase
 
         $case->refresh();
         $this->assertSame(ClosedTrainingCase::STATUS_WAITING, $case->status);
+        $this->assertSame(ClosedTrainingCase::WAITING_ON_SCHOOL, $case->waiting_on);
         $this->assertSame($user->id, $case->assignee_user_id);
 
         $this->actingAs($user)
@@ -747,6 +749,8 @@ class ClosedTrainingCaseTest extends TestCase
                 'send_mode' => 'school',
                 'email_recipients' => ['szkola@example.com'],
                 'email_intent' => 'general',
+                'update_waiting_on' => '1',
+                'suggested_waiting_on' => ClosedTrainingCase::WAITING_ON_SCHOOL,
             ])
             ->assertRedirect(route('closed-training-cases.show', $case))
             ->assertSessionHas('success');
@@ -764,6 +768,7 @@ class ClosedTrainingCaseTest extends TestCase
 
         $case->refresh();
         $this->assertSame(ClosedTrainingCase::STATUS_IN_PROGRESS, $case->status);
+        $this->assertSame(ClosedTrainingCase::WAITING_ON_SCHOOL, $case->waiting_on);
         $this->assertSame('Oddzwonić jutro.', $case->next_action);
         $this->assertSame($user->id, $case->assignee_user_id);
 
