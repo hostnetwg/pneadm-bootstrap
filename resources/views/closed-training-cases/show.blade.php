@@ -32,6 +32,9 @@
                         <div class="card-body">
                             <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
                                 <span class="badge {{ $case->statusBadgeClass() }}">{{ $case->statusLabel() }}</span>
+                                @if($case->status === \App\Models\ClosedTrainingCase::STATUS_CLOSED)
+                                    <span class="badge text-bg-light border">{{ $case->closedOutcomeLabel() }}</span>
+                                @endif
                                 <span class="text-secondary small">{{ $case->sourceLabel() }}</span>
                             </div>
                             <h3 class="h6 text-uppercase text-secondary">Następne działanie</h3>
@@ -410,12 +413,12 @@
                                             Przygotuj e-mail z terminem
                                         </button>
                                     </form>
-                                    <p class="form-text mb-0 mt-2">Wstawi temat i treść do formularza po prawej. Po wysłaniu do szkoły status przejdzie na Zaplanowana.</p>
+                                    <p class="form-text mb-0 mt-2">Wstawi temat i treść do formularza po prawej. Po wysłaniu do szkoły sprawa pozostaje w statusie W toku.</p>
                                 @elseif($case->course && ($case->course->type ?? '') === 'online')
                                     <p class="form-text text-warning mb-0 mt-3">Aby przygotować e-mail z linkiem, uzupełnij link ClickMeeting (meeting_link) albo włącz gościnny live na pnedu.pl.</p>
                                 @endif
                                 @if($case->status !== \App\Models\ClosedTrainingCase::STATUS_CLOSED)
-                                    <p class="form-text mb-0 mt-3">Zwykły e-mail nie zmienia statusu. E-mail z terminem (do szkoły) ustawia status Zaplanowana.</p>
+                                    <p class="form-text mb-0 mt-3">Zwykły e-mail nie zmienia statusu. E-mail z terminem (do szkoły) pozostawia sprawę w toku.</p>
                                 @endif
                             @else
                                 <p class="text-secondary mb-3">Brak powiązanego szkolenia. Po uzgodnieniu terminu utwórz rekord albo powiąż istniejący.</p>
@@ -596,6 +599,17 @@
                                 </select>
                                 @error('status')<div class="invalid-feedback">{{ $message }}</div>@enderror
                                 <div class="form-text">Status nie opisuje kroku negocjacji. Szczegół wpisz w następnym działaniu.</div>
+                            </div>
+                            <div class="mb-3 {{ old('status', $case->status) === \App\Models\ClosedTrainingCase::STATUS_CLOSED ? '' : 'd-none' }}" id="closed_outcome_wrap">
+                                <label for="closed_outcome" class="form-label">Wynik zakończenia</label>
+                                <select name="closed_outcome" id="closed_outcome" class="form-select @error('closed_outcome') is-invalid @enderror">
+                                    <option value="">Wybierz wynik</option>
+                                    @foreach(\App\Models\ClosedTrainingCase::closedOutcomeOptions() as $value => $label)
+                                        <option value="{{ $value }}" @selected(old('closed_outcome', $case->closed_outcome) === $value)>{{ $label }}</option>
+                                    @endforeach
+                                </select>
+                                @error('closed_outcome')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                <div class="form-text">Wymagane tylko wtedy, gdy status sprawy to Zakończona.</div>
                             </div>
                             <div class="mb-3">
                                 <label for="assignee_user_id" class="form-label">Opiekun</label>
@@ -790,7 +804,7 @@
 
                                     @if($emailIntent === 'scheduled_notice')
                                         <div class="alert alert-info py-2 small">
-                                            Tryb: info o terminie. Po wysyłce do szkoły status zostanie ustawiony na <strong>Zaplanowana</strong>. Test / mail do prowadzącego nie zmienia statusu.
+                                            Tryb: info o terminie. Po wysyłce do szkoły sprawa pozostanie w statusie <strong>W toku</strong>. Test / mail do prowadzącego nie zmienia statusu.
                                         </div>
                                     @elseif($emailIntent === 'instructor_brief')
                                         <div class="alert alert-info py-2 small">
@@ -972,6 +986,26 @@
                 extended_valid_elements: 'p[style],table[cellpadding|cellspacing|border|style|role],tr,td[align|style],th[align|style],a[href|target|rel]',
                 content_style: 'body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; font-size: 15px; line-height: 1.6; } p { margin: 0 0 0.75em; } table { border-collapse: collapse; margin: 0; } td { vertical-align: top; padding: 0; }',
             };
+
+            const statusSelect = document.getElementById('status');
+            const closedOutcomeWrap = document.getElementById('closed_outcome_wrap');
+            const closedOutcomeSelect = document.getElementById('closed_outcome');
+            function syncClosedOutcome() {
+                const isClosed = statusSelect && statusSelect.value === '{{ \App\Models\ClosedTrainingCase::STATUS_CLOSED }}';
+                if (closedOutcomeWrap) {
+                    closedOutcomeWrap.classList.toggle('d-none', !isClosed);
+                }
+                if (closedOutcomeSelect) {
+                    closedOutcomeSelect.required = !!isClosed;
+                    if (!isClosed) {
+                        closedOutcomeSelect.value = '';
+                    }
+                }
+            }
+            if (statusSelect) {
+                statusSelect.addEventListener('change', syncClosedOutcome);
+            }
+            syncClosedOutcome();
 
             const sendForm = document.getElementById('closed-training-case-email-form');
             if (sendForm && window.tinymce) {

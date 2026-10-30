@@ -44,7 +44,8 @@ class ClosedTrainingCaseController extends Controller
             ->with(['assignee', 'instructor', 'course.instructor', 'trainingOffer'])
             ->withCount('events')
             ->withMax('events as last_event_at', 'happened_at')
-            ->when($status === 'open', fn ($query) => $query->whereNotIn('status', ClosedTrainingCase::terminalStatuses()))
+            ->when($status === 'open', fn ($query) => $query->whereIn('status', [ClosedTrainingCase::STATUS_NEW, ClosedTrainingCase::STATUS_IN_PROGRESS]))
+            ->when($status === 'all', fn ($query) => $query)
             ->when(array_key_exists($status, ClosedTrainingCase::statusOptions()), fn ($query) => $query->where('status', $status))
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($inner) use ($search) {
@@ -346,6 +347,11 @@ class ClosedTrainingCaseController extends Controller
     {
         $data = $request->validate([
             'status' => ['required', Rule::in(array_keys(ClosedTrainingCase::statusOptions()))],
+            'closed_outcome' => [
+                Rule::requiredIf($request->input('status') === ClosedTrainingCase::STATUS_CLOSED),
+                'nullable',
+                Rule::in(array_keys(ClosedTrainingCase::closedOutcomeOptions())),
+            ],
             'assignee_user_id' => ['nullable', 'integer', Rule::exists('users', 'id')],
             'waiting_on' => ['nullable', Rule::in(array_keys(ClosedTrainingCase::waitingOnOptions()))],
             'next_action' => 'nullable|string|max:1000',
@@ -354,6 +360,7 @@ class ClosedTrainingCaseController extends Controller
 
         $this->cases->updateHandling($closedTrainingCase, [
             'status' => $data['status'],
+            'closed_outcome' => $this->blankToNull($data['closed_outcome'] ?? null),
             'assignee_user_id' => $data['assignee_user_id'] ?? null,
             'waiting_on' => $this->blankToNull($data['waiting_on'] ?? null),
             'next_action' => $this->blankToNull($data['next_action'] ?? null),
@@ -746,7 +753,7 @@ class ClosedTrainingCaseController extends Controller
             $isTest => 'Wysłano e-mail testowy do '.$toLabel.'. Status sprawy bez zmian.',
             $isInstructorOnly => 'E-mail został wysłany do prowadzącego ('.$toLabel.').',
             default => 'E-mail został wysłany do '.$toLabel.'.'
-                .($isScheduledNotice ? ' Status ustawiony na Zaplanowana.' : ''),
+                .($isScheduledNotice ? ' Sprawa pozostaje w statusie W toku.' : ''),
         };
         if ($extraMessages !== []) {
             $success .= ' '.implode(' ', $extraMessages);

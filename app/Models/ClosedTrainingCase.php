@@ -33,6 +33,10 @@ class ClosedTrainingCase extends Model
 
     public const STATUS_CLOSED = 'closed';
 
+    public const CLOSED_OUTCOME_DELIVERED = 'delivered';
+
+    public const CLOSED_OUTCOME_CANCELLED = 'cancelled';
+
     public const FORMAT_ONLINE = 'online';
 
     public const FORMAT_ONSITE = 'onsite';
@@ -71,6 +75,7 @@ class ClosedTrainingCase extends Model
         'source',
         'training_offer_id',
         'status',
+        'closed_outcome',
         'assignee_user_id',
         'instructor_id',
         'topic',
@@ -362,11 +367,15 @@ class ClosedTrainingCase extends Model
         return [
             self::STATUS_NEW => 'Nowa',
             self::STATUS_IN_PROGRESS => 'W toku',
-            self::STATUS_WAITING => 'Oczekuje',
-            self::STATUS_SCHEDULED => 'Zaplanowana',
-            self::STATUS_DELIVERED => 'Przeprowadzona',
-            self::STATUS_CANCELLED => 'Anulowana',
-            self::STATUS_CLOSED => 'Zamknięta',
+            self::STATUS_CLOSED => 'Zakończona',
+        ];
+    }
+
+    public static function closedOutcomeOptions(): array
+    {
+        return [
+            self::CLOSED_OUTCOME_DELIVERED => 'Przeprowadzone',
+            self::CLOSED_OUTCOME_CANCELLED => 'Anulowane',
         ];
     }
 
@@ -406,7 +415,6 @@ class ClosedTrainingCase extends Model
     public static function terminalStatuses(): array
     {
         return [
-            self::STATUS_CANCELLED,
             self::STATUS_CLOSED,
         ];
     }
@@ -459,15 +467,20 @@ class ClosedTrainingCase extends Model
         return self::statusOptions()[$this->status] ?? $this->status;
     }
 
+    public function closedOutcomeLabel(): string
+    {
+        if ($this->closed_outcome === null || $this->closed_outcome === '') {
+            return '—';
+        }
+
+        return self::closedOutcomeOptions()[$this->closed_outcome] ?? $this->closed_outcome;
+    }
+
     public function statusBadgeClass(): string
     {
         return match ($this->status) {
             self::STATUS_NEW => 'text-bg-primary',
             self::STATUS_IN_PROGRESS => 'text-bg-info',
-            self::STATUS_WAITING => 'text-bg-warning',
-            self::STATUS_SCHEDULED => 'text-bg-success',
-            self::STATUS_DELIVERED => 'text-bg-dark',
-            self::STATUS_CANCELLED => 'text-bg-danger',
             self::STATUS_CLOSED => 'text-bg-secondary',
             default => 'text-bg-light',
         };

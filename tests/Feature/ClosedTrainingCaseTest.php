@@ -74,7 +74,7 @@ class ClosedTrainingCaseTest extends TestCase
 
         $this->actingAs($user)
             ->put(route('closed-training-cases.update', $case), [
-                'status' => ClosedTrainingCase::STATUS_WAITING,
+                'status' => ClosedTrainingCase::STATUS_IN_PROGRESS,
                 'assignee_user_id' => $user->id,
                 'waiting_on' => ClosedTrainingCase::WAITING_ON_SCHOOL,
                 'next_action' => 'Jeżeli nie będzie odpowiedzi, zadzwonić ponownie.',
@@ -83,7 +83,7 @@ class ClosedTrainingCaseTest extends TestCase
             ->assertRedirect(route('closed-training-cases.show', $case));
 
         $case->refresh();
-        $this->assertSame(ClosedTrainingCase::STATUS_WAITING, $case->status);
+        $this->assertSame(ClosedTrainingCase::STATUS_IN_PROGRESS, $case->status);
         $this->assertSame(ClosedTrainingCase::WAITING_ON_SCHOOL, $case->waiting_on);
         $this->assertSame($user->id, $case->assignee_user_id);
 
@@ -130,7 +130,7 @@ class ClosedTrainingCaseTest extends TestCase
         $this->assertSame('500600700', $case->contact_phone);
         $this->assertSame('Poprawiona nazwa placówki', $case->institution);
         $this->assertSame('https://szkola.edu.pl', $case->institution_www);
-        $this->assertSame(ClosedTrainingCase::STATUS_WAITING, $case->status);
+        $this->assertSame(ClosedTrainingCase::STATUS_IN_PROGRESS, $case->status);
 
         $contactEvent = $case->events()->where('body', 'like', 'Dane zapytania.%')->first();
         $this->assertNotNull($contactEvent);
@@ -239,7 +239,7 @@ class ClosedTrainingCaseTest extends TestCase
             ->assertSee('Operator Test')
             ->assertDontSee('>Opiekun<', false)
             ->assertSee('Telefon: prośba o termin w listopadzie.')
-            ->assertSee('Oczekuje')
+            ->assertSee('W toku')
             ->assertSee('(7)', false)
             ->assertSee('title="Liczba działań w historii sprawy"', false);
     }
@@ -335,7 +335,7 @@ class ClosedTrainingCaseTest extends TestCase
         $this->assertSame('E-mail', $note->noteContextLabel());
     }
 
-    public function test_operator_can_set_scheduled_and_delivered_status(): void
+    public function test_operator_can_set_main_status_and_closed_outcome(): void
     {
         $user = User::factory()->create(['is_active' => true]);
         $case = $this->makeCase(['topic' => 'Sprawa do zaplanowania']);
@@ -343,16 +343,17 @@ class ClosedTrainingCaseTest extends TestCase
         $this->actingAs($user)
             ->get(route('closed-training-cases.show', $case))
             ->assertOk()
-            ->assertSee('Zaplanowana')
-            ->assertSee('Przeprowadzona')
-            ->assertSee('Anulowana')
-            ->assertSee('value="scheduled"', false)
-            ->assertSee('value="delivered"', false)
-            ->assertSee('value="cancelled"', false);
+            ->assertSee('Nowa')
+            ->assertSee('W toku')
+            ->assertSee('Zakończona')
+            ->assertSee('Przeprowadzone')
+            ->assertSee('Anulowane')
+            ->assertDontSee('value="scheduled"', false)
+            ->assertDontSee('value="waiting"', false);
 
         $this->actingAs($user)
             ->put(route('closed-training-cases.update', $case), [
-                'status' => ClosedTrainingCase::STATUS_SCHEDULED,
+                'status' => ClosedTrainingCase::STATUS_IN_PROGRESS,
                 'assignee_user_id' => $user->id,
                 'next_action' => 'Potwierdzić salę.',
                 'next_action_at' => '2026-11-01 10:00',
@@ -360,12 +361,14 @@ class ClosedTrainingCaseTest extends TestCase
             ->assertRedirect(route('closed-training-cases.show', $case));
 
         $case->refresh();
-        $this->assertSame(ClosedTrainingCase::STATUS_SCHEDULED, $case->status);
+        $this->assertSame(ClosedTrainingCase::STATUS_IN_PROGRESS, $case->status);
+        $this->assertNull($case->closed_outcome);
         $this->assertNull($case->closed_at);
 
         $this->actingAs($user)
             ->put(route('closed-training-cases.update', $case), [
-                'status' => ClosedTrainingCase::STATUS_DELIVERED,
+                'status' => ClosedTrainingCase::STATUS_CLOSED,
+                'closed_outcome' => ClosedTrainingCase::CLOSED_OUTCOME_DELIVERED,
                 'assignee_user_id' => $user->id,
                 'next_action' => 'Wysłać ankietę.',
                 'next_action_at' => null,
@@ -373,26 +376,32 @@ class ClosedTrainingCaseTest extends TestCase
             ->assertRedirect(route('closed-training-cases.show', $case));
 
         $case->refresh();
-        $this->assertSame(ClosedTrainingCase::STATUS_DELIVERED, $case->status);
-        $this->assertNull($case->closed_at);
+        $this->assertSame(ClosedTrainingCase::STATUS_CLOSED, $case->status);
+        $this->assertSame(ClosedTrainingCase::CLOSED_OUTCOME_DELIVERED, $case->closed_outcome);
+        $this->assertNotNull($case->closed_at);
         $this->assertTrue(
-            $case->events()->where('body', 'like', '%Status: Zaplanowana → Przeprowadzona%')->exists()
+            $case->events()->where('body', 'like', '%Status: W toku → Zakończona%')->exists()
+        );
+        $this->assertTrue(
+            $case->events()->where('body', 'like', '%Wynik zakończenia: brak → Przeprowadzone%')->exists()
         );
 
         $this->actingAs($user)
             ->get(route('closed-training-cases.index', ['status' => 'all']))
             ->assertOk()
-            ->assertSee('Przeprowadzona');
+            ->assertSee('Zakończona')
+            ->assertSee('Przeprowadzone');
     }
 
-    public function test_cancelled_status_sets_closed_at_and_is_hidden_from_open_list(): void
+    public function test_closed_cancelled_outcome_sets_closed_at_and_is_hidden_from_open_list(): void
     {
         $user = User::factory()->create(['is_active' => true]);
         $case = $this->makeCase(['topic' => 'Sprawa niedogadana']);
 
         $this->actingAs($user)
             ->put(route('closed-training-cases.update', $case), [
-                'status' => ClosedTrainingCase::STATUS_CANCELLED,
+                'status' => ClosedTrainingCase::STATUS_CLOSED,
+                'closed_outcome' => ClosedTrainingCase::CLOSED_OUTCOME_CANCELLED,
                 'assignee_user_id' => $user->id,
                 'next_action' => 'Szkoła zrezygnowała.',
                 'next_action_at' => now()->subDay()->format('Y-m-d H:i'),
@@ -400,7 +409,8 @@ class ClosedTrainingCaseTest extends TestCase
             ->assertRedirect(route('closed-training-cases.show', $case));
 
         $case->refresh();
-        $this->assertSame(ClosedTrainingCase::STATUS_CANCELLED, $case->status);
+        $this->assertSame(ClosedTrainingCase::STATUS_CLOSED, $case->status);
+        $this->assertSame(ClosedTrainingCase::CLOSED_OUTCOME_CANCELLED, $case->closed_outcome);
         $this->assertNotNull($case->closed_at);
         $this->assertFalse($case->nextActionIsOverdue());
 
@@ -410,10 +420,10 @@ class ClosedTrainingCaseTest extends TestCase
             ->assertDontSee('Sprawa niedogadana');
 
         $this->actingAs($user)
-            ->get(route('closed-training-cases.index', ['status' => 'cancelled']))
+            ->get(route('closed-training-cases.index', ['status' => 'closed']))
             ->assertOk()
             ->assertSee('Sprawa niedogadana')
-            ->assertSee('Anulowana');
+            ->assertSee('Anulowane');
     }
 
     public function test_case_list_shows_contact_person_phone_and_email_prominently(): void
@@ -449,7 +459,7 @@ class ClosedTrainingCaseTest extends TestCase
             ->assertSee('data-institution="SP nr 7 Testowa"', false)
             ->assertSee('data-www="https://sp7.example.edu.pl"', false)
             ->assertSee('data-offer="Oferta z info na liście"', false)
-            ->assertSee('Następne działanie');
+            ->assertSee('Ruch');
     }
 
     public function test_case_list_shows_negotiation_summary_compactly(): void
@@ -794,7 +804,7 @@ class ClosedTrainingCaseTest extends TestCase
         $user = User::factory()->create(['is_active' => true]);
         $case = ClosedTrainingCase::query()->create([
             'source' => ClosedTrainingCase::SOURCE_MANUAL,
-            'status' => ClosedTrainingCase::STATUS_WAITING,
+            'status' => ClosedTrainingCase::STATUS_IN_PROGRESS,
             'topic' => 'Temat bez wysyłki',
             'contact_name' => 'Osoba szkoły',
             'contact_email' => 'szkola@example.com',
@@ -818,7 +828,7 @@ class ClosedTrainingCaseTest extends TestCase
             ->assertSessionHas('error');
 
         $case->refresh();
-        $this->assertSame(ClosedTrainingCase::STATUS_WAITING, $case->status);
+        $this->assertSame(ClosedTrainingCase::STATUS_IN_PROGRESS, $case->status);
         $this->assertSame('Czekamy na odpowiedź.', $case->next_action);
         $this->assertFalse($case->events()->where('event_type', ClosedTrainingCaseEvent::TYPE_EMAIL_SENT)->exists());
         $this->assertSame(0, $case->events()->count());
@@ -840,7 +850,7 @@ class ClosedTrainingCaseTest extends TestCase
         $this->actingAs($user)
             ->get(route('closed-training-cases.show', $case))
             ->assertOk()
-            ->assertSee('Brak poprawnego adresu e-mail')
+            ->assertSee('Brak e-maila szkoły i prowadzącego')
             ->assertDontSee('name="email_body"', false);
 
         $this->actingAs($user)
@@ -852,7 +862,7 @@ class ClosedTrainingCaseTest extends TestCase
                 'email_intent' => 'general',
             ])
             ->assertRedirect(route('closed-training-cases.show', $case))
-            ->assertSessionHas('error');
+            ->assertSessionHasErrors('email_recipients.0');
 
         Mail::assertNothingSent();
         $this->assertFalse($case->events()->where('event_type', ClosedTrainingCaseEvent::TYPE_EMAIL_SENT)->exists());
@@ -979,7 +989,7 @@ class ClosedTrainingCaseTest extends TestCase
             ->assertSessionHas('success');
 
         $case->refresh();
-        $this->assertSame(ClosedTrainingCase::STATUS_SCHEDULED, $case->status);
+        $this->assertSame(ClosedTrainingCase::STATUS_IN_PROGRESS, $case->status);
         $this->assertTrue(
             $case->events()
                 ->where('event_type', ClosedTrainingCaseEvent::TYPE_EMAIL_SENT)
@@ -1087,7 +1097,7 @@ class ClosedTrainingCaseTest extends TestCase
         $user = User::factory()->create(['is_active' => true]);
         $case = $this->makeCase([
             'contact_email' => 'szkola@example.com',
-            'status' => ClosedTrainingCase::STATUS_WAITING,
+            'status' => ClosedTrainingCase::STATUS_IN_PROGRESS,
         ]);
         $start = Carbon::parse('2026-11-05 09:00:00', 'Europe/Warsaw');
         $course = $this->makeCourse([
@@ -1126,7 +1136,7 @@ class ClosedTrainingCaseTest extends TestCase
             ])
             ->assertRedirect(route('closed-training-cases.show', $case));
 
-        $this->assertSame(ClosedTrainingCase::STATUS_SCHEDULED, $case->fresh()->status);
+        $this->assertSame(ClosedTrainingCase::STATUS_IN_PROGRESS, $case->fresh()->status);
     }
 
     public function test_operator_can_edit_and_delete_history_events(): void

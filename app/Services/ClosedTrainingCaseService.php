@@ -119,7 +119,7 @@ class ClosedTrainingCaseService
 
     public function markScheduledAfterSchoolNotice(ClosedTrainingCase $case, User $user): void
     {
-        if ($case->status === ClosedTrainingCase::STATUS_SCHEDULED) {
+        if ($case->status === ClosedTrainingCase::STATUS_IN_PROGRESS) {
             return;
         }
 
@@ -128,7 +128,8 @@ class ClosedTrainingCaseService
         }
 
         $this->updateHandling($case, [
-            'status' => ClosedTrainingCase::STATUS_SCHEDULED,
+            'status' => ClosedTrainingCase::STATUS_IN_PROGRESS,
+            'closed_outcome' => null,
             'assignee_user_id' => $case->assignee_user_id,
             'waiting_on' => $case->waiting_on,
             'next_action' => $case->next_action,
@@ -144,6 +145,7 @@ class ClosedTrainingCaseService
 
         $this->updateHandling($case, [
             'status' => $case->status,
+            'closed_outcome' => $case->closed_outcome,
             'assignee_user_id' => $case->assignee_user_id,
             'waiting_on' => $waitingOn,
             'next_action' => $case->next_action,
@@ -152,12 +154,13 @@ class ClosedTrainingCaseService
     }
 
     /**
-     * @param  array{status: string, assignee_user_id: ?int, waiting_on?: ?string, next_action: ?string, next_action_at: ?string}  $attributes
+     * @param  array{status: string, closed_outcome?: ?string, assignee_user_id: ?int, waiting_on?: ?string, next_action: ?string, next_action_at: ?string}  $attributes
      */
     public function updateHandling(ClosedTrainingCase $case, array $attributes, User $user): void
     {
         $before = [
             'status' => $case->status,
+            'closed_outcome' => $case->closed_outcome,
             'assignee_user_id' => $case->assignee_user_id,
             'waiting_on' => $case->waiting_on,
             'next_action' => $case->next_action,
@@ -165,6 +168,9 @@ class ClosedTrainingCaseService
         ];
 
         $case->status = $attributes['status'];
+        $case->closed_outcome = $case->status === ClosedTrainingCase::STATUS_CLOSED
+            ? $attributes['closed_outcome']
+            : null;
         $case->assignee_user_id = $attributes['assignee_user_id'];
         $case->waiting_on = $attributes['waiting_on'] ?? $case->waiting_on;
         $case->next_action = $attributes['next_action'];
@@ -178,6 +184,7 @@ class ClosedTrainingCaseService
 
         $after = [
             'status' => $case->status,
+            'closed_outcome' => $case->closed_outcome,
             'assignee_user_id' => $case->assignee_user_id,
             'waiting_on' => $case->waiting_on,
             'next_action' => $case->next_action,
@@ -757,14 +764,23 @@ class ClosedTrainingCaseService
     }
 
     /**
-     * @param  array{status: string, assignee_user_id: ?int, waiting_on?: ?string, next_action: ?string, next_action_at: ?string}  $before
+     * @param  array{status: string, closed_outcome?: ?string, assignee_user_id: ?int, waiting_on?: ?string, next_action: ?string, next_action_at: ?string}  $before
      */
     private function changeSummary(array $before, ClosedTrainingCase $case): string
     {
         $parts = [];
 
         if ($before['status'] !== $case->status) {
-            $parts[] = 'Status: '.ClosedTrainingCase::statusOptions()[$before['status']].' → '.$case->statusLabel().'.';
+            $beforeLabel = ClosedTrainingCase::statusOptions()[$before['status']] ?? $before['status'];
+            $parts[] = 'Status: '.$beforeLabel.' → '.$case->statusLabel().'.';
+        }
+
+        if (($before['closed_outcome'] ?? null) !== $case->closed_outcome) {
+            $beforeOutcome = $before['closed_outcome'] ?? null;
+            $beforeLabel = $beforeOutcome
+                ? (ClosedTrainingCase::closedOutcomeOptions()[$beforeOutcome] ?? $beforeOutcome)
+                : 'brak';
+            $parts[] = 'Wynik zakończenia: '.$beforeLabel.' → '.$case->closedOutcomeLabel().'.';
         }
 
         if ((int) $before['assignee_user_id'] !== (int) $case->assignee_user_id) {

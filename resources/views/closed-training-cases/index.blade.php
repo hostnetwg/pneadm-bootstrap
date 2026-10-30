@@ -26,11 +26,11 @@
                         <div class="col-md-3">
                             <label for="status" class="form-label">Status</label>
                             <select name="status" id="status" class="form-select">
-                                <option value="open" @selected($status === 'open')>Otwarte</option>
+                                <option value="open" @selected($status === 'open')>Aktywne</option>
+                                <option value="{{ \App\Models\ClosedTrainingCase::STATUS_NEW }}" @selected($status === \App\Models\ClosedTrainingCase::STATUS_NEW)>Nowe</option>
+                                <option value="{{ \App\Models\ClosedTrainingCase::STATUS_IN_PROGRESS }}" @selected($status === \App\Models\ClosedTrainingCase::STATUS_IN_PROGRESS)>W toku</option>
+                                <option value="{{ \App\Models\ClosedTrainingCase::STATUS_CLOSED }}" @selected($status === \App\Models\ClosedTrainingCase::STATUS_CLOSED)>Zakończone</option>
                                 <option value="all" @selected($status === 'all')>Wszystkie</option>
-                                @foreach(\App\Models\ClosedTrainingCase::statusOptions() as $value => $label)
-                                    <option value="{{ $value }}" @selected($status === $value)>{{ $label }}</option>
-                                @endforeach
                             </select>
                         </div>
                         <div class="col-md-4 d-flex gap-2">
@@ -199,6 +199,9 @@
                                             <span class="badge {{ $case->statusBadgeClass() }}">{{ $case->statusLabel() }}</span>
                                             <span class="text-muted" title="Liczba działań w historii sprawy">({{ (int) $case->events_count }})</span>
                                         </div>
+                                        @if($case->status === \App\Models\ClosedTrainingCase::STATUS_CLOSED)
+                                            <div class="small text-muted">{{ $case->closedOutcomeLabel() }}</div>
+                                        @endif
                                         <div class="text-muted">
                                             @if($case->lastActivityAt())
                                                 {{ $case->formatLocal($case->lastActivityAt()) }}
