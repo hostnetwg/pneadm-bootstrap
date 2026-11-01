@@ -13,7 +13,6 @@ Jedna komenda `dev-pull` na każdym komputerze deva (dwa laptopy, stacjonarny). 
 | `dev-pull --db` | najnowszy **kompletny** zestaw czterech zrzutów z produkcji → import do lokalnego MySQL (`pneadm`, `certgen`, `pne_analytics`, `pnedu`) → `migrate` |
 | `dev-pull --files` | `rsync` `storage/app` obu aplikacji (bez `public/certificates`) |
 | `dev-pull --all` | kod + baza + pliki |
-| `--with-certificates` | dodaje `storage/app/public/certificates` (**ok. 15 GB**) |
 | `--delete-files` | lustro: kasuje lokalne pliki, których nie ma na produkcji (domyślnie nie) |
 | `--dry-run` | tylko raport, nic nie zmienia |
 | `--yes` | bez pytań (automatyzacja) |
@@ -48,7 +47,7 @@ Zrzut produkcji ma schemat z wersji kodu wdrożonej na prod, a tabela `migration
 
 ## Pliki: dlaczego bez certyfikatów
 
-`storage/app` w `pneadm` ma 10 933 plików i **15,2 GB**, z czego **15 GB to `public/certificates`** (wygenerowane PDF-y). Reszta to ok. 160 MB (`courses`, `articles`, `instructors`, `training-offers`, `private`, `exports`). Domyślnie pobieramy resztę (994 pliki, 158 MB). `pnedu` ma 107 KB. Certyfikaty tylko na wyraźną flagę `--with-certificates`.
+`storage/app` w `pneadm` ma 10 933 plików i **15,2 GB**, z czego **15 GB to `public/certificates`** (wygenerowane PDF-y). Reszta to ok. 160 MB (`courses`, `articles`, `instructors`, `training-offers`, `private`, `exports`). Domyślnie pobieramy resztę (994 pliki, 158 MB). `pnedu` ma 107 KB. **Certyfikatów na deva nie pobieramy nigdy** (decyzja Waldemara 2026-11-01; skrypt nie ma na to flagi): PDF można wygenerować ponownie z danych w bazie, a lokalnie nie ma potrzeby ich mieć. Agent AI nie dodaje flagi ani nie pobiera ich ręcznie.
 
 ## Konfiguracja nowego komputera (krok po kroku)
 

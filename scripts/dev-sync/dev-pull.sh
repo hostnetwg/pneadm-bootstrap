@@ -13,7 +13,6 @@
 #   --files           rsync storage/app (pneadm + pnedu), bez storage/app/public/certificates
 #   --all             --code --db --files
 # Opcje:
-#   --with-certificates  dołącz storage/app/public/certificates (ok. 15 GB!)
 #   --delete-files       lustro: kasuje lokalne pliki, których nie ma na prod (domyślnie NIE)
 #   --dry-run            tylko raport, nic nie zmienia
 #   --yes                bez pytań o potwierdzenie (automatyzacja)
@@ -47,7 +46,7 @@ MAX_DUMP_AGE_HOURS="${MAX_DUMP_AGE_HOURS:-36}"
 ALLOW_LIVE_PAYMENTS="${ALLOW_LIVE_PAYMENTS:-0}"
 
 DO_CODE=0; DO_DB=0; DO_FILES=0
-WITH_CERTS=0; DELETE_FILES=0; DRY=0; ASSUME_YES=0; SCRATCH=0
+DELETE_FILES=0; DRY=0; ASSUME_YES=0; SCRATCH=0
 
 # ---------- pomocnicze ----------
 c_red=$'\033[31m'; c_yel=$'\033[33m'; c_grn=$'\033[32m'; c_dim=$'\033[2m'; c_off=$'\033[0m'
@@ -88,7 +87,6 @@ for arg in "$@"; do
     --db) DO_DB=1 ;;
     --files) DO_FILES=1 ;;
     --all) DO_CODE=1; DO_DB=1; DO_FILES=1 ;;
-    --with-certificates) WITH_CERTS=1 ;;
     --delete-files) DELETE_FILES=1 ;;
     --dry-run) DRY=1 ;;
     --yes) ASSUME_YES=1 ;;
@@ -522,20 +520,16 @@ rsync_pull() { # etykieta ścieżka_zdalna katalog_lokalny [excludes...]
 
 do_files() {
   step "Pliki: storage/app z produkcji (tylko pobieranie)"
-  local ex=()
-  if (( WITH_CERTS )); then
-    warn "Włączono certyfikaty (ok. 15 GB). Pobieranie potrwa długo i zajmie dużo miejsca."
-    (( DRY )) || confirm "Pobrać certyfikaty?" || die "Przerwano przez użytkownika."
-  else
-    ex+=("/public/certificates/")
-    info "   (pomijam storage/app/public/certificates — ok. 15 GB; dodaj --with-certificates, aby pobrać)"
-  fi
+  # Certyfikaty (wygenerowane PDF-y) NIGDY nie są pobierane na deva (decyzja Waldemara
+  # 2026-11-01): można je wygenerować ponownie z danych w bazie.
+  local ex=("/public/certificates/")
+  info "   (pomijam storage/app/public/certificates — celowo, zawsze)"
   (( DELETE_FILES )) && warn "--delete-files: lokalne pliki nieobecne na produkcji zostaną skasowane."
   say "-- pneadm"
   rsync_pull pneadm "domains/adm.pnedu.pl/pneadm/storage/app/" "$PNEADM_DIR/storage/app" "${ex[@]}"
   say "-- pnedu"
   rsync_pull pnedu "domains/pnedu.pl/app/storage/app/" "$PNEDU_DIR/storage/app"
-  log "FILES done dry=$DRY certs=$WITH_CERTS delete=$DELETE_FILES"
+  log "FILES done dry=$DRY delete=$DELETE_FILES"
 }
 
 # ---------- GŁÓWNY PRZEBIEG ----------
