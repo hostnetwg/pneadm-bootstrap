@@ -15,6 +15,10 @@ Komenda `certificates:cleanup-pdfs` ([`CleanupCertificatePdfsCommand`](../../app
 3. Zeruje `file_path` (rekord, numer, daty i statystyki pobrań zostają). To samo robi ręczny przycisk „Usuń PDF”.
 4. **Przed skasowaniem zamraża datę wystawienia:** jeśli zaświadczenie nie ma `issue_date`, a kurs nie ma własnej daty (`courses.issue_date_certyficates` albo `online_courses.certificate_issue_date`), wpisuje `issue_date = data generated_at`. Bez tego odtworzony PDF dostałby **dzisiejszą datę** (`CertificateGeneratorService::resolveEffectiveCompletionDate`).
 
+**Gdzie na PDF-ie widać datę wystawienia:** w treści, w zdaniu „zorganizowanym w dniu **DD.MM.RRRR** r.” (zmienna `{data_zakonczenia}`, czyli `effective_completion_date`). Linia **„Data, DD.MM.RRRR r.” w stopce** to `end_date` kursu i nie zależy od `issue_date`. Przy weryfikacji po czyszczeniu patrz na zdanie w treści, nie na stopkę. (Dotyczy szablonów z domyślnym tekstem zdarzenia; szablon z własnym `event_text` bez `{data_zakonczenia}` w ogóle nie pokazuje tej daty.)
+
+**Stan na 2026-11-01 (sprawdzone na kopii produkcji):** większość certyfikatów używa szablonów, które drukują datę rozpoczęcia i zakończenia kursu (`start_date`/`end_date`), a nie datę wystawienia. Dotyczy to m.in. szablonu `default-old-1`, `default` (inna zmienna niż `{data_zakonczenia}`) i kursów bez przypisanego szablonu. Zmienna `{data_zakonczenia}` jest dziś w jednym szablonie (nr 10, kursy online, wszystkie certyfikaty mają już `issue_date`). Zamrażanie `issue_date` jest więc zabezpieczeniem **prewencyjnym** (gdyby szablon zaczął używać `{data_zakonczenia}`), a nie poprawką widocznej zmiany. Odtworzone PDF-y sprawdzone na produkcji (kursy 262 i 391) mają te same daty co oryginały.
+
 Co dzieje się po usunięciu:
 
 | Kto | Efekt |
@@ -60,6 +64,12 @@ Harmonogram jest w `routes/console.php`. Korzysta z istniejącego crona `schedul
 `2026_11_01_120000_backfill_certificates_issue_date_from_generated_at` (baza `pneadm`) to **jednorazowe uzupełnienie danych**, bez zmiany schematu. Dla zaświadczeń z plikiem, bez `issue_date` i bez daty w kursie wpisuje `issue_date = DATE(generated_at)`. Nie nadpisuje istniejących wartości. Nie da się jej odwrócić (`down()` nic nie robi).
 
 Na lokalnej kopii produkcji z 2026-11-01 uzupełniła 6889 z 6892 zaświadczeń z plikiem bez daty. Pozostałe 3 mają datę w kursie. Data to dzień **ostatniego** wygenerowania pliku (`generated_at` zmienia się przy regeneracji), co jest najlepszym dostępnym przybliżeniem daty na PDF-ie.
+
+## Stan wdrożenia na produkcji
+
+**Wdrożone i włączone 2026-11-01** (kroki wykonał Waldemar w terminalu SeoHost): kod `3eb2e1e`, migracja uzupełniająca `issue_date`, `--dry-run`, próba `--limit=20` z weryfikacją odtworzonych PDF-ów (kursy 262 i 391, daty zgodne z oryginałami), pełny przebieg (8626 plików, 12 905 MB, 0 błędów), `--orphans` (4 pliki, 5,3 MB), `CERTIFICATE_PDF_CLEANUP_ENABLED=true`. Katalog `certificates` zmalał z ok. 15 GB do ok. 1,5 GB. Od tej pory scheduler kasuje pliki starsze niż 30 dni codziennie o 03:15 (czas polski).
+
+Po zmianie `.env` na prodzie robi się `php artisan config:cache`. Kopie `.env.bak-*` zawierają sekrety, więc po sprawdzeniu, że wszystko działa, usuń je (`rm ~/domains/adm.pnedu.pl/pneadm/.env.bak-*`).
 
 ## Wdrożenie na produkcji (SeoHost), krok po kroku
 

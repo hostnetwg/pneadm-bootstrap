@@ -3,7 +3,9 @@
 Data utworzenia/aktualizacji: 2026-10-28
 Status: plan roboczy, do potwierdzenia przez właściciela
 
-## Ostatnio (2026-11-01) — Retencja PDF zaświadczeń (30 dni) — do wdrożenia na prod
+## Ostatnio (2026-11-01) — Retencja PDF zaświadczeń (30 dni) — WDROŻONE na prod i włączone
+
+Stan: wdrożone, przebieg główny i osierocone pliki wykonane (12,9 GB zwolnione, `certificates` ok. 1,5 GB), automat włączony (codziennie 03:15). Szczegóły: [deploy/CERTIFICATE_PDF_RETENTION.md](./deploy/CERTIFICATE_PDF_RETENTION.md), sekcja „Stan wdrożenia”. Do zrobienia: usunąć `.env.bak-*` na prodzie po kilku dniach; sprawdzić w `storage/logs/laravel.log` pierwszy nocny przebieg. Opis poniżej to historia przygotowania.
 
 Kod gotowy: komenda `certificates:cleanup-pdfs` (`--dry-run`, `--days`, `--limit`, `--orphans`), migracja uzupełniająca `issue_date` z `generated_at` (6889 zaświadczeń na kopii prod), harmonogram **wyłączony** domyślnie (`CERTIFICATE_PDF_CLEANUP_ENABLED`), testy (11), changelog ADM 1.5. Do zrobienia: wdrożenie krok po kroku z [deploy/CERTIFICATE_PDF_RETENTION.md](./deploy/CERTIFICATE_PDF_RETENTION.md) (migracja, `--dry-run`, próba `--limit=20`, pełny przebieg, osierocone pliki, włączenie automatu). Zyskamy ok. 15 GB na serwerze.
 
