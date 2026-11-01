@@ -32,6 +32,16 @@ Schedule::command('participants:cleanup-live-access')
     ->dailyAt('04:15')
     ->timezone($reminderTimezone);
 
+/*
+ * Retencja PDF zaświadczeń (domyślnie WYŁĄCZONA: CERTIFICATE_PDF_CLEANUP_ENABLED=false).
+ * Najpierw: php artisan certificates:cleanup-pdfs --dry-run. Zob. docs/deploy/CERTIFICATE_PDF_RETENTION.md
+ */
+Schedule::command('certificates:cleanup-pdfs')
+    ->dailyAt((string) config('certificate_pdf_retention.schedule_time', '03:15'))
+    ->timezone((string) config('certificate_pdf_retention.timezone', 'Europe/Warsaw'))
+    ->withoutOverlapping(120)
+    ->when(fn () => (bool) config('certificate_pdf_retention.enabled', false));
+
 $analyticsTimezone = (string) config('analytics.order_form_funnel.timezone', 'Europe/Warsaw');
 
 Schedule::command('analytics:aggregate-order-forms')

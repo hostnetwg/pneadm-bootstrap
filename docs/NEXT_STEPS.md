@@ -3,6 +3,10 @@
 Data utworzenia/aktualizacji: 2026-10-28
 Status: plan roboczy, do potwierdzenia przez właściciela
 
+## Ostatnio (2026-11-01) — Retencja PDF zaświadczeń (30 dni) — do wdrożenia na prod
+
+Kod gotowy: komenda `certificates:cleanup-pdfs` (`--dry-run`, `--days`, `--limit`, `--orphans`), migracja uzupełniająca `issue_date` z `generated_at` (6889 zaświadczeń na kopii prod), harmonogram **wyłączony** domyślnie (`CERTIFICATE_PDF_CLEANUP_ENABLED`), testy (11), changelog ADM 1.5. Do zrobienia: wdrożenie krok po kroku z [deploy/CERTIFICATE_PDF_RETENTION.md](./deploy/CERTIFICATE_PDF_RETENTION.md) (migracja, `--dry-run`, próba `--limit=20`, pełny przebieg, osierocone pliki, włączenie automatu). Zyskamy ok. 15 GB na serwerze.
+
 ## Ostatnio (2026-11-01) — Synchronizacja PROD → DEV jedną komendą
 
 `scripts/dev-sync/dev-pull.sh` odświeża kod (`git pull --ff-only`), bazy (najnowszy komplet zrzutów z nocnego backupu, import do lokalnego MySQL, potem `migrate`) i pliki `storage/app` (bez `certificates`, nigdy). Połączenie z produkcją tylko kluczem ograniczonym do odczytu (`command=` w `authorized_keys` → `~/bin/pne-devsync-readonly.sh`). Import odmawia, gdy lokalne płatności są w trybie produkcyjnym albo poczta nie idzie do Mailpita. Bez zmian w aplikacjach i bez migracji. Kanon i konfiguracja komputerów: [deploy/DEV_SYNC.md](./deploy/DEV_SYNC.md).

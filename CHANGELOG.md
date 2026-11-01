@@ -2,6 +2,13 @@
 
 Krótka numeracja panelu. Szczegóły zawsze w `docs/`. Nowy numer wersji (np. 1.1) tylko po potwierdzeniu Waldemara. Hotfixy dopisujemy do bieżącej wersji.
 
+## 1.5 — 2026-11-01
+
+Zaświadczenia: automatyczne czyszczenie starych plików PDF. Narzędzia deweloperskie: odświeżanie komputera deva jedną komendą.
+
+- **Czyszczenie plików PDF zaświadczeń:** pliki starsze niż 30 dni od wygenerowania są usuwane z serwera (PDF można odtworzyć z bazy); numery i rekordy zostają. Na liście uczestników ikona PDF znika, a link z numerem zaświadczenia generuje plik od nowa; uczestnik na pnedu.pl pobiera zaświadczenie jak dotąd. Zaświadczeniom z plikiem, ale bez daty wystawienia, wpisano datę pierwszego wygenerowania, więc data na odtworzonym PDF się nie zmienia. Włączane osobno po próbnym uruchomieniu. Kanon: [deploy/CERTIFICATE_PDF_RETENTION.md](docs/deploy/CERTIFICATE_PDF_RETENTION.md).
+- **Narzędzia deweloperskie (bez wpływu na panel):** `scripts/dev-sync/dev-pull.sh` odświeża kod, bazy i pliki na komputerze deva z produkcji (tylko odczyt, bez certyfikatów). Kanon: [deploy/DEV_SYNC.md](docs/deploy/DEV_SYNC.md).
+
 ## 1.4 — 2026-10-19
 
 Windykacja: masowe przypomnienia po wyciągu oraz doprecyzowanie wyszukiwania przelewów i danych sprawy.
