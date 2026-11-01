@@ -60,6 +60,7 @@ git pull origin main
 
 ## Powiązane
 
+- Synchronizacja prod → dev (kod, bazy, pliki; klucz tylko do odczytu): [`DEV_SYNC.md`](./DEV_SYNC.md)
 - Kolejka / cron: [`PRODUCTION_QUEUE_OPS.md`](./PRODUCTION_QUEUE_OPS.md)
 - Forma komunikacji (docs po etapie): [`../AI_HUMAN_COMMUNICATION.md`](../AI_HUMAN_COMMUNICATION.md)
 

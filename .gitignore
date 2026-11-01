@@ -38,3 +38,13 @@ backup_*.sql
 
 # Lokalna konfiguracja deploya (zawiera hosty/ścieżki)
 /scripts/deploy-assets.env
+
+# Klucze SSH i zrzuty baz NIGDY w repo (trzymaj w ~/.ssh i ~/pne-dev-sync)
+/kluczGitHub*
+/hostnet#70*
+id_rsa*
+id_ed25519*
+*.pem
+*.ppk
+/dev-sync-dumps/
+*.sql.gz

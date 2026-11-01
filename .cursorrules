@@ -185,6 +185,17 @@ sail artisan test --filter TestName      # Run specific test
 - Use Laravel 11 syntax (avoid deprecated methods)
 - Prefer modern PHP 8.2+ features (readonly properties, enums, etc.)
 
+## 🔄 Synchronizacja PROD → DEV (kod, bazy, pliki) — OBOWIĄZKOWE ZASADY
+
+Kanon: `docs/deploy/DEV_SYNC.md` (sekcja „Dla agentów AI”). Skrót:
+
+- Odświeżanie komputera deva z produkcji **tylko** przez `scripts/dev-sync/dev-pull.sh` (flagi: `--code`, `--db`, `--files`, `--all`, `--dry-run`). Kierunek wyłącznie prod → dev. **Nigdy nic nie zapisuj na produkcji.**
+- Klucz SSH deva jest **ograniczony** (`command=` na serwerze). Nie łącz się z produkcją żadnym innym kluczem i nie omijaj `dev-pull` ręcznym `ssh`/`rsync`/`mysqldump`.
+- **Sekrety:** nie czytaj, nie wypisuj i nie wklejaj zawartości `~/.ssh/`, `~/.config/pne/`, plików `.env` ani zrzutów z `~/pne-dev-sync/`. Pokazuj tylko nazwy kluczy i „ustawione/puste”. Numer portu SSH nie trafia do repo.
+- Hasło do klucza zna tylko człowiek (`ssh-add -t …`). Nie edytuj `~/.ssh/authorized_keys` na produkcji.
+- `dev-pull --db` zastępuje lokalne bazy: tylko po wyraźnej zgodzie Waldemara. `--yes` tylko wtedy.
+- Lokalne dane po imporcie są **prawdziwe** (dane osobowe, prawdziwe zamówienia). Płatności lokalnie muszą być `*_SANDBOX=true`, poczta tylko Mailpit. Nie klikaj akcji ClickMeeting/Sendy/Publigo/iFirma bez zgody.
+
 ## Git Workflow
 - This project uses standard Git
 - Don't commit `.env`, `node_modules/`, `vendor/`

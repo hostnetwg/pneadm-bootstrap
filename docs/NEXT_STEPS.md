@@ -3,6 +3,12 @@
 Data utworzenia/aktualizacji: 2026-10-28
 Status: plan roboczy, do potwierdzenia przez właściciela
 
+## Ostatnio (2026-11-01) — Synchronizacja PROD → DEV jedną komendą
+
+`scripts/dev-sync/dev-pull.sh` odświeża kod (`git pull --ff-only`), bazy (najnowszy komplet zrzutów z nocnego backupu, import do lokalnego MySQL, potem `migrate`) i pliki `storage/app` (bez 15 GB `certificates`). Połączenie z produkcją tylko kluczem ograniczonym do odczytu (`command=` w `authorized_keys` → `~/bin/pne-devsync-readonly.sh`). Import odmawia, gdy lokalne płatności są w trybie produkcyjnym albo poczta nie idzie do Mailpita. Bez zmian w aplikacjach i bez migracji. Kanon i konfiguracja komputerów: [deploy/DEV_SYNC.md](./deploy/DEV_SYNC.md).
+
+Następny krok: wykonać pierwszy `dev-pull --db` (lokalnie `PAYU_SANDBOX`/`PAYNOW_SANDBOX` już `true`), skonfigurować dwa pozostałe komputery. Odłożone świadomie: rozdzielenie kluczy API dev/prod i rotacja kluczy produkcyjnych (m.in. Sendy z `.env.example` jest w historii gita), twardsza blokada integracji w `dev-pull`. Szczegóły: [deploy/DEV_SYNC.md](./deploy/DEV_SYNC.md), sekcja „Odłożone”.
+
 ## Ostatnio (2026-10-28) — Operacyjna atrybucja kampanii zamówień
 
 Kod kampanii z pełnego UTM, legacy `fb` i `/l/{kod}` jest zachowywany w bieżącej sesji Laravel także bez zgody GA. Formularz odroczony, PayU i Paynow zapisują go w `form_orders.fb_source`; `pne_marketing` i GA/GTM nadal wymagają zgody. Bez migracji i nowego cookie. Kolumna „Zam.” w panelu została opisana jako liczba rekordów zamówień, nie płatności ani uczestników. Kanon: [MARKETING.md](./MARKETING.md), deploy: [2026-10-operational-campaign-attribution-deploy.md](./deploy/2026-10-operational-campaign-attribution-deploy.md).
