@@ -129,6 +129,7 @@ Skrypt leży na prodzie poza gitem i **nie aktualizuje się przy `git pull`**. Z
 
 ## Powiązane
 
+- Powiadomienie o końcu zadania agenta (dźwięk + telefon, per komputer): [`DEV_NOTIFICATIONS.md`](./DEV_NOTIFICATIONS.md)
 - Backup produkcji (źródło zrzutów): [`MYSQL_BACKUP.md`](./MYSQL_BACKUP.md)
 - Ścieżki produkcyjne: [`PRODUCTION_PATHS.md`](./PRODUCTION_PATHS.md)
 - Bezpieczeństwo baz: [`../DATA_SAFETY.md`](../DATA_SAFETY.md)
