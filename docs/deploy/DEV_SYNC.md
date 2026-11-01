@@ -51,6 +51,8 @@ Zrzut produkcji ma schemat z wersji kodu wdrożonej na prod, a tabela `migration
 
 ## Konfiguracja nowego komputera (krok po kroku)
 
+**Dla agenta AI jest gotowy runbook z podziałem „agent / człowiek”: [`DEV_SYNC_NEW_COMPUTER.md`](./DEV_SYNC_NEW_COMPUTER.md)** (zawiera prompt do wklejenia w Cursorze na nowym komputerze). Poniżej ta sama procedura w skrócie.
+
 Na każdym z trzech komputerów, w WSL:
 
 1. Sklonuj/zaktualizuj `pneadm` i `pnedu`, uruchom Sail (`sail up -d` w obu projektach).
@@ -63,8 +65,31 @@ Na każdym z trzech komputerów, w WSL:
 
    Nie używaj „Klucze SSH → Wklej klucz” w DirectAdmin: to dodałoby klucz **bez** ograniczenia. Uwaga: operacje „Autoryzacja/Usuń” w tym panelu mogą przepisać `authorized_keys`, więc po nich sprawdź, czy linia nadal jest.
 4. Skopiuj konfigurację: `mkdir -p ~/.config/pne && cp scripts/dev-sync/dev-pull.env.example ~/.config/pne/dev-pull.env && chmod 600 ~/.config/pne/dev-pull.env` i wpisz `SSH_PORT` (port z maila SeoHost o aktywacji SSH).
-5. Odblokuj klucz w agencie: `ssh-add -t 14400 ~/.ssh/pne_devsync_ed25519` (4 godziny).
-6. Test: `dev-pull --dry-run --all`.
+5. **Zaufaj kluczowi serwera SeoHost (raz na komputer).** Skrypt używa ścisłego sprawdzania (`StrictHostKeyChecking=yes`), więc na nowym komputerze pierwsza próba kończy się `No ED25519 host key is known … Host key verification failed`. Nie akceptuj klucza na ślepo, tylko porównaj odcisk z komputerem, który już się łączył (`ssh-keygen -F "[h30.seohost.pl]:PORT" | grep -v '^#' | ssh-keygen -lf -`, wiersz ED25519), a potem dopisz klucz do `~/.ssh/known_hosts` tylko przy zgodnym odcisku:
+
+   ```bash
+   . ~/.config/pne/dev-pull.env
+   EXPECTED='SHA256:…odcisk ED25519 z zaufanego komputera…'
+   ssh-keyscan -p "$SSH_PORT" -t ed25519 "$SSH_HOST" 2>/dev/null > /tmp/h30.key
+   GOT=$(ssh-keygen -lf /tmp/h30.key 2>/dev/null | awk '{print $2}')
+   [ -n "$GOT" ] && [ "$GOT" = "$EXPECTED" ] && cat /tmp/h30.key >> ~/.ssh/known_hosts && echo ZGODNE || echo "NIC nie dopisano"
+   rm -f /tmp/h30.key
+   ```
+
+   Komendę wykonuj w terminalu **WSL na dev-komputerze**, nie w terminalu SeoHost. Odcisk jest publiczny (nie jest sekretem), ale źródłem jest komputer, który zaakceptował klucz przy pierwszym połączeniu, więc to jest porównanie, a nie weryfikacja u źródła.
+6. Uruchom agenta SSH pod stałą ścieżką i odblokuj klucz (hasło wpisuje człowiek; `dev-pull` sam używa `~/.ssh/pne-agent.sock`, gdy `SSH_AUTH_SOCK` jest pusty):
+
+   ```bash
+   export SSH_AUTH_SOCK=~/.ssh/pne-agent.sock
+   ssh-add -l >/dev/null 2>&1; [ $? -eq 2 ] && { rm -f "$SSH_AUTH_SOCK"; ssh-agent -a "$SSH_AUTH_SOCK" >/dev/null; }
+   ssh-add -t 14400 ~/.ssh/pne_devsync_ed25519   # 4 godziny
+   ```
+
+   `export` działa tylko w tym oknie terminala. W nowym oknie wpisz go ponownie albo jeszcze raz odblokuj klucz.
+7. Test: `dev-pull --dry-run --all`.
+8. Lokalne `.env` musi mieć **`PAYU_SANDBOX=true` i `PAYNOW_SANDBOX=true` w `pneadm` i w `pnedu`**. Inaczej import zatrzyma się przy sprawdzaniu bezpieczników (`BŁĄD: Lokalne płatności są w trybie PRODUKCYJNYM`), zanim cokolwiek zmieni: `sed -i -E 's/^(PAYU_SANDBOX)=.*/\1=true/; s/^(PAYNOW_SANDBOX)=.*/\1=true/' pneadm/.env pnedu/.env`.
+9. Pierwszy import: `dev-pull --all` (bez `--yes`, potwierdzasz `TAK`; przed zastąpieniem baz powstaje snapshot).
+10. Powiadomienia o końcu zadania agenta (dźwięk + telefon): [`DEV_NOTIFICATIONS.md`](./DEV_NOTIFICATIONS.md).
 
 Odcięcie zgubionego laptopa: usuń jego jedną linię z `~/.ssh/authorized_keys` na SeoHost.
 
