@@ -496,10 +496,10 @@ class ClosedTrainingCaseScheduledEmailBuilder
         }
 
         if ($lines === []) {
-            return '<p><strong>Kontakt w placówce:</strong> (brak danych na sprawie — uzupełnij przed wysyłką)</p>';
+            return '<p><strong>Kontakt:</strong> (brak danych na sprawie — uzupełnij przed wysyłką)</p>';
         }
 
-        return '<p><strong>Kontakt w placówce:</strong><br>'.implode('<br>', $lines).'</p>';
+        return '<p><strong>Kontakt:</strong><br>'.implode('<br>', $lines).'</p>';
     }
 
     private function signatureHtml(): string

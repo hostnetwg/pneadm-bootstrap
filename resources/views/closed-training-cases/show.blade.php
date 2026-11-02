@@ -249,7 +249,9 @@
                                     @if($canEmailInstructor ?? false)
                                         <form method="POST" action="{{ route('closed-training-cases.email.prepare-instructor-details', $case) }}" class="mb-0">
                                             @csrf
-                                            <button type="submit" class="btn btn-outline-primary btn-sm">E-mail ze szczegółami dla prowadzącego</button>
+                                            <button type="submit" class="btn btn-success btn-sm">
+                                                <i class="bi bi-envelope me-1" aria-hidden="true"></i>E-mail ze szczegółami dla prowadzącego
+                                            </button>
                                             <div class="form-check mt-2">
                                                 <input class="form-check-input" type="checkbox" name="include_school_contact" id="include_school_contact" value="1" checked>
                                                 <label class="form-check-label" for="include_school_contact">Dodaj kontakt do szkoły</label>
@@ -427,7 +429,7 @@
                                     <form method="POST" action="{{ route('closed-training-cases.email.prepare-scheduled', $case) }}" class="mt-3">
                                         @csrf
                                         <button type="submit" class="btn btn-success btn-sm">
-                                            Przygotuj e-mail z terminem
+                                            <i class="bi bi-envelope me-1" aria-hidden="true"></i>Przygotuj e-mail z terminem
                                         </button>
                                     </form>
                                     <p class="form-text mb-0 mt-2">Wstawi temat i treść do formularza po prawej. Po wysłaniu do szkoły sprawa pozostaje w statusie W toku.</p>

@@ -1353,6 +1353,8 @@ class ClosedTrainingCaseTest extends TestCase
             ->get(route('closed-training-cases.show', $case))
             ->assertOk()
             ->assertSee('E-mail ze szczegółami dla prowadzącego', false)
+            ->assertSee('bi bi-envelope', false)
+            ->assertSee('btn btn-success btn-sm', false)
             ->assertSee('id="include_school_contact"', false)
             ->assertSee('Dodaj kontakt do szkoły', false);
 
@@ -1383,6 +1385,8 @@ class ClosedTrainingCaseTest extends TestCase
         $this->assertStringContainsString('SP Przykład', $draft['body']);
         $this->assertStringContainsString('Sala konferencyjna', $draft['body']);
         $this->assertStringContainsString('1 200 PLN brutto', $draft['body']);
+        $this->assertStringContainsString('Kontakt:', $draft['body']);
+        $this->assertStringNotContainsString('Kontakt w placówce', $draft['body']);
         $this->assertStringContainsString('Anna Dyrektor', $draft['body']);
         $this->assertStringContainsString('szkola@example.com', $draft['body']);
         $this->assertStringContainsString('501 111 222', $draft['body']);
