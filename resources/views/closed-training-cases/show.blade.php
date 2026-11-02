@@ -1009,7 +1009,7 @@
                 convert_urls: false,
                 browser_spellcheck: true,
                 autoresize_bottom_margin: 16,
-                extended_valid_elements: 'p[style],div[data-order-form-notice],table[cellpadding|cellspacing|border|style|role],tr,td[align|style],th[align|style],a[href|target|rel]',
+                extended_valid_elements: 'p[style],span[data-order-form-notice],table[cellpadding|cellspacing|border|style|role],tr,td[align|style],th[align|style],a[href|target|rel]',
                 content_style: 'body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; font-size: 15px; line-height: 1.6; } p { margin: 0 0 0.75em; } table { border-collapse: collapse; margin: 0; } td { vertical-align: top; padding: 0; }',
             };
 
@@ -1063,29 +1063,21 @@
             const shareContacts = document.getElementById('share_contacts');
             const emailSubmit = document.getElementById('closed-training-email-submit');
             const emailIntent = document.getElementById('email_intent');
-            const orderFormSentence = 'szkolenie dla Państwa placówki jest już zaplanowane.';
 
             function insertOrderFormNotice(html, block) {
-                if (html.indexOf('data-order-form-notice="1"') !== -1 || html.indexOf("data-order-form-notice='1'") !== -1) {
+                if (/data-order-form-notice=(["'])1\1/.test(html)) {
                     return html;
                 }
-                const position = html.indexOf(orderFormSentence);
-                if (position === -1) {
+                const match = /szkolenie\s+dla\s+Państwa\s+placówki\s+jest\s+już\s+zaplanowane\./i.exec(html);
+                if (!match) {
                     return html + block;
                 }
-                const after = position + orderFormSentence.length;
-                let rest = html.slice(after).replace(/^\s*(?:<br\s*\/?>\s*)?/i, '');
-                const before = html.slice(0, after);
-                if (/^\s*<\/p>/i.test(rest)) {
-                    rest = rest.replace(/^\s*<\/p>\s*/i, '');
-                    return before + '</p>' + block + '<p><br></p>' + rest;
-                }
-                return before + '</p>' + block + '<p><br></p><p>' + rest;
+                const after = match.index + match[0].length;
+                return html.slice(0, after) + '<br>' + block + html.slice(after);
             }
 
             function removeOrderFormNotice(html) {
-                const without = html.replace(/<div\s+data-order-form-notice=(["'])1\1>[\s\S]*?<\/div>\s*(?:<p>(?:\s|&nbsp;|<br\s*\/?>)*<\/p>\s*)?/i, '');
-                return without.replace(/(szkolenie dla Państwa placówki jest już zaplanowane\.)<\/p>\s*<p>/i, '$1<br>');
+                return html.replace(/(?:<br\s*\/?>\s*)?<span\s+data-order-form-notice=(["'])1\1>[\s\S]*?<\/span>/i, '');
             }
 
             function emailEditor() {

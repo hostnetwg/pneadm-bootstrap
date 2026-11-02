@@ -76,55 +76,38 @@ class ClosedTrainingCaseScheduledEmailBuilder
         $url = CourseFormOrderBillingService::newOrderFormUrl($course, $variantId);
         $safeUrl = e($url);
 
-        return '<div data-order-form-notice="1">'
-            .'<p>W celu oficjalnego potwierdzenia terminu proszę wypełnić formularz zamówienia:<br>'
-            .'<a href="'.$safeUrl.'">'.$safeUrl.'</a></p>'
-            .'<p>(Jako uczestnika proszę wpisać imię, nazwisko i adres e-mail dyrektora. Pozostali nauczyciele podczas szkolenia otrzymają listę obecności, na podstawie której wystawimy zaświadczenia.)</p>'
-            .'<p>(Faktura z 14-dniowym terminem płatności zostanie wystawiona w dniu szkolenia.)</p>'
-            .'</div>';
+        return '<span data-order-form-notice="1">'
+            .'W celu oficjalnego potwierdzenia terminu proszę wypełnić formularz zamówienia:<br>'
+            .'<a href="'.$safeUrl.'">'.$safeUrl.'</a><br><br>'
+            .'(Jako uczestnika proszę wpisać imię, nazwisko i adres e-mail dyrektora. Pozostali nauczyciele podczas szkolenia otrzymają listę obecności, na podstawie której wystawimy zaświadczenia.)<br><br>'
+            .'(Faktura z 14-dniowym terminem płatności zostanie wystawiona w dniu szkolenia.)'
+            .'</span>';
     }
 
     public function insertOrderFormNotice(string $html, string $block): string
     {
-        if (str_contains($html, 'data-order-form-notice="1"') || str_contains($html, "data-order-form-notice='1'")) {
+        if (preg_match('/data-order-form-notice=(["\'])1\1/u', $html) === 1) {
             return $html;
         }
 
-        $sentence = 'szkolenie dla Państwa placówki jest już zaplanowane.';
-        $position = mb_strpos($html, $sentence);
-        if ($position === false) {
+        $pattern = '/szkolenie\s+dla\s+Państwa\s+placówki\s+jest\s+już\s+zaplanowane\./iu';
+        if (preg_match($pattern, $html, $matches, PREG_OFFSET_CAPTURE) !== 1) {
             return $html.$block;
         }
 
-        $after = $position + mb_strlen($sentence);
-        $before = mb_substr($html, 0, $after);
-        $rest = mb_substr($html, $after);
-        $rest = preg_replace('/^\s*(?:<br\s*\/?>\s*)?/iu', '', $rest, 1) ?? $rest;
+        $end = $matches[0][1] + strlen($matches[0][0]);
 
-        if (preg_match('/^\s*<\/p>/iu', $rest) === 1) {
-            $rest = preg_replace('/^\s*<\/p>\s*/iu', '', $rest, 1) ?? $rest;
-
-            return $before.'</p>'.$block.'<p><br></p>'.$rest;
-        }
-
-        return $before.'</p>'.$block.'<p><br></p><p>'.$rest;
+        return substr($html, 0, $end).'<br>'.$block.substr($html, $end);
     }
 
     public function removeOrderFormNotice(string $html): string
     {
-        $without = preg_replace(
-            '/<div\s+data-order-form-notice=(["\'])1\1>.*?<\/div>\s*(?:<p>(?:\s|&nbsp;|<br\s*\/?>)*<\/p>\s*)?/isu',
+        return preg_replace(
+            '/(?:<br\s*\/?>\s*)?<span\s+data-order-form-notice=(["\'])1\1>.*?<\/span>/isu',
             '',
             $html,
             1
         ) ?? $html;
-
-        return preg_replace(
-            '/(szkolenie dla Państwa placówki jest już zaplanowane\.)<\/p>\s*<p>/iu',
-            '$1<br>',
-            $without,
-            1
-        ) ?? $without;
     }
 
     public function hasResolvableAccessLink(Course $course): bool

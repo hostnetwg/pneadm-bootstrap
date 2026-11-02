@@ -18,13 +18,17 @@ class ClosedTrainingCaseScheduledEmailBuilderTest extends TestCase
         $html = '<p>Dzień dobry,</p>'
             .'<p>szkolenie dla Państwa placówki jest już zaplanowane.<br>'
             .'Poniżej przesyłam potwierdzenie ustaleń.</p>';
-        $block = '<div data-order-form-notice="1"><p>Formularz zamówienia.</p></div>';
+        $block = '<span data-order-form-notice="1">Formularz zamówienia.</span>';
 
         $withNotice = $builder->insertOrderFormNotice($html, $block);
 
         $this->assertStringContainsString(
-            'szkolenie dla Państwa placówki jest już zaplanowane.</p>'.$block.'<p><br></p><p>Poniżej przesyłam potwierdzenie ustaleń.</p>',
+            'szkolenie dla Państwa placówki jest już zaplanowane.<br>'.$block.'<br>Poniżej przesyłam potwierdzenie ustaleń.</p>',
             $withNotice
+        );
+        $this->assertLessThan(
+            strpos($withNotice, 'Poniżej przesyłam potwierdzenie ustaleń.'),
+            strpos($withNotice, 'Formularz zamówienia.')
         );
         $this->assertSame($withNotice, $builder->insertOrderFormNotice($withNotice, $block));
         $this->assertSame($html, $builder->removeOrderFormNotice($withNotice));
