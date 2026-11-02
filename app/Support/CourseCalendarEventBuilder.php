@@ -104,11 +104,100 @@ class CourseCalendarEventBuilder
 
     public function templateDatesString(): string
     {
-        $timezone = $this->timezone();
-        $start = $this->start()->copy()->timezone($timezone);
-        $end = $this->end()->copy()->timezone($timezone);
+        $start = $this->zonedStart();
+        $end = $this->zonedEnd();
 
         return $start->format('Ymd\THis').'/'.$end->format('Ymd\THis');
+    }
+
+    /**
+     * Link Google z maila sprawy. Opis jest dla szkoły i prowadzącego:
+     * przy stacjonarnym jest adres, przy online nie ma linku dla uczestników.
+     */
+    public function caseEmailGoogleCalendarUrl(): ?string
+    {
+        if (! $this->course->start_date) {
+            return null;
+        }
+
+        $params = [
+            'action' => 'TEMPLATE',
+            'text' => $this->title(),
+            'dates' => $this->templateDatesString(),
+            'details' => $this->caseEmailDescription(),
+            'ctz' => $this->timezone(),
+        ];
+
+        $place = $this->placeWithoutCountry();
+        if ($place !== null && strtolower((string) $this->course->type) === 'offline') {
+            $params['location'] = $place;
+        }
+
+        return 'https://calendar.google.com/calendar/render?'.http_build_query($params, '', '&', PHP_QUERY_RFC3986);
+    }
+
+    public function caseEmailDescription(): string
+    {
+        $lines = [
+            'Szkolenie: '.($this->plainTitle() ?: 'Szkolenie'),
+            'Termin: '.$this->scheduleLabel(),
+        ];
+
+        $institution = $this->institutionName();
+        if ($institution !== null) {
+            $lines[] = 'Placówka: '.$institution;
+        }
+
+        if (strtolower((string) $this->course->type) === 'offline') {
+            $place = $this->placeWithoutCountry();
+            if ($place !== null) {
+                $lines[] = 'Miejsce: '.$place;
+            }
+        }
+
+        $contact = $this->contactLines();
+        if ($contact !== []) {
+            $lines[] = '';
+            $lines[] = 'Kontakt:';
+            array_push($lines, ...$contact);
+        }
+
+        return implode("\n", $lines);
+    }
+
+    /**
+     * Plik kalendarza dla Apple, Outlooka i innych programów, które otwierają .ics.
+     */
+    public function toIcs(): string
+    {
+        $lines = [
+            'BEGIN:VCALENDAR',
+            'VERSION:2.0',
+            'PRODID:-//PNE//Szkolenie//PL',
+            'CALSCALE:GREGORIAN',
+            'METHOD:PUBLISH',
+            'BEGIN:VEVENT',
+            'UID:course-'.$this->course->id.'@pnedu.pl',
+            'DTSTAMP:'.now()->utc()->format('Ymd\THis\Z'),
+            'DTSTART:'.$this->zonedStart()->utc()->format('Ymd\THis\Z'),
+            'DTEND:'.$this->zonedEnd()->utc()->format('Ymd\THis\Z'),
+            'SUMMARY:'.$this->icsEscape($this->title()),
+        ];
+
+        $description = $this->caseEmailDescription();
+        if ($description !== '') {
+            $lines[] = 'DESCRIPTION:'.$this->icsEscape($description);
+        }
+
+        $place = $this->placeWithoutCountry();
+        if ($place !== null && strtolower((string) $this->course->type) === 'offline') {
+            $lines[] = 'LOCATION:'.$this->icsEscape($place);
+        }
+
+        $lines[] = 'END:VEVENT';
+        $lines[] = 'END:VCALENDAR';
+
+        return implode("\r\n", array_map($this->foldIcsLine(...), $lines))."\r\n";
     }
 
     public function colorId(): string
@@ -134,9 +223,9 @@ class CourseCalendarEventBuilder
      */
     public function toApiEventArray(): array
     {
+        $start = $this->zonedStart();
+        $end = $this->zonedEnd();
         $timezone = $this->timezone();
-        $start = $this->start()->copy()->timezone($timezone);
-        $end = $this->end()->copy()->timezone($timezone);
 
         $event = [
             'summary' => $this->title(),
@@ -178,6 +267,136 @@ class CourseCalendarEventBuilder
     private function timezone(): string
     {
         return (string) config('services.google_calendar.timezone', 'Europe/Warsaw');
+    }
+
+    private function zonedStart(): Carbon
+    {
+        return $this->start()->copy()->timezone($this->timezone());
+    }
+
+    private function zonedEnd(): Carbon
+    {
+        return $this->end()->copy()->timezone($this->timezone());
+    }
+
+    private function scheduleLabel(): string
+    {
+        if (! $this->course->start_date) {
+            return 'do uzupełnienia';
+        }
+
+        $start = $this->course->start_date->copy()->timezone('Europe/Warsaw');
+        $label = $start->format('d.m.Y').' r., godz. '.$start->format('H:i');
+
+        if ($this->course->end_date) {
+            $end = $this->course->end_date->copy()->timezone('Europe/Warsaw');
+            if ($start->isSameDay($end)) {
+                if ($end->format('H:i') !== $start->format('H:i')) {
+                    $label .= '–'.$end->format('H:i');
+                }
+            } else {
+                $label .= ' – '.$end->format('d.m.Y').' r., godz. '.$end->format('H:i');
+            }
+        }
+
+        return $label;
+    }
+
+    private function institutionName(): ?string
+    {
+        $this->course->loadMissing(['closedTrainingCase', 'location']);
+        $fromCase = trim((string) ($this->course->closedTrainingCase?->institution ?? ''));
+        if ($fromCase !== '') {
+            return $fromCase;
+        }
+
+        $fromLocation = trim((string) ($this->course->location?->location_name ?? ''));
+
+        return $fromLocation !== '' ? $fromLocation : null;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function contactLines(): array
+    {
+        $this->course->loadMissing('closedTrainingCase');
+        $case = $this->course->closedTrainingCase;
+        if ($case === null) {
+            return [];
+        }
+
+        $lines = [];
+        $name = trim((string) $case->contact_name);
+        if ($name !== '') {
+            $lines[] = 'Osoba: '.$name;
+        }
+        $phone = trim((string) $case->contact_phone);
+        if ($phone !== '') {
+            $lines[] = 'Telefon: '.$phone;
+        }
+        $emails = $case->contactEmailList();
+        if ($emails !== []) {
+            $lines[] = 'E-mail: '.implode(', ', $emails);
+        }
+
+        return $lines;
+    }
+
+    private function placeWithoutCountry(): ?string
+    {
+        $this->course->loadMissing('location');
+        $location = $this->course->location;
+        if ($location === null) {
+            return null;
+        }
+
+        $parts = array_values(array_filter([
+            trim((string) ($location->location_name ?? '')),
+            trim((string) ($location->address ?? '')),
+            trim(trim((string) ($location->postal_code ?? '')).' '.trim((string) ($location->post_office ?? ''))),
+        ], static fn (string $part): bool => $part !== ''));
+
+        return $parts === [] ? null : implode(', ', $parts);
+    }
+
+    private function icsEscape(string $value): string
+    {
+        return str_replace(
+            ['\\', "\r\n", "\n", "\r", ';', ','],
+            ['\\\\', '\\n', '\\n', '', '\\;', '\\,'],
+            $value
+        );
+    }
+
+    private function foldIcsLine(string $line): string
+    {
+        $limit = 75;
+        if (strlen($line) <= $limit) {
+            return $line;
+        }
+
+        $parts = [];
+        $offset = 0;
+        $length = strlen($line);
+        $first = true;
+
+        while ($offset < $length) {
+            $chunkLimit = $first ? $limit : $limit - 1;
+            $take = min($chunkLimit, $length - $offset);
+            if ($offset + $take < $length) {
+                while ($take > 1 && (ord($line[$offset + $take]) & 0xC0) === 0x80) {
+                    $take--;
+                }
+            }
+
+            $chunk = substr($line, $offset, $take);
+            $parts[] = $first ? $chunk : ' '.$chunk;
+            $offset += $take;
+            $first = false;
+        }
+
+        return implode("\r\n", $parts);
     }
 
     private function plainTitle(): string

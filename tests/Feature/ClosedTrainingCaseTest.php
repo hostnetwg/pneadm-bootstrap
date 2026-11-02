@@ -1284,6 +1284,16 @@ class ClosedTrainingCaseTest extends TestCase
         $this->assertStringContainsString('potwierdzenie terminu', $draft['subject']);
         $this->assertStringContainsString('stacjonarnie', $draft['body']);
         $this->assertStringContainsString('Sala konferencyjna', $draft['body']);
+        $this->assertStringContainsString('Dodaj do kalendarza Google', $draft['body']);
+        $this->assertStringContainsString('Dodaj do kalendarza Apple', $draft['body']);
+        $this->assertStringContainsString('calendar.google.com/calendar/render?action=TEMPLATE', $draft['body']);
+        $this->assertStringContainsString('&amp;dates=', $draft['body']);
+        $this->assertStringNotContainsString('&amp;amp;', $draft['body']);
+        $caseCalendarUrl = \App\Support\CourseCalendarEventBuilder::for($course->fresh(['location', 'instructor']))->caseEmailGoogleCalendarUrl();
+        $this->assertStringContainsString(htmlspecialchars((string) $caseCalendarUrl, ENT_QUOTES), $draft['body']);
+        $this->assertStringContainsString(rawurlencode('Miejsce:'), $draft['body']);
+        $this->assertStringContainsString(rawurlencode('Termin:'), $draft['body']);
+        $this->assertLessThan(strpos($draft['body'], 'Prowadzący'), strpos($draft['body'], 'Dodaj do kalendarza Google'));
 
         $this->actingAs($user)
             ->post(route('closed-training-cases.email.send', $case), [
@@ -1362,6 +1372,13 @@ class ClosedTrainingCaseTest extends TestCase
         $this->assertStringContainsString('W razie pytań proszę o kontakt telefoniczny', $draft['body']);
         $this->assertStringContainsString('Szkolenie rady w Przemyślu', $draft['body']);
         $this->assertStringContainsString('02.12.2026', $draft['body']);
+        $this->assertLessThan(strpos($draft['body'], 'Placówka'), strpos($draft['body'], 'Dodaj do kalendarza Apple'));
+        $this->assertStringContainsString('calendar.google.com/calendar/render?action=TEMPLATE', $draft['body']);
+        $this->assertStringContainsString('signature=', $draft['body']);
+        $caseCalendarUrl = \App\Support\CourseCalendarEventBuilder::for($course->fresh(['location', 'instructor']))->caseEmailGoogleCalendarUrl();
+        $this->assertStringContainsString(htmlspecialchars((string) $caseCalendarUrl, ENT_QUOTES), $draft['body']);
+        $this->assertStringContainsString(rawurlencode('Miejsce:'), $draft['body']);
+        $this->assertStringContainsString(rawurlencode('Termin:'), $draft['body']);
         $this->assertStringContainsString('SP Przykład', $draft['body']);
         $this->assertStringContainsString('Sala konferencyjna', $draft['body']);
         $this->assertStringContainsString('1 200 PLN brutto', $draft['body']);
@@ -1398,6 +1415,9 @@ class ClosedTrainingCaseTest extends TestCase
         $this->assertStringContainsString('Szkolenie online', $onlineDraft['subject']);
         $this->assertStringContainsString('szkolenie online jest już zaplanowane', $onlineDraft['body']);
         $this->assertStringContainsString('https://pnedu.clickmeeting.com/rada-test', $onlineDraft['body']);
+        $this->assertStringNotContainsString(rawurlencode('https://pnedu.clickmeeting.com/rada-test'), $onlineDraft['body']);
+        $this->assertStringContainsString('Dodaj do kalendarza Google', $onlineDraft['body']);
+        $this->assertStringContainsString('Dodaj do kalendarza Apple', $onlineDraft['body']);
         $this->assertStringContainsString('sprawdzić połączenie', $onlineDraft['body']);
         $this->assertStringContainsString('1 200 PLN brutto', $onlineDraft['body']);
         $this->assertStringContainsString('Anna Dyrektor', $onlineDraft['body']);

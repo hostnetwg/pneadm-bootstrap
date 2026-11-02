@@ -703,7 +703,14 @@ class ClosedTrainingCase extends Model
                     return '<a>';
                 }
 
-                return '<a href="'.htmlspecialchars($href[2], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8').'">';
+                $url = $href[2];
+                $previous = null;
+                while ($url !== $previous) {
+                    $previous = $url;
+                    $url = html_entity_decode($url, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                }
+
+                return '<a href="'.htmlspecialchars($url, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8').'">';
             },
             $html
         ) ?? $html;

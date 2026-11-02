@@ -5,7 +5,9 @@ namespace App\Services;
 use App\Models\ClosedTrainingCase;
 use App\Models\Course;
 use App\Models\Instructor;
+use App\Support\CourseCalendarEventBuilder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\URL;
 
 /**
  * Treść e-maila „szkolenie zaplanowane” (online z linkiem / stacjonarne potwierdzenie).
@@ -102,6 +104,7 @@ class ClosedTrainingCaseScheduledEmailBuilder
         }
 
         $isOnline = $type === 'online';
+        $accessLink = $isOnline ? $this->resolveAccessLink($course) : null;
         $title = $this->trainingTitle($case, $course);
         $greetingName = trim((string) ($instructor->first_name ?? ''));
         $hello = $greetingName !== '' ? 'Dzień dobry, '.e($greetingName).',' : 'Dzień dobry,';
@@ -110,7 +113,7 @@ class ClosedTrainingCaseScheduledEmailBuilder
 
         $lines = [
             '<strong>Szkolenie:</strong> '.e($title),
-            '<strong>Termin:</strong> '.e($this->scheduleLabel($case, $course)),
+            '<strong>Termin:</strong> '.e($this->scheduleLabel($case, $course)).$this->calendarLinksHtml($course),
         ];
         $institution = trim((string) $case->institution);
         if ($institution !== '') {
@@ -134,7 +137,6 @@ class ClosedTrainingCaseScheduledEmailBuilder
             .'<p>'.implode('<br>', $lines).'</p>';
 
         if ($isOnline) {
-            $accessLink = $this->resolveAccessLink($course);
             if ($accessLink !== null) {
                 $safeLink = e($accessLink);
                 $html .= '<p><strong>Link do szkolenia:</strong><br><a href="'.$safeLink.'">'.$safeLink.'</a></p>';
@@ -237,7 +239,7 @@ class ClosedTrainingCaseScheduledEmailBuilder
             .'<p>szkolenie dla Państwa placówki jest już zaplanowane.<br>'
             .'Poniżej przesyłam szczegóły oraz link, który proszę przekazać nauczycielom.</p>'
             .'<p><strong>Szkolenie:</strong> '.$safeTitle.'<br>'
-            .'<strong>Termin:</strong> '.$safeSchedule.'<br>'
+            .'<strong>Termin:</strong> '.$safeSchedule.$this->calendarLinksHtml($course).'<br>'
             .'<strong>Prowadzący:</strong> '.$safeInstructor.'</p>'
             .'<p><strong>Link do szkolenia:</strong><br>'
             .'<a href="'.$safeLink.'">'.$safeLink.'</a></p>'
@@ -282,7 +284,7 @@ class ClosedTrainingCaseScheduledEmailBuilder
             .'szkolenie dla Państwa placówki jest już zaplanowane.<br><br>'
             .'<strong>Poniżej przesyłam potwierdzenie ustaleń.</strong><br><br></p>'
             .'<p><strong>Szkolenie:</strong> '.$safeTitle.'<br>'
-            .'<strong>Termin:</strong> '.$safeSchedule.'<br>'
+            .'<strong>Termin:</strong> '.$safeSchedule.$this->calendarLinksHtml($course).'<br>'
             .'<strong>Prowadzący:</strong> '.$safeInstructor
             .$placeBlock
             .'<br><strong>Forma:</strong> stacjonarnie</p>'
@@ -297,6 +299,23 @@ class ClosedTrainingCaseScheduledEmailBuilder
             'variant' => 'onsite',
             'access_link' => null,
         ];
+    }
+
+    private function calendarLinksHtml(Course $course): string
+    {
+        if (! $course->start_date || ! $course->exists) {
+            return '';
+        }
+
+        $google = CourseCalendarEventBuilder::for($course)->caseEmailGoogleCalendarUrl();
+        $apple = URL::signedRoute('courses.calendar-ics', ['course' => $course]);
+        $links = [];
+        if (is_string($google) && $google !== '') {
+            $links[] = '<a href="'.$google.'">Dodaj do kalendarza Google</a>';
+        }
+        $links[] = '<a href="'.$apple.'">Dodaj do kalendarza Apple</a>';
+
+        return '<br>'.implode(' · ', $links);
     }
 
     public function resolveAccessLink(Course $course): ?string

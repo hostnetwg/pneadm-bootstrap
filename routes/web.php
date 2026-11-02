@@ -16,6 +16,7 @@ use App\Http\Controllers\BankStatementImportController;
 use App\Http\Controllers\CertificateController;
 use App\Http\Controllers\CertificateTemplateController;
 use App\Http\Controllers\ClosedTrainingCaseController;
+use App\Http\Controllers\CourseCalendarIcsController;
 use App\Http\Controllers\CourseLiveController;
 use App\Http\Controllers\CoursePriceVariantController;
 use App\Http\Controllers\CoursesController;
@@ -66,6 +67,11 @@ use App\Http\Controllers\WebhookPubligoController;
 use App\Http\Controllers\ZamowieniaController;
 use App\Http\Controllers\ZamowieniaProdController;
 use Illuminate\Support\Facades\Route;
+
+Route::get('/kalendarz/szkolenie/{course}.ics', CourseCalendarIcsController::class)
+    ->middleware('signed')
+    ->name('courses.calendar-ics')
+    ->whereNumber('course');
 
 Route::middleware(['auth', 'check.user.status'])->group(function () {
     Route::get('/', [DashboardOrdersController::class, 'index'])->name('dashboard');
