@@ -81,7 +81,7 @@
                                 </th>
                                 <th style="min-width: 15rem;">Temat / placówka</th>
                                 <th style="width: 14rem; max-width: 15.5rem;" title="Osoba do kontaktu, na dole cena dla szkoły; (i) = szczegóły placówki i oferty">Kontakt</th>
-                                <th style="width: 14.5rem; max-width: 16rem;" title="Termin, instruktor i wynagrodzenie pod nazwiskiem. Zielone / ✓ = potwierdzone">Ustalenia</th>
+                                <th style="width: 14.5rem; max-width: 16rem;" title="Termin, instruktor i wynagrodzenie pod nazwiskiem. Zielone / ✓ = potwierdzone. Gdy sprawa ma szkolenie — link do jego karty.">Ustalenia</th>
                                 <th style="min-width: 8rem;" title="Status z liczbą wpisów w historii, data ostatniego wpisu i opiekun; sortowanie po dacie">
                                     <a href="{{ $activitySortUrl }}" class="text-decoration-none text-dark">
                                         Ostatni wpis
@@ -193,10 +193,20 @@
                                                 @endif
                                             @endif
                                         </div>
+                                        @if($case->course)
+                                            <div class="mt-1">
+                                                <a href="{{ route('courses.show', $case->course) }}"
+                                                   class="font-monospace fw-semibold text-decoration-none"
+                                                   title="Szczegóły zaplanowanego szkolenia">[Szkolenie id: {{ $case->course->id }}]</a>
+                                            </div>
+                                        @endif
                                     </td>
                                     <td class="text-nowrap">
                                         <div class="mb-1">
                                             <span class="badge {{ $case->statusBadgeClass() }}">{{ $case->statusLabel() }}</span>
+                                            @if($case->course)
+                                                <span class="badge text-bg-success" title="Szkolenie jest już w kalendarzu">ZAPLANOWANE</span>
+                                            @endif
                                             <span class="text-muted" title="Liczba działań w historii sprawy">({{ (int) $case->events_count }})</span>
                                         </div>
                                         @if($case->status === \App\Models\ClosedTrainingCase::STATUS_CLOSED)

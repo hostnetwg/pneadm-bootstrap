@@ -32,6 +32,9 @@
                         <div class="card-body">
                             <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
                                 <span class="badge {{ $case->statusBadgeClass() }}">{{ $case->statusLabel() }}</span>
+                                @if($case->course)
+                                    <span class="badge text-bg-success" title="Szkolenie jest już w kalendarzu">ZAPLANOWANE</span>
+                                @endif
                                 @if($case->status === \App\Models\ClosedTrainingCase::STATUS_CLOSED)
                                     <span class="badge text-bg-light border">{{ $case->closedOutcomeLabel() }}</span>
                                 @endif
@@ -376,9 +379,10 @@
                         <div class="card-body">
                             @if($case->course)
                                 <p class="mb-1">
-                                    <a href="{{ route('courses.show', $case->course) }}" class="fw-semibold">
-                                        #{{ $case->course->id }} {{ $case->course->title }}
+                                    <a href="{{ route('courses.show', $case->course) }}" class="font-monospace fw-semibold text-decoration-none">
+                                        [Szkolenie id: {{ $case->course->id }}]
                                     </a>
+                                    <span class="fw-semibold">{{ $case->course->title }}</span>
                                 </p>
                                 @if($case->course->start_date)
                                     <p class="text-secondary small mb-1">

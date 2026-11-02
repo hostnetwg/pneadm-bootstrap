@@ -20,6 +20,23 @@ class ClosedTrainingCaseTest extends TestCase
 {
     use RefreshDatabase;
 
+    private int $outputBufferLevel = 0;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->withoutVite();
+        $this->outputBufferLevel = ob_get_level();
+    }
+
+    protected function tearDown(): void
+    {
+        while (ob_get_level() > $this->outputBufferLevel) {
+            ob_end_clean();
+        }
+        parent::tearDown();
+    }
+
     public function test_guest_cannot_open_the_case_list(): void
     {
         $this->get(route('closed-training-cases.index'))
@@ -1605,6 +1622,49 @@ class ClosedTrainingCaseTest extends TestCase
         $this->assertTrue(
             $case->events()->where('body', 'like', 'Zsynchronizowano ustalenia ze szkoleniem%')->exists()
         );
+    }
+
+    public function test_case_list_shows_planned_course_link_only_when_linked(): void
+    {
+        $user = User::factory()->create(['is_active' => true]);
+        $linked = $this->makeCase([
+            'topic' => 'UNIQ-LINKED-CASE-TOPIC',
+            'status' => ClosedTrainingCase::STATUS_IN_PROGRESS,
+        ]);
+        $plain = $this->makeCase([
+            'topic' => 'UNIQ-PLAIN-CASE-TOPIC',
+            'status' => ClosedTrainingCase::STATUS_NEW,
+        ]);
+        $course = $this->makeCourse([
+            'title' => 'UNIQ-LINKED-COURSE',
+            'closed_training_case_id' => $linked->id,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('closed-training-cases.index', ['status' => 'all', 'q' => 'UNIQ-LINKED-CASE-TOPIC']))
+            ->assertOk()
+            ->assertSee('[Szkolenie id: '.$course->id.']', false)
+            ->assertSee(route('courses.show', $course), false)
+            ->assertSee('ZAPLANOWANE');
+
+        $this->actingAs($user)
+            ->get(route('closed-training-cases.index', ['status' => 'all', 'q' => 'UNIQ-PLAIN-CASE-TOPIC']))
+            ->assertOk()
+            ->assertSee('UNIQ-PLAIN-CASE-TOPIC')
+            ->assertDontSee('ZAPLANOWANE')
+            ->assertDontSee('[Szkolenie id:', false);
+
+        $this->actingAs($user)
+            ->get(route('closed-training-cases.show', $linked))
+            ->assertOk()
+            ->assertSee('[Szkolenie id: '.$course->id.']', false)
+            ->assertSee('ZAPLANOWANE')
+            ->assertSee('UNIQ-LINKED-COURSE');
+
+        $this->actingAs($user)
+            ->get(route('closed-training-cases.show', $plain))
+            ->assertOk()
+            ->assertDontSee('ZAPLANOWANE');
     }
 
     public function test_unbind_clears_fee_confirmation_and_keeps_case_fields(): void
