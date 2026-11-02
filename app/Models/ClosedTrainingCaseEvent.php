@@ -57,13 +57,36 @@ class ClosedTrainingCaseEvent extends Model
 
     public function typeLabel(): string
     {
+        if ($this->event_type === self::TYPE_EMAIL_SENT) {
+            return $this->emailHistoryLabel();
+        }
+
         return match ($this->event_type) {
             self::TYPE_CREATED => 'Założenie',
             self::TYPE_NOTE => 'Notatka',
             self::TYPE_UPDATED => 'Zmiana',
-            self::TYPE_EMAIL_SENT => 'E-mail do szkoły',
             default => $this->event_type,
         };
+    }
+
+    /**
+     * Nagłówek historii bierze się z pierwszej linii zapisu, więc stare wpisy
+     * do prowadzącego nie pokazują się jako mail do szkoły.
+     */
+    public function emailHistoryLabel(): string
+    {
+        $normalized = str_replace(["\r\n", "\r"], "\n", (string) $this->body);
+        $firstLine = trim(explode("\n", $normalized, 2)[0]);
+
+        if (str_starts_with($firstLine, 'E-mail do prowadzącego')) {
+            return 'E-mail do prowadzącego';
+        }
+
+        if (str_starts_with($firstLine, 'E-mail testowy')) {
+            return 'E-mail testowy';
+        }
+
+        return 'E-mail do szkoły';
     }
 
     /**

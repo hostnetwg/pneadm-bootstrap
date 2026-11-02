@@ -306,6 +306,14 @@ class ClosedTrainingCaseTest extends TestCase
         ]))->historyIconClass());
         $this->assertSame('bg-secondary-subtle', (new ClosedTrainingCaseEvent(['event_type' => ClosedTrainingCaseEvent::TYPE_UPDATED]))->historyItemClass());
         $this->assertSame('bg-success-subtle', (new ClosedTrainingCaseEvent(['event_type' => ClosedTrainingCaseEvent::TYPE_EMAIL_SENT]))->historyItemClass());
+        $this->assertSame('E-mail do prowadzącego', (new ClosedTrainingCaseEvent([
+            'event_type' => ClosedTrainingCaseEvent::TYPE_EMAIL_SENT,
+            'body' => "E-mail do prowadzącego\nDo: trener@example.com\n\n<p>Szczegóły</p>",
+        ]))->typeLabel());
+        $this->assertSame('E-mail do szkoły', (new ClosedTrainingCaseEvent([
+            'event_type' => ClosedTrainingCaseEvent::TYPE_EMAIL_SENT,
+            'body' => "E-mail wysłany do szkoły\nDo: szkola@example.com\n\n<p>Treść</p>",
+        ]))->typeLabel());
         $this->assertSame('SMS · Trener: '.$note->note_party_name, $note->noteContextLabel());
 
         $this->actingAs($user)
@@ -1146,7 +1154,9 @@ class ClosedTrainingCaseTest extends TestCase
             ->assertSee('id="instructor-brief-plain"', false)
             ->assertSee('id="instructor-brief-shared"', false)
             ->assertSee('nie kontaktować się bezpośrednio ze szkołą', false)
-            ->assertSee('Anna Dyrektor', false);
+            ->assertSee('Anna Dyrektor', false)
+            ->assertSee('E-mail do prowadzącego', false)
+            ->assertDontSee('E-mail do szkoły', false);
 
         Mail::fake();
 
