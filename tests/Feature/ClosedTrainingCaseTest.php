@@ -1403,6 +1403,7 @@ class ClosedTrainingCaseTest extends TestCase
             'type' => 'online',
         ]);
         $course->onlineDetails()->create([
+            'platform' => 'ClickMeeting',
             'meeting_link' => 'https://pnedu.clickmeeting.com/rada-test',
         ]);
 
@@ -1416,6 +1417,11 @@ class ClosedTrainingCaseTest extends TestCase
         $this->assertStringContainsString('Szkolenie online', $onlineDraft['subject']);
         $this->assertStringContainsString('szkolenie online jest już zaplanowane', $onlineDraft['body']);
         $this->assertStringContainsString('https://pnedu.clickmeeting.com/rada-test', $onlineDraft['body']);
+        $this->assertLessThan(
+            strpos($onlineDraft['body'], 'Link do szkolenia'),
+            strpos($onlineDraft['body'], 'Platforma:')
+        );
+        $this->assertStringContainsString('ClickMeeting', $onlineDraft['body']);
         $this->assertStringNotContainsString(rawurlencode('https://pnedu.clickmeeting.com/rada-test'), $onlineDraft['body']);
         $this->assertStringContainsString('Dodaj do kalendarza Google', $onlineDraft['body']);
         $this->assertStringContainsString('Dodaj do kalendarza iCalendar Apple', $onlineDraft['body']);
@@ -1488,6 +1494,11 @@ class ClosedTrainingCaseTest extends TestCase
         $draft = session('email_draft');
         $presenter = 'https://pnedu.clickmeeting.com/nowy-pokoj/presenterhash12345678';
         $this->assertStringContainsString('Link dla prowadzącego', $draft['body']);
+        $this->assertLessThan(
+            strpos($draft['body'], 'Link dla prowadzącego'),
+            strpos($draft['body'], 'Platforma:')
+        );
+        $this->assertStringContainsString('ClickMeeting', $draft['body']);
         $this->assertStringContainsString('href="'.$presenter.'"', $draft['body']);
         $this->assertDoesNotMatchRegularExpression(
             '/href="https:\/\/pnedu\.clickmeeting\.com\/nowy-pokoj"/',
@@ -1509,6 +1520,7 @@ class ClosedTrainingCaseTest extends TestCase
         $school = session('email_draft');
         $this->assertStringContainsString('href="https://pnedu.clickmeeting.com/nowy-pokoj"', $school['body']);
         $this->assertStringNotContainsString('presenterhash12345678', $school['body']);
+        $this->assertStringNotContainsString('Platforma:', $school['body']);
     }
 
     public function test_operator_can_edit_and_delete_history_events(): void

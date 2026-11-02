@@ -142,11 +142,15 @@ class ClosedTrainingCaseScheduledEmailBuilder
         if ($isOnline && is_array($instructorLink)) {
             $label = e((string) $instructorLink['label']);
             $url = $instructorLink['url'];
+            $platform = $this->onlinePlatformLabel($course);
+            $platformHtml = $platform !== null
+                ? '<strong>Platforma:</strong> '.e($platform).'<br>'
+                : '';
             if (is_string($url) && $url !== '') {
                 $safeLink = e($url);
-                $html .= '<p><strong>'.$label.':</strong><br><a href="'.$safeLink.'">'.$safeLink.'</a></p>';
+                $html .= '<p>'.$platformHtml.'<strong>'.$label.':</strong><br><a href="'.$safeLink.'">'.$safeLink.'</a></p>';
             } else {
-                $html .= '<p><strong>'.$label.':</strong> ('.e((string) $instructorLink['empty']).')</p>';
+                $html .= '<p>'.$platformHtml.'<strong>'.$label.':</strong> ('.e((string) $instructorLink['empty']).')</p>';
             }
         }
 
@@ -321,6 +325,19 @@ class ClosedTrainingCaseScheduledEmailBuilder
         $links[] = '<a href="'.$apple.'">Dodaj do kalendarza iCalendar Apple</a>';
 
         return '<br>'.implode(' · ', $links);
+    }
+
+    private function onlinePlatformLabel(Course $course): ?string
+    {
+        $course->loadMissing('onlineDetails');
+        $platform = trim((string) ($course->onlineDetails?->platform ?? ''));
+        if ($platform !== '') {
+            return $platform;
+        }
+
+        $eventId = trim((string) ($course->onlineDetails?->clickmeeting_event_id ?? ''));
+
+        return $eventId !== '' ? 'ClickMeeting' : null;
     }
 
     /**

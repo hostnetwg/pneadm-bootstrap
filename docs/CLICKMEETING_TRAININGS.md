@@ -107,7 +107,7 @@ Dociągnięcie:
 
 Pole widać na karcie i w edycji szkolenia. Nie trafia do maila szkoły, do uczestników, do kalendarza sprawy ani na pnedu.pl (model publiczny ma to pole ukryte przy serializacji).
 
-Gdy szkolenie ma ID ClickMeeting, mail do prowadzącego używa wyłącznie linku prezentera. Gdy go nie ma, w treści jest informacja, że trzeba go uzupełnić — bez podstawiania linku uczestnika. Szkolenie online bez ID ClickMeeting zostaje przy dotychczasowym linku spotkania.
+Gdy szkolenie ma ID ClickMeeting, mail do prowadzącego używa wyłącznie linku prezentera. Nad tym linkiem jest linia „Platforma:” z nazwą z karty szkolenia. Gdy go nie ma, w treści jest informacja, że trzeba go uzupełnić — bez podstawiania linku uczestnika. Szkolenie online bez ID ClickMeeting zostaje przy dotychczasowym linku spotkania.
 
 ## Deploy
 
