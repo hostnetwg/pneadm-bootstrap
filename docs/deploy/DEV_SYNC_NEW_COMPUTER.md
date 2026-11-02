@@ -125,6 +125,6 @@ Ten dokument przeprowadza agenta AI (Cursor) przez konfigurację `dev-pull` i po
 |----------|------|-------|
 | PNE-YOGA | 2026-11-01 | pierwsza konfiguracja, import wykonany |
 | LAPTOP-33SJB4MI | 2026-11-01 | import wykonany, powiadomienia zainstalowane |
-| komputer stacjonarny | (do konfiguracji) | według tego runbooka |
+| DESKTOP-RSK0JVN (komputer stacjonarny) | 2026-11-01 | import wykonany, pliki pobrane, powiadomienia zainstalowane. Uwaga: `storage/app` w kontenerze Sail należy do uid 1337 (gid 1000), więc przed `--files` ustaw `docker exec pneadm-bootstrap-app chown -R 1000:1000 storage/app && chmod -R g+rwX storage/app` (grupa 1000, nie 1337) |
 
 Odcięcie zgubionego komputera: usuń jego jedną linię z `~/.ssh/authorized_keys` na SeoHost (wiersz z komentarzem `pne-devsync-NAZWA`).
