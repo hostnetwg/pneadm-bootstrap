@@ -582,6 +582,31 @@ class ClosedTrainingCaseController extends Controller
             ]);
     }
 
+    public function prepareInstructorDetailsEmail(Request $request, ClosedTrainingCase $closedTrainingCase): RedirectResponse
+    {
+        $draft = $this->scheduledEmailBuilder->buildInstructorDetails(
+            $closedTrainingCase,
+            $request->boolean('include_school_contact'),
+        );
+        if ($draft['ok'] !== true) {
+            return redirect()
+                ->route('closed-training-cases.show', $closedTrainingCase)
+                ->with('error', $draft['error']);
+        }
+
+        return redirect()
+            ->route('closed-training-cases.show', $closedTrainingCase)
+            ->withFragment('closed-training-case-email')
+            ->with('success', 'Przygotowano e-mail ze szczegółami dla prowadzącego. Sprawdź treść i wyślij.')
+            ->with('email_draft', [
+                'subject' => $draft['subject'],
+                'body' => $draft['html'],
+                'intent' => 'instructor_details',
+                'send_mode' => 'instructor',
+                'share_contacts' => false,
+            ]);
+    }
+
     public function prepareInstructorEmail(Request $request, ClosedTrainingCase $closedTrainingCase): RedirectResponse
     {
         $share = $request->boolean('share_contacts');
@@ -618,8 +643,10 @@ class ClosedTrainingCaseController extends Controller
             'email_recipients' => ['nullable', 'array'],
             'email_recipients.*' => ['string', 'email', Rule::in($allowedSchool)],
             'test_recipient' => ['nullable', 'string', 'email', Rule::in($allowedTest)],
-            'email_intent' => ['nullable', Rule::in(['general', 'scheduled_notice', 'instructor_brief'])],
+            'email_intent' => ['nullable', Rule::in(['general', 'scheduled_notice', 'instructor_brief', 'instructor_details'])],
             'notify_instructor' => ['nullable', 'boolean'],
+            'instructor_brief_subject' => ['nullable', 'string', 'max:255'],
+            'instructor_brief_body' => ['nullable', 'string', 'max:20000'],
             'share_contacts' => ['nullable', 'boolean'],
             'update_waiting_on' => ['nullable', 'boolean'],
             'suggested_waiting_on' => ['nullable', Rule::in(array_keys(ClosedTrainingCase::waitingOnOptions()))],
@@ -636,14 +663,25 @@ class ClosedTrainingCaseController extends Controller
         $isInstructorOnly = $sendMode === 'instructor';
         $isScheduledNotice = ($data['email_intent'] ?? 'general') === 'scheduled_notice';
         $notifyInstructor = $request->boolean('notify_instructor');
-        $shareContacts = $request->boolean('share_contacts');
         $updateWaitingOn = $request->boolean('update_waiting_on');
+        $instructorBriefSubject = null;
+        $instructorBriefBody = null;
         $suggestedWaitingOn = $this->blankToNull($data['suggested_waiting_on'] ?? null);
 
         if ($isInstructorOnly || ($notifyInstructor && $sendMode === 'school')) {
             if ($instructorEmail === null) {
                 throw ValidationException::withMessages([
                     'notify_instructor' => 'Brak e-maila prowadzącego. Przypisz instruktora z adresem e-mail.',
+                ]);
+            }
+        }
+
+        if ($notifyInstructor && $sendMode === 'school' && ! $isTest) {
+            $instructorBriefSubject = $closedTrainingCase->withCaseReferenceInSubject((string) ($data['instructor_brief_subject'] ?? ''));
+            $instructorBriefBody = ClosedTrainingCase::sanitizeSchoolEmailHtml((string) ($data['instructor_brief_body'] ?? ''));
+            if (trim((string) ($data['instructor_brief_subject'] ?? '')) === '' || trim(strip_tags($instructorBriefBody)) === '') {
+                throw ValidationException::withMessages([
+                    'instructor_brief_body' => 'Brief dla prowadzącego jest pusty. Popraw go w polu obok albo odznacz wysyłkę briefu.',
                 ]);
             }
         }
@@ -717,27 +755,24 @@ class ClosedTrainingCaseController extends Controller
 
         $extraMessages = [];
 
-        if ($notifyInstructor && $sendMode === 'school' && ! $isTest && $instructorEmail !== null) {
-            $brief = $this->coordinationEmailBuilder->buildInstructorBrief($closedTrainingCase, $shareContacts);
-            if ($brief['ok'] === true) {
-                try {
-                    Mail::to($instructorEmail)->send(new ClosedTrainingCaseSchoolMail($brief['html'], $brief['subject']));
-                    $this->cases->recordSchoolEmailSent(
-                        $closedTrainingCase,
-                        $request->user(),
-                        [$instructorEmail],
-                        $brief['subject'],
-                        $brief['html'],
-                        'instructor',
-                    );
-                    $extraMessages[] = 'Wysłano też bezpieczny brief do prowadzącego ('.$instructorEmail.').';
-                } catch (\Throwable $exception) {
-                    Log::warning('Closed training case instructor notify email failed', [
-                        'case_id' => $closedTrainingCase->id,
-                        'message' => $exception->getMessage(),
-                    ]);
-                    $extraMessages[] = 'E-mail do szkoły wyszedł, ale powiadomienie prowadzącego nie — sprawdź SMTP i wyślij trybem „Tylko do prowadzącego”.';
-                }
+        if ($notifyInstructor && $sendMode === 'school' && ! $isTest && $instructorEmail !== null && $instructorBriefSubject !== null && $instructorBriefBody !== null) {
+            try {
+                Mail::to($instructorEmail)->send(new ClosedTrainingCaseSchoolMail($instructorBriefBody, $instructorBriefSubject));
+                $this->cases->recordSchoolEmailSent(
+                    $closedTrainingCase,
+                    $request->user(),
+                    [$instructorEmail],
+                    $instructorBriefSubject,
+                    $instructorBriefBody,
+                    'instructor',
+                );
+                $extraMessages[] = 'Wysłano też bezpieczny brief do prowadzącego ('.$instructorEmail.').';
+            } catch (\Throwable $exception) {
+                Log::warning('Closed training case instructor notify email failed', [
+                    'case_id' => $closedTrainingCase->id,
+                    'message' => $exception->getMessage(),
+                ]);
+                $extraMessages[] = 'E-mail do szkoły wyszedł, ale powiadomienie prowadzącego nie — sprawdź SMTP i wyślij trybem „Tylko do prowadzącego”.';
             }
         }
 

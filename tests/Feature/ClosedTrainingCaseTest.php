@@ -1138,6 +1138,15 @@ class ClosedTrainingCaseTest extends TestCase
         );
         $this->assertSame(ClosedTrainingCase::STATUS_IN_PROGRESS, $case->fresh()->status);
 
+        $this->actingAs($user)
+            ->get(route('closed-training-cases.show', $case))
+            ->assertOk()
+            ->assertSee('id="instructor-brief-panel"', false)
+            ->assertSee('id="instructor-brief-plain"', false)
+            ->assertSee('id="instructor-brief-shared"', false)
+            ->assertSee('nie kontaktować się bezpośrednio ze szkołą', false)
+            ->assertSee('Anna Dyrektor', false);
+
         Mail::fake();
 
         $this->actingAs($user)
@@ -1150,6 +1159,21 @@ class ClosedTrainingCaseTest extends TestCase
                 'notify_instructor' => '1',
                 'share_contacts' => '1',
             ])
+            ->assertSessionHasErrors('instructor_brief_body');
+
+        Mail::assertNothingSent();
+
+        $this->actingAs($user)
+            ->post(route('closed-training-cases.email.send', $case), [
+                'email_subject' => 'Propozycja dla szkoły',
+                'email_body' => '<p>Koszt 2500 zł brutto.</p>',
+                'send_mode' => 'school',
+                'email_recipients' => ['szkola@example.com'],
+                'email_intent' => 'general',
+                'notify_instructor' => '1',
+                'instructor_brief_subject' => 'Brief poprawiony',
+                'instructor_brief_body' => '<p>Poprawiony brief: Anna Dyrektor, szkola@example.com.</p>',
+            ])
             ->assertRedirect(route('closed-training-cases.show', $case))
             ->assertSessionHas('success');
 
@@ -1159,9 +1183,9 @@ class ClosedTrainingCaseTest extends TestCase
         });
         Mail::assertSent(ClosedTrainingCaseSchoolMail::class, function (ClosedTrainingCaseSchoolMail $mail) use ($instructor) {
             return $mail->hasTo(strtolower($instructor->email))
-                && ! str_contains($mail->htmlBody, '2500')
-                && str_contains($mail->htmlBody, 'szkola@example.com')
-                && str_contains($mail->htmlBody, 'Anna Dyrektor');
+                && str_contains($mail->htmlBody, 'Poprawiony brief')
+                && str_contains($mail->htmlBody, 'Anna Dyrektor')
+                && ! str_contains($mail->htmlBody, '2500');
         });
     }
 
@@ -1212,6 +1236,113 @@ class ClosedTrainingCaseTest extends TestCase
             ->assertRedirect(route('closed-training-cases.show', $case));
 
         $this->assertSame(ClosedTrainingCase::STATUS_IN_PROGRESS, $case->fresh()->status);
+    }
+
+    public function test_instructor_details_email_includes_fee_and_optional_school_contact(): void
+    {
+        $user = User::factory()->create(['is_active' => true]);
+        $instructor = Instructor::query()->create([
+            'title' => 'mgr',
+            'first_name' => 'Jacek',
+            'last_name' => 'Krzyzak',
+            'email' => 'jacek.szczegoly.'.uniqid('', true).'@example.com',
+            'phone' => '502 145 752',
+            'is_active' => true,
+        ]);
+        $case = $this->makeCase([
+            'contact_name' => 'Anna Dyrektor',
+            'contact_email' => 'szkola@example.com',
+            'contact_phone' => '501 111 222',
+            'institution' => 'SP Przykład',
+            'status' => ClosedTrainingCase::STATUS_IN_PROGRESS,
+            'instructor_id' => $instructor->id,
+            'client_price' => '2500.00',
+            'instructor_fee' => '1200.00',
+            'topic' => 'Zagrożenie przemocą i atak w szkole',
+        ]);
+        $start = Carbon::parse('2026-12-02 15:00:00', 'Europe/Warsaw');
+        $course = $this->makeCourse([
+            'title' => 'Szkolenie rady w Przemyślu',
+            'type' => 'offline',
+            'category' => 'closed',
+            'instructor_id' => $instructor->id,
+            'start_date' => $start,
+            'end_date' => $start->copy()->addHours(3),
+            'closed_training_case_id' => $case->id,
+        ]);
+        $course->location()->create([
+            'location_name' => 'Sala konferencyjna',
+            'address' => 'ul. Szkolna 1',
+            'postal_code' => '37-700',
+            'post_office' => 'Przemyśl',
+            'country' => 'PL',
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('closed-training-cases.show', $case))
+            ->assertOk()
+            ->assertSee('E-mail ze szczegółami dla prowadzącego', false)
+            ->assertSee('id="include_school_contact"', false)
+            ->assertSee('Dodaj kontakt do szkoły', false);
+
+        $this->actingAs($user)
+            ->post(route('closed-training-cases.email.prepare-instructor-details', $case), [
+                'include_school_contact' => '1',
+            ])
+            ->assertRedirect(route('closed-training-cases.show', $case).'#closed-training-case-email')
+            ->assertSessionHas('email_draft');
+
+        $draft = session('email_draft');
+        $this->assertSame('instructor', $draft['send_mode']);
+        $this->assertSame('instructor_details', $draft['intent']);
+        $this->assertStringContainsString('Szkolenie stacjonarne', $draft['subject']);
+        $this->assertStringContainsString('Dzień dobry, Jacek', $draft['body']);
+        $this->assertStringContainsString('szkolenie stacjonarne jest już zaplanowane', $draft['body']);
+        $this->assertStringContainsString('być na miejscu przed rozpoczęciem', $draft['body']);
+        $this->assertStringContainsString('Szkolenie rady w Przemyślu', $draft['body']);
+        $this->assertStringContainsString('02.12.2026', $draft['body']);
+        $this->assertStringContainsString('SP Przykład', $draft['body']);
+        $this->assertStringContainsString('Sala konferencyjna', $draft['body']);
+        $this->assertStringContainsString('1 200 PLN brutto', $draft['body']);
+        $this->assertStringContainsString('Anna Dyrektor', $draft['body']);
+        $this->assertStringContainsString('szkola@example.com', $draft['body']);
+        $this->assertStringContainsString('501 111 222', $draft['body']);
+        $this->assertStringNotContainsString('2500', $draft['body']);
+
+        $this->actingAs($user)
+            ->post(route('closed-training-cases.email.prepare-instructor-details', $case))
+            ->assertRedirect(route('closed-training-cases.show', $case).'#closed-training-case-email');
+
+        $withoutContact = session('email_draft');
+        $this->assertStringContainsString('1 200 PLN brutto', $withoutContact['body']);
+        $this->assertStringNotContainsString('Anna Dyrektor', $withoutContact['body']);
+        $this->assertStringNotContainsString('szkola@example.com', $withoutContact['body']);
+        $this->assertStringNotContainsString('501 111 222', $withoutContact['body']);
+
+        $course->update([
+            'title' => 'Szkolenie online rady',
+            'type' => 'online',
+        ]);
+        $course->onlineDetails()->create([
+            'meeting_link' => 'https://pnedu.clickmeeting.com/rada-test',
+        ]);
+
+        $this->actingAs($user)
+            ->post(route('closed-training-cases.email.prepare-instructor-details', $case->fresh()), [
+                'include_school_contact' => '1',
+            ])
+            ->assertRedirect(route('closed-training-cases.show', $case).'#closed-training-case-email');
+
+        $onlineDraft = session('email_draft');
+        $this->assertStringContainsString('Szkolenie online', $onlineDraft['subject']);
+        $this->assertStringContainsString('szkolenie online jest już zaplanowane', $onlineDraft['body']);
+        $this->assertStringContainsString('https://pnedu.clickmeeting.com/rada-test', $onlineDraft['body']);
+        $this->assertStringContainsString('sprawdzić połączenie', $onlineDraft['body']);
+        $this->assertStringContainsString('1 200 PLN brutto', $onlineDraft['body']);
+        $this->assertStringContainsString('Anna Dyrektor', $onlineDraft['body']);
+        $this->assertStringNotContainsString('Sala konferencyjna', $onlineDraft['body']);
+        $this->assertStringNotContainsString('być na miejscu', $onlineDraft['body']);
+        $this->assertStringNotContainsString('2500', $onlineDraft['body']);
     }
 
     public function test_operator_can_edit_and_delete_history_events(): void

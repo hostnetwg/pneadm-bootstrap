@@ -242,10 +242,23 @@
                                         Trener:
                                         <strong>{{ $case->course?->instructor?->full_title_name ?: '—' }}</strong>
                                     </p>
-                                    <p class="mb-0">
+                                    <p class="mb-2">
                                         Termin:
                                         <strong>{{ $case->formatScheduleRange($case->course?->start_date, $case->course?->end_date, true) }}</strong>
                                     </p>
+                                    @if($canEmailInstructor ?? false)
+                                        <form method="POST" action="{{ route('closed-training-cases.email.prepare-instructor-details', $case) }}" class="mb-0">
+                                            @csrf
+                                            <button type="submit" class="btn btn-outline-primary btn-sm">E-mail ze szczegółami dla prowadzącego</button>
+                                            <div class="form-check mt-2">
+                                                <input class="form-check-input" type="checkbox" name="include_school_contact" id="include_school_contact" value="1" checked>
+                                                <label class="form-check-label" for="include_school_contact">Dodaj kontakt do szkoły</label>
+                                            </div>
+                                        </form>
+                                        <p class="form-text mb-0 mt-2">Wstawi temat i treść do formularza po prawej. Wynagrodzenie jest w treści. Ceny dla szkoły nie ma. Kontakt do szkoły zależy od pola powyżej.</p>
+                                    @else
+                                        <p class="form-text mb-0">Brak e-maila prowadzącego. Przypisz instruktora ze skrzynką, żeby przygotować wiadomość ze szczegółami.</p>
+                                    @endif
                                     @if($case->linkedCourseInstructorMismatch() || $case->linkedCourseScheduleMismatch())
                                         <div class="alert alert-warning py-2 small mt-2 mb-0">
                                             <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
@@ -648,7 +661,9 @@
                             <button type="submit" class="btn btn-primary">Zapisz obsługę</button>
                         </div>
                     </form>
+                </div>
 
+                <div class="col-12">
                     @php
                         $emailDraft = $emailDraft ?? null;
                         $canEmailInstructor = $canEmailInstructor ?? false;
@@ -744,6 +759,7 @@
                                                     Przy wysyłce do szkoły — wyślij też bezpieczny brief do prowadzącego (bez ceny)
                                                 </label>
                                             </div>
+                                            <div class="form-text">Po zaznaczeniu brief pojawi się obok treści. Można go poprawić przed wysyłką.</div>
                                             @error('notify_instructor')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
                                         </div>
                                     @endif
@@ -792,11 +808,35 @@
                                         </div>
                                         <template id="order-form-notice-template">{!! $orderFormNoticeHtml !!}</template>
                                     @endif
-                                    <div class="mb-3">
-                                        <label for="email_body" class="form-label">Treść</label>
-                                        <textarea name="email_body" id="email_body" rows="12" class="form-control @error('email_body') is-invalid @enderror">{!! \App\Models\ClosedTrainingCase::sanitizeSchoolEmailHtml((string) $emailBodyDefault) !!}</textarea>
-                                        @error('email_body')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                                        <div class="form-text">Stopka jest już w treści. Możesz ją edytować przed wysyłką.</div>
+                                    <div class="row g-3 mb-3">
+                                        <div class="{{ ($oldNotifyInstructor && ($canEmailInstructor ?? false)) ? 'col-lg-6' : 'col-12' }}" id="school-email-column">
+                                            <label for="email_body" class="form-label">Treść</label>
+                                            <textarea name="email_body" id="email_body" rows="12" class="form-control @error('email_body') is-invalid @enderror">{!! \App\Models\ClosedTrainingCase::sanitizeSchoolEmailHtml((string) $emailBodyDefault) !!}</textarea>
+                                            @error('email_body')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                            <div class="form-text">Stopka jest już w treści. Możesz ją edytować przed wysyłką.</div>
+                                        </div>
+                                        @if($canEmailInstructor)
+                                            @php
+                                                $instructorBriefBuilder = app(\App\Services\ClosedTrainingCaseCoordinationEmailBuilder::class);
+                                                $instructorBriefPlain = $instructorBriefBuilder->buildInstructorBrief($case, false);
+                                                $instructorBriefShared = $instructorBriefBuilder->buildInstructorBrief($case, true);
+                                            @endphp
+                                            <div class="col-lg-6 {{ $oldNotifyInstructor ? '' : 'd-none' }}" id="instructor-brief-panel">
+                                                <label for="instructor_brief_subject" class="form-label">Brief dla prowadzącego — temat</label>
+                                                <input type="text" name="instructor_brief_subject" id="instructor_brief_subject" value="{{ old('instructor_brief_subject') }}" maxlength="255" class="form-control mb-2 @error('instructor_brief_subject') is-invalid @enderror">
+                                                @error('instructor_brief_subject')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                                <label for="instructor_brief_body" class="form-label">Brief dla prowadzącego — treść</label>
+                                                <textarea name="instructor_brief_body" id="instructor_brief_body" rows="12" class="form-control @error('instructor_brief_body') is-invalid @enderror">{!! \App\Models\ClosedTrainingCase::sanitizeSchoolEmailHtml((string) old('instructor_brief_body', '')) !!}</textarea>
+                                                @error('instructor_brief_body')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
+                                                <div class="form-text">To ten mail wyjdzie do prowadzącego razem z wysyłką do szkoły. „Połącz kontakty” podmienia go tylko zanim zaczniesz poprawiać.</div>
+                                            </div>
+                                            @if(($instructorBriefPlain['ok'] ?? false) === true)
+                                                <template id="instructor-brief-plain" data-subject="{{ $instructorBriefPlain['subject'] }}">{!! $instructorBriefPlain['html'] !!}</template>
+                                            @endif
+                                            @if(($instructorBriefShared['ok'] ?? false) === true)
+                                                <template id="instructor-brief-shared" data-subject="{{ $instructorBriefShared['subject'] }}">{!! $instructorBriefShared['html'] !!}</template>
+                                            @endif
+                                        @endif
                                     </div>
 
                                     <fieldset class="mb-3">
@@ -835,6 +875,10 @@
                                     @elseif($emailIntent === 'instructor_brief')
                                         <div class="alert alert-info py-2 small">
                                             Tryb: brief dla prowadzącego (bez ceny). Odpowiedzi trafią na kontakt@pnedu.pl.
+                                        </div>
+                                    @elseif($emailIntent === 'instructor_details')
+                                        <div class="alert alert-info py-2 small">
+                                            Tryb: szczegóły zaplanowanego szkolenia dla prowadzącego. W treści jest wynagrodzenie, nie ma ceny dla szkoły. Status sprawy bez zmian.
                                         </div>
                                     @endif
 
@@ -1244,6 +1288,92 @@
                 });
             }
 
+            const schoolEmailColumn = document.getElementById('school-email-column');
+            const instructorBriefPanel = document.getElementById('instructor-brief-panel');
+            const instructorBriefSubject = document.getElementById('instructor_brief_subject');
+            const instructorBriefBody = document.getElementById('instructor_brief_body');
+            let briefEdited = !!((instructorBriefSubject && instructorBriefSubject.value.trim()) || (instructorBriefBody && instructorBriefBody.value.trim()));
+            let applyingBrief = false;
+            let briefEditorReady = Promise.resolve();
+            let briefEditorStarting = false;
+
+            function briefTemplate() {
+                const shared = !!(shareContacts && shareContacts.checked);
+                return document.getElementById(shared ? 'instructor-brief-shared' : 'instructor-brief-plain');
+            }
+
+            function writeInstructorBrief(subject, html) {
+                applyingBrief = true;
+                if (instructorBriefSubject) {
+                    instructorBriefSubject.value = subject;
+                }
+                if (instructorBriefBody) {
+                    instructorBriefBody.value = html;
+                }
+                const editor = window.tinymce ? window.tinymce.get('instructor_brief_body') : null;
+                if (editor) {
+                    editor.setContent(html);
+                }
+                briefEdited = false;
+                setTimeout(function () {
+                    applyingBrief = false;
+                }, 400);
+            }
+
+            function fillInstructorBriefIfUntouched() {
+                if (briefEdited) {
+                    return;
+                }
+                const template = briefTemplate();
+                if (!template) {
+                    return;
+                }
+                writeInstructorBrief(template.getAttribute('data-subject') || '', template.innerHTML.trim());
+            }
+
+            function ensureBriefEditor() {
+                if (!window.tinymce || !instructorBriefBody || briefEditorStarting || (window.tinymce.get && window.tinymce.get('instructor_brief_body'))) {
+                    return briefEditorReady;
+                }
+                briefEditorStarting = true;
+                const initResult = window.tinymce.init(Object.assign({
+                    selector: '#instructor_brief_body',
+                    height: 320,
+                    setup: function (editor) {
+                        editor.on('input', function () {
+                            if (!applyingBrief) {
+                                briefEdited = true;
+                            }
+                        });
+                    },
+                }, tinyOptions));
+                briefEditorReady = initResult && typeof initResult.then === 'function'
+                    ? initResult
+                    : Promise.resolve();
+                return briefEditorReady;
+            }
+
+            function syncInstructorBriefPanel() {
+                const visible = !!(notifyInstructor && notifyInstructor.checked && !notifyInstructor.disabled && instructorBriefPanel);
+                if (instructorBriefPanel) {
+                    instructorBriefPanel.classList.toggle('d-none', !visible);
+                }
+                if (schoolEmailColumn) {
+                    schoolEmailColumn.classList.toggle('col-lg-6', visible);
+                    schoolEmailColumn.classList.toggle('col-12', !visible);
+                }
+                if (!visible) {
+                    return;
+                }
+                const wasEmpty = !briefEdited;
+                fillInstructorBriefIfUntouched();
+                ensureBriefEditor().then(function () {
+                    if (wasEmpty) {
+                        fillInstructorBriefIfUntouched();
+                    }
+                });
+            }
+
             function syncEmailSendMode() {
                 const isTest = !!(sendModeTest && sendModeTest.checked);
                 const isInstructor = !!(sendModeInstructor && sendModeInstructor.checked);
@@ -1284,6 +1414,7 @@
                         updateWaitingOnLabel.textContent = 'Po wysyłce ustaw „czyj ruch” na Szkoła';
                     }
                 }
+                syncInstructorBriefPanel();
             }
             if (sendModeSchool) {
                 sendModeSchool.addEventListener('change', syncEmailSendMode);
@@ -1305,8 +1436,20 @@
                     input.value = on ? '1' : '0';
                 });
             }
+            if (instructorBriefSubject) {
+                instructorBriefSubject.addEventListener('input', function () {
+                    if (!applyingBrief) {
+                        briefEdited = true;
+                    }
+                });
+            }
             if (shareContacts) {
-                shareContacts.addEventListener('change', syncShareHiddenFields);
+                shareContacts.addEventListener('change', function () {
+                    syncShareHiddenFields();
+                    if (notifyInstructor && notifyInstructor.checked && !notifyInstructor.disabled) {
+                        fillInstructorBriefIfUntouched();
+                    }
+                });
                 syncShareHiddenFields();
             }
 

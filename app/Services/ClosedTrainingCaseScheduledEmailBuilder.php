@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\ClosedTrainingCase;
 use App\Models\Course;
+use App\Models\Instructor;
 use Illuminate\Support\Collection;
 
 /**
@@ -61,6 +62,98 @@ class ClosedTrainingCaseScheduledEmailBuilder
         return [
             'ok' => false,
             'error' => 'Szkolenie ma nieobsługiwany typ (oczekiwane: online albo stacjonarne).',
+        ];
+    }
+
+    /**
+     * Szczegóły już zaplanowanego szkolenia dla prowadzącego. Z wynagrodzeniem, bez ceny szkoły.
+     * Kontakt placówki tylko gdy $includeSchoolContact.
+     *
+     * @return array{ok: true, subject: string, html: string}|array{ok: false, error: string}
+     */
+    public function buildInstructorDetails(ClosedTrainingCase $case, bool $includeSchoolContact = true): array
+    {
+        $case->loadMissing(['course.instructor', 'course.onlineDetails', 'course.location', 'instructor']);
+        $course = $case->course;
+        if (! $course instanceof Course) {
+            return [
+                'ok' => false,
+                'error' => 'Najpierw powiąż sprawę ze szkoleniem, potem przygotuj e-mail ze szczegółami.',
+            ];
+        }
+
+        $instructor = $course->instructor ?? $case->instructor;
+        $email = $instructor instanceof Instructor
+            ? strtolower(trim((string) $instructor->email))
+            : '';
+        if (! filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return [
+                'ok' => false,
+                'error' => 'Brak e-maila prowadzącego. Przypisz instruktora ze skrzynką w powiązanym szkoleniu albo w ustaleniach.',
+            ];
+        }
+
+        $type = strtolower(trim((string) $course->type));
+        if (! in_array($type, ['online', 'offline'], true)) {
+            return [
+                'ok' => false,
+                'error' => 'Szkolenie ma nieobsługiwany typ (oczekiwane: online albo stacjonarne).',
+            ];
+        }
+
+        $isOnline = $type === 'online';
+        $title = $this->trainingTitle($case, $course);
+        $greetingName = trim((string) ($instructor->first_name ?? ''));
+        $hello = $greetingName !== '' ? 'Dzień dobry, '.e($greetingName).',' : 'Dzień dobry,';
+        $fee = $case->formatInstructorFeeList();
+        $feeLabel = $fee === '—' ? '(uzupełnij przed wysyłką)' : $fee;
+
+        $lines = [
+            '<strong>Szkolenie:</strong> '.e($title),
+            '<strong>Termin:</strong> '.e($this->scheduleLabel($case, $course)),
+        ];
+        $institution = trim((string) $case->institution);
+        if ($institution !== '') {
+            $lines[] = '<strong>Placówka:</strong> '.e($institution);
+        }
+        if ($isOnline) {
+            $intro = 'szkolenie online jest już zaplanowane. Poniżej przesyłam ustalenia oraz link do spotkania.';
+            $closing = 'Proszę wejść w link przed rozpoczęciem, żeby sprawdzić połączenie. W razie problemów z dostępem proszę o kontakt telefoniczny: 501&nbsp;654&nbsp;274.';
+            $subject = 'Szkolenie online – szczegóły – '.$title;
+        } else {
+            $place = $this->locationLabel($course);
+            $lines[] = '<strong>Miejsce:</strong> '.e($place ?? '(uzupełnij przed wysyłką)');
+            $intro = 'szkolenie stacjonarne jest już zaplanowane. Poniżej przesyłam miejsce i ustalenia.';
+            $closing = 'Proszę być na miejscu przed rozpoczęciem szkolenia. W razie pytań proszę o kontakt telefoniczny: 501&nbsp;654&nbsp;274.';
+            $subject = 'Szkolenie stacjonarne – szczegóły – '.$title;
+        }
+        $lines[] = '<strong>Wynagrodzenie:</strong> '.e($feeLabel);
+
+        $html = '<p style="margin:0;">'.$hello.'<br><br>'
+            .$intro.'<br><br></p>'
+            .'<p>'.implode('<br>', $lines).'</p>';
+
+        if ($isOnline) {
+            $accessLink = $this->resolveAccessLink($course);
+            if ($accessLink !== null) {
+                $safeLink = e($accessLink);
+                $html .= '<p><strong>Link do szkolenia:</strong><br><a href="'.$safeLink.'">'.$safeLink.'</a></p>';
+            } else {
+                $html .= '<p><strong>Link do szkolenia:</strong> (brak linku — uzupełnij przed wysyłką)</p>';
+            }
+        }
+
+        if ($includeSchoolContact) {
+            $html .= $this->schoolContactHtml($case);
+        }
+
+        $html .= '<p>'.$closing.'</p>'
+            .$this->signatureHtml();
+
+        return [
+            'ok' => true,
+            'subject' => $case->withCaseReferenceInSubject($subject),
+            'html' => ClosedTrainingCase::sanitizeSchoolEmailHtml($html),
         ];
     }
 
@@ -305,6 +398,29 @@ class ClosedTrainingCaseScheduledEmailBuilder
         }
 
         return $course->activePriceVariants()->get();
+    }
+
+    private function schoolContactHtml(ClosedTrainingCase $case): string
+    {
+        $lines = [];
+        $name = trim((string) $case->contact_name);
+        if ($name !== '') {
+            $lines[] = '<strong>Osoba:</strong> '.e($name);
+        }
+        $phone = trim((string) $case->contact_phone);
+        if ($phone !== '') {
+            $lines[] = '<strong>Telefon:</strong> '.e($phone);
+        }
+        $emails = $case->contactEmailList();
+        if ($emails !== []) {
+            $lines[] = '<strong>E-mail:</strong> '.e(implode(', ', $emails));
+        }
+
+        if ($lines === []) {
+            return '<p><strong>Kontakt w placówce:</strong> (brak danych na sprawie — uzupełnij przed wysyłką)</p>';
+        }
+
+        return '<p><strong>Kontakt w placówce:</strong><br>'.implode('<br>', $lines).'</p>';
     }
 
     private function signatureHtml(): string
