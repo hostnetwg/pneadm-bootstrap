@@ -1432,6 +1432,14 @@ class ClosedTrainingCaseTest extends TestCase
         $this->assertStringContainsString('sprawdzić połączenie', $onlineDraft['body']);
         $this->assertStringContainsString('1 200 PLN brutto', $onlineDraft['body']);
         $this->assertStringContainsString('Anna Dyrektor', $onlineDraft['body']);
+        $placowka = strpos($onlineDraft['body'], 'Placówka:');
+        $kontakt = strpos($onlineDraft['body'], 'Kontakt:');
+        $platforma = strpos($onlineDraft['body'], 'Platforma:');
+        $this->assertNotFalse($placowka);
+        $this->assertNotFalse($kontakt);
+        $this->assertNotFalse($platforma);
+        $this->assertLessThan($kontakt, $placowka);
+        $this->assertLessThan($platforma, $kontakt);
         $this->assertStringNotContainsString('Sala konferencyjna', $onlineDraft['body']);
         $this->assertStringNotContainsString('być na miejscu', $onlineDraft['body']);
         $this->assertStringNotContainsString('2500', $onlineDraft['body']);

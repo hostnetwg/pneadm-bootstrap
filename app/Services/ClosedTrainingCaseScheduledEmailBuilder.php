@@ -122,6 +122,9 @@ class ClosedTrainingCaseScheduledEmailBuilder
         if ($institution !== '') {
             $lines[] = '<strong>Placówka:</strong> '.e($institution);
         }
+        if ($includeSchoolContact && $isOnline) {
+            $lines[] = $this->schoolContactInner($case);
+        }
         if ($isOnline) {
             $intro = 'szkolenie online jest już zaplanowane. Poniżej przesyłam ustalenia oraz link do spotkania.';
             $closing = 'Proszę wejść w link przed rozpoczęciem, żeby sprawdzić połączenie. W razie problemów z dostępem proszę o kontakt telefoniczny: 501&nbsp;654&nbsp;274.';
@@ -154,8 +157,8 @@ class ClosedTrainingCaseScheduledEmailBuilder
             }
         }
 
-        if ($includeSchoolContact) {
-            $html .= $this->schoolContactHtml($case);
+        if ($includeSchoolContact && ! $isOnline) {
+            $html .= '<p>'.$this->schoolContactInner($case).'</p>';
         }
 
         $html .= '<p>'.$closing.'</p>'
@@ -479,7 +482,7 @@ class ClosedTrainingCaseScheduledEmailBuilder
         return $course->activePriceVariants()->get();
     }
 
-    private function schoolContactHtml(ClosedTrainingCase $case): string
+    private function schoolContactInner(ClosedTrainingCase $case): string
     {
         $lines = [];
         $name = trim((string) $case->contact_name);
@@ -496,10 +499,10 @@ class ClosedTrainingCaseScheduledEmailBuilder
         }
 
         if ($lines === []) {
-            return '<p><strong>Kontakt:</strong> (brak danych na sprawie — uzupełnij przed wysyłką)</p>';
+            return '<strong>Kontakt:</strong> (brak danych na sprawie — uzupełnij przed wysyłką)';
         }
 
-        return '<p><strong>Kontakt:</strong><br>'.implode('<br>', $lines).'</p>';
+        return '<strong>Kontakt:</strong><br>'.implode('<br>', $lines);
     }
 
     private function signatureHtml(): string
