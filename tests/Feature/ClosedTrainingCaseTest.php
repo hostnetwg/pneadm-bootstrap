@@ -1376,6 +1376,8 @@ class ClosedTrainingCaseTest extends TestCase
         $this->assertStringContainsString('Szkolenie rady w Przemyślu', $draft['body']);
         $this->assertStringContainsString('02.12.2026', $draft['body']);
         $this->assertLessThan(strpos($draft['body'], 'Placówka'), strpos($draft['body'], 'Dodaj do kalendarza iCalendar Apple'));
+        $this->assertLessThan(strpos($draft['body'], 'Wynagrodzenie:'), strpos($draft['body'], 'Termin:'));
+        $this->assertLessThan(strpos($draft['body'], 'Placówka:'), strpos($draft['body'], 'Wynagrodzenie:'));
         $this->assertStringContainsString('calendar.google.com/calendar/render?action=TEMPLATE', $draft['body']);
         $this->assertStringContainsString('signature=', $draft['body']);
         $caseCalendarUrl = \App\Support\CourseCalendarEventBuilder::for($course->fresh(['location', 'instructor']))->caseEmailGoogleCalendarUrl();
@@ -1440,6 +1442,8 @@ class ClosedTrainingCaseTest extends TestCase
         $this->assertNotFalse($platforma);
         $this->assertLessThan($kontakt, $placowka);
         $this->assertLessThan($platforma, $kontakt);
+        $this->assertLessThan(strpos($onlineDraft['body'], 'Wynagrodzenie:'), strpos($onlineDraft['body'], 'Termin:'));
+        $this->assertLessThan($placowka, strpos($onlineDraft['body'], 'Wynagrodzenie:'));
         $this->assertStringNotContainsString('Sala konferencyjna', $onlineDraft['body']);
         $this->assertStringNotContainsString('być na miejscu', $onlineDraft['body']);
         $this->assertStringNotContainsString('2500', $onlineDraft['body']);

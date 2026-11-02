@@ -6,6 +6,7 @@ Krótka numeracja panelu. Szczegóły zawsze w `docs/`. Nowy numer wersji (np. 1
 
 Zaświadczenia: automatyczne czyszczenie starych plików PDF. Narzędzia deweloperskie: odświeżanie komputera deva jedną komendą.
 
+- **Hotfix 2026-11-02:** w mailu do prowadzącego na [sprawie szkolenia zamkniętego](/closed-training-cases) wynagrodzenie jest tuż pod terminem, przed placówką.
 - **Hotfix 2026-11-02:** w mailu do prowadzącego na [sprawie szkolenia zamkniętego](/closed-training-cases), przy szkoleniu online, blok **Kontakt:** jest tuż pod placówką, nad platformą i linkiem prowadzącego.
 - **Hotfix 2026-11-02:** na [sprawie szkolenia zamkniętego](/closed-training-cases) przyciski **Przygotuj e-mail z terminem** i **E-mail ze szczegółami dla prowadzącego** są zielone i mają ikonę koperty. W mailu do prowadzącego nagłówek kontaktu to **Kontakt:**.
 - **Hotfix 2026-11-02:** szkolenie online z ID ClickMeeting zapisuje link prezentera. Widać go na karcie szkolenia i w edycji. Mail ze szczegółami dla prowadzącego na [sprawie szkolenia zamkniętego](/closed-training-cases) używa tego adresu, a nad nim jest nazwa platformy (np. ClickMeeting). Link uczestnika zostaje dla szkoły i uczestników. Kanon: [CLICKMEETING_TRAININGS.md](docs/CLICKMEETING_TRAININGS.md)

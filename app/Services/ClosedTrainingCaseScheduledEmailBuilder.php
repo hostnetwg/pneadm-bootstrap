@@ -117,6 +117,7 @@ class ClosedTrainingCaseScheduledEmailBuilder
         $lines = [
             '<strong>Szkolenie:</strong> '.e($title),
             '<strong>Termin:</strong> '.e($this->scheduleLabel($case, $course)).$this->calendarLinksHtml($course),
+            '<strong>Wynagrodzenie:</strong> '.e($feeLabel),
         ];
         $institution = trim((string) $case->institution);
         if ($institution !== '') {
@@ -136,7 +137,6 @@ class ClosedTrainingCaseScheduledEmailBuilder
             $closing = 'W razie pytań proszę o kontakt telefoniczny: 501&nbsp;654&nbsp;274.';
             $subject = 'Szkolenie stacjonarne – szczegóły – '.$title;
         }
-        $lines[] = '<strong>Wynagrodzenie:</strong> '.e($feeLabel);
 
         $html = '<p style="margin:0;">'.$hello.'<br><br>'
             .$intro.'<br><br></p>'
