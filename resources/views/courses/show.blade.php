@@ -481,9 +481,10 @@
                             </div>
                             <div class="card-body">
                                 <p class="mb-1">
-                                    <a href="{{ route('closed-training-cases.show', $course->closedTrainingCase) }}" class="fw-semibold">
-                                        #{{ $course->closedTrainingCase->id }} {{ $course->closedTrainingCase->trainingTopicLabel() }}
+                                    <a href="{{ route('closed-training-cases.show', $course->closedTrainingCase) }}" class="fw-semibold font-monospace">
+                                        [{{ $course->closedTrainingCase->referenceCode() }}]
                                     </a>
+                                    <span class="fw-semibold">{{ $course->closedTrainingCase->trainingTopicLabel() }}</span>
                                 </p>
                                 <p class="small text-muted mb-2">
                                     {{ $course->closedTrainingCase->statusLabel() }}

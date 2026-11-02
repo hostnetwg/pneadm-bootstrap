@@ -151,6 +151,7 @@ class CoursesController extends Controller
             'instructor:id,first_name,last_name,title',
             'location:id,course_id,location_name,address,postal_code,post_office',
             'onlineDetails:id,course_id,platform,meeting_link,clickmeeting_event_id,clickmeeting_join_enabled,embed_on_pnedu',
+            'closedTrainingCase:id,status,institution,topic',
         ];
 
         if (auth()->user()?->isSuperAdmin()) {

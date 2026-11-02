@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\ClosedTrainingCase;
 use App\Models\Course;
 use App\Models\Instructor;
 use App\Models\User;
@@ -198,5 +199,64 @@ class CoursesIndexStatsTest extends TestCase
         $response->assertSee('UNIQ-ENDED-INACTIVE-ROW');
         $response->assertSee('<tr class="course-row-inactive">', false);
         $response->assertDontSee('<tr class="table-secondary text-muted">', false);
+    }
+
+    public function test_course_index_links_related_closed_training_case_by_symbol(): void
+    {
+        $user = $this->actingOperator();
+        $case = ClosedTrainingCase::create([
+            'source' => ClosedTrainingCase::SOURCE_MANUAL,
+            'status' => ClosedTrainingCase::STATUS_NEW,
+            'topic' => 'Rada pedagogiczna',
+            'contact_name' => 'Anna Test',
+            'institution' => 'SP 1',
+            'message' => 'Prośba o termin.',
+            'inquired_at' => now(),
+        ]);
+        $this->createCourse([
+            'title' => 'UNIQ-CASE-LINK-COURSE',
+            'category' => 'closed',
+            'closed_training_case_id' => $case->id,
+        ]);
+
+        $symbol = '[SZ-'.$case->id.']';
+        $caseUrl = route('closed-training-cases.show', $case);
+
+        $response = $this->actingAs($user)
+            ->get(route('courses.index', [
+                'date_filter' => 'upcoming',
+                'search' => 'UNIQ-CASE-LINK-COURSE',
+            ]));
+
+        $response->assertOk();
+        $response->assertSee($symbol, false);
+        $response->assertSee($caseUrl, false);
+        $response->assertSee('Rada pedagogiczna');
+    }
+
+    public function test_course_show_links_related_closed_training_case_by_symbol(): void
+    {
+        $user = $this->actingOperator();
+        $case = ClosedTrainingCase::create([
+            'source' => ClosedTrainingCase::SOURCE_MANUAL,
+            'status' => ClosedTrainingCase::STATUS_IN_PROGRESS,
+            'topic' => 'Rada na karcie',
+            'contact_name' => 'Anna Test',
+            'institution' => 'SP 2',
+            'message' => 'Prośba o termin.',
+            'inquired_at' => now(),
+        ]);
+        $course = $this->createCourse([
+            'title' => 'UNIQ-CASE-SHOW-COURSE',
+            'category' => 'closed',
+            'closed_training_case_id' => $case->id,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('courses.show', $course))
+            ->assertOk()
+            ->assertSee('[SZ-'.$case->id.']', false)
+            ->assertSee(route('closed-training-cases.show', $case), false)
+            ->assertSee('Rada na karcie');
     }
 }

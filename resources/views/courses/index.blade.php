@@ -459,6 +459,20 @@
                                     </div>
                                 @endif
                             @endif
+                            @if($course->closedTrainingCase)
+                                @php
+                                    $caseLinkTitle = 'Sprawa: '.$course->closedTrainingCase->trainingTopicLabel();
+                                    if ($course->closedTrainingCase->institution) {
+                                        $caseLinkTitle .= ' · '.$course->closedTrainingCase->institution;
+                                    }
+                                    $caseLinkTitle .= ' · '.$course->closedTrainingCase->statusLabel();
+                                @endphp
+                                <div class="mb-1">
+                                    <a href="{{ route('closed-training-cases.show', $course->closedTrainingCase) }}"
+                                       class="font-monospace fw-semibold text-decoration-none"
+                                       title="{{ $caseLinkTitle }}">[{{ $course->closedTrainingCase->referenceCode() }}]</a>
+                                </div>
+                            @endif
                             <strong>{{ $course->plainTitle() }}</strong>
                             @include('courses.partials.index-price-variants', ['course' => $course])
                         </td>
