@@ -1076,11 +1076,11 @@
                     return html;
                 }
                 const after = match.index + match[0].length;
-                return html.slice(0, after) + '<br>' + block + html.slice(after);
+                return html.slice(0, after) + '<br><br>' + block + html.slice(after);
             }
 
             function removeOrderFormNotice(html) {
-                return html.replace(/(?:<br\s*\/?>\s*)?W celu oficjalnego potwierdzenia terminu proszę wypełnić formularz zamówienia:[\s\S]*?zostanie wystawiona w dniu szkolenia\.\)\s*(?:<br\s*\/?>\s*)?/i, '');
+                return html.replace(/(?:<br\s*\/?>\s*){0,2}(?:<strong>\s*)?W celu oficjalnego potwierdzenia terminu proszę wypełnić formularz zamówienia:(?:<\/strong>)?[\s\S]*?zostanie wystawiona w dniu szkolenia\.\s*/i, '');
             }
 
             function locatePlannedSentence(root) {
@@ -1122,6 +1122,7 @@
                 const after = found.node.splitText(found.offset);
                 const parent = found.node.parentNode;
                 parent.insertBefore(editor.dom.create('br'), after);
+                parent.insertBefore(editor.dom.create('br'), after);
                 const holder = document.createElement('div');
                 holder.innerHTML = blockHtml;
                 while (holder.firstChild) {
@@ -1138,7 +1139,7 @@
                 let startNode = null;
                 let endNode = null;
                 let textNode;
-                const endRe = /zostanie wystawiona w dniu szkolenia\.\)/;
+                const endRe = /zostanie wystawiona w dniu szkolenia\./;
                 while ((textNode = walker.nextNode())) {
                     if (!startNode && textNode.nodeValue.indexOf(orderFormStart) !== -1) {
                         startNode = textNode;
@@ -1162,18 +1163,29 @@
                 } else if (endMatch.index > 0) {
                     endNode = endNode.splitText(endMatch.index);
                 }
-                const previous = startNode.previousSibling;
-                if (previous && previous.nodeName === 'BR') {
+                let startEl = startNode;
+                if (startNode.parentNode && startNode.parentNode.nodeName === 'STRONG' && startNode === startNode.parentNode.firstChild) {
+                    startEl = startNode.parentNode;
+                }
+                let previous = startEl.previousSibling;
+                let removedBreaks = 0;
+                while (previous && removedBreaks < 2) {
+                    if (previous.nodeType === Node.TEXT_NODE && previous.nodeValue.trim() === '') {
+                        previous = previous.previousSibling;
+                        continue;
+                    }
+                    if (previous.nodeName !== 'BR') {
+                        break;
+                    }
+                    const older = previous.previousSibling;
                     previous.remove();
+                    previous = older;
+                    removedBreaks++;
                 }
                 const range = document.createRange();
-                range.setStartBefore(startNode);
+                range.setStartBefore(startEl);
                 range.setEnd(endNode, endNode.nodeValue.length);
-                const afterNotice = endNode.nextSibling;
                 range.deleteContents();
-                if (afterNotice && afterNotice.nodeName === 'BR' && afterNotice.parentNode) {
-                    afterNotice.remove();
-                }
             }
 
             function emailEditor() {

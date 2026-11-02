@@ -76,10 +76,10 @@ class ClosedTrainingCaseScheduledEmailBuilder
         $url = CourseFormOrderBillingService::newOrderFormUrl($course, $variantId);
         $safeUrl = e($url);
 
-        return 'W celu oficjalnego potwierdzenia terminu proszę wypełnić formularz zamówienia:<br>'
-            .'<a href="'.$safeUrl.'">'.$safeUrl.'</a><br><br>'
-            .'(Jako uczestnika proszę wpisać imię, nazwisko i adres e-mail dyrektora. Pozostali nauczyciele podczas szkolenia otrzymają do wypełnienia formularz listy obecności, na podstawie której wystawimy zaświadczenia.)<br>'
-            .'(Faktura z 14-dniowym terminem płatności zostanie wystawiona w dniu szkolenia.)<br>';
+        return '<strong>W celu oficjalnego potwierdzenia terminu proszę wypełnić formularz zamówienia:</strong><br>'
+            .'<a href="'.$safeUrl.'">'.$safeUrl.'</a><br>'
+            .'Jako uczestnika proszę wpisać imię, nazwisko i adres e-mail dyrektora. Pozostali nauczyciele podczas szkolenia otrzymają do wypełnienia formularz listy obecności, na podstawie której wystawimy zaświadczenia.<br>'
+            .'Faktura z 14-dniowym terminem płatności zostanie wystawiona w dniu szkolenia.';
     }
 
     public function insertOrderFormNotice(string $html, string $block): string
@@ -95,13 +95,13 @@ class ClosedTrainingCaseScheduledEmailBuilder
 
         $end = $matches[0][1] + strlen($matches[0][0]);
 
-        return substr($html, 0, $end).'<br>'.$block.substr($html, $end);
+        return substr($html, 0, $end).'<br><br>'.$block.substr($html, $end);
     }
 
     public function removeOrderFormNotice(string $html): string
     {
         return preg_replace(
-            '/(?:<br\s*\/?>\s*)?W celu oficjalnego potwierdzenia terminu proszę wypełnić formularz zamówienia:.*?zostanie wystawiona w dniu szkolenia\.\)\s*(?:<br\s*\/?>\s*)?/isu',
+            '/(?:<br\s*\/?>\s*){0,2}(?:<strong>\s*)?W celu oficjalnego potwierdzenia terminu proszę wypełnić formularz zamówienia:(?:<\/strong>)?.*?zostanie wystawiona w dniu szkolenia\.\s*/isu',
             '',
             $html,
             1
@@ -185,9 +185,9 @@ class ClosedTrainingCaseScheduledEmailBuilder
             $placeBlock = '<br><strong>Miejsce:</strong> '.e($place);
         }
 
-        $html = '<p>Dzień dobry,</p>'
-            .'<p>szkolenie dla Państwa placówki jest już zaplanowane.<br>'
-            .'<strong>Poniżej przesyłam potwierdzenie ustaleń.</strong></p>'
+        $html = '<p style="margin:0;">Dzień dobry,<br><br>'
+            .'szkolenie dla Państwa placówki jest już zaplanowane.<br><br>'
+            .'<strong>Poniżej przesyłam potwierdzenie ustaleń.</strong><br><br></p>'
             .'<p><strong>Szkolenie:</strong> '.$safeTitle.'<br>'
             .'<strong>Termin:</strong> '.$safeSchedule.'<br>'
             .'<strong>Prowadzący:</strong> '.$safeInstructor

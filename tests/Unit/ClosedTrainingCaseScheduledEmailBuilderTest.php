@@ -15,21 +15,21 @@ class ClosedTrainingCaseScheduledEmailBuilderTest extends TestCase
     public function test_order_form_notice_is_inserted_after_the_planned_sentence_and_removed_again(): void
     {
         $builder = app(ClosedTrainingCaseScheduledEmailBuilder::class);
-        $html = '<p>Dzień dobry,</p>'
-            .'<p>szkolenie dla Państwa placówki jest już zaplanowane.<br>'
-            .'Poniżej przesyłam potwierdzenie ustaleń.</p>';
-        $nbspHtml = '<p>szkolenie&nbsp;dla&nbsp;Państwa&nbsp;placówki&nbsp;jest&nbsp;już&nbsp;zaplanowane.<br>'
-            .'Poniżej przesyłam potwierdzenie ustaleń.</p>';
-        $block = 'W celu oficjalnego potwierdzenia terminu proszę wypełnić formularz zamówienia:<br>'
-            .'<a href="https://pnedu.pl/courses/587/order-form?price_variant_id=133">https://pnedu.pl/courses/587/order-form?price_variant_id=133</a><br><br>'
-            .'(Jako uczestnika proszę wpisać imię, nazwisko i adres e-mail dyrektora. Pozostali nauczyciele podczas szkolenia otrzymają do wypełnienia formularz listy obecności, na podstawie której wystawimy zaświadczenia.)<br>'
-            .'(Faktura z 14-dniowym terminem płatności zostanie wystawiona w dniu szkolenia.)<br>';
+        $html = '<p style="margin:0;">Dzień dobry,<br><br>'
+            .'szkolenie dla Państwa placówki jest już zaplanowane.<br><br>'
+            .'<strong>Poniżej przesyłam potwierdzenie ustaleń.</strong><br><br></p>';
+        $nbspHtml = '<p style="margin:0;">szkolenie&nbsp;dla&nbsp;Państwa&nbsp;placówki&nbsp;jest&nbsp;już&nbsp;zaplanowane.<br><br>'
+            .'<strong>Poniżej przesyłam potwierdzenie ustaleń.</strong></p>';
+        $block = '<strong>W celu oficjalnego potwierdzenia terminu proszę wypełnić formularz zamówienia:</strong><br>'
+            .'<a href="https://pnedu.pl/courses/587/order-form?price_variant_id=133">https://pnedu.pl/courses/587/order-form?price_variant_id=133</a><br>'
+            .'Jako uczestnika proszę wpisać imię, nazwisko i adres e-mail dyrektora. Pozostali nauczyciele podczas szkolenia otrzymają do wypełnienia formularz listy obecności, na podstawie której wystawimy zaświadczenia.<br>'
+            .'Faktura z 14-dniowym terminem płatności zostanie wystawiona w dniu szkolenia.';
 
         $withNotice = $builder->insertOrderFormNotice($html, $block);
         $withNbsp = $builder->insertOrderFormNotice($nbspHtml, $block);
 
         $this->assertStringContainsString(
-            'szkolenie dla Państwa placówki jest już zaplanowane.<br>'.$block.'<br>Poniżej przesyłam potwierdzenie ustaleń.</p>',
+            'Dzień dobry,<br><br>szkolenie dla Państwa placówki jest już zaplanowane.<br><br>'.$block.'<br><br><strong>Poniżej przesyłam potwierdzenie ustaleń.</strong><br><br>',
             $withNotice
         );
         $this->assertLessThan(
@@ -89,9 +89,11 @@ class ClosedTrainingCaseScheduledEmailBuilderTest extends TestCase
             'https://pnedu.pl/courses/'.$course->id.'/order-form?price_variant_id='.$active->id,
             $html
         );
-        $this->assertStringContainsString('W celu oficjalnego potwierdzenia terminu', $html);
+        $this->assertStringContainsString('<strong>W celu oficjalnego potwierdzenia terminu proszę wypełnić formularz zamówienia:</strong><br>', $html);
         $this->assertStringContainsString('formularz listy obecności', $html);
-        $this->assertStringContainsString('zaświadczenia.)<br>(Faktura z 14-dniowym terminem płatności', $html);
-        $this->assertStringContainsString('14-dniowym terminem płatności', $html);
+        $this->assertStringContainsString('</a><br>Jako uczestnika', $html);
+        $this->assertStringContainsString('zaświadczenia.<br>Faktura z 14-dniowym terminem płatności', $html);
+        $this->assertStringNotContainsString('(Jako uczestnika', $html);
+        $this->assertStringNotContainsString('(Faktura', $html);
     }
 }
