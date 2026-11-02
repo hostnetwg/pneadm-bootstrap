@@ -78,8 +78,8 @@ class ClosedTrainingCaseScheduledEmailBuilder
 
         return 'W celu oficjalnego potwierdzenia terminu proszę wypełnić formularz zamówienia:<br>'
             .'<a href="'.$safeUrl.'">'.$safeUrl.'</a><br><br>'
-            .'(Jako uczestnika proszę wpisać imię, nazwisko i adres e-mail dyrektora. Pozostali nauczyciele podczas szkolenia otrzymają listę obecności, na podstawie której wystawimy zaświadczenia.)<br><br>'
-            .'(Faktura z 14-dniowym terminem płatności zostanie wystawiona w dniu szkolenia.)';
+            .'(Jako uczestnika proszę wpisać imię, nazwisko i adres e-mail dyrektora. Pozostali nauczyciele podczas szkolenia otrzymają do wypełnienia formularz listy obecności, na podstawie której wystawimy zaświadczenia.)<br>'
+            .'(Faktura z 14-dniowym terminem płatności zostanie wystawiona w dniu szkolenia.)<br>';
     }
 
     public function insertOrderFormNotice(string $html, string $block): string
@@ -101,7 +101,7 @@ class ClosedTrainingCaseScheduledEmailBuilder
     public function removeOrderFormNotice(string $html): string
     {
         return preg_replace(
-            '/(?:<br\s*\/?>\s*)?W celu oficjalnego potwierdzenia terminu proszę wypełnić formularz zamówienia:.*?zostanie wystawiona w dniu szkolenia\.\)\s*/isu',
+            '/(?:<br\s*\/?>\s*)?W celu oficjalnego potwierdzenia terminu proszę wypełnić formularz zamówienia:.*?zostanie wystawiona w dniu szkolenia\.\)\s*(?:<br\s*\/?>\s*)?/isu',
             '',
             $html,
             1
@@ -187,7 +187,7 @@ class ClosedTrainingCaseScheduledEmailBuilder
 
         $html = '<p>Dzień dobry,</p>'
             .'<p>szkolenie dla Państwa placówki jest już zaplanowane.<br>'
-            .'Poniżej przesyłam potwierdzenie ustaleń.</p>'
+            .'<strong>Poniżej przesyłam potwierdzenie ustaleń.</strong></p>'
             .'<p><strong>Szkolenie:</strong> '.$safeTitle.'<br>'
             .'<strong>Termin:</strong> '.$safeSchedule.'<br>'
             .'<strong>Prowadzący:</strong> '.$safeInstructor

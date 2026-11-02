@@ -1080,7 +1080,7 @@
             }
 
             function removeOrderFormNotice(html) {
-                return html.replace(/(?:<br\s*\/?>\s*)?W celu oficjalnego potwierdzenia terminu proszę wypełnić formularz zamówienia:[\s\S]*?zostanie wystawiona w dniu szkolenia\.\)\s*/i, '');
+                return html.replace(/(?:<br\s*\/?>\s*)?W celu oficjalnego potwierdzenia terminu proszę wypełnić formularz zamówienia:[\s\S]*?zostanie wystawiona w dniu szkolenia\.\)\s*(?:<br\s*\/?>\s*)?/i, '');
             }
 
             function locatePlannedSentence(root) {
@@ -1169,7 +1169,11 @@
                 const range = document.createRange();
                 range.setStartBefore(startNode);
                 range.setEnd(endNode, endNode.nodeValue.length);
+                const afterNotice = endNode.nextSibling;
                 range.deleteContents();
+                if (afterNotice && afterNotice.nodeName === 'BR' && afterNotice.parentNode) {
+                    afterNotice.remove();
+                }
             }
 
             function emailEditor() {
