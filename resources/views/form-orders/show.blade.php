@@ -2735,6 +2735,7 @@ nowoczesna-edukacja.pl `;
         function applyIssuedInvoiceUi(data, orderId) {
             data = data || {};
             if (data.invoice_number) {
+                // skipStatusRefresh: jeden fetch na końcu tej funkcji (nie podwójny).
                 applyInvoiceNumberFieldValue(data.invoice_number, { skipStatusRefresh: true });
                 const orderStatusAlert = document.getElementById('orderStatusAlert');
                 if (orderStatusAlert && orderId) {
@@ -2754,6 +2755,8 @@ nowoczesna-edukacja.pl `;
                 applyKsefNumberDisplay(data.ksef_number);
             }
             enableCreateDebtCaseButtonAfterInvoice();
+            // Krajowa / z odbiorcą / z KSeF — STATUS ZAMÓWIENIA bez przeładowania strony.
+            refreshOperationalStatusPanel();
         }
 
         function enableCreateDebtCaseButtonAfterInvoice() {
@@ -2919,6 +2922,8 @@ nowoczesna-edukacja.pl `;
                     window.formOrderPlayUiSound('success');
                 }
                 stopKsefStatusPoll();
+                // Numer KSeF w panelu STATUS ZAMÓWIENIA („· KSeF …”) bez reloadu.
+                refreshOperationalStatusPanel();
             } else if (data.ksef_status === 'failed' && playSound && !ksefStatusPollHeard) {
                 ksefStatusPollHeard = true;
                 if (typeof window.formOrderPlayUiSound === 'function') {
