@@ -185,6 +185,7 @@ class FormOrder extends Model
         'publigo_product_id',
         'publigo_price_id',
         'course_price_variant_id',
+        'flat_order_price',
         'publigo_sent',
         'publigo_sent_at',
         'pnedu_provisioned_at',
@@ -284,6 +285,7 @@ class FormOrder extends Model
         'publigo_product_id' => 'integer',
         'publigo_price_id' => 'integer',
         'course_price_variant_id' => 'integer',
+        'flat_order_price' => 'boolean',
         'publigo_sent' => 'integer',
         'order_date' => 'datetime',
         'invoice_issue_date' => 'date',
@@ -996,17 +998,21 @@ class FormOrder extends Model
     }
 
     /**
-     * Liczba sztuk na FV iFirma = liczba uczestników zamówienia (min. 1).
+     * Liczba sztuk na FV iFirma. Stała cena szkolenia to jedna sztuka, inaczej liczba uczestników (min. 1).
      */
     public function invoiceLineQuantity(): int
     {
+        if ($this->flat_order_price) {
+            return 1;
+        }
+
         $count = (int) $this->participants()->count();
 
         return max(1, $count);
     }
 
     /**
-     * Cena jednostkowa na FV: product_price jest kwotą całkowitą (cena × liczba osób).
+     * Cena jednostkowa na FV. product_price jest kwotą całkowitą (przy cenie za osobę: cena × liczba osób).
      */
     public function invoiceUnitPrice(): float
     {

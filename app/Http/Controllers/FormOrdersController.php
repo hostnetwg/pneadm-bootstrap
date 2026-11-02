@@ -610,6 +610,7 @@ class FormOrdersController extends Controller
                     'default_price' => $defaultVariant
                         ? number_format((float) $defaultVariant->getCurrentPrice(), 2, '.', '')
                         : null,
+                    'default_price_flat' => (bool) ($defaultVariant->flat_order_price ?? false),
                     'default_variant_name' => $defaultVariant?->name,
                     'default_variant_active' => $defaultVariant ? (bool) $defaultVariant->is_active : null,
                 ];
@@ -742,10 +743,16 @@ class FormOrdersController extends Controller
             }
         }
 
+        $flatOrderPrice = isset($sourceOrder) && $sourceOrder
+            ? (bool) $sourceOrder->flat_order_price
+            : (bool) ($selectedCourse?->priceVariants->first()?->flat_order_price ?? false);
+
         $participantUnitPrice = null;
         if (! empty($prefill['product_price'])) {
             $count = max(1, count($participantsPrefill));
-            $participantUnitPrice = round(((float) $prefill['product_price']) / $count, 2);
+            $participantUnitPrice = $flatOrderPrice
+                ? round((float) $prefill['product_price'], 2)
+                : round(((float) $prefill['product_price']) / $count, 2);
         }
 
         return view('form-orders.create', compact(
@@ -755,7 +762,8 @@ class FormOrdersController extends Controller
             'cloneWarning',
             'selectedCourse',
             'participantsPrefill',
-            'participantUnitPrice'
+            'participantUnitPrice',
+            'flatOrderPrice'
         ));
     }
 
@@ -816,7 +824,10 @@ class FormOrdersController extends Controller
             $participantService->assertEmailsUniqueOnOrder($participantRows);
 
             // Pobierz dane kursu
-            $course = \App\Models\Course::findOrFail($request->course_id);
+            $course = \App\Models\Course::with(['priceVariants' => function ($q) {
+                $q->where('is_active', true)->orderBy('id');
+            }])->findOrFail($request->course_id);
+            $flatOrderPrice = (bool) ($course->priceVariants->first()?->flat_order_price ?? false);
 
             // Ustaw dane Publigo na podstawie kursu
             $publigoProductId = $course->id_old; // ID produktu z Publigo
@@ -829,6 +840,7 @@ class FormOrdersController extends Controller
                 'product_id' => $course->id, // ID kursu z bazy
                 'product_name' => $course->title,
                 'product_price' => $request->product_price ?? 0, // Można ustawić ręcznie
+                'flat_order_price' => $flatOrderPrice,
                 'product_description' => $course->description,
                 'orderer_name' => $request->orderer_name,
                 'orderer_phone' => $request->orderer_phone,
@@ -1244,9 +1256,12 @@ class FormOrdersController extends Controller
                                 is_string($previousVariantName) ? $previousVariantName : null
                             );
                             $zamowienie->course_price_variant_id = $matchedVariant?->id;
+                            $zamowienie->flat_order_price = (bool) ($matchedVariant?->flat_order_price ?? false);
                             if ($matchedVariant !== null) {
                                 $unitPrice = $matchedVariant->getCurrentPrice();
-                                $priceAfterCourseChange = round(((float) $unitPrice) * max(1, count($participantRows)), 2);
+                                $priceAfterCourseChange = $zamowienie->flat_order_price
+                                    ? round((float) $unitPrice, 2)
+                                    : round(((float) $unitPrice) * max(1, count($participantRows)), 2);
                                 $zamowienie->product_price = $priceAfterCourseChange;
                             }
                         }
@@ -3301,8 +3316,11 @@ class FormOrdersController extends Controller
             }
 
             $participantCount = max(1, count($participantsPrefill));
+            $flatOrderPrice = (bool) $zamowienie->flat_order_price;
             $participantUnitPrice = $zamowienie->product_price !== null
-                ? round(((float) $zamowienie->product_price) / $participantCount, 2)
+                ? ($flatOrderPrice
+                    ? round((float) $zamowienie->product_price, 2)
+                    : round(((float) $zamowienie->product_price) / $participantCount, 2))
                 : null;
 
             $participant = $zamowienie->primaryParticipant;
@@ -3311,7 +3329,8 @@ class FormOrdersController extends Controller
                 'zamowienie',
                 'participant',
                 'participantsPrefill',
-                'participantUnitPrice'
+                'participantUnitPrice',
+                'flatOrderPrice'
             ));
         } catch (Exception $e) {
             return redirect()->route('form-orders.index')->with('error', 'Zamówienie nie zostało znalezione.');

@@ -332,6 +332,27 @@ class FormOrderOperationalStatusTest extends TestCase
         $this->assertSame(300.0, $order->invoiceUnitPrice());
     }
 
+    public function test_flat_order_price_invoices_one_unit_at_the_full_amount(): void
+    {
+        $courseId = $this->createCourse();
+        $order = $this->createOrderWithParticipant($courseId, [
+            'product_price' => 1250,
+            'flat_order_price' => true,
+        ]);
+
+        FormOrderParticipant::create([
+            'form_order_id' => $order->id,
+            'participant_firstname' => 'Anna',
+            'participant_lastname' => 'Nowak',
+            'participant_email' => 'anna-flat@example.test',
+            'is_primary' => false,
+        ]);
+
+        $order = $order->fresh(['participants']);
+        $this->assertSame(1, $order->invoiceLineQuantity());
+        $this->assertSame(1250.0, $order->invoiceUnitPrice());
+    }
+
     public function test_cancel_order_endpoint_sets_cancelled_at(): void
     {
         $user = User::factory()->create([

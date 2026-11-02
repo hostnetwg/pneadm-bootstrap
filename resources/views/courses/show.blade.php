@@ -297,6 +297,9 @@
                                                     </td>
                                                     <td>
                                                         <strong>{{ number_format($variant->getCurrentPrice(), 2, ',', ' ') }} PLN</strong>
+                                                        @if($variant->flat_order_price)
+                                                            <br><small class="text-muted">stała cena za całe szkolenie</small>
+                                                        @endif
                                                         @if($variant->isPromotionActive())
                                                             <br><small class="text-success">
                                                                 <del>{{ number_format($variant->price, 2, ',', ' ') }} PLN</del>

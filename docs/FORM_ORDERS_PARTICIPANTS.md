@@ -5,7 +5,7 @@
 - Imię, nazwisko i e-mail uczestników są w tabeli **`form_order_participants`**.
 - Pierwszy wiersz ma **`is_primary = 1`** (główny — używany m.in. przy wznowieniu checkoutu / kompatybilności).
 - Kolumn **`participant_name`** i **`participant_email`** w **`form_orders` nie ma**.
-- **`form_orders.product_price`** = kwota **całkowita** (cena jednostkowa szkolenia × liczba uczestników). Bez rabatu grupowego w v1 (miejsce w `OrderFormParticipantService::totalPrice()`).
+- **`form_orders.product_price`** = kwota **całkowita**. Przy zwykłym wariancie jest to cena × liczba uczestników. Gdy wariant ma **stałą cenę** (`course_price_variants.flat_order_price`), suma zostaje ceną wariantu, a `form_orders.flat_order_price` zapamiętuje to na zamówieniu. Faktura ma wtedy jedną sztukę i pełną kwotę. Dopisanie nauczycieli na formularzu obecności nie tworzy nowego zamówienia.
 
 ## Publiczny formularz (pnedu)
 
@@ -25,7 +25,7 @@
 
 - Lista kart uczestników z kopiowaniem danych na **podglądzie** zamówienia.
 - **Dodawanie i edycja wielu uczestników** na create/edit — ten sam układ co publiczny formularz (imię, nazwisko, e-mail, „Dodaj kolejnego uczestnika”). Limit: `config/form_orders.php` → `max_participants` (domyślnie 50).
-- Cena na create/edit: `product_price` = kwota całkowita; JS mnoży cenę jednostkową × liczbę osób. Serwer zapisuje listę przez `FormOrderAdminParticipantService` → `FormOrderParticipant::syncManyFromFormOrder()` (dopasowanie po e-mailu zachowuje `participant_id`).
+- Cena na create/edit: `product_price` = kwota całkowita. JS mnoży cenę jednostkową × liczbę osób, chyba że zamówienie albo wariant ma stałą cenę — wtedy pole Cena zostaje. Serwer zapisuje listę przez `FormOrderAdminParticipantService` → `FormOrderParticipant::syncManyFromFormOrder()` (dopasowanie po e-mailu zachowuje `participant_id`).
 - Duplikat e-maila **w ramach jednego zamówienia** jest blokowany. Panel nie blokuje e-maili już zapisanych na szkoleniu (obsługa ręczna).
 - Walidacja e-maila: `email:filter` (wymaga TLD w domenie; odrzuca np. `user@gminakrzeszowice`). Ta sama reguła na create/update ADM oraz na publicznym formularzu pnedu.
 - Klonowanie zamówienia (`?clone_from=`) kopiuje **wszystkich** uczestników, nie tylko głównego.

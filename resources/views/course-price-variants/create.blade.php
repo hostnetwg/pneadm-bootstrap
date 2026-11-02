@@ -92,6 +92,19 @@
                                 </div>
                             </div>
                         </div>
+                        @php
+                            $flatDefault = ($course->category === 'closed') ? '1' : '0';
+                            $flatChecked = (string) old('flat_order_price', $flatDefault) === '1';
+                        @endphp
+                        <input type="hidden" name="flat_order_price" value="0">
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" name="flat_order_price" id="flat_order_price" value="1"
+                                   {{ $flatChecked ? 'checked' : '' }}>
+                            <label class="form-check-label" for="flat_order_price">
+                                Stała cena niezależnie od ilości uczestników w zamówieniu
+                            </label>
+                        </div>
+                        <p class="form-text">Przy nowym wariancie szkolenia zamkniętego pole jest zaznaczone. Odznacz je, gdy cena ma być liczona za każdą osobę. Istniejące warianty pozostają bez tej opcji, dopóki jej nie włączysz.</p>
                     </div>
                 </div>
 

@@ -1,6 +1,7 @@
 @php
     $maxParticipants = (int) ($maxParticipants ?? config('form_orders.max_participants', 50));
     $unitPrice = $unitPrice ?? null;
+    $flatOrderPrice = (bool) ($flatOrderPrice ?? false);
     $prefillRows = old('participants');
     if (! is_array($prefillRows) || $prefillRows === []) {
         $prefillRows = $participantsPrefill ?? null;
@@ -16,7 +17,8 @@
 
 <div id="order-form-participants-root"
      data-max-participants="{{ $maxParticipants }}"
-     data-unit-price="{{ $unitPrice !== null && $unitPrice !== '' ? number_format((float) $unitPrice, 2, '.', '') : '' }}">
+     data-unit-price="{{ $unitPrice !== null && $unitPrice !== '' ? number_format((float) $unitPrice, 2, '.', '') : '' }}"
+     data-flat-price="{{ $flatOrderPrice ? '1' : '0' }}">
     <div id="order-form-participant-rows">
         @foreach($prefillRows as $idx => $row)
             @include('form-orders.partials.participants-form-row', [

@@ -190,7 +190,7 @@
                                     @if($zamowienie->isProductOrder())
                                         Na te adresy e-mail trafią dane dostępowe do kursu online. Możesz dodać lub usunąć osoby — kwota przelicza się automatycznie (cena jednostkowa × liczba osób).
                                     @else
-                                        Na te adresy e-mail trafią dane dostępowe do szkolenia. Możesz dodać lub usunąć osoby — kwota przelicza się automatycznie (cena jednostkowa × liczba osób).
+                                        Na te adresy e-mail trafią dane dostępowe do szkolenia. Przy zwykłej cenie kwota rośnie wraz z liczbą osób. Przy stałej cenie szkolenia zamkniętego kwota w polu Cena zostaje bez zmian.
                                     @endif
                                 </p>
                                 @include('form-orders.partials.participants-form', [
@@ -537,7 +537,7 @@
                 if (item.default_price !== null && item.default_price !== undefined && priceInput) {
                     priceInput.value = item.default_price;
                     if (typeof window.formOrderParticipantsSetUnitPrice === 'function') {
-                        window.formOrderParticipantsSetUnitPrice(item.default_price);
+                        window.formOrderParticipantsSetUnitPrice(item.default_price, item.default_price_flat);
                     }
                 }
             };

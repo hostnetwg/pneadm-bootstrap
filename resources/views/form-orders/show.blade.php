@@ -266,6 +266,9 @@
                             <span class="badge bg-success ms-2 fs-6">
                                 {{ number_format($zamowienie->product_price, 2) }} PLN
                             </span>
+                            @if($zamowienie->flat_order_price)
+                                <span class="badge bg-light text-dark ms-1">za całe szkolenie</span>
+                            @endif
                         @endif
                         @if($zamowienie->activeDebtCases->isNotEmpty())
                             @php

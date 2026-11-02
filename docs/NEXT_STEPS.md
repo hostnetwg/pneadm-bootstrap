@@ -3,6 +3,10 @@
 Data utworzenia/aktualizacji: 2026-10-28
 Status: plan roboczy, do potwierdzenia przez właściciela
 
+## Ostatnio (2026-11-02) — Stała cena wariantu szkolenia
+
+Na wariancie cenowym jest pole **Stała cena niezależnie od ilości uczestników w zamówieniu**. Przy nowym wariancie szkolenia zamkniętego jest zaznaczone, przy otwartym puste. Istniejące warianty zostają puste, dopóki nie zaznaczysz. Na formularzu zamówienia pnedu.pl suma, płatność i zapisane `product_price` zostają ceną wariantu. Faktura ma jedną sztukę. Zamówienia złożone wcześniej trzymają swoją kwotę. Kanon: [FORM_ORDERS_PARTICIPANTS.md](./FORM_ORDERS_PARTICIPANTS.md). Migracja: `2026_11_02_222000_add_flat_order_price_to_price_variants_and_form_orders`.
+
 ## Ostatnio (2026-11-02) — Link prezentera ClickMeeting
 
 Szkolenie online z ID ClickMeeting zapisuje `course_online_details.presenter_meeting_link` (adres pokoju + kod roli prezentera). Dociąga go „Dodaj do szkoleń”, zapis szkolenia, otwarcie edycji i „Aktualizuj link z ClickMeeting”. Mail ze szczegółami dla prowadzącego używa tego adresu. Link uczestnika zostaje dla szkoły i uczestników. Migracja: `2026_11_02_210000_add_presenter_meeting_link_to_course_online_details_table`. Kanon: [CLICKMEETING_TRAININGS.md](./CLICKMEETING_TRAININGS.md).

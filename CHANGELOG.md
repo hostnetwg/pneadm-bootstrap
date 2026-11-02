@@ -6,6 +6,7 @@ Krótka numeracja panelu. Szczegóły zawsze w `docs/`. Nowy numer wersji (np. 1
 
 Zaświadczenia: automatyczne czyszczenie starych plików PDF. Narzędzia deweloperskie: odświeżanie komputera deva jedną komendą.
 
+- **Hotfix 2026-11-02:** na [wariancie cenowym szkolenia](/courses) jest pole **Stała cena niezależnie od ilości uczestników w zamówieniu**. Przy szkoleniu zamkniętym kwota na formularzu zamówienia zostaje ceną ustaloną z dyrektorem, także gdy szkoła dopisze kolejne osoby. Szkolenie otwarte nadal mnoży cenę przez liczbę uczestników. Kanon: [FORM_ORDERS_PARTICIPANTS.md](docs/FORM_ORDERS_PARTICIPANTS.md)
 - **Hotfix 2026-11-02:** w historii [sprawy szkolenia zamkniętego](/closed-training-cases) mail do prowadzącego ma nagłówek **E-mail do prowadzącego**, a nie „E-mail do szkoły”. Dotyczy też już zapisanych wpisów.
 - **Hotfix 2026-11-02:** w mailu do prowadzącego na [sprawie szkolenia zamkniętego](/closed-training-cases) wynagrodzenie jest tuż pod terminem, przed placówką.
 - **Hotfix 2026-11-02:** w mailu do prowadzącego na [sprawie szkolenia zamkniętego](/closed-training-cases), przy szkoleniu online, blok **Kontakt:** jest tuż pod placówką, nad platformą i linkiem prowadzącego.

@@ -2,15 +2,15 @@
 
 namespace App\Models;
 
+use App\Traits\LogsActivity;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use App\Traits\LogsActivity;
-use Carbon\Carbon;
 
 class CoursePriceVariant extends Model
 {
-    use HasFactory, SoftDeletes, LogsActivity;
+    use HasFactory, LogsActivity, SoftDeletes;
 
     public const AVAILABILITY_ALWAYS = 'always';
 
@@ -30,6 +30,7 @@ class CoursePriceVariant extends Model
         'description',
         'is_active',
         'price',
+        'flat_order_price',
         'is_promotion',
         'promotion_price',
         'promotion_type',
@@ -49,6 +50,7 @@ class CoursePriceVariant extends Model
     protected $casts = [
         'is_active' => 'boolean',
         'price' => 'decimal:2',
+        'flat_order_price' => 'boolean',
         'is_promotion' => 'boolean',
         'promotion_price' => 'decimal:2',
         'promotion_start' => 'datetime',
@@ -72,7 +74,7 @@ class CoursePriceVariant extends Model
      */
     public function isPromotionActive(): bool
     {
-        if (!$this->is_promotion || $this->promotion_type === 'disabled') {
+        if (! $this->is_promotion || $this->promotion_type === 'disabled') {
             return false;
         }
 
@@ -82,6 +84,7 @@ class CoursePriceVariant extends Model
 
         if ($this->promotion_type === 'time_limited') {
             $now = now();
+
             return $this->promotion_start <= $now && $now <= $this->promotion_end;
         }
 
@@ -105,6 +108,7 @@ class CoursePriceVariant extends Model
         if ($this->isPromotionActive() && $this->promotion_price !== null) {
             return (float) $this->promotion_price;
         }
+
         return (float) $this->price;
     }
 
@@ -113,13 +117,13 @@ class CoursePriceVariant extends Model
      */
     public function calculateAccessEndDate(): ?Carbon
     {
-        if ($this->access_type !== '5' || !$this->access_start_datetime || !$this->access_duration_value || !$this->access_duration_unit) {
+        if ($this->access_type !== '5' || ! $this->access_start_datetime || ! $this->access_duration_value || ! $this->access_duration_unit) {
             return null;
         }
 
         $start = Carbon::parse($this->access_start_datetime);
-        
-        return match($this->access_duration_unit) {
+
+        return match ($this->access_duration_unit) {
             'hours' => $start->copy()->addHours($this->access_duration_value),
             'days' => $start->copy()->addDays($this->access_duration_value),
             'months' => $start->copy()->addMonths($this->access_duration_value),
@@ -135,7 +139,7 @@ class CoursePriceVariant extends Model
     {
         $now = now();
 
-        return match($this->access_type) {
+        return match ($this->access_type) {
             '1' => true, // Bezterminowy, natychmiastowy
             '2' => $this->access_start_datetime <= $now && ($this->access_end_datetime === null || $now <= $this->access_end_datetime),
             '3' => true, // Określony czas, natychmiastowy (czas liczy się od momentu zakupu)
@@ -150,7 +154,7 @@ class CoursePriceVariant extends Model
      */
     public function getAccessTypeName(): string
     {
-        return match($this->access_type) {
+        return match ($this->access_type) {
             '1' => 'Bezterminowy, z natychmiastowym dostępem',
             '2' => 'Bezterminowy, od określonej daty',
             '3' => 'Przez określony czas, z natychmiastowym dostępem',
@@ -165,7 +169,7 @@ class CoursePriceVariant extends Model
      */
     public function getPromotionTypeName(): string
     {
-        return match($this->promotion_type) {
+        return match ($this->promotion_type) {
             'disabled' => 'Wyłączona',
             'unlimited' => 'Bez ram czasowych',
             'time_limited' => 'Ograniczona czasowo',

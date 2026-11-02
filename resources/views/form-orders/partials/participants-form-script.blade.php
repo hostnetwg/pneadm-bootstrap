@@ -21,6 +21,8 @@
         var priceInput = document.getElementById('product_price');
         var max = parseInt(root.dataset.maxParticipants || '50', 10) || 50;
         var unitPrice = parseFloat(root.dataset.unitPrice || '');
+        var flatPrice = root.dataset.flatPrice === '1';
+        var flatInput = document.getElementById('flat_order_price');
 
         function rows() {
             return Array.prototype.slice.call(rowsWrap.querySelectorAll('.order-form-participant-row'));
@@ -76,6 +78,14 @@
 
         function recalculatePrice() {
             var count = Math.max(1, rows().length);
+            if (flatPrice) {
+                if (breakdownEl) {
+                    breakdownEl.textContent = count > 1
+                        ? ('Stała cena za całe szkolenie, ' + count + ' os.')
+                        : '';
+                }
+                return;
+            }
             if (isNaN(unitPrice)) {
                 if (breakdownEl) {
                     breakdownEl.textContent = count > 1 ? (count + ' os.') : '';
@@ -163,13 +173,21 @@
         rows().forEach(bindRowEvents);
         reindex();
 
-        window.formOrderParticipantsSetUnitPrice = function (price) {
+        window.formOrderParticipantsSetUnitPrice = function (price, flat) {
+            flatPrice = flat === true || flat === 1 || flat === '1';
+            root.dataset.flatPrice = flatPrice ? '1' : '0';
+            if (flatInput) {
+                flatInput.value = flatPrice ? '1' : '0';
+            }
             unitPrice = parseFloat(price);
             if (isNaN(unitPrice)) {
                 root.dataset.unitPrice = '';
                 return;
             }
             root.dataset.unitPrice = String(unitPrice);
+            if (flatPrice && priceInput) {
+                priceInput.value = unitPrice.toFixed(2);
+            }
             recalculatePrice();
         };
     });

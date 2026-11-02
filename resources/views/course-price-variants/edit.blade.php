@@ -72,6 +72,18 @@
                                 </div>
                             </div>
                         </div>
+                        @php
+                            $flatChecked = (string) old('flat_order_price', $variant->flat_order_price ? '1' : '0') === '1';
+                        @endphp
+                        <input type="hidden" name="flat_order_price" value="0">
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" name="flat_order_price" id="flat_order_price" value="1"
+                                   {{ $flatChecked ? 'checked' : '' }}>
+                            <label class="form-check-label" for="flat_order_price">
+                                Stała cena niezależnie od ilości uczestników w zamówieniu
+                            </label>
+                        </div>
+                        <p class="form-text">Zaznacz przy szkoleniu zamkniętym, gdy z dyrektorem ustalona jest jedna kwota za całe szkolenie. Dopisanie kolejnych osób na formularzu zamówienia nie zmienia sumy. Uczestnicy nadal zapisują się na zamówieniu. Przy szkoleniu otwartym zostaw puste — cena mnoży się przez liczbę osób.</p>
                     </div>
                 </div>
 

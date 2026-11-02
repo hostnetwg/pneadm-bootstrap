@@ -179,7 +179,7 @@ Planowany, jeszcze niezaimplementowany system spraw operacyjnych (zapytanie o sz
 
 | Moduł | Główne tabele | Główna aplikacja |
 |---|---|---|
-| szkolenia | `courses`, `course_price_variants`, `course_online_details` | `adm.pnedu.pl`, widoczne w `pnedu.pl` |
+| szkolenia | `courses`, `course_price_variants` (w tym stała cena zamówienia `flat_order_price`), `course_online_details` | `adm.pnedu.pl`, widoczne w `pnedu.pl` |
 | trenerzy | `instructors` | `adm.pnedu.pl` |
 | zamówienia | `form_orders`, `form_order_participants` | oba |
 | płatności | `online_payment_orders`, `payment_webhook_logs` | oba |
