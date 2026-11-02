@@ -1358,7 +1358,8 @@ class ClosedTrainingCaseTest extends TestCase
         $this->assertStringContainsString('Szkolenie stacjonarne', $draft['subject']);
         $this->assertStringContainsString('Dzień dobry, Jacek', $draft['body']);
         $this->assertStringContainsString('szkolenie stacjonarne jest już zaplanowane', $draft['body']);
-        $this->assertStringContainsString('być na miejscu przed rozpoczęciem', $draft['body']);
+        $this->assertStringNotContainsString('być na miejscu przed rozpoczęciem', $draft['body']);
+        $this->assertStringContainsString('W razie pytań proszę o kontakt telefoniczny', $draft['body']);
         $this->assertStringContainsString('Szkolenie rady w Przemyślu', $draft['body']);
         $this->assertStringContainsString('02.12.2026', $draft['body']);
         $this->assertStringContainsString('SP Przykład', $draft['body']);

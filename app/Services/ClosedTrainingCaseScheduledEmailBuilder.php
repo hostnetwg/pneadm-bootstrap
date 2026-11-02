@@ -124,7 +124,7 @@ class ClosedTrainingCaseScheduledEmailBuilder
             $place = $this->locationLabel($course);
             $lines[] = '<strong>Miejsce:</strong> '.e($place ?? '(uzupełnij przed wysyłką)');
             $intro = 'szkolenie stacjonarne jest już zaplanowane. Poniżej przesyłam miejsce i ustalenia.';
-            $closing = 'Proszę być na miejscu przed rozpoczęciem szkolenia. W razie pytań proszę o kontakt telefoniczny: 501&nbsp;654&nbsp;274.';
+            $closing = 'W razie pytań proszę o kontakt telefoniczny: 501&nbsp;654&nbsp;274.';
             $subject = 'Szkolenie stacjonarne – szczegóły – '.$title;
         }
         $lines[] = '<strong>Wynagrodzenie:</strong> '.e($feeLabel);
