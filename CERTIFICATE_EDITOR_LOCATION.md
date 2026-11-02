@@ -1,5 +1,7 @@
 # 📍 Lokalizacja edytora szablonów certyfikatów
 
+> **NIEAKTUALNE (historyczne).** PDF nie korzysta już z pakietu `pne-certificate-generator` ani z plików Blade. Aktualny opis: [docs/CERTIFICATE_TEMPLATES.md](docs/CERTIFICATE_TEMPLATES.md).
+
 ## ✅ Odpowiedź na pytanie
 
 **Edytor szablonów jest w `pneadm-bootstrap` (adm.pnedu.pl), NIE w pakiecie `pne-certificate-generator`.**

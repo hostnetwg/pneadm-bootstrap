@@ -357,6 +357,165 @@
                             </div>
                         </div>
                     </div>
+
+                    <!-- Stałe elementy (Data wystawienia i podpis prowadzącego oraz Stopka) -->
+                    @php
+                        $cloneBlocks = isset($templateToClone) ? ($templateToClone->config['blocks'] ?? []) : null;
+                        $cloneSignatureBlock = null;
+                        $cloneFooterBlock = null;
+                        foreach ($cloneBlocks ?? [] as $cloneBlock) {
+                            if (($cloneBlock['type'] ?? '') === 'instructor_signature') {
+                                $cloneSignatureBlock = $cloneBlock;
+                            } elseif (($cloneBlock['type'] ?? '') === 'footer') {
+                                $cloneFooterBlock = $cloneBlock;
+                            }
+                        }
+                        $hasOldInput = session()->hasOldInput();
+                        $showSignature = $hasOldInput
+                            ? (bool) old('show_instructor_signature')
+                            : ($cloneBlocks === null || $cloneSignatureBlock !== null);
+                        $showFooter = $hasOldInput
+                            ? (bool) old('show_footer')
+                            : ($cloneBlocks === null || $cloneFooterBlock !== null);
+                        $showCertificateNumber = $hasOldInput
+                            ? (bool) old('show_certificate_number')
+                            : (isset($templateToClone) ? ($templateToClone->config['settings']['show_certificate_number'] ?? true) : true);
+                        $footerConfig = $cloneFooterBlock['config'] ?? [];
+                        $footerFields = $availableBlocks['footer']['fields'] ?? [];
+                    @endphp
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <i class="bi bi-pin-angle me-2"></i>Stałe Elementy Zaświadczenia
+                            <small class="text-muted ms-2">(zawsze na dole zaświadczenia, kolejność nie ma znaczenia)</small>
+                        </div>
+                        <div class="card-body">
+                            <div class="card mb-3">
+                                <div class="card-header">
+                                    <div class="form-check">
+                                        <input class="form-check-input"
+                                               type="checkbox"
+                                               id="show_instructor_signature"
+                                               name="show_instructor_signature"
+                                               value="1"
+                                               {{ $showSignature ? 'checked' : '' }}>
+                                        <label class="form-check-label fw-bold" for="show_instructor_signature">
+                                            Data wystawienia i podpis prowadzącego
+                                        </label>
+                                    </div>
+                                    <small class="text-muted d-block mt-1">Wyświetla sekcję "Data" i "Prowadzący" na dole zaświadczenia</small>
+                                </div>
+                                <div class="card-body" id="instructor-signature-config" style="{{ $showSignature ? '' : 'display: none;' }}">
+                                    <input type="hidden" name="blocks[instructor_signature_new][type]" value="instructor_signature">
+                                    <input type="hidden" name="blocks[instructor_signature_new][order]" value="9999">
+                                    <div class="form-check mb-3">
+                                        <input class="form-check-input"
+                                               type="checkbox"
+                                               id="show_certificate_number"
+                                               name="show_certificate_number"
+                                               value="1"
+                                               {{ $showCertificateNumber ? 'checked' : '' }}>
+                                        <label class="form-check-label" for="show_certificate_number">
+                                            Pokaż numer rejestru w certyfikacie
+                                        </label>
+                                        <small class="form-text text-muted d-block">
+                                            Jeśli odznaczone, numer rejestru nie będzie wyświetlany w certyfikacie.
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="card">
+                                <div class="card-header">
+                                    <div class="form-check">
+                                        <input class="form-check-input"
+                                               type="checkbox"
+                                               id="show_footer"
+                                               name="show_footer"
+                                               value="1"
+                                               {{ $showFooter ? 'checked' : '' }}>
+                                        <label class="form-check-label fw-bold" for="show_footer">
+                                            Stopka
+                                        </label>
+                                    </div>
+                                    <small class="text-muted d-block mt-1">Wyświetla stopkę z logo i tekstem na dole zaświadczenia</small>
+                                </div>
+                                <div class="card-body" id="footer-config" style="{{ $showFooter ? '' : 'display: none;' }}">
+                                    <input type="hidden" name="blocks[footer_new][type]" value="footer">
+                                    <input type="hidden" name="blocks[footer_new][order]" value="9999">
+                                    @foreach($footerFields as $fieldName => $fieldConfig)
+                                        @php
+                                            $fieldInputName = "blocks[footer_new][config][{$fieldName}]";
+                                            $fieldValue = $hasOldInput
+                                                ? old("blocks.footer_new.config.{$fieldName}")
+                                                : ($footerConfig[$fieldName] ?? ($fieldConfig['type'] === 'checkbox' ? null : ($fieldConfig['default'] ?? '')));
+                                        @endphp
+                                        <div class="mb-3">
+                                            <label for="footer_new_{{ $fieldName }}" class="form-label">{{ $fieldConfig['label'] }}</label>
+                                            @if($fieldConfig['type'] === 'text' && $fieldName === 'logo_path')
+                                                <div class="input-group">
+                                                    <input type="text"
+                                                           class="form-control"
+                                                           id="footer_new_{{ $fieldName }}"
+                                                           name="{{ $fieldInputName }}"
+                                                           value="{{ $fieldValue }}"
+                                                           readonly>
+                                                    <button type="button"
+                                                            class="btn btn-outline-secondary"
+                                                            onclick="openLogoGallery('{{ $fieldInputName }}')">
+                                                        <i class="bi bi-image me-1"></i>Wybierz logo
+                                                    </button>
+                                                </div>
+                                                <div id="blocks[footer_new][config][logo_preview]">
+                                                    @if(!empty($fieldValue))
+                                                        <img src="{{ asset('storage/' . $fieldValue) }}" alt="Logo" style="max-width: 150px; margin-top: 10px;" class="img-thumbnail">
+                                                    @endif
+                                                </div>
+                                            @elseif($fieldConfig['type'] === 'text')
+                                                <input type="text"
+                                                       class="form-control"
+                                                       id="footer_new_{{ $fieldName }}"
+                                                       name="{{ $fieldInputName }}"
+                                                       value="{{ $fieldValue }}">
+                                            @elseif($fieldConfig['type'] === 'number')
+                                                <input type="number"
+                                                       class="form-control"
+                                                       id="footer_new_{{ $fieldName }}"
+                                                       name="{{ $fieldInputName }}"
+                                                       value="{{ $fieldValue }}">
+                                            @elseif($fieldConfig['type'] === 'textarea')
+                                                <textarea class="form-control"
+                                                          id="footer_new_{{ $fieldName }}"
+                                                          name="{{ $fieldInputName }}"
+                                                          rows="3">{{ $fieldValue }}</textarea>
+                                            @elseif($fieldConfig['type'] === 'checkbox')
+                                                <div class="form-check">
+                                                    <input class="form-check-input"
+                                                           type="checkbox"
+                                                           id="footer_new_{{ $fieldName }}"
+                                                           name="{{ $fieldInputName }}"
+                                                           value="1"
+                                                           {{ !empty($fieldValue) ? 'checked' : '' }}>
+                                                    <label class="form-check-label" for="footer_new_{{ $fieldName }}">
+                                                        {{ $fieldConfig['label'] }}
+                                                    </label>
+                                                </div>
+                                            @elseif($fieldConfig['type'] === 'select')
+                                                <select class="form-select"
+                                                        id="footer_new_{{ $fieldName }}"
+                                                        name="{{ $fieldInputName }}">
+                                                    @foreach($fieldConfig['options'] ?? [] as $optionValue => $optionLabel)
+                                                        <option value="{{ $optionValue }}" {{ (string) ($fieldValue ?: ($fieldConfig['default'] ?? '')) === (string) $optionValue ? 'selected' : '' }}>
+                                                            {{ $optionLabel }}
+                                                        </option>
+                                                    @endforeach
+                                                </select>
+                                            @endif
+                                        </div>
+                                    @endforeach
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="col-md-4">
@@ -408,6 +567,7 @@
                 <div class="modal-body">
                     <div class="list-group">
                         @foreach($availableBlocks as $type => $block)
+                            @if($type !== 'instructor_signature' && $type !== 'footer')
                             <a href="#" 
                                class="list-group-item list-group-item-action add-block-btn" 
                                data-block-type="{{ $type }}"
@@ -418,6 +578,7 @@
                                 </div>
                                 <p class="mb-1 small text-muted">{{ $block['description'] }}</p>
                             </a>
+                            @endif
                         @endforeach
                     </div>
                 </div>
@@ -574,6 +735,16 @@
             
             // Inicjalizacja Sortable dla drag & drop bloków
             initializeSortable();
+
+            [['show_instructor_signature', 'instructor-signature-config'], ['show_footer', 'footer-config']].forEach(([checkboxId, configId]) => {
+                const checkbox = document.getElementById(checkboxId);
+                const config = document.getElementById(configId);
+                if (checkbox && config) {
+                    checkbox.addEventListener('change', function() {
+                        config.style.display = this.checked ? 'block' : 'none';
+                    });
+                }
+            });
             
             // Delegacja eventów dla usuwania bloków
             document.addEventListener('click', function(e) {
@@ -783,6 +954,7 @@
 
             fetch('/api/admin/certificate-templates/upload-logo', {
                 method: 'POST',
+                headers: { 'Accept': 'application/json' },
                 body: formData
             })
             .then(response => response.json())
@@ -818,6 +990,7 @@
                     method: 'DELETE',
                     headers: {
                         'Content-Type': 'application/json',
+                        'Accept': 'application/json',
                         'X-CSRF-TOKEN': '{{ csrf_token() }}'
                     },
                     body: JSON.stringify({ path: logoPath })
@@ -987,6 +1160,9 @@
 
             sortedBlocks.forEach((block, index) => {
                 const blockType = block.type;
+                if (blockType === 'instructor_signature' || blockType === 'footer') {
+                    return;
+                }
                 const blockData = availableBlocks[blockType];
                 
                 console.log(`Przetwarzanie bloku ${index + 1}/${sortedBlocks.length}:`, {
@@ -1105,6 +1281,7 @@
 
             fetch('/api/admin/certificate-templates/upload-background', {
                 method: 'POST',
+                headers: { 'Accept': 'application/json' },
                 body: formData
             })
             .then(response => response.json())
@@ -1140,6 +1317,7 @@
                     method: 'DELETE',
                     headers: {
                         'Content-Type': 'application/json',
+                        'Accept': 'application/json',
                         'X-CSRF-TOKEN': '{{ csrf_token() }}'
                     },
                     body: JSON.stringify({ path: backgroundPath })

@@ -56,42 +56,7 @@ class CertificatePdfRetentionService
                         return false;
                     }
 
-                    $relative = $this->relativePath((string) $certificate->file_path);
-                    if ($relative === null) {
-                        $stats['skipped_invalid_path']++;
-
-                        continue;
-                    }
-
-                    $stats['candidates']++;
-                    $exists = $disk->exists($relative);
-                    $size = $exists ? (int) $disk->size($relative) : 0;
-                    $freeze = $this->needsIssueDateFreeze($certificate);
-
-                    if ($dryRun) {
-                        $exists ? $stats['deleted']++ : $stats['missing_on_disk']++;
-                        $stats['bytes'] += $size;
-                        $stats['issue_date_frozen'] += $freeze ? 1 : 0;
-
-                        continue;
-                    }
-
-                    if ($exists && ! $disk->delete($relative)) {
-                        $stats['failed']++;
-                        Log::warning('certificates:cleanup-pdfs: nie udało się skasować pliku', ['certificate_id' => $certificate->id, 'path' => $relative]);
-
-                        continue;
-                    }
-
-                    $update = ['file_path' => null];
-                    if ($freeze) {
-                        $update['issue_date'] = $certificate->generated_at->toDateString();
-                        $stats['issue_date_frozen']++;
-                    }
-                    DB::table('certificates')->where('id', $certificate->id)->update($update);
-
-                    $exists ? $stats['deleted']++ : $stats['missing_on_disk']++;
-                    $stats['bytes'] += $size;
+                    $this->purgeOne($certificate, $disk, $dryRun, $stats);
                 }
 
                 return true;
@@ -102,6 +67,86 @@ class CertificatePdfRetentionService
         }
 
         return $stats;
+    }
+
+    /**
+     * Kasuje pliki PDF wskazanych zaświadczeń (niezależnie od wieku), z tymi samymi zabezpieczeniami co retencja.
+     *
+     * @param  iterable<int>  $certificateIds
+     * @return array{candidates:int,deleted:int,missing_on_disk:int,skipped_invalid_path:int,failed:int,issue_date_frozen:int,bytes:int}
+     */
+    public function purgeFiles(iterable $certificateIds, bool $dryRun = false): array
+    {
+        $disk = Storage::disk('public');
+        $stats = [
+            'candidates' => 0,
+            'deleted' => 0,
+            'missing_on_disk' => 0,
+            'skipped_invalid_path' => 0,
+            'failed' => 0,
+            'issue_date_frozen' => 0,
+            'bytes' => 0,
+        ];
+
+        Certificate::query()
+            ->with(['course:id,issue_date_certyficates', 'onlineCourse:id,certificate_issue_date'])
+            ->whereIn('id', collect($certificateIds)->all())
+            ->whereNotNull('file_path')
+            ->where('file_path', '!=', '')
+            ->chunkById(200, function ($certificates) use (&$stats, $disk, $dryRun) {
+                foreach ($certificates as $certificate) {
+                    $this->purgeOne($certificate, $disk, $dryRun, $stats);
+                }
+            });
+
+        if (! $dryRun) {
+            Log::info('certificates: usunięto wskazane pliki PDF', $stats);
+        }
+
+        return $stats;
+    }
+
+    /**
+     * @param  array<string,int>  $stats
+     */
+    private function purgeOne(Certificate $certificate, \Illuminate\Contracts\Filesystem\Filesystem $disk, bool $dryRun, array &$stats): void
+    {
+        $relative = $this->relativePath((string) $certificate->file_path);
+        if ($relative === null) {
+            $stats['skipped_invalid_path']++;
+
+            return;
+        }
+
+        $stats['candidates']++;
+        $exists = $disk->exists($relative);
+        $size = $exists ? (int) $disk->size($relative) : 0;
+        $freeze = $this->needsIssueDateFreeze($certificate);
+
+        if ($dryRun) {
+            $exists ? $stats['deleted']++ : $stats['missing_on_disk']++;
+            $stats['bytes'] += $size;
+            $stats['issue_date_frozen'] += $freeze ? 1 : 0;
+
+            return;
+        }
+
+        if ($exists && ! $disk->delete($relative)) {
+            $stats['failed']++;
+            Log::warning('certificates: nie udało się skasować pliku PDF', ['certificate_id' => $certificate->id, 'path' => $relative]);
+
+            return;
+        }
+
+        $update = ['file_path' => null];
+        if ($freeze) {
+            $update['issue_date'] = $certificate->generated_at->toDateString();
+            $stats['issue_date_frozen']++;
+        }
+        DB::table('certificates')->where('id', $certificate->id)->update($update);
+
+        $exists ? $stats['deleted']++ : $stats['missing_on_disk']++;
+        $stats['bytes'] += $size;
     }
 
     /**

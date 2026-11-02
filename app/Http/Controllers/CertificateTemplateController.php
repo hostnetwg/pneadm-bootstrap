@@ -606,8 +606,9 @@ class CertificateTemplateController extends Controller
             'participant' => $participant,
             'course' => $course,
             'instructor' => $instructor,
-            'certificateNumber' => $certificateNumber,
-            'durationMinutes' => $durationMinutes,
+            'certificate_number' => $certificateNumber,
+            'duration_minutes' => $durationMinutes,
+            'effective_completion_date' => $course->end_date->toDateString(),
             'is_pdf_mode' => true,
             'template_config' => $config,
             'settings' => $settings,
@@ -708,14 +709,13 @@ class CertificateTemplateController extends Controller
             
             // Zapisz w storage aplikacji
             $this->saveToAppStorage($file, $relativePath);
-            $savedPath = storage_path('app/public/' . $relativePath);
             
             \Log::info('Logo saved to app storage', [
-                'path' => $savedPath,
+                'path' => $relativePath,
                 'filename' => $filename
             ]);
             
-            if (File::exists($savedPath)) {
+            if (Storage::disk('public')->exists($relativePath)) {
                 $url = asset('storage/' . $relativePath);
                 
                 return response()->json([
@@ -743,13 +743,73 @@ class CertificateTemplateController extends Controller
      */
     protected function saveToAppStorage($file, string $relativePath): void
     {
-        $directory = dirname(storage_path('app/public/' . $relativePath));
-        
-        if (!File::exists($directory)) {
-            File::makeDirectory($directory, 0755, true);
-        }
-        
         Storage::disk('public')->put($relativePath, file_get_contents($file->getRealPath()));
+    }
+
+    /**
+     * Ścieżka pliku galerii względem dysku public albo null, gdy wychodzi poza katalog galerii.
+     */
+    protected function resolveGalleryPath(string $path, string $directory): ?string
+    {
+        $normalizedPath = ltrim(str_replace('\\', '/', $path), '/');
+        if (str_starts_with($normalizedPath, 'storage/')) {
+            $normalizedPath = substr($normalizedPath, 8);
+        }
+
+        $prefix = $directory . '/';
+        if (! str_starts_with($normalizedPath, $prefix)) {
+            return null;
+        }
+
+        $filename = substr($normalizedPath, strlen($prefix));
+        if ($filename === '' || $filename !== basename($filename) || str_starts_with($filename, '.')) {
+            return null;
+        }
+
+        return $prefix . $filename;
+    }
+
+    protected function deleteGalleryFile(Request $request, string $directory, string $successMessage)
+    {
+        $request->validate([
+            'path' => 'required|string'
+        ]);
+
+        $path = (string) $request->input('path');
+        if ($directory === 'certificates/backgrounds') {
+            $path = str_replace('certificate-backgrounds/', 'certificates/backgrounds/', $path);
+        }
+
+        $relativePath = $this->resolveGalleryPath($path, $directory);
+        if ($relativePath === null) {
+            \Log::warning('Certificate gallery: rejected delete path', [
+                'path' => $path,
+                'user_id' => $request->user()?->id,
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Nieprawidłowa ścieżka pliku.'
+            ], 422);
+        }
+
+        $disk = Storage::disk('public');
+        if ($disk->exists($relativePath) && $disk->delete($relativePath)) {
+            \Log::info('Certificate gallery file deleted', [
+                'path' => $relativePath,
+                'user_id' => $request->user()?->id,
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => $successMessage
+            ]);
+        }
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Plik nie istnieje.'
+        ], 404);
     }
 
     /**
@@ -758,46 +818,7 @@ class CertificateTemplateController extends Controller
      */
     public function deleteLogo(Request $request)
     {
-        $request->validate([
-            'path' => 'required|string'
-        ]);
-
-        $path = $request->input('path');
-        
-        // Normalizuj ścieżkę (usuń ewentualne prefiksy)
-        $normalizedPath = ltrim($path, '/');
-        if (strpos($normalizedPath, 'storage/') === 0) {
-            $normalizedPath = substr($normalizedPath, 8); // Usuń 'storage/'
-        }
-        
-        $deleted = false;
-        
-        // Usuń z storage aplikacji
-        $appPath = storage_path('app/public/' . $normalizedPath);
-        if (File::exists($appPath)) {
-            try {
-                File::delete($appPath);
-                \Log::info('Logo deleted from app storage', ['path' => $appPath]);
-                $deleted = true;
-            } catch (\Exception $e) {
-                \Log::error('Failed to delete logo from app storage', [
-                    'path' => $appPath,
-                    'error' => $e->getMessage()
-                ]);
-            }
-        }
-        
-        if ($deleted) {
-            return response()->json([
-                'success' => true,
-                'message' => 'Logo zostało usunięte'
-            ]);
-        }
-        
-        return response()->json([
-            'success' => false,
-            'message' => 'Plik nie istnieje.'
-        ], 404);
+        return $this->deleteGalleryFile($request, 'certificates/logos', 'Logo zostało usunięte');
     }
 
     /**
@@ -818,14 +839,13 @@ class CertificateTemplateController extends Controller
             
             // Zapisz w storage aplikacji
             $this->saveToAppStorage($file, $relativePath);
-            $savedPath = storage_path('app/public/' . $relativePath);
             
             \Log::info('Background saved to app storage', [
-                'path' => $savedPath,
+                'path' => $relativePath,
                 'filename' => $filename
             ]);
             
-            if (File::exists($savedPath)) {
+            if (Storage::disk('public')->exists($relativePath)) {
                 $url = asset('storage/' . $relativePath);
                 
                 return response()->json([
@@ -854,48 +874,7 @@ class CertificateTemplateController extends Controller
      */
     public function deleteBackground(Request $request)
     {
-        $request->validate([
-            'path' => 'required|string'
-        ]);
-
-        $path = $request->input('path');
-        
-        // Normalizuj ścieżkę (usuń ewentualne prefiksy i zamień stare ścieżki)
-        $normalizedPath = ltrim($path, '/');
-        if (strpos($normalizedPath, 'storage/') === 0) {
-            $normalizedPath = substr($normalizedPath, 8); // Usuń 'storage/'
-        }
-        // Zamień stare ścieżki na nowe
-        $normalizedPath = str_replace('certificate-backgrounds/', 'certificates/backgrounds/', $normalizedPath);
-        
-        $deleted = false;
-        
-        // Usuń z storage aplikacji
-        $appPath = storage_path('app/public/' . $normalizedPath);
-        if (File::exists($appPath)) {
-            try {
-                File::delete($appPath);
-                \Log::info('Background deleted from app storage', ['path' => $appPath]);
-                $deleted = true;
-            } catch (\Exception $e) {
-                \Log::error('Failed to delete background from app storage', [
-                    'path' => $appPath,
-                    'error' => $e->getMessage()
-                ]);
-            }
-        }
-        
-        if ($deleted) {
-            return response()->json([
-                'success' => true,
-                'message' => 'Tło zostało usunięte'
-            ]);
-        }
-        
-        return response()->json([
-            'success' => false,
-            'message' => 'Plik nie istnieje.'
-        ], 404);
+        return $this->deleteGalleryFile($request, 'certificates/backgrounds', 'Tło zostało usunięte');
     }
     
     /**

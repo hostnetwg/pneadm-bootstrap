@@ -3,6 +3,19 @@
 Data utworzenia/aktualizacji: 2026-10-28
 Status: plan roboczy, do potwierdzenia przez właściciela
 
+## Ostatnio (2026-11-02) — Edytor szablonów zaświadczeń: przegląd + hotfix bezpieczeństwa
+
+Nowy kanon: [CERTIFICATE_TEMPLATES.md](./CERTIFICATE_TEMPLATES.md) (edytor, JSON `config`, renderowanie, daty, kiedy widać zmianę szablonu, checklista rozbudowy).
+
+Naprawione lokalnie (niezacommitowane, **do pilnego wdrożenia na prod**): galeria logo/tła `/api/admin/certificate-templates/*` przeniesiona do `routes/web.php` (logowanie + CSRF; wcześniej bez logowania i z możliwością usunięcia dowolnego pliku przez `../`), usuwanie tylko w katalogu galerii; `create` ma sekcję podpisu i stopki (wcześniej nowy/klonowany szablon je tracił); podgląd pokazuje numer i czas trwania; szablony 2, 3, 6–9 znów drukują datę rozpoczęcia, wymiar minut i „przez” (regresja od 2026-07-08, migracja danych). Testy: `--filter='CertificateTemplateEditorTest|CertificateLegacyEventTextTest|CertificatePdfRetentionTest'`.
+
+Na prod po `git pull`, w tej kolejności:
+1. `php artisan migrate --force` (jedna migracja: `2026_11_02_120000_add_start_date_variables_to_legacy_certificate_event_text`),
+2. `php artisan optimize:clear` (trasy) + `php artisan view:clear`,
+3. `php artisan certificates:audit-event-text --templates=2,3,6,7,8,9 --list`, potem to samo z `--delete-files` (pyta o potwierdzenie) — usuwa PDF-y z uciętym tekstem wygenerowane od 2026-07-08; odtworzą się przy pobraniu. Bez powiadamiania uczestników (decyzja Waldemara).
+
+Ta sama migracja przestawia szablony 1 i 5 z `{data_konca}` na `{data_rozpoczecia}` (zasada: na zaświadczeniu szkolenia data rozpoczęcia). Szablon 10 (kursy online) bez zmian. Szczegóły: CERTIFICATE_TEMPLATES.md §12 pkt 2.
+
 ## Ostatnio (2026-11-01) — Retencja PDF zaświadczeń (30 dni) — WDROŻONE na prod i włączone
 
 Stan: wdrożone, przebieg główny i osierocone pliki wykonane (12,9 GB zwolnione, `certificates` ok. 1,5 GB), automat włączony (codziennie 03:15). Szczegóły: [deploy/CERTIFICATE_PDF_RETENTION.md](./deploy/CERTIFICATE_PDF_RETENTION.md), sekcja „Stan wdrożenia”. Do zrobienia: usunąć `.env.bak-*` na prodzie po kilku dniach; sprawdzić w `storage/logs/laravel.log` pierwszy nocny przebieg. Opis poniżej to historia przygotowania.

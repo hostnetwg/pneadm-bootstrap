@@ -98,6 +98,7 @@ Testy integracyjne z prawdziwym API Sendy — wyjątki mockowane przez `Http::fa
 | Katalog sprzedaży i warianty cenowe kursów online | `--filter=OnlineCourseSalesCatalogTest`, `--filter=ProductPriceTest` |
 | Kolejność kursów na `/kursy` | **pneadm:** `--filter=OnlineCourseCatalogOrderTest`; **pnedu:** `--filter=StorefrontCatalogOrderTest` |
 | Seria — auto format/szablon zaświadczeń | `--filter=CourseSeriesCertificateSettingsTest` |
+| Edytor szablonów zaświadczeń | `--filter=CertificateTemplateEditorTest` (galeria logo/tła tylko po zalogowaniu, brak usuwania poza katalogiem galerii, podpis/stopka przy tworzeniu i klonowaniu, dane podglądu); ręcznie: wgraj/usuń logo i tło w `/admin/certificate-templates/create` i `/edit`, utwórz szablon i sprawdź Podgląd. `--filter=CertificateLegacyEventTextTest`: migracja daty rozpoczęcia w starych szablonach i `certificates:audit-event-text --delete-files`. Kanon: [CERTIFICATE_TEMPLATES.md](./CERTIFICATE_TEMPLATES.md) |
 | Linki e-mail do prowadzącego | `--filter=CourseInstructorLinksEmailBodyTest` (pierwszy punkt: `Lista obecności / zaświadczenie`, gdy flaga na edycji kursu jest włączona). Kanon: [CERTIFICATES.md](./CERTIFICATES.md). |
 | Omnibus — historia cen i wyłączenie wpisu | `--filter=PriceOmnibusServiceTest` |
 | Omnibus na szkoleniach zakończonych | **pnedu:** `sail artisan test --filter=ArchivedCourseOmnibusTest` |

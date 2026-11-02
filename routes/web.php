@@ -208,6 +208,14 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
         Route::post('certificate-templates/{id}/restore', [CertificateTemplateController::class, 'restore'])->name('certificate-templates.restore');
     });
 
+    // Galeria logo/tła edytora szablonów (adresy /api/... wołane fetch() z widoków edytora; sesja + CSRF)
+    Route::prefix('api/admin/certificate-templates')->name('admin.certificate-templates.')->group(function () {
+        Route::post('upload-logo', [CertificateTemplateController::class, 'uploadLogo'])->name('upload-logo');
+        Route::delete('delete-logo', [CertificateTemplateController::class, 'deleteLogo'])->name('delete-logo');
+        Route::post('upload-background', [CertificateTemplateController::class, 'uploadBackground'])->name('upload-background');
+        Route::delete('delete-background', [CertificateTemplateController::class, 'deleteBackground'])->name('delete-background');
+    });
+
     /**/
     // Dostęp do drugiej bazy danych CERTGEN
     Route::get('/nodn-szkolenia', [NODNSzkoleniaController::class, 'index'])->name('archiwum.certgen_szkolenia.index');

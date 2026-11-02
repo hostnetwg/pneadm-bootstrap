@@ -1,7 +1,7 @@
 # Zaświadczenia — dokumentacja (kanon: pneadm)
 
 Opis systemu generowania PDF zaświadczeń w ekosystemie **pneadm** (adm) + **pnedu** (front).  
-Ostatnia aktualizacja: **2026-09-19**.
+Ostatnia aktualizacja: **2026-11-02** (link do kanonu szablonów).
 
 ## Spis treści
 
@@ -56,7 +56,11 @@ Ostatnia aktualizacja: **2026-09-19**.
 
 ## 3. Szablony (`certificate_templates`)
 
+**Pełny opis edytora, struktury JSON, renderowania, dat i znanych problemów: [CERTIFICATE_TEMPLATES.md](./CERTIFICATE_TEMPLATES.md).** Poniżej tylko skrót.
+
 - Panel: `/admin/certificate-templates`
+- Szkolenie bez szablonu („Domyślny szablon”) używa szablonu z `is_default = 1` (dziś id 1), nie szablonu ze slugiem `default`.
+- Gdy plik PDF już istnieje, pnedu dostaje plik z dysku — zmiana szablonu nie zmienia wydanych plików (szczegóły w §9 kanonu szablonów).
 - Blok **Informacje o kursie** (`course_info`):
   - Tekst ukończenia, tekst wydarzenia (`event_text`)
   - Pokaż czas trwania (`show_duration`)
@@ -225,7 +229,7 @@ Kursy online — **tylko przez zalogowane konto** na pnedu (brak tokenu publiczn
 | Kursy online — wydanie | `app/Services/Certificate/OnlineCourseCertificateIssueService.php` |
 | Numeracja | `app/Services/Certificate/CertificateNumberGenerator.php` |
 | Seria — auto format/szablon z ustawień serii | `app/Services/Certificate/CourseSeriesCertificateSettings.php`, `CourseSeriesController::updateCourses` |
-| Admin szablony | `app/Http/Controllers/CertificateTemplateController.php` |
+| Admin szablony | `app/Http/Controllers/CertificateTemplateController.php`, `app/Services/TemplateBuilderService.php` (definicje bloków) — opis: [CERTIFICATE_TEMPLATES.md](./CERTIFICATE_TEMPLATES.md) |
 | Admin online | `app/Http/Controllers/OnlineCoursesController.php`, `OnlineCourseEnrollmentController.php` |
 | Model | `app/Models/Certificate.php` |
 | Testy | `tests/Unit/CertificateTemplateVariableResolverTest.php`, `tests/Feature/CourseSeriesCertificateSettingsTest.php`, `tests/Unit/CourseInstructorLinksEmailBodyTest.php` |
@@ -237,6 +241,7 @@ Kursy online — **tylko przez zalogowane konto** na pnedu (brak tokenu publiczn
 
 | Dokument | Zawartość |
 |----------|-----------|
+| [CERTIFICATE_TEMPLATES.md](./CERTIFICATE_TEMPLATES.md) | Edytor szablonów, JSON `config`, renderowanie PDF, znane problemy, checklista rozbudowy |
 | [CERTIFICATE_DOWNLOAD_LINKS.md](./CERTIFICATE_DOWNLOAD_LINKS.md) | Tokeny publiczne, lista szkoleń bez logowania |
 | [ONLINE-COURSES.md](./ONLINE-COURSES.md) | Moduły, lekcje, enrollments |
 | [deploy/2026-07-online-certificates-production-deploy.md](./deploy/2026-07-online-certificates-production-deploy.md) | Checklist wdrożenia prod (lipiec 2026) |

@@ -1255,6 +1255,7 @@
 
             fetch('/api/admin/certificate-templates/upload-logo', {
                 method: 'POST',
+                headers: { 'Accept': 'application/json' },
                 body: formData
             })
             .then(response => response.json())
@@ -1290,6 +1291,7 @@
                     method: 'DELETE',
                     headers: {
                         'Content-Type': 'application/json',
+                        'Accept': 'application/json',
                         'X-CSRF-TOKEN': '{{ csrf_token() }}'
                     },
                     body: JSON.stringify({ path: logoPath })
@@ -1406,6 +1408,7 @@
 
             fetch('/api/admin/certificate-templates/upload-background', {
                 method: 'POST',
+                headers: { 'Accept': 'application/json' },
                 body: formData
             })
             .then(response => response.json())
@@ -1441,6 +1444,7 @@
                     method: 'DELETE',
                     headers: {
                         'Content-Type': 'application/json',
+                        'Accept': 'application/json',
                         'X-CSRF-TOKEN': '{{ csrf_token() }}'
                     },
                     body: JSON.stringify({ path: backgroundPath })
