@@ -698,22 +698,24 @@
                         <div class="card-header fw-semibold">Wyślij e-mail</div>
                         <div class="card-body">
                             @if($canShowEmailForm)
-                                <div class="d-flex flex-wrap gap-2 mb-3">
-                                    @if($case->hasAnyContactEmail())
-                                        <form method="POST" action="{{ route('closed-training-cases.email.prepare-school-proposal', $case) }}" class="d-inline">
-                                            @csrf
-                                            <input type="hidden" name="share_contacts" value="{{ $oldShareContacts ? '1' : '0' }}" data-share-sync>
-                                            <button type="submit" class="btn btn-outline-secondary btn-sm">Przygotuj propozycję dla szkoły</button>
-                                        </form>
-                                    @endif
-                                    @if($canEmailInstructor)
-                                        <form method="POST" action="{{ route('closed-training-cases.email.prepare-instructor', $case) }}" class="d-inline">
-                                            @csrf
-                                            <input type="hidden" name="share_contacts" value="{{ $oldShareContacts ? '1' : '0' }}" data-share-sync>
-                                            <button type="submit" class="btn btn-outline-secondary btn-sm">Przygotuj mail do prowadzącego</button>
-                                        </form>
-                                    @endif
-                                </div>
+                                @unless($case->isLinkedToCourse())
+                                    <div class="d-flex flex-wrap gap-2 mb-3">
+                                        @if($case->hasAnyContactEmail())
+                                            <form method="POST" action="{{ route('closed-training-cases.email.prepare-school-proposal', $case) }}" class="d-inline">
+                                                @csrf
+                                                <input type="hidden" name="share_contacts" value="{{ $oldShareContacts ? '1' : '0' }}" data-share-sync>
+                                                <button type="submit" class="btn btn-outline-secondary btn-sm">Przygotuj propozycję dla szkoły</button>
+                                            </form>
+                                        @endif
+                                        @if($canEmailInstructor)
+                                            <form method="POST" action="{{ route('closed-training-cases.email.prepare-instructor', $case) }}" class="d-inline">
+                                                @csrf
+                                                <input type="hidden" name="share_contacts" value="{{ $oldShareContacts ? '1' : '0' }}" data-share-sync>
+                                                <button type="submit" class="btn btn-outline-secondary btn-sm">Przygotuj mail do prowadzącego</button>
+                                            </form>
+                                        @endif
+                                    </div>
+                                @endunless
 
                                 <form method="POST" action="{{ route('closed-training-cases.email.send', $case) }}" id="closed-training-case-email-form">
                                     @csrf
@@ -753,14 +755,16 @@
                                                 {{ $coordinationInstructor?->full_title_name }}
                                                 &lt;{{ $instructorEmail }}&gt;
                                             </p>
-                                            <div class="form-check">
-                                                <input class="form-check-input" type="checkbox" name="notify_instructor" id="notify_instructor" value="1" @checked($oldNotifyInstructor)>
-                                                <label class="form-check-label" for="notify_instructor">
-                                                    Przy wysyłce do szkoły — wyślij też bezpieczny brief do prowadzącego (bez ceny)
-                                                </label>
-                                            </div>
-                                            <div class="form-text">Po zaznaczeniu brief pojawi się obok treści. Można go poprawić przed wysyłką.</div>
-                                            @error('notify_instructor')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
+                                            @unless($case->isLinkedToCourse())
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="notify_instructor" id="notify_instructor" value="1" @checked($oldNotifyInstructor)>
+                                                    <label class="form-check-label" for="notify_instructor">
+                                                        Przy wysyłce do szkoły — wyślij też bezpieczny brief do prowadzącego (bez ceny)
+                                                    </label>
+                                                </div>
+                                                <div class="form-text">Po zaznaczeniu brief pojawi się obok treści. Można go poprawić przed wysyłką.</div>
+                                                @error('notify_instructor')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
+                                            @endunless
                                         </div>
                                     @endif
 
@@ -772,13 +776,15 @@
                                         </label>
                                     </div>
 
-                                    <div class="form-check mb-3">
-                                        <input class="form-check-input" type="checkbox" name="share_contacts" id="share_contacts" value="1" @checked($oldShareContacts)>
-                                        <label class="form-check-label" for="share_contacts">
-                                            Połącz kontakty (opcjonalnie): w briefie dla trenera dane szkoły; w propozycji dla szkoły — telefon prowadzącego
-                                        </label>
-                                        <div class="form-text">Ułatwia ustalenie terminu, ale strony mogą dogadać się poza PNE. Ceny i tak nie wysyłamy trenerowi.</div>
-                                    </div>
+                                    @unless($case->isLinkedToCourse())
+                                        <div class="form-check mb-3">
+                                            <input class="form-check-input" type="checkbox" name="share_contacts" id="share_contacts" value="1" @checked($oldShareContacts)>
+                                            <label class="form-check-label" for="share_contacts">
+                                                Połącz kontakty (opcjonalnie): w briefie dla trenera dane szkoły; w propozycji dla szkoły — telefon prowadzącego
+                                            </label>
+                                            <div class="form-text">Ułatwia ustalenie terminu, ale strony mogą dogadać się poza PNE. Ceny i tak nie wysyłamy trenerowi.</div>
+                                        </div>
+                                    @endunless
 
                                     <div class="mb-3">
                                         <label for="email_subject" class="form-label">Temat</label>
@@ -809,13 +815,13 @@
                                         <template id="order-form-notice-template">{!! $orderFormNoticeHtml !!}</template>
                                     @endif
                                     <div class="row g-3 mb-3">
-                                        <div class="{{ ($oldNotifyInstructor && ($canEmailInstructor ?? false)) ? 'col-lg-6' : 'col-12' }}" id="school-email-column">
+                                        <div class="{{ ($oldNotifyInstructor && ($canEmailInstructor ?? false) && ! $case->isLinkedToCourse()) ? 'col-lg-6' : 'col-12' }}" id="school-email-column">
                                             <label for="email_body" class="form-label">Treść</label>
                                             <textarea name="email_body" id="email_body" rows="12" class="form-control @error('email_body') is-invalid @enderror">{!! \App\Models\ClosedTrainingCase::sanitizeSchoolEmailHtml((string) $emailBodyDefault) !!}</textarea>
                                             @error('email_body')<div class="invalid-feedback">{{ $message }}</div>@enderror
                                             <div class="form-text">Stopka jest już w treści. Możesz ją edytować przed wysyłką.</div>
                                         </div>
-                                        @if($canEmailInstructor)
+                                        @if($canEmailInstructor && ! $case->isLinkedToCourse())
                                             @php
                                                 $instructorBriefBuilder = app(\App\Services\ClosedTrainingCaseCoordinationEmailBuilder::class);
                                                 $instructorBriefPlain = $instructorBriefBuilder->buildInstructorBrief($case, false);

@@ -566,6 +566,10 @@ class ClosedTrainingCaseController extends Controller
 
     public function prepareSchoolProposalEmail(Request $request, ClosedTrainingCase $closedTrainingCase): RedirectResponse
     {
+        if ($closed = $this->negotiationEmailClosed($closedTrainingCase)) {
+            return $closed;
+        }
+
         $share = $request->boolean('share_contacts');
         $draft = $this->coordinationEmailBuilder->buildSchoolProposal($closedTrainingCase, $share);
 
@@ -609,6 +613,10 @@ class ClosedTrainingCaseController extends Controller
 
     public function prepareInstructorEmail(Request $request, ClosedTrainingCase $closedTrainingCase): RedirectResponse
     {
+        if ($closed = $this->negotiationEmailClosed($closedTrainingCase)) {
+            return $closed;
+        }
+
         $share = $request->boolean('share_contacts');
         $draft = $this->coordinationEmailBuilder->buildInstructorBrief($closedTrainingCase, $share);
         if ($draft['ok'] !== true) {
@@ -674,6 +682,12 @@ class ClosedTrainingCaseController extends Controller
                     'notify_instructor' => 'Brak e-maila prowadzącego. Przypisz instruktora z adresem e-mail.',
                 ]);
             }
+        }
+
+        if ($notifyInstructor && $sendMode === 'school' && ! $isTest && $closedTrainingCase->isLinkedToCourse()) {
+            throw ValidationException::withMessages([
+                'notify_instructor' => 'Szkolenie jest już zaplanowane. Brief z prośbą o termin nie jest wysyłany.',
+            ]);
         }
 
         if ($notifyInstructor && $sendMode === 'school' && ! $isTest) {
@@ -799,6 +813,18 @@ class ClosedTrainingCaseController extends Controller
         return redirect()
             ->route('closed-training-cases.show', $closedTrainingCase)
             ->with('success', $success);
+    }
+
+    private function negotiationEmailClosed(ClosedTrainingCase $case): ?RedirectResponse
+    {
+        if (! $case->isLinkedToCourse()) {
+            return null;
+        }
+
+        return redirect()
+            ->route('closed-training-cases.show', $case)
+            ->withFragment('closed-training-case-email')
+            ->with('error', 'Szkolenie jest już zaplanowane. Użyj e-maila z terminem do szkoły albo szczegółów dla prowadzącego.');
     }
 
     /**

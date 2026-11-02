@@ -1189,6 +1189,66 @@ class ClosedTrainingCaseTest extends TestCase
         });
     }
 
+    public function test_linked_course_hides_negotiation_email_templates(): void
+    {
+        Mail::fake();
+
+        $user = User::factory()->create(['is_active' => true]);
+        $instructor = Instructor::query()->create([
+            'title' => 'mgr',
+            'first_name' => 'Jacek',
+            'last_name' => 'Krzyzak',
+            'email' => 'jacek.ukryty.'.uniqid('', true).'@example.com',
+            'phone' => '502 145 752',
+            'is_active' => true,
+        ]);
+        $case = $this->makeCase([
+            'contact_email' => 'szkola@example.com',
+            'status' => ClosedTrainingCase::STATUS_IN_PROGRESS,
+            'instructor_id' => $instructor->id,
+        ]);
+        $this->makeCourse([
+            'type' => 'offline',
+            'category' => 'closed',
+            'instructor_id' => $instructor->id,
+            'closed_training_case_id' => $case->id,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('closed-training-cases.show', $case))
+            ->assertOk()
+            ->assertDontSee('Przygotuj propozycję dla szkoły', false)
+            ->assertDontSee('Przygotuj mail do prowadzącego', false)
+            ->assertDontSee('wyślij też bezpieczny brief', false)
+            ->assertDontSee('Połącz kontakty', false)
+            ->assertSee('E-mail ze szczegółami dla prowadzącego', false);
+
+        $this->actingAs($user)
+            ->post(route('closed-training-cases.email.prepare-school-proposal', $case))
+            ->assertRedirect(route('closed-training-cases.show', $case).'#closed-training-case-email')
+            ->assertSessionHas('error');
+
+        $this->actingAs($user)
+            ->post(route('closed-training-cases.email.prepare-instructor', $case))
+            ->assertRedirect(route('closed-training-cases.show', $case).'#closed-training-case-email')
+            ->assertSessionHas('error');
+
+        $this->actingAs($user)
+            ->post(route('closed-training-cases.email.send', $case), [
+                'email_subject' => 'Termin',
+                'email_body' => '<p>Szkolenie jest zaplanowane.</p>',
+                'send_mode' => 'school',
+                'email_recipients' => ['szkola@example.com'],
+                'email_intent' => 'scheduled_notice',
+                'notify_instructor' => '1',
+                'instructor_brief_subject' => 'Prośba o termin',
+                'instructor_brief_body' => '<p>Proszę o potwierdzenie dostępności.</p>',
+            ])
+            ->assertSessionHasErrors('notify_instructor');
+
+        Mail::assertNothingSent();
+    }
+
     public function test_scheduled_onsite_notice_does_not_require_meeting_link(): void
     {
         Mail::fake();
