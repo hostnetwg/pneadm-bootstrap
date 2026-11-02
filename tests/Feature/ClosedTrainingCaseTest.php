@@ -6,6 +6,7 @@ use App\Mail\ClosedTrainingCaseSchoolMail;
 use App\Models\ClosedTrainingCase;
 use App\Models\ClosedTrainingCaseEvent;
 use App\Models\Course;
+use App\Models\CoursePriceVariant;
 use App\Models\Instructor;
 use App\Models\TrainingOffer;
 use App\Models\User;
@@ -1013,6 +1014,63 @@ class ClosedTrainingCaseTest extends TestCase
                 ->where('body', 'like', 'E-mail: info o terminie szkolenia%')
                 ->exists()
         );
+    }
+
+    public function test_scheduled_email_form_warns_when_price_variant_is_missing_and_links_it_when_present(): void
+    {
+        config(['services.pnedu_frontend_url' => 'https://pnedu.pl']);
+
+        $user = User::factory()->create(['is_active' => true]);
+        $case = $this->makeCase([
+            'contact_email' => 'szkola@example.com',
+            'status' => ClosedTrainingCase::STATUS_IN_PROGRESS,
+            'topic' => 'Termin dla rady',
+        ]);
+        $start = Carbon::parse('2026-11-12 09:00:00', 'Europe/Warsaw');
+        $course = $this->makeCourse([
+            'title' => 'Szkolenie rady pedagogicznej',
+            'type' => 'offline',
+            'category' => 'closed',
+            'start_date' => $start,
+            'end_date' => $start->copy()->addHours(3),
+            'closed_training_case_id' => $case->id,
+        ]);
+
+        $this->actingAs($user)
+            ->post(route('closed-training-cases.email.prepare-scheduled', $case))
+            ->assertRedirect(route('closed-training-cases.show', $case).'#closed-training-case-email');
+
+        $withoutVariant = $this->actingAs($user)
+            ->get(route('closed-training-cases.show', $case));
+
+        $withoutVariant->assertOk()
+            ->assertSee('id="include_order_form_link"', false)
+            ->assertSee('form-check-label text-danger fw-semibold', false)
+            ->assertSee('Dodaj link do formularza zamówienia', false)
+            ->assertSee('Dla tego szkolenia nie ustalono wariantu cenowego.', false)
+            ->assertSee('bi-exclamation-triangle-fill', false)
+            ->assertSee('https://pnedu.pl/courses/'.$course->id.'/order-form', false)
+            ->assertSee('id="order-form-notice-template"', false);
+
+        $variant = CoursePriceVariant::query()->create([
+            'course_id' => $course->id,
+            'name' => 'Rada pedagogiczna',
+            'is_active' => true,
+            'price' => 1800,
+            'promotion_type' => 'disabled',
+            'access_type' => '1',
+        ]);
+
+        $this->actingAs($user)
+            ->post(route('closed-training-cases.email.prepare-scheduled', $case))
+            ->assertRedirect(route('closed-training-cases.show', $case).'#closed-training-case-email');
+
+        $this->actingAs($user)
+            ->get(route('closed-training-cases.show', $case))
+            ->assertOk()
+            ->assertSee('form-check-label text-success fw-semibold', false)
+            ->assertSee('https://pnedu.pl/courses/'.$course->id.'/order-form?price_variant_id='.$variant->id, false)
+            ->assertDontSee('Dla tego szkolenia nie ustalono wariantu cenowego.', false);
     }
 
     public function test_operator_can_email_instructor_and_notify_on_school_send(): void

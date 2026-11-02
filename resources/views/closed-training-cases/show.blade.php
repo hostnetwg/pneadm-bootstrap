@@ -770,6 +770,28 @@
                                         @error('email_subject')<div class="invalid-feedback">{{ $message }}</div>@enderror
                                         <div class="form-text">Identyfikator {{ $case->referenceCode() }} zostanie dopisany, jeśli go usuniesz.</div>
                                     </div>
+                                    @if($emailIntent === 'scheduled_notice' && $case->course)
+                                        @php
+                                            $scheduledEmailBuilder = app(\App\Services\ClosedTrainingCaseScheduledEmailBuilder::class);
+                                            $hasPriceVariant = $scheduledEmailBuilder->hasActivePriceVariant($case->course);
+                                            $orderFormNoticeHtml = $scheduledEmailBuilder->orderFormNoticeHtml($case->course);
+                                            $orderFormAlreadyInBody = str_contains((string) $emailBodyDefault, 'data-order-form-notice=');
+                                        @endphp
+                                        <div class="form-check mb-3">
+                                            <input class="form-check-input" type="checkbox" id="include_order_form_link" value="1" @checked($orderFormAlreadyInBody)>
+                                            <label class="form-check-label {{ $hasPriceVariant ? 'text-success' : 'text-danger' }} fw-semibold" for="include_order_form_link">
+                                                Dodaj link do formularza zamówienia
+                                                @unless($hasPriceVariant)
+                                                    <i class="bi bi-exclamation-triangle-fill ms-1"
+                                                       data-bs-toggle="tooltip"
+                                                       data-bs-placement="top"
+                                                       title="Dla tego szkolenia nie ustalono wariantu cenowego."
+                                                       aria-label="Dla tego szkolenia nie ustalono wariantu cenowego."></i>
+                                                @endunless
+                                            </label>
+                                        </div>
+                                        <template id="order-form-notice-template">{!! $orderFormNoticeHtml !!}</template>
+                                    @endif
                                     <div class="mb-3">
                                         <label for="email_body" class="form-label">Treść</label>
                                         <textarea name="email_body" id="email_body" rows="12" class="form-control @error('email_body') is-invalid @enderror">{!! \App\Models\ClosedTrainingCase::sanitizeSchoolEmailHtml((string) $emailBodyDefault) !!}</textarea>
@@ -987,7 +1009,7 @@
                 convert_urls: false,
                 browser_spellcheck: true,
                 autoresize_bottom_margin: 16,
-                extended_valid_elements: 'p[style],table[cellpadding|cellspacing|border|style|role],tr,td[align|style],th[align|style],a[href|target|rel]',
+                extended_valid_elements: 'p[style],div[data-order-form-notice],table[cellpadding|cellspacing|border|style|role],tr,td[align|style],th[align|style],a[href|target|rel]',
                 content_style: 'body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; font-size: 15px; line-height: 1.6; } p { margin: 0 0 0.75em; } table { border-collapse: collapse; margin: 0; } td { vertical-align: top; padding: 0; }',
             };
 
@@ -1012,15 +1034,22 @@
             syncClosedOutcome();
 
             const sendForm = document.getElementById('closed-training-case-email-form');
+            let emailEditorReady = Promise.resolve();
             if (sendForm && window.tinymce) {
-                window.tinymce.init(Object.assign({
+                const initResult = window.tinymce.init(Object.assign({
                     selector: '#email_body',
                     height: 320,
                 }, tinyOptions));
+                emailEditorReady = initResult && typeof initResult.then === 'function'
+                    ? initResult
+                    : Promise.resolve();
                 sendForm.addEventListener('submit', function () {
                     window.tinymce.triggerSave();
                 });
             }
+            emailEditorReady.then(function () {
+                bindOrderFormNoticeToggle();
+            });
 
             const sendModeSchool = document.getElementById('send_mode_school');
             const sendModeInstructor = document.getElementById('send_mode_instructor');
@@ -1034,6 +1063,74 @@
             const shareContacts = document.getElementById('share_contacts');
             const emailSubmit = document.getElementById('closed-training-email-submit');
             const emailIntent = document.getElementById('email_intent');
+            const orderFormSentence = 'szkolenie dla Państwa placówki jest już zaplanowane.';
+
+            function insertOrderFormNotice(html, block) {
+                if (html.indexOf('data-order-form-notice="1"') !== -1 || html.indexOf("data-order-form-notice='1'") !== -1) {
+                    return html;
+                }
+                const position = html.indexOf(orderFormSentence);
+                if (position === -1) {
+                    return html + block;
+                }
+                const after = position + orderFormSentence.length;
+                let rest = html.slice(after).replace(/^\s*(?:<br\s*\/?>\s*)?/i, '');
+                const before = html.slice(0, after);
+                if (/^\s*<\/p>/i.test(rest)) {
+                    rest = rest.replace(/^\s*<\/p>\s*/i, '');
+                    return before + '</p>' + block + '<p><br></p>' + rest;
+                }
+                return before + '</p>' + block + '<p><br></p><p>' + rest;
+            }
+
+            function removeOrderFormNotice(html) {
+                const without = html.replace(/<div\s+data-order-form-notice=(["'])1\1>[\s\S]*?<\/div>\s*(?:<p>(?:\s|&nbsp;|<br\s*\/?>)*<\/p>\s*)?/i, '');
+                return without.replace(/(szkolenie dla Państwa placówki jest już zaplanowane\.)<\/p>\s*<p>/i, '$1<br>');
+            }
+
+            function emailEditor() {
+                return window.tinymce ? window.tinymce.get('email_body') : null;
+            }
+
+            function readEmailHtml() {
+                const editor = emailEditor();
+                if (editor) {
+                    return editor.getContent();
+                }
+                const field = document.getElementById('email_body');
+                return field ? field.value : '';
+            }
+
+            function writeEmailHtml(html) {
+                const editor = emailEditor();
+                if (editor) {
+                    editor.setContent(html);
+                    editor.save();
+                    return;
+                }
+                const field = document.getElementById('email_body');
+                if (field) {
+                    field.value = html;
+                }
+            }
+
+            function bindOrderFormNoticeToggle() {
+                const checkbox = document.getElementById('include_order_form_link');
+                const template = document.getElementById('order-form-notice-template');
+                if (!checkbox || !template) {
+                    return;
+                }
+                const warning = checkbox.parentElement ? checkbox.parentElement.querySelector('[data-bs-toggle="tooltip"]') : null;
+                if (warning && window.bootstrap && window.bootstrap.Tooltip) {
+                    window.bootstrap.Tooltip.getOrCreateInstance(warning);
+                }
+                const block = template.innerHTML.trim();
+                checkbox.addEventListener('change', function () {
+                    const current = readEmailHtml();
+                    writeEmailHtml(checkbox.checked ? insertOrderFormNotice(current, block) : removeOrderFormNotice(current));
+                });
+            }
+
             function syncEmailSendMode() {
                 const isTest = !!(sendModeTest && sendModeTest.checked);
                 const isInstructor = !!(sendModeInstructor && sendModeInstructor.checked);

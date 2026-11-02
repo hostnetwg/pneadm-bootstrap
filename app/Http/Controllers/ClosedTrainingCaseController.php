@@ -192,6 +192,7 @@ class ClosedTrainingCaseController extends Controller
             'course.instructor',
             'course.onlineDetails',
             'course.location',
+            'course.activePriceVariants',
         ]);
 
         $this->cases->syncFeeConfirmationWithLinkedCourse($closedTrainingCase);
@@ -204,6 +205,7 @@ class ClosedTrainingCaseController extends Controller
             'course.instructor',
             'course.onlineDetails',
             'course.location',
+            'course.activePriceVariants',
         ]);
 
         return view('closed-training-cases.show', [

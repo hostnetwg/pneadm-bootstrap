@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\ClosedTrainingCase;
 use App\Models\Course;
+use Illuminate\Support\Collection;
 
 /**
  * Treść e-maila „szkolenie zaplanowane” (online z linkiem / stacjonarne potwierdzenie).
@@ -61,6 +62,69 @@ class ClosedTrainingCaseScheduledEmailBuilder
             'ok' => false,
             'error' => 'Szkolenie ma nieobsługiwany typ (oczekiwane: online albo stacjonarne).',
         ];
+    }
+
+    public function hasActivePriceVariant(Course $course): bool
+    {
+        return $this->activePriceVariants($course)->isNotEmpty();
+    }
+
+    public function orderFormNoticeHtml(Course $course): string
+    {
+        $variants = $this->activePriceVariants($course);
+        $variantId = $variants->count() === 1 ? (int) $variants->first()->id : null;
+        $url = CourseFormOrderBillingService::newOrderFormUrl($course, $variantId);
+        $safeUrl = e($url);
+
+        return '<div data-order-form-notice="1">'
+            .'<p>W celu oficjalnego potwierdzenia terminu proszę wypełnić formularz zamówienia:<br>'
+            .'<a href="'.$safeUrl.'">'.$safeUrl.'</a></p>'
+            .'<p>(Jako uczestnika proszę wpisać imię, nazwisko i adres e-mail dyrektora. Pozostali nauczyciele podczas szkolenia otrzymają listę obecności, na podstawie której wystawimy zaświadczenia.)</p>'
+            .'<p>(Faktura z 14-dniowym terminem płatności zostanie wystawiona w dniu szkolenia.)</p>'
+            .'</div>';
+    }
+
+    public function insertOrderFormNotice(string $html, string $block): string
+    {
+        if (str_contains($html, 'data-order-form-notice="1"') || str_contains($html, "data-order-form-notice='1'")) {
+            return $html;
+        }
+
+        $sentence = 'szkolenie dla Państwa placówki jest już zaplanowane.';
+        $position = mb_strpos($html, $sentence);
+        if ($position === false) {
+            return $html.$block;
+        }
+
+        $after = $position + mb_strlen($sentence);
+        $before = mb_substr($html, 0, $after);
+        $rest = mb_substr($html, $after);
+        $rest = preg_replace('/^\s*(?:<br\s*\/?>\s*)?/iu', '', $rest, 1) ?? $rest;
+
+        if (preg_match('/^\s*<\/p>/iu', $rest) === 1) {
+            $rest = preg_replace('/^\s*<\/p>\s*/iu', '', $rest, 1) ?? $rest;
+
+            return $before.'</p>'.$block.'<p><br></p>'.$rest;
+        }
+
+        return $before.'</p>'.$block.'<p><br></p><p>'.$rest;
+    }
+
+    public function removeOrderFormNotice(string $html): string
+    {
+        $without = preg_replace(
+            '/<div\s+data-order-form-notice=(["\'])1\1>.*?<\/div>\s*(?:<p>(?:\s|&nbsp;|<br\s*\/?>)*<\/p>\s*)?/isu',
+            '',
+            $html,
+            1
+        ) ?? $html;
+
+        return preg_replace(
+            '/(szkolenie dla Państwa placówki jest już zaplanowane\.)<\/p>\s*<p>/iu',
+            '$1<br>',
+            $without,
+            1
+        ) ?? $without;
     }
 
     public function hasResolvableAccessLink(Course $course): bool
@@ -248,6 +312,18 @@ class ClosedTrainingCaseScheduledEmailBuilder
         }
 
         return implode(', ', $parts);
+    }
+
+    /**
+     * @return Collection<int, \App\Models\CoursePriceVariant>
+     */
+    private function activePriceVariants(Course $course): Collection
+    {
+        if ($course->relationLoaded('activePriceVariants')) {
+            return $course->activePriceVariants;
+        }
+
+        return $course->activePriceVariants()->get();
     }
 
     private function signatureHtml(): string
