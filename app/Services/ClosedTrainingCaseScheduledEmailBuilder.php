@@ -76,23 +76,21 @@ class ClosedTrainingCaseScheduledEmailBuilder
         $url = CourseFormOrderBillingService::newOrderFormUrl($course, $variantId);
         $safeUrl = e($url);
 
-        return '<span data-order-form-notice="1">'
-            .'W celu oficjalnego potwierdzenia terminu proszę wypełnić formularz zamówienia:<br>'
+        return 'W celu oficjalnego potwierdzenia terminu proszę wypełnić formularz zamówienia:<br>'
             .'<a href="'.$safeUrl.'">'.$safeUrl.'</a><br><br>'
             .'(Jako uczestnika proszę wpisać imię, nazwisko i adres e-mail dyrektora. Pozostali nauczyciele podczas szkolenia otrzymają listę obecności, na podstawie której wystawimy zaświadczenia.)<br><br>'
-            .'(Faktura z 14-dniowym terminem płatności zostanie wystawiona w dniu szkolenia.)'
-            .'</span>';
+            .'(Faktura z 14-dniowym terminem płatności zostanie wystawiona w dniu szkolenia.)';
     }
 
     public function insertOrderFormNotice(string $html, string $block): string
     {
-        if (preg_match('/data-order-form-notice=(["\'])1\1/u', $html) === 1) {
+        if (str_contains($html, 'W celu oficjalnego potwierdzenia terminu proszę wypełnić formularz zamówienia:')) {
             return $html;
         }
 
-        $pattern = '/szkolenie\s+dla\s+Państwa\s+placówki\s+jest\s+już\s+zaplanowane\./iu';
+        $pattern = '/szkolenie(?:\s|&nbsp;|\x{00A0})+dla(?:\s|&nbsp;|\x{00A0})+Państwa(?:\s|&nbsp;|\x{00A0})+placówki(?:\s|&nbsp;|\x{00A0})+jest(?:\s|&nbsp;|\x{00A0})+już(?:\s|&nbsp;|\x{00A0})+zaplanowane\./iu';
         if (preg_match($pattern, $html, $matches, PREG_OFFSET_CAPTURE) !== 1) {
-            return $html.$block;
+            return $html;
         }
 
         $end = $matches[0][1] + strlen($matches[0][0]);
@@ -103,7 +101,7 @@ class ClosedTrainingCaseScheduledEmailBuilder
     public function removeOrderFormNotice(string $html): string
     {
         return preg_replace(
-            '/(?:<br\s*\/?>\s*)?<span\s+data-order-form-notice=(["\'])1\1>.*?<\/span>/isu',
+            '/(?:<br\s*\/?>\s*)?W celu oficjalnego potwierdzenia terminu proszę wypełnić formularz zamówienia:.*?zostanie wystawiona w dniu szkolenia\.\)\s*/isu',
             '',
             $html,
             1

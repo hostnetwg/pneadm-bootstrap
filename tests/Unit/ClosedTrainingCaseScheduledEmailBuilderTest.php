@@ -18,9 +18,15 @@ class ClosedTrainingCaseScheduledEmailBuilderTest extends TestCase
         $html = '<p>Dzień dobry,</p>'
             .'<p>szkolenie dla Państwa placówki jest już zaplanowane.<br>'
             .'Poniżej przesyłam potwierdzenie ustaleń.</p>';
-        $block = '<span data-order-form-notice="1">Formularz zamówienia.</span>';
+        $nbspHtml = '<p>szkolenie&nbsp;dla&nbsp;Państwa&nbsp;placówki&nbsp;jest&nbsp;już&nbsp;zaplanowane.<br>'
+            .'Poniżej przesyłam potwierdzenie ustaleń.</p>';
+        $block = 'W celu oficjalnego potwierdzenia terminu proszę wypełnić formularz zamówienia:<br>'
+            .'<a href="https://pnedu.pl/courses/587/order-form?price_variant_id=133">https://pnedu.pl/courses/587/order-form?price_variant_id=133</a><br><br>'
+            .'(Jako uczestnika proszę wpisać imię, nazwisko i adres e-mail dyrektora. Pozostali nauczyciele podczas szkolenia otrzymają listę obecności, na podstawie której wystawimy zaświadczenia.)<br><br>'
+            .'(Faktura z 14-dniowym terminem płatności zostanie wystawiona w dniu szkolenia.)';
 
         $withNotice = $builder->insertOrderFormNotice($html, $block);
+        $withNbsp = $builder->insertOrderFormNotice($nbspHtml, $block);
 
         $this->assertStringContainsString(
             'szkolenie dla Państwa placówki jest już zaplanowane.<br>'.$block.'<br>Poniżej przesyłam potwierdzenie ustaleń.</p>',
@@ -28,7 +34,15 @@ class ClosedTrainingCaseScheduledEmailBuilderTest extends TestCase
         );
         $this->assertLessThan(
             strpos($withNotice, 'Poniżej przesyłam potwierdzenie ustaleń.'),
-            strpos($withNotice, 'Formularz zamówienia.')
+            strpos($withNotice, 'W celu oficjalnego potwierdzenia terminu')
+        );
+        $this->assertLessThan(
+            strpos($withNbsp, 'Poniżej przesyłam potwierdzenie ustaleń.'),
+            strpos($withNbsp, 'W celu oficjalnego potwierdzenia terminu')
+        );
+        $this->assertStringNotContainsString(
+            $block.'</p>',
+            substr($withNbsp, (int) strrpos($withNbsp, '</p>'))
         );
         $this->assertSame($withNotice, $builder->insertOrderFormNotice($withNotice, $block));
         $this->assertSame($html, $builder->removeOrderFormNotice($withNotice));

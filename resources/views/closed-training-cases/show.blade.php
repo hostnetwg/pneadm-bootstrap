@@ -775,7 +775,7 @@
                                             $scheduledEmailBuilder = app(\App\Services\ClosedTrainingCaseScheduledEmailBuilder::class);
                                             $hasPriceVariant = $scheduledEmailBuilder->hasActivePriceVariant($case->course);
                                             $orderFormNoticeHtml = $scheduledEmailBuilder->orderFormNoticeHtml($case->course);
-                                            $orderFormAlreadyInBody = str_contains((string) $emailBodyDefault, 'data-order-form-notice=');
+                                            $orderFormAlreadyInBody = str_contains((string) $emailBodyDefault, 'W celu oficjalnego potwierdzenia terminu proszę wypełnić formularz zamówienia:');
                                         @endphp
                                         <div class="form-check mb-3">
                                             <input class="form-check-input" type="checkbox" id="include_order_form_link" value="1" @checked($orderFormAlreadyInBody)>
@@ -1009,7 +1009,7 @@
                 convert_urls: false,
                 browser_spellcheck: true,
                 autoresize_bottom_margin: 16,
-                extended_valid_elements: 'p[style],span[data-order-form-notice],table[cellpadding|cellspacing|border|style|role],tr,td[align|style],th[align|style],a[href|target|rel]',
+                extended_valid_elements: 'p[style],table[cellpadding|cellspacing|border|style|role],tr,td[align|style],th[align|style],a[href|target|rel]',
                 content_style: 'body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; font-size: 15px; line-height: 1.6; } p { margin: 0 0 0.75em; } table { border-collapse: collapse; margin: 0; } td { vertical-align: top; padding: 0; }',
             };
 
@@ -1064,20 +1064,112 @@
             const emailSubmit = document.getElementById('closed-training-email-submit');
             const emailIntent = document.getElementById('email_intent');
 
+            const orderFormStart = 'W celu oficjalnego potwierdzenia terminu proszę wypełnić formularz zamówienia:';
+            const orderFormSentencePattern = /szkolenie(?:\s|&nbsp;|\u00a0)+dla(?:\s|&nbsp;|\u00a0)+Państwa(?:\s|&nbsp;|\u00a0)+placówki(?:\s|&nbsp;|\u00a0)+jest(?:\s|&nbsp;|\u00a0)+już(?:\s|&nbsp;|\u00a0)+zaplanowane\./i;
+
             function insertOrderFormNotice(html, block) {
-                if (/data-order-form-notice=(["'])1\1/.test(html)) {
+                if (html.indexOf(orderFormStart) !== -1) {
                     return html;
                 }
-                const match = /szkolenie\s+dla\s+Państwa\s+placówki\s+jest\s+już\s+zaplanowane\./i.exec(html);
+                const match = orderFormSentencePattern.exec(html);
                 if (!match) {
-                    return html + block;
+                    return html;
                 }
                 const after = match.index + match[0].length;
                 return html.slice(0, after) + '<br>' + block + html.slice(after);
             }
 
             function removeOrderFormNotice(html) {
-                return html.replace(/(?:<br\s*\/?>\s*)?<span\s+data-order-form-notice=(["'])1\1>[\s\S]*?<\/span>/i, '');
+                return html.replace(/(?:<br\s*\/?>\s*)?W celu oficjalnego potwierdzenia terminu proszę wypełnić formularz zamówienia:[\s\S]*?zostanie wystawiona w dniu szkolenia\.\)\s*/i, '');
+            }
+
+            function locatePlannedSentence(root) {
+                const blocks = root.querySelectorAll('p, div, li');
+                const list = blocks.length ? Array.from(blocks) : [root];
+                const re = /szkolenie\s+dla\s+Państwa\s+placówki\s+jest\s+już\s+zaplanowane\./i;
+                for (let i = 0; i < list.length; i++) {
+                    const block = list[i];
+                    const plain = block.textContent.replace(/\u00a0/g, ' ');
+                    const match = re.exec(plain);
+                    if (!match) {
+                        continue;
+                    }
+                    const target = match.index + match[0].length;
+                    const walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT);
+                    let seen = 0;
+                    let textNode;
+                    while ((textNode = walker.nextNode())) {
+                        const value = textNode.nodeValue.replace(/\u00a0/g, ' ');
+                        const nextSeen = seen + value.length;
+                        if (nextSeen >= target) {
+                            return { node: textNode, offset: target - seen };
+                        }
+                        seen = nextSeen;
+                    }
+                }
+                return null;
+            }
+
+            function insertNoticeInEditor(editor, blockHtml) {
+                const body = editor.getBody();
+                if (body.textContent.indexOf(orderFormStart) !== -1) {
+                    return;
+                }
+                const found = locatePlannedSentence(body);
+                if (!found) {
+                    return;
+                }
+                const after = found.node.splitText(found.offset);
+                const parent = found.node.parentNode;
+                parent.insertBefore(editor.dom.create('br'), after);
+                const holder = document.createElement('div');
+                holder.innerHTML = blockHtml;
+                while (holder.firstChild) {
+                    parent.insertBefore(holder.firstChild, after);
+                }
+                if (after.nodeValue === '') {
+                    after.remove();
+                }
+            }
+
+            function removeNoticeInEditor(editor) {
+                const body = editor.getBody();
+                const walker = document.createTreeWalker(body, NodeFilter.SHOW_TEXT);
+                let startNode = null;
+                let endNode = null;
+                let textNode;
+                const endRe = /zostanie wystawiona w dniu szkolenia\.\)/;
+                while ((textNode = walker.nextNode())) {
+                    if (!startNode && textNode.nodeValue.indexOf(orderFormStart) !== -1) {
+                        startNode = textNode;
+                    }
+                    if (startNode && endRe.test(textNode.nodeValue)) {
+                        endNode = textNode;
+                        break;
+                    }
+                }
+                if (!startNode || !endNode) {
+                    return;
+                }
+                const startIdx = startNode.nodeValue.indexOf(orderFormStart);
+                if (startIdx > 0) {
+                    startNode = startNode.splitText(startIdx);
+                }
+                const endMatch = endRe.exec(endNode.nodeValue);
+                const endCut = endMatch.index + endMatch[0].length;
+                if (endCut < endNode.nodeValue.length) {
+                    endNode.splitText(endCut);
+                } else if (endMatch.index > 0) {
+                    endNode = endNode.splitText(endMatch.index);
+                }
+                const previous = startNode.previousSibling;
+                if (previous && previous.nodeName === 'BR') {
+                    previous.remove();
+                }
+                const range = document.createRange();
+                range.setStartBefore(startNode);
+                range.setEnd(endNode, endNode.nodeValue.length);
+                range.deleteContents();
             }
 
             function emailEditor() {
@@ -1118,6 +1210,19 @@
                 }
                 const block = template.innerHTML.trim();
                 checkbox.addEventListener('change', function () {
+                    const editor = emailEditor();
+                    if (editor) {
+                        editor.focus();
+                        editor.undoManager.transact(function () {
+                            if (checkbox.checked) {
+                                insertNoticeInEditor(editor, block);
+                            } else {
+                                removeNoticeInEditor(editor);
+                            }
+                        });
+                        editor.save();
+                        return;
+                    }
                     const current = readEmailHtml();
                     writeEmailHtml(checkbox.checked ? insertOrderFormNotice(current, block) : removeOrderFormNotice(current));
                 });
