@@ -3,6 +3,10 @@
 Data utworzenia/aktualizacji: 2026-10-28
 Status: plan roboczy, do potwierdzenia przez właściciela
 
+## Ostatnio (2026-11-02) — Link prezentera ClickMeeting
+
+Szkolenie online z ID ClickMeeting zapisuje `course_online_details.presenter_meeting_link` (adres pokoju + kod roli prezentera). Dociąga go „Dodaj do szkoleń”, zapis szkolenia, otwarcie edycji i „Aktualizuj link z ClickMeeting”. Mail ze szczegółami dla prowadzącego używa tego adresu. Link uczestnika zostaje dla szkoły i uczestników. Migracja: `2026_11_02_210000_add_presenter_meeting_link_to_course_online_details_table`. Kanon: [CLICKMEETING_TRAININGS.md](./CLICKMEETING_TRAININGS.md).
+
 ## Ostatnio (2026-11-02) — Edytor szablonów zaświadczeń: przegląd + hotfix bezpieczeństwa
 
 Nowy kanon: [CERTIFICATE_TEMPLATES.md](./CERTIFICATE_TEMPLATES.md) (edytor, JSON `config`, renderowanie, daty, kiedy widać zmianę szablonu, checklista rozbudowy).

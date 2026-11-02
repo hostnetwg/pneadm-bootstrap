@@ -104,7 +104,10 @@ class ClosedTrainingCaseScheduledEmailBuilder
         }
 
         $isOnline = $type === 'online';
-        $accessLink = $isOnline ? $this->resolveAccessLink($course) : null;
+        if ($isOnline) {
+            $this->refreshClickMeetingLinks($course);
+        }
+        $instructorLink = $isOnline ? $this->instructorMeetingLink($course) : null;
         $title = $this->trainingTitle($case, $course);
         $greetingName = trim((string) ($instructor->first_name ?? ''));
         $hello = $greetingName !== '' ? 'Dzień dobry, '.e($greetingName).',' : 'Dzień dobry,';
@@ -136,12 +139,14 @@ class ClosedTrainingCaseScheduledEmailBuilder
             .$intro.'<br><br></p>'
             .'<p>'.implode('<br>', $lines).'</p>';
 
-        if ($isOnline) {
-            if ($accessLink !== null) {
-                $safeLink = e($accessLink);
-                $html .= '<p><strong>Link do szkolenia:</strong><br><a href="'.$safeLink.'">'.$safeLink.'</a></p>';
+        if ($isOnline && is_array($instructorLink)) {
+            $label = e((string) $instructorLink['label']);
+            $url = $instructorLink['url'];
+            if (is_string($url) && $url !== '') {
+                $safeLink = e($url);
+                $html .= '<p><strong>'.$label.':</strong><br><a href="'.$safeLink.'">'.$safeLink.'</a></p>';
             } else {
-                $html .= '<p><strong>Link do szkolenia:</strong> (brak linku — uzupełnij przed wysyłką)</p>';
+                $html .= '<p><strong>'.$label.':</strong> ('.e((string) $instructorLink['empty']).')</p>';
             }
         }
 
@@ -313,9 +318,47 @@ class ClosedTrainingCaseScheduledEmailBuilder
         if (is_string($google) && $google !== '') {
             $links[] = '<a href="'.$google.'">Dodaj do kalendarza Google</a>';
         }
-        $links[] = '<a href="'.$apple.'">Dodaj do kalendarza Apple</a>';
+        $links[] = '<a href="'.$apple.'">Dodaj do kalendarza iCalendar Apple</a>';
 
         return '<br>'.implode(' · ', $links);
+    }
+
+    /**
+     * @return array{url: ?string, label: string, empty: string}
+     */
+    private function instructorMeetingLink(Course $course): array
+    {
+        $course->loadMissing('onlineDetails');
+        $eventId = trim((string) ($course->onlineDetails?->clickmeeting_event_id ?? ''));
+        if ($eventId !== '') {
+            $presenter = trim((string) ($course->onlineDetails?->presenter_meeting_link ?? ''));
+            $url = $presenter !== '' && filter_var($presenter, FILTER_VALIDATE_URL) ? $presenter : null;
+
+            return [
+                'url' => $url,
+                'label' => 'Link dla prowadzącego',
+                'empty' => 'brak linku prezentera — uzupełnij przed wysyłką',
+            ];
+        }
+
+        return [
+            'url' => $this->resolveAccessLink($course),
+            'label' => 'Link do szkolenia',
+            'empty' => 'brak linku — uzupełnij przed wysyłką',
+        ];
+    }
+
+    private function refreshClickMeetingLinks(Course $course): void
+    {
+        $course->loadMissing('onlineDetails');
+        $eventId = trim((string) ($course->onlineDetails?->clickmeeting_event_id ?? ''));
+        if ($eventId === '') {
+            return;
+        }
+
+        app(ClickMeetingCourseRoomUrlSyncService::class)->refreshFromApi($course);
+        $course->unsetRelation('onlineDetails');
+        $course->load('onlineDetails');
     }
 
     public function resolveAccessLink(Course $course): ?string

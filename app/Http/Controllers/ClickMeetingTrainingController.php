@@ -100,6 +100,7 @@ class ClickMeetingTrainingController extends Controller
         }
 
         return $this->redirectAfterSync(
+            $syncService,
             $syncService->refreshFromApi($course),
             route('clickmeeting.trainings.index')
         );
@@ -108,20 +109,15 @@ class ClickMeetingTrainingController extends Controller
     /**
      * @param  array{success: bool, changed: bool, room_url?: string|null, error?: string, live_access_updated?: int}  $result
      */
-    private function redirectAfterSync(array $result, string $url): RedirectResponse
-    {
+    private function redirectAfterSync(
+        ClickMeetingCourseRoomUrlSyncService $syncService,
+        array $result,
+        string $url
+    ): RedirectResponse {
+        $message = $syncService->successMessage($result);
+
         if (! ($result['success'] ?? false)) {
-            return redirect($url)->with('error', $result['error'] ?? 'Nie udało się zaktualizować linku z ClickMeeting.');
-        }
-
-        if (! ($result['changed'] ?? false)) {
-            return redirect($url)->with('success', 'Link do spotkania jest już zgodny z ClickMeeting.');
-        }
-
-        $message = 'Zaktualizowano link do spotkania z ClickMeeting.';
-        $liveUpdated = (int) ($result['live_access_updated'] ?? 0);
-        if ($liveUpdated > 0) {
-            $message .= ' Odświeżono też link w dostępach uczestników ('.$liveUpdated.').';
+            return redirect($url)->with('error', $message);
         }
 
         return redirect($url)->with('success', $message);

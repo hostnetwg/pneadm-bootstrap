@@ -1011,20 +1011,10 @@ class CoursesController extends Controller
         $redirect = $this->redirectToCourseEdit($course->id);
 
         if (! ($result['success'] ?? false)) {
-            return $redirect->with('error', $result['error'] ?? 'Nie udało się zaktualizować linku z ClickMeeting.');
+            return $redirect->with('error', $syncService->successMessage($result));
         }
 
-        if (! ($result['changed'] ?? false)) {
-            return $redirect->with('success', 'Link do spotkania jest już zgodny z ClickMeeting.');
-        }
-
-        $message = 'Zaktualizowano link do spotkania z ClickMeeting.';
-        $liveUpdated = (int) ($result['live_access_updated'] ?? 0);
-        if ($liveUpdated > 0) {
-            $message .= ' Odświeżono też link w dostępach uczestników ('.$liveUpdated.').';
-        }
-
-        return $redirect->with('success', $message);
+        return $redirect->with('success', $syncService->successMessage($result));
     }
 
     public function store(Request $request)
@@ -1057,6 +1047,7 @@ class CoursesController extends Controller
             'registration_closed_message' => 'nullable|string|max:1000',
             'notatki' => 'nullable|string',
             'clickmeeting_event_id' => 'nullable|string|max:255',
+            'presenter_meeting_link' => 'nullable|url|max:512',
             'live_room_mode' => 'nullable|in:clickmeeting,embed_pnedu',
             'embed_email_link_enabled' => 'sometimes|boolean',
             'sendy_suppression_list_id' => 'nullable|string|max:255',
@@ -1079,6 +1070,7 @@ class CoursesController extends Controller
             $validated['live_room_mode'],
             $validated['embed_email_link_enabled'],
             $validated['closed_training_case_id'],
+            $validated['presenter_meeting_link'],
         );
 
         $sourceCase = null;
@@ -1176,6 +1168,9 @@ class CoursesController extends Controller
                     'course_id' => $course->id,
                     'platform' => $request->platform,
                     'meeting_link' => $request->meeting_link,
+                    'presenter_meeting_link' => $request->filled('presenter_meeting_link')
+                        ? trim((string) $request->presenter_meeting_link)
+                        : null,
                     'meeting_password' => $request->meeting_password,
                     'clickmeeting_event_id' => $request->filled('clickmeeting_event_id')
                         ? trim((string) $request->clickmeeting_event_id)
@@ -1185,7 +1180,9 @@ class CoursesController extends Controller
                     'embed_email_link_enabled' => $liveRoomFlags['embed_email_link_enabled'],
                 ];
 
-                \Log::info('Dane kursu online:', $onlineData);
+                $onlineLog = $onlineData;
+                unset($onlineLog['presenter_meeting_link']);
+                \Log::info('Dane kursu online:', $onlineLog);
 
                 CourseOnlineDetails::create($onlineData);
             }
@@ -1194,6 +1191,7 @@ class CoursesController extends Controller
             \Log::info('Transakcja zatwierdzona');
 
             $clickMeetingThankYouWarning = $this->syncClickMeetingThankYouPage($course, $request);
+            $presenterWarning = $this->syncClickMeetingPresenterLink($course, $request);
 
             if ($saveAction === 'stay_editing') {
                 $redirect = $this->redirectToCourseEdit($course->id)
@@ -1207,7 +1205,12 @@ class CoursesController extends Controller
                     ->with('success', 'Szkolenie zostało dodane!');
             }
 
-            $redirect = $this->appendCourseSaveWarnings($redirect, $imageUploadWarning, $clickMeetingThankYouWarning);
+            $redirect = $this->appendCourseSaveWarnings(
+                $redirect,
+                $imageUploadWarning,
+                $clickMeetingThankYouWarning,
+                $presenterWarning,
+            );
 
             return $redirect;
 
@@ -1447,19 +1450,24 @@ class CoursesController extends Controller
         // ✅ Aktualizacja danych kursu online
         if ($request->type === 'online') {
             $liveRoomFlags = $this->resolveLiveRoomFlags($request);
+            $clickMeetingEventId = $request->filled('clickmeeting_event_id')
+                ? trim((string) $request->clickmeeting_event_id)
+                : null;
+            $onlinePayload = [
+                'platform' => $request->platform,
+                'meeting_link' => $request->meeting_link,
+                'meeting_password' => $request->meeting_password,
+                'clickmeeting_event_id' => $clickMeetingEventId,
+                'clickmeeting_join_enabled' => $liveRoomFlags['clickmeeting_join_enabled'],
+                'embed_on_pnedu' => $liveRoomFlags['embed_on_pnedu'],
+                'embed_email_link_enabled' => $liveRoomFlags['embed_email_link_enabled'],
+            ];
+            if ($clickMeetingEventId === null) {
+                $onlinePayload['presenter_meeting_link'] = null;
+            }
             CourseOnlineDetails::updateOrCreate(
                 ['course_id' => $course->id],
-                [
-                    'platform' => $request->platform,
-                    'meeting_link' => $request->meeting_link,
-                    'meeting_password' => $request->meeting_password,
-                    'clickmeeting_event_id' => $request->filled('clickmeeting_event_id')
-                        ? trim((string) $request->clickmeeting_event_id)
-                        : null,
-                    'clickmeeting_join_enabled' => $liveRoomFlags['clickmeeting_join_enabled'],
-                    'embed_on_pnedu' => $liveRoomFlags['embed_on_pnedu'],
-                    'embed_email_link_enabled' => $liveRoomFlags['embed_email_link_enabled'],
-                ]
+                $onlinePayload
             );
 
             // Jeśli kurs zmieniono na online, usuwamy lokalizację
@@ -1467,6 +1475,7 @@ class CoursesController extends Controller
         }
 
         $clickMeetingThankYouWarning = $this->syncClickMeetingThankYouPage($course, $request);
+        $presenterWarning = $this->syncClickMeetingPresenterLink($course, $request);
 
         // Zachowaj parametry filtrów przekazane z formularza
         $queryParams = $this->extractFilterQueryParamsFromRequest($request);
@@ -1478,7 +1487,12 @@ class CoursesController extends Controller
             $redirect = redirect()->route('courses.index', $queryParams)->with('success', 'Szkolenie zaktualizowane!');
         }
 
-        return $this->appendCourseSaveWarnings($redirect, $imageUploadWarning, $clickMeetingThankYouWarning);
+        return $this->appendCourseSaveWarnings(
+            $redirect,
+            $imageUploadWarning,
+            $clickMeetingThankYouWarning,
+            $presenterWarning,
+        );
     }
 
     /* --------importFromPubligo------------ */
@@ -1707,7 +1721,8 @@ class CoursesController extends Controller
      *     start_date: string|null,
      *     end_date: string|null,
      *     platform: string,
-     *     meeting_link: string|null
+     *     meeting_link: string|null,
+     *     presenter_meeting_link: string|null
      * }
      */
     private function clickMeetingCoursePrefill(
@@ -1733,6 +1748,7 @@ class CoursesController extends Controller
             'end_date' => $endDate,
             'platform' => 'ClickMeeting',
             'meeting_link' => $clickMeetingService->extractRoomUrl($conference),
+            'presenter_meeting_link' => $clickMeetingService->extractPresenterMeetingLink($conference),
         ];
     }
 
@@ -1830,14 +1846,32 @@ class CoursesController extends Controller
             .($result['error'] ?? 'nieznany błąd API.');
     }
 
+    private function syncClickMeetingPresenterLink(Course $course, Request $request): ?string
+    {
+        if ($request->type !== 'online' || ! $request->filled('clickmeeting_event_id')) {
+            return null;
+        }
+
+        $course->unsetRelation('onlineDetails');
+        $result = app(ClickMeetingCourseRoomUrlSyncService::class)->refreshPresenterLink($course);
+        if ($result['success'] ?? false) {
+            return null;
+        }
+
+        return 'Szkolenie zapisano, ale nie udało się pobrać linku prezentera z ClickMeeting: '
+            .($result['error'] ?? 'nieznany błąd API.');
+    }
+
     private function appendCourseSaveWarnings(
         RedirectResponse $redirect,
         ?string $imageUploadWarning,
-        ?string $clickMeetingThankYouWarning
+        ?string $clickMeetingThankYouWarning,
+        ?string $presenterWarning = null,
     ): RedirectResponse {
         $warnings = array_values(array_filter([
             $imageUploadWarning,
             $clickMeetingThankYouWarning,
+            $presenterWarning,
         ]));
 
         if ($warnings === []) {

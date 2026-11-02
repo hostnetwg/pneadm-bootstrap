@@ -223,6 +223,23 @@
                                             </td>
                                         </tr>
                                     @endif
+                                    @if(trim((string) ($course->onlineDetails->clickmeeting_event_id ?? '')) !== '')
+                                        <tr>
+                                            <td><strong>Link prezentera:</strong></td>
+                                            <td>
+                                                @if(trim((string) ($course->onlineDetails->presenter_meeting_link ?? '')) !== '')
+                                                    <input type="text"
+                                                           class="form-control form-control-sm"
+                                                           id="show-presenter-meeting-link"
+                                                           value="{{ $course->onlineDetails->presenter_meeting_link }}"
+                                                           readonly>
+                                                @else
+                                                    <span class="text-muted">Brak. Otwórz edycję szkolenia, żeby pobrać go z ClickMeeting.</span>
+                                                @endif
+                                                <div class="form-text mb-0">Tylko dla prowadzącego. Nie wysyłaj go uczestnikom ani szkole.</div>
+                                            </td>
+                                        </tr>
+                                    @endif
                                     @if($course->onlineDetails->meeting_password)
                                         <tr>
                                             <td><strong>Hasło:</strong></td>

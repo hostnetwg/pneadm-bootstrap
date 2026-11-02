@@ -234,6 +234,20 @@
                                     value="{{ $course->onlineDetails->meeting_password ?? '' }}">
                             </div>
                         </div>
+                        @if($clickMeetingEventId !== '')
+                            <div class="mb-3">
+                                <label for="presenter_meeting_link" class="form-label">Link prezentera</label>
+                                <input type="text"
+                                       class="form-control"
+                                       id="presenter_meeting_link"
+                                       value="{{ $course->onlineDetails->presenter_meeting_link ?? '' }}"
+                                       readonly>
+                                <div class="form-text">
+                                    Tylko dla prowadzącego. Nie wysyłaj go uczestnikom ani szkole.
+                                    Uzupełnia się z ClickMeeting przy otwarciu tej strony i przy „Aktualizuj link z ClickMeeting”.
+                                </div>
+                            </div>
+                        @endif
                     </div>
 
                 <div class="row">

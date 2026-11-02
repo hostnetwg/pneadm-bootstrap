@@ -339,4 +339,34 @@ class ClickMeetingServiceTest extends TestCase
         $this->assertSame(1, $service->extractAccessType(['access_type' => '1']));
         $this->assertNull($service->extractAccessType([]));
     }
+
+    public function test_extract_presenter_meeting_link_uses_presenter_hash_only(): void
+    {
+        $service = app(ClickMeetingService::class);
+        $conference = [
+            'room_url' => 'https://pnedu.clickmeeting.com/rada-test/',
+            'access_role_hashes' => [
+                'listener' => 'listenerhash12345678',
+                'presenter' => 'presenterhash12345678',
+                'host' => 'hosthash1234567890',
+            ],
+        ];
+
+        $this->assertSame(
+            'https://pnedu.clickmeeting.com/rada-test/presenterhash12345678',
+            $service->extractPresenterMeetingLink($conference)
+        );
+        $this->assertNull($service->extractPresenterMeetingLink([
+            'room_url' => 'https://pnedu.clickmeeting.com/rada-test',
+            'access_role_hashes' => [
+                'host' => 'hosthash1234567890',
+            ],
+        ]));
+        $this->assertNull($service->extractPresenterMeetingLink([
+            'room_url' => 'https://pnedu.clickmeeting.com/rada-test',
+        ]));
+        $this->assertFalse($service->conferenceIncludesAccessRoleHashes([
+            'room_url' => 'https://pnedu.clickmeeting.com/rada-test',
+        ]));
+    }
 }

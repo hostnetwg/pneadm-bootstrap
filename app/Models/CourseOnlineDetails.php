@@ -15,6 +15,7 @@ class CourseOnlineDetails extends Model
         'course_id',
         'platform',
         'meeting_link',
+        'presenter_meeting_link',
         'meeting_password',
         'clickmeeting_event_id',
         'clickmeeting_join_enabled',

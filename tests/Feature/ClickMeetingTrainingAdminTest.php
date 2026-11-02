@@ -499,6 +499,10 @@ class ClickMeetingTrainingAdminTest extends TestCase
                         'starts_at' => '2026-10-01T08:00:00+00:00',
                         'ends_at' => '2026-10-01T11:00:00+00:00',
                         'room_url' => 'https://pnedu.clickmeeting.com/prefill-test',
+                        'access_role_hashes' => [
+                            'presenter' => 'presenterhash12345678',
+                            'host' => 'hosthash1234567890',
+                        ],
                     ],
                 ], 200);
             }
@@ -518,6 +522,10 @@ class ClickMeetingTrainingAdminTest extends TestCase
             ->assertSee('value="ClickMeeting"', false)
             ->assertSee('value="10088701"', false)
             ->assertSee('https://pnedu.clickmeeting.com/prefill-test')
+            ->assertSee('https://pnedu.clickmeeting.com/prefill-test/presenterhash12345678', false)
+            ->assertSee('id="presenter_meeting_link"', false)
+            ->assertSee('readonly', false)
+            ->assertDontSee('hosthash1234567890', false)
             ->assertSee('id="live_room_mode_embed"', false)
             ->assertSee('Płatne')
             ->assertSee('Otwarte');
@@ -701,6 +709,176 @@ class ClickMeetingTrainingAdminTest extends TestCase
         $this->assertDatabaseHas('participant_live_access', [
             'participant_id' => $participant->id,
             'room_url' => 'https://pnedu.clickmeeting.com/nowy-provision',
+        ]);
+    }
+
+    public function test_storing_clickmeeting_course_keeps_presenter_link_from_api(): void
+    {
+        $user = User::factory()->create();
+
+        Http::fake([
+            'api.clickmeeting.com/v1/conferences/10088721' => Http::response([
+                'conference' => [
+                    'id' => 10088721,
+                    'room_url' => 'https://pnedu.clickmeeting.com/z-api',
+                    'access_role_hashes' => [
+                        'presenter' => 'presenterhash12345678',
+                    ],
+                ],
+            ], 200),
+        ]);
+
+        $this->actingAs($user)->post(route('courses.store'), [
+            'title' => 'Szkolenie z linkiem prezentera',
+            'description' => '',
+            'start_date' => '2026-10-01T10:00',
+            'end_date' => '2026-10-01T13:00',
+            'is_paid' => '1',
+            'type' => 'online',
+            'category' => 'open',
+            'show_on_pnedu' => '0',
+            'platform' => 'ClickMeeting',
+            'meeting_link' => 'https://pnedu.clickmeeting.com/z-formularza',
+            'presenter_meeting_link' => 'https://pnedu.clickmeeting.com/stary/presenterhash12345678',
+            'clickmeeting_event_id' => '10088721',
+            'live_room_mode' => 'clickmeeting',
+            'save_action' => 'close',
+        ])->assertRedirect(route('courses.index'));
+
+        $course = Course::query()->where('title', 'Szkolenie z linkiem prezentera')->first();
+        $this->assertNotNull($course);
+        $this->assertDatabaseHas('course_online_details', [
+            'course_id' => $course->id,
+            'meeting_link' => 'https://pnedu.clickmeeting.com/z-formularza',
+            'presenter_meeting_link' => 'https://pnedu.clickmeeting.com/z-api/presenterhash12345678',
+        ]);
+    }
+
+    public function test_course_edit_stores_presenter_link_from_api(): void
+    {
+        $user = User::factory()->create();
+        $course = $this->createOnlineCourse('Edycja prezentera');
+        CourseOnlineDetails::create([
+            'course_id' => $course->id,
+            'platform' => 'ClickMeeting',
+            'clickmeeting_event_id' => '10088722',
+            'meeting_link' => 'https://pnedu.clickmeeting.com/pokoj',
+        ]);
+
+        Http::fake([
+            'api.clickmeeting.com/v1/conferences/10088722' => Http::response([
+                'conference' => [
+                    'id' => 10088722,
+                    'room_url' => 'https://pnedu.clickmeeting.com/pokoj',
+                    'access_role_hashes' => [
+                        'presenter' => 'presenterhash12345678',
+                    ],
+                ],
+            ], 200),
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('courses.edit', $course->id))
+            ->assertOk()
+            ->assertSee('https://pnedu.clickmeeting.com/pokoj/presenterhash12345678', false)
+            ->assertSee('Link prezentera', false);
+
+        $this->assertDatabaseHas('course_online_details', [
+            'course_id' => $course->id,
+            'meeting_link' => 'https://pnedu.clickmeeting.com/pokoj',
+            'presenter_meeting_link' => 'https://pnedu.clickmeeting.com/pokoj/presenterhash12345678',
+        ]);
+    }
+
+    public function test_course_edit_keeps_presenter_link_when_api_omits_role_hashes(): void
+    {
+        $user = User::factory()->create();
+        $course = $this->createOnlineCourse('Edycja bez hashy');
+        CourseOnlineDetails::create([
+            'course_id' => $course->id,
+            'platform' => 'ClickMeeting',
+            'clickmeeting_event_id' => '10088723',
+            'meeting_link' => 'https://pnedu.clickmeeting.com/pokoj',
+            'presenter_meeting_link' => 'https://pnedu.clickmeeting.com/pokoj/presenterhash12345678',
+        ]);
+
+        Http::fake([
+            'api.clickmeeting.com/v1/conferences/10088723' => Http::response([
+                'conference' => [
+                    'id' => 10088723,
+                    'room_url' => 'https://pnedu.clickmeeting.com/pokoj',
+                ],
+            ], 200),
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('courses.edit', $course->id))
+            ->assertOk();
+
+        $this->assertDatabaseHas('course_online_details', [
+            'course_id' => $course->id,
+            'presenter_meeting_link' => 'https://pnedu.clickmeeting.com/pokoj/presenterhash12345678',
+        ]);
+    }
+
+    public function test_sync_updates_presenter_link_without_touching_participant_room(): void
+    {
+        $user = User::factory()->create();
+        $course = $this->createOnlineCourse('Sync prezentera');
+        CourseOnlineDetails::create([
+            'course_id' => $course->id,
+            'platform' => 'ClickMeeting',
+            'clickmeeting_event_id' => '10088724',
+            'meeting_link' => 'https://pnedu.clickmeeting.com/stary-pokoj',
+            'presenter_meeting_link' => 'https://pnedu.clickmeeting.com/stary-pokoj/presenterhash12345678',
+        ]);
+        $participant = Participant::query()->create([
+            'course_id' => $course->id,
+            'first_name' => 'Anna',
+            'last_name' => 'Nowak',
+            'email' => 'anna.presenter-sync@example.test',
+            'order' => 1,
+        ]);
+        ParticipantLiveAccess::query()->create([
+            'participant_id' => $participant->id,
+            'course_id' => $course->id,
+            'platform' => 'clickmeeting',
+            'clickmeeting_event_id' => '10088724',
+            'access_type' => 1,
+            'room_url' => 'https://pnedu.clickmeeting.com/stary-pokoj',
+            'status' => 'success',
+            'synced_at' => now(),
+        ]);
+
+        Http::fake([
+            'api.clickmeeting.com/v1/conferences/10088724' => Http::response([
+                'conference' => [
+                    'id' => 10088724,
+                    'room_url' => 'https://pnedu.clickmeeting.com/nowy-pokoj/',
+                    'access_role_hashes' => [
+                        'presenter' => 'presenterhash12345678',
+                        'host' => 'hosthash1234567890',
+                    ],
+                ],
+            ], 200),
+        ]);
+
+        $this->actingAs($user)
+            ->post(route('courses.sync-clickmeeting-room-url', $course->id))
+            ->assertRedirect(route('courses.edit', $course->id));
+
+        $this->assertDatabaseHas('course_online_details', [
+            'course_id' => $course->id,
+            'meeting_link' => 'https://pnedu.clickmeeting.com/nowy-pokoj',
+            'presenter_meeting_link' => 'https://pnedu.clickmeeting.com/nowy-pokoj/presenterhash12345678',
+        ]);
+        $this->assertDatabaseHas('participant_live_access', [
+            'participant_id' => $participant->id,
+            'room_url' => 'https://pnedu.clickmeeting.com/nowy-pokoj',
+        ]);
+        $this->assertDatabaseMissing('participant_live_access', [
+            'participant_id' => $participant->id,
+            'room_url' => 'https://pnedu.clickmeeting.com/nowy-pokoj/presenterhash12345678',
         ]);
     }
 

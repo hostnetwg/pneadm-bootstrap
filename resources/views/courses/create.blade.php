@@ -57,6 +57,7 @@
                     $defaultEndDate = old('end_date', $caseEndPrefill !== '' ? $caseEndPrefill : ($sourceClickMeeting['end_date'] ?? ''));
                     $defaultPlatform = old('platform', $sourceClickMeeting['platform'] ?? '');
                     $defaultMeetingLink = old('meeting_link', $sourceClickMeeting['meeting_link'] ?? '');
+                    $defaultPresenterLink = old('presenter_meeting_link', $sourceClickMeeting['presenter_meeting_link'] ?? '');
                     $defaultClickMeetingEventId = old(
                         'clickmeeting_event_id',
                         $sourceClickMeeting['event_id'] ?? ''
@@ -236,6 +237,18 @@
                         <label for="meeting_password" class="form-label">Hasło do spotkania</label>
                         <input type="text" name="meeting_password" id="meeting_password" class="form-control">
                     </div>
+                    @if($defaultPresenterLink !== '')
+                        <div class="col-12 mt-3">
+                            <label for="presenter_meeting_link" class="form-label">Link prezentera</label>
+                            <input type="url"
+                                   name="presenter_meeting_link"
+                                   id="presenter_meeting_link"
+                                   class="form-control"
+                                   value="{{ $defaultPresenterLink }}"
+                                   readonly>
+                            <div class="form-text">Tylko dla prowadzącego. Nie wysyłaj go uczestnikom ani szkole.</div>
+                        </div>
+                    @endif
                 </div>
 
                 <div class="row mb-2">

@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Services\ClosedTrainingSubmissionBackfill;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Mockery;
 use Tests\TestCase;
@@ -1285,7 +1286,7 @@ class ClosedTrainingCaseTest extends TestCase
         $this->assertStringContainsString('stacjonarnie', $draft['body']);
         $this->assertStringContainsString('Sala konferencyjna', $draft['body']);
         $this->assertStringContainsString('Dodaj do kalendarza Google', $draft['body']);
-        $this->assertStringContainsString('Dodaj do kalendarza Apple', $draft['body']);
+        $this->assertStringContainsString('Dodaj do kalendarza iCalendar Apple', $draft['body']);
         $this->assertStringContainsString('calendar.google.com/calendar/render?action=TEMPLATE', $draft['body']);
         $this->assertStringContainsString('&amp;dates=', $draft['body']);
         $this->assertStringNotContainsString('&amp;amp;', $draft['body']);
@@ -1372,7 +1373,7 @@ class ClosedTrainingCaseTest extends TestCase
         $this->assertStringContainsString('W razie pytań proszę o kontakt telefoniczny', $draft['body']);
         $this->assertStringContainsString('Szkolenie rady w Przemyślu', $draft['body']);
         $this->assertStringContainsString('02.12.2026', $draft['body']);
-        $this->assertLessThan(strpos($draft['body'], 'Placówka'), strpos($draft['body'], 'Dodaj do kalendarza Apple'));
+        $this->assertLessThan(strpos($draft['body'], 'Placówka'), strpos($draft['body'], 'Dodaj do kalendarza iCalendar Apple'));
         $this->assertStringContainsString('calendar.google.com/calendar/render?action=TEMPLATE', $draft['body']);
         $this->assertStringContainsString('signature=', $draft['body']);
         $caseCalendarUrl = \App\Support\CourseCalendarEventBuilder::for($course->fresh(['location', 'instructor']))->caseEmailGoogleCalendarUrl();
@@ -1417,13 +1418,97 @@ class ClosedTrainingCaseTest extends TestCase
         $this->assertStringContainsString('https://pnedu.clickmeeting.com/rada-test', $onlineDraft['body']);
         $this->assertStringNotContainsString(rawurlencode('https://pnedu.clickmeeting.com/rada-test'), $onlineDraft['body']);
         $this->assertStringContainsString('Dodaj do kalendarza Google', $onlineDraft['body']);
-        $this->assertStringContainsString('Dodaj do kalendarza Apple', $onlineDraft['body']);
+        $this->assertStringContainsString('Dodaj do kalendarza iCalendar Apple', $onlineDraft['body']);
         $this->assertStringContainsString('sprawdzić połączenie', $onlineDraft['body']);
         $this->assertStringContainsString('1 200 PLN brutto', $onlineDraft['body']);
         $this->assertStringContainsString('Anna Dyrektor', $onlineDraft['body']);
         $this->assertStringNotContainsString('Sala konferencyjna', $onlineDraft['body']);
         $this->assertStringNotContainsString('być na miejscu', $onlineDraft['body']);
         $this->assertStringNotContainsString('2500', $onlineDraft['body']);
+    }
+
+    public function test_instructor_details_email_uses_clickmeeting_presenter_link(): void
+    {
+        config([
+            'services.clickmeeting.url' => 'https://api.clickmeeting.com/v1/',
+            'services.clickmeeting.token' => 'test-api-key',
+            'services.google_calendar.enabled' => false,
+        ]);
+
+        $user = User::factory()->create(['is_active' => true]);
+        $instructor = Instructor::query()->create([
+            'title' => 'mgr',
+            'first_name' => 'Jacek',
+            'last_name' => 'Krzyzak',
+            'email' => 'jacek.presenter.'.uniqid('', true).'@example.com',
+            'phone' => '502 145 752',
+            'is_active' => true,
+        ]);
+        $case = $this->makeCase([
+            'contact_name' => 'Anna Dyrektor',
+            'contact_email' => 'szkola@example.com',
+            'status' => ClosedTrainingCase::STATUS_IN_PROGRESS,
+            'instructor_id' => $instructor->id,
+            'instructor_fee' => '1200.00',
+        ]);
+        $start = Carbon::parse('2026-12-02 15:00:00', 'Europe/Warsaw');
+        $course = $this->makeCourse([
+            'title' => 'Szkolenie online rady',
+            'type' => 'online',
+            'instructor_id' => $instructor->id,
+            'start_date' => $start,
+            'end_date' => $start->copy()->addHours(3),
+            'closed_training_case_id' => $case->id,
+        ]);
+        $course->onlineDetails()->create([
+            'platform' => 'ClickMeeting',
+            'clickmeeting_event_id' => '10088730',
+            'meeting_link' => 'https://pnedu.clickmeeting.com/stary-pokoj',
+        ]);
+
+        Http::fake([
+            'api.clickmeeting.com/v1/conferences/10088730' => Http::response([
+                'conference' => [
+                    'id' => 10088730,
+                    'room_url' => 'https://pnedu.clickmeeting.com/nowy-pokoj',
+                    'access_role_hashes' => [
+                        'presenter' => 'presenterhash12345678',
+                        'host' => 'hosthash1234567890',
+                    ],
+                ],
+            ], 200),
+        ]);
+
+        $this->actingAs($user)
+            ->post(route('closed-training-cases.email.prepare-instructor-details', $case), [
+                'include_school_contact' => '0',
+            ])
+            ->assertRedirect(route('closed-training-cases.show', $case).'#closed-training-case-email');
+
+        $draft = session('email_draft');
+        $presenter = 'https://pnedu.clickmeeting.com/nowy-pokoj/presenterhash12345678';
+        $this->assertStringContainsString('Link dla prowadzącego', $draft['body']);
+        $this->assertStringContainsString('href="'.$presenter.'"', $draft['body']);
+        $this->assertDoesNotMatchRegularExpression(
+            '/href="https:\/\/pnedu\.clickmeeting\.com\/nowy-pokoj"/',
+            $draft['body']
+        );
+        $this->assertStringNotContainsString('stary-pokoj', $draft['body']);
+        $this->assertStringNotContainsString('hosthash1234567890', $draft['body']);
+
+        $this->assertDatabaseHas('course_online_details', [
+            'course_id' => $course->id,
+            'meeting_link' => 'https://pnedu.clickmeeting.com/nowy-pokoj',
+            'presenter_meeting_link' => $presenter,
+        ]);
+
+        $this->actingAs($user)
+            ->post(route('closed-training-cases.email.prepare-scheduled', $case))
+            ->assertRedirect(route('closed-training-cases.show', $case).'#closed-training-case-email');
+
+        $school = session('email_draft');
+        $this->assertStringContainsString('href="https://pnedu.clickmeeting.com/nowy-pokoj"', $school['body']);
+        $this->assertStringNotContainsString('presenterhash12345678', $school['body']);
     }
 
     public function test_operator_can_edit_and_delete_history_events(): void

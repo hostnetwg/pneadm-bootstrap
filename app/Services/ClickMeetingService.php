@@ -476,6 +476,44 @@ class ClickMeetingService
         return $this->normalizeRoomUrl($conference['room_url'] ?? null);
     }
 
+    public function conferenceIncludesAccessRoleHashes(mixed $conference): bool
+    {
+        return is_array($conference)
+            && array_key_exists('access_role_hashes', $conference)
+            && is_array($conference['access_role_hashes']);
+    }
+
+    /**
+     * Stały adres z panelu ClickMeeting „dla prezentera”: room_url + kod roli presenter.
+     * To nie jest autologin i nie jest kodem hosta.
+     */
+    public function extractPresenterMeetingLink(mixed $conference): ?string
+    {
+        $roomUrl = $this->extractRoomUrl($conference);
+        $hash = $this->extractPresenterHash($conference);
+        if ($roomUrl === null || $hash === null) {
+            return null;
+        }
+
+        $url = $this->buildJoinUrl($roomUrl, $hash);
+
+        return filter_var($url, FILTER_VALIDATE_URL) ? $url : null;
+    }
+
+    private function extractPresenterHash(mixed $conference): ?string
+    {
+        if (! $this->conferenceIncludesAccessRoleHashes($conference)) {
+            return null;
+        }
+
+        $hash = trim((string) ($conference['access_role_hashes']['presenter'] ?? ''));
+        if ($hash === '' || preg_match('/^[A-Za-z0-9_-]{8,128}$/', $hash) !== 1) {
+            return null;
+        }
+
+        return $hash;
+    }
+
     public function normalizeRoomUrl(mixed $raw): ?string
     {
         $url = rtrim(trim((string) $raw), '/');

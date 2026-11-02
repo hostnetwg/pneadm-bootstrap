@@ -21,7 +21,7 @@ class ClickMeetingCourseRoomUrlSyncService
     ) {}
 
     /**
-     * @return array{success: bool, changed: bool, room_url?: string|null, error?: string, live_access_updated?: int}
+     * @return array{success: bool, changed: bool, room_changed?: bool, presenter_changed?: bool, room_url?: string|null, error?: string, live_access_updated?: int}
      */
     public function refreshFromApi(Course $course, bool $syncCalendarWhenChanged = true): array
     {
@@ -58,16 +58,88 @@ class ClickMeetingCourseRoomUrlSyncService
             return $result;
         }
 
-        $conference = $conferenceResult['conference'] ?? [];
+        $conference = is_array($conferenceResult['conference'] ?? null)
+            ? $conferenceResult['conference']
+            : [];
         $accessType = isset($conferenceResult['access_type'])
             ? (int) $conferenceResult['access_type']
             : $this->clickMeeting->extractAccessType($conference);
         $roomUrl = $this->clickMeeting->extractRoomUrl($conference);
         $result = $this->applyRoomUrl($course, $roomUrl, $syncCalendarWhenChanged);
+        if ($result['success'] ?? false) {
+            $result['presenter_changed'] = $this->applyPresenterLink($course, $conference);
+            $result['changed'] = ($result['changed'] ?? false) || $result['presenter_changed'];
+        }
         $this->accessSnapshots->reconcileCourse($courseId, $accessType);
         $this->remember($courseId, $result);
 
         return $result;
+    }
+
+    /**
+     * Zapisuje sam link prezentera. Nie zmienia linku uczestnika.
+     *
+     * @return array{success: bool, changed: bool, error?: string}
+     */
+    public function refreshPresenterLink(Course $course): array
+    {
+        $course->loadMissing('onlineDetails');
+        $eventId = trim((string) optional($course->onlineDetails)->clickmeeting_event_id);
+        if ($eventId === '') {
+            return [
+                'success' => true,
+                'changed' => false,
+            ];
+        }
+
+        $conferenceResult = $this->clickMeeting->getConference($eventId);
+        if (! ($conferenceResult['success'] ?? false)) {
+            return [
+                'success' => false,
+                'changed' => false,
+                'error' => (string) ($conferenceResult['error'] ?? 'Nie udało się pobrać wydarzenia z ClickMeeting.'),
+            ];
+        }
+
+        $conference = is_array($conferenceResult['conference'] ?? null)
+            ? $conferenceResult['conference']
+            : [];
+
+        return [
+            'success' => true,
+            'changed' => $this->applyPresenterLink($course, $conference),
+        ];
+    }
+
+    /**
+     * @param  array{success: bool, changed: bool, room_changed?: bool, presenter_changed?: bool, room_url?: string|null, error?: string, live_access_updated?: int}  $result
+     */
+    public function successMessage(array $result): string
+    {
+        if (! ($result['success'] ?? false)) {
+            return (string) ($result['error'] ?? 'Nie udało się zaktualizować linku z ClickMeeting.');
+        }
+
+        if (! ($result['changed'] ?? false)) {
+            return 'Link do spotkania jest już zgodny z ClickMeeting.';
+        }
+
+        $parts = [];
+        $liveUpdated = (int) ($result['live_access_updated'] ?? 0);
+        if (($result['room_changed'] ?? false) || $liveUpdated > 0) {
+            $parts[] = 'Zaktualizowano link do spotkania z ClickMeeting.';
+        }
+        if ($liveUpdated > 0) {
+            $parts[] = 'Odświeżono też link w dostępach uczestników ('.$liveUpdated.').';
+        }
+        if ($result['presenter_changed'] ?? false) {
+            $parts[] = 'Zaktualizowano link prezentera.';
+        }
+        if ($parts === []) {
+            $parts[] = 'Zaktualizowano link do spotkania z ClickMeeting.';
+        }
+
+        return implode(' ', $parts);
     }
 
     /**
@@ -119,6 +191,7 @@ class ClickMeetingCourseRoomUrlSyncService
         $meetingLinkStale = $apiRoomUrl !== null
             && $this->clickMeeting->roomUrlsDiffer($storedLink, $apiRoomUrl);
         $closedShouldBeOpen = $this->accessSnapshots->closedCourseShouldUseOpenAccess($course, $accessType);
+        $this->applyPresenterLink($course, is_array($conference) ? $conference : []);
 
         return [
             'success' => true,
@@ -139,7 +212,7 @@ class ClickMeetingCourseRoomUrlSyncService
     }
 
     /**
-     * @return array{success: bool, changed: bool, room_url?: string|null, error?: string, live_access_updated?: int}
+     * @return array{success: bool, changed: bool, room_changed: bool, room_url?: string|null, error?: string, live_access_updated?: int}
      */
     public function applyRoomUrl(
         Course $course,
@@ -151,6 +224,7 @@ class ClickMeetingCourseRoomUrlSyncService
             return [
                 'success' => false,
                 'changed' => false,
+                'room_changed' => false,
                 'error' => 'ClickMeeting nie zwrócił aktualnego linku do pokoju.',
             ];
         }
@@ -161,6 +235,7 @@ class ClickMeetingCourseRoomUrlSyncService
             return [
                 'success' => true,
                 'changed' => false,
+                'room_changed' => false,
                 'room_url' => $normalized,
                 'live_access_updated' => 0,
             ];
@@ -205,9 +280,42 @@ class ClickMeetingCourseRoomUrlSyncService
         return [
             'success' => true,
             'changed' => $changed,
+            'room_changed' => $linkChanged,
             'room_url' => $normalized,
             'live_access_updated' => $liveAccessUpdated,
         ];
+    }
+
+    /**
+     * Zapisuje adres prezentera. Nie rusza meeting_link ani dostępów uczestników.
+     * Gdy API nie przysłało access_role_hashes, zostawia dotychczasową wartość.
+     *
+     * @param  array<string, mixed>  $conference
+     */
+    public function applyPresenterLink(Course $course, array $conference): bool
+    {
+        if (! $this->clickMeeting->conferenceIncludesAccessRoleHashes($conference)) {
+            return false;
+        }
+
+        $course->loadMissing('onlineDetails');
+        $details = $course->onlineDetails;
+        if (! $details instanceof CourseOnlineDetails || ! $details->exists) {
+            return false;
+        }
+
+        $next = $this->clickMeeting->normalizeRoomUrl(
+            $this->clickMeeting->extractPresenterMeetingLink($conference)
+        );
+        $current = $this->clickMeeting->normalizeRoomUrl($details->presenter_meeting_link);
+        if ($current === $next) {
+            return false;
+        }
+
+        $details->presenter_meeting_link = $next;
+        $details->save();
+
+        return true;
     }
 
     /**

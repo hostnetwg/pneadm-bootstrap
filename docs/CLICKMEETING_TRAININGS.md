@@ -29,7 +29,8 @@ Wejście bezpośrednie na `/clickmeeting/trainings/{eventId}/create-course` przy
 | Data zakończenia | `ends_at` / `end_time`, jeśli jest i jest późniejsza niż start; **w przeciwnym razie puste** |
 | Platforma | `ClickMeeting` |
 | ID wydarzenia ClickMeeting | ID z API |
-| Link do spotkania | `room_url` |
+| Link do spotkania | `room_url` (uczestnicy) |
+| Link prezentera | `room_url` + `/` + `access_role_hashes.presenter` |
 | Płatność | Płatne |
 | Kategoria | Otwarte |
 | Rodzaj kursu | Online |
@@ -80,10 +81,11 @@ Osadzony pokój na pnedu.pl **bez logowania:** sekretny `/live/{token}` (formula
 
 Akcja:
 
-1. `GET /v1/conferences/{event_id}` → `room_url`,
+1. `GET /v1/conferences/{event_id}` → `room_url` i `access_role_hashes.presenter`,
 2. zapis do `course_online_details.meeting_link`,
-3. aktualizacja `participant_live_access.room_url` dla tego szkolenia,
-4. synchronizacja Google Calendar, jeśli włączona.
+3. zapis linku prezentera do `course_online_details.presenter_meeting_link` (gdy API przysłało `access_role_hashes`; brak kodu prezentera czyści pole, brak całego obiektu zostawia poprzednią wartość),
+4. aktualizacja `participant_live_access.room_url` dla tego szkolenia (zostaje adres uczestnika, bez kodu prezentera),
+5. synchronizacja Google Calendar, jeśli włączona.
 
 Serwis: `App\Services\ClickMeetingCourseRoomUrlSyncService`.
 
@@ -93,9 +95,23 @@ Przy pierwszym provisionie ClickMeeting, przy ponownej wysyłce / podglądzie ma
 
 Już wysłanych maili to nie poprawi. Maile z adresem pnedu.pl (`/transmisja`) nadal działają, bo pokój jest rozwiązywany w chwili wejścia.
 
+## Link prezentera
+
+Kolumna `course_online_details.presenter_meeting_link`. To stały adres z panelu ClickMeeting „dla prezentera” (`room_url` + kod roli `presenter`). Nie jest to autologin ani kod hosta / moderatora.
+
+Dociągnięcie:
+
+- **Dodaj do szkoleń** wpisuje go w formularz (pole tylko do odczytu) i zapisuje razem ze szkoleniem; po zapisie panel jeszcze raz bierze go z API,
+- otwarcie `/courses/{id}/edit` zapisuje go, gdy wydarzenie ma ID ClickMeeting,
+- **Aktualizuj link z ClickMeeting** oraz odświeżenie przy mailach uczestników i przy „E-mail ze szczegółami dla prowadzącego” zapisują go ponownie, razem ze zmianą nazwy pokoju.
+
+Pole widać na karcie i w edycji szkolenia. Nie trafia do maila szkoły, do uczestników, do kalendarza sprawy ani na pnedu.pl (model publiczny ma to pole ukryte przy serializacji).
+
+Gdy szkolenie ma ID ClickMeeting, mail do prowadzącego używa wyłącznie linku prezentera. Gdy go nie ma, w treści jest informacja, że trzeba go uzupełnić — bez podstawiania linku uczestnika. Szkolenie online bez ID ClickMeeting zostaje przy dotychczasowym linku spotkania.
+
 ## Deploy
 
-Brak migracji. Po wrzuceniu kodu: `optimize:clear` na `pneadm`.
+Migracja `2026_11_02_210000_add_presenter_meeting_link_to_course_online_details_table`. Po wrzuceniu kodu: `php artisan migrate --force`, potem `optimize:clear` na `pneadm`.
 
 Smoke:
 
@@ -105,6 +121,7 @@ Smoke:
 4. Zmień nazwę pokoju w ClickMeeting → na liście **Link nieaktualny** → aktualizacja.
 5. To samo z `/courses/{id}/edit` (także ostrzeżenie zamknięte + podpis typu dostępu).
 6. Provision / „Wyślij link do live” — w mailu nowy slug.
+7. Szkolenie z ID ClickMeeting — na edycji jest **Link prezentera**. Mail do prowadzącego ma ten adres, mail do szkoły zostaje przy linku uczestnika.
 
 ## Testy
 
