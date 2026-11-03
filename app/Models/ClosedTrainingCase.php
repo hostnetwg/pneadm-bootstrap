@@ -641,6 +641,27 @@ class ClosedTrainingCase extends Model
         return $topic;
     }
 
+    /**
+     * Tytuł do pola edycji. Kod [SZ-id] nie jest częścią tematu.
+     */
+    public function editableTopic(): string
+    {
+        $topic = trim((string) $this->topic);
+        if ($topic === '' || $topic === '(temat nie określony)') {
+            return '';
+        }
+
+        return self::topicWithoutReferencePrefix($topic);
+    }
+
+    public static function topicWithoutReferencePrefix(string $topic): string
+    {
+        $topic = trim($topic);
+        $topic = preg_replace('/^(?:\[SZ-\d+\]\s*)+/u', '', $topic) ?? $topic;
+
+        return trim($topic);
+    }
+
     public function referenceCode(): string
     {
         return 'SZ-'.$this->id;

@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\ClosedTrainingCase;
 use App\Models\Instructor;
+use App\Models\TrainingOffer;
 
 /**
  * Maile koordynacji terminu: propozycja dla szkoły oraz bezpieczny brief dla prowadzącego.
@@ -92,53 +93,140 @@ class ClosedTrainingCaseCoordinationEmailBuilder
      */
     public function buildSchoolProposal(ClosedTrainingCase $case, bool $shareInstructorContact): array
     {
-        $topic = $this->topicLabel($case);
-        $schedule = $case->listScheduleLabel();
-        if ($schedule === '—') {
-            $schedule = 'do ustalenia';
+        $case->loadMissing(['trainingOffer.instructor', 'instructor']);
+
+        $title = $this->proposalTitle($case);
+        $format = $case->preferredFormatLabel();
+        if ($format === 'Nie wybrano') {
+            $format = 'do ustalenia';
         }
 
-        $priceLine = '';
-        if ($case->client_price !== null && $case->client_price !== '') {
-            $priceLine = '<p>Koszt szkolenia online/stacjonarnego: <strong>'
-                .$this->e($case->formatMoneyCompact($case->client_price))
-                .'</strong>.</p>';
+        $instructor = $this->proposalInstructor($case);
+        $instructorLabel = $instructor
+            ? trim((string) $instructor->full_title_name)
+            : '';
+        if ($instructorLabel === '') {
+            $instructorLabel = '(uzupełnij przed wysyłką)';
+        }
+
+        $html = '<p>Dzień dobry,</p>'
+            .'<p>przesyłam propozycję szkolenia dla Państwa placówki.</p>'
+            .'<p><strong>Szkolenie:</strong> '.$this->e($title).'<br>'
+            .'<strong>Forma:</strong> '.$this->e($format).'<br>'
+            .'<strong>Cena:</strong> '.$this->e($this->proposalPriceLabel($case)).'<br>'
+            .'<strong>Czas trwania:</strong> <em>(uzupełnij przed wysyłką)</em><br>'
+            .'<strong>Prowadzący:</strong> '.$this->e($instructorLabel).'</p>';
+
+        $bio = $this->instructorBio($instructor);
+        if ($bio !== '') {
+            $html .= '<p>'.$this->e($bio).'</p>';
+        }
+
+        $schedule = $case->listScheduleLabel();
+        if ($schedule !== '—') {
+            $html .= '<p>Najbliższy możliwy termin (roboczo): <strong>'.$this->e($schedule).'</strong>.</p>';
         } else {
-            $priceLine = '<p>Koszt szkolenia: <em>(uzupełnij kwotę brutto)</em>.</p>';
+            $html .= '<p>Termin ustalimy wspólnie.</p>';
+        }
+
+        $html .= $this->schoolConnectBlock($instructor, $shareInstructorContact, $schedule !== '—');
+
+        $offerUrl = $this->publicOfferUrl($case->trainingOffer);
+        if ($offerUrl !== null) {
+            $html .= '<p>Opis szkolenia: <a href="'.$this->e($offerUrl).'">'.$this->e($offerUrl).'</a></p>';
         }
 
         $original = trim(strip_tags((string) $case->message));
-        $quote = $original !== ''
-            ? '<hr><p><em>'.$this->e($original).'</em></p><hr>'
-            : '';
+        if ($original !== '') {
+            $html .= '<hr><p><em>'.$this->e($original).'</em></p><hr>';
+        }
 
+        $html .= ClosedTrainingCase::defaultSchoolEmailBodyHtml();
+
+        return [
+            'ok' => true,
+            'subject' => $case->withCaseReferenceInSubject('Propozycja szkolenia – '.$title),
+            'html' => ClosedTrainingCase::sanitizeSchoolEmailHtml($html),
+        ];
+    }
+
+    private function proposalTitle(ClosedTrainingCase $case): string
+    {
+        $offerTitle = trim((string) ($case->trainingOffer?->title ?? ''));
+
+        return $offerTitle !== '' ? $offerTitle : $this->topicLabel($case);
+    }
+
+    private function proposalInstructor(ClosedTrainingCase $case): ?Instructor
+    {
         $instructor = $this->coordinationInstructor($case);
-        $connectBlock = '';
+        if ($instructor instanceof Instructor) {
+            return $instructor;
+        }
+
+        $fromOffer = $case->trainingOffer?->instructor;
+
+        return $fromOffer instanceof Instructor ? $fromOffer : null;
+    }
+
+    private function proposalPriceLabel(ClosedTrainingCase $case): string
+    {
+        if ($case->client_price !== null && $case->client_price !== '') {
+            return $case->formatMoney($case->client_price);
+        }
+
+        $offer = $case->trainingOffer;
+        if ($offer instanceof TrainingOffer
+            && $offer->price_mode === TrainingOffer::PRICE_MODE_FIXED
+            && $offer->price_amount !== null) {
+            return $offer->formattedPrice();
+        }
+
+        return '(uzupełnij przed wysyłką)';
+    }
+
+    private function instructorBio(?Instructor $instructor): string
+    {
+        if (! $instructor) {
+            return '';
+        }
+
+        $bio = trim(preg_replace('/\s+/u', ' ', strip_tags((string) $instructor->bio)) ?? '');
+
+        return $bio;
+    }
+
+    private function schoolConnectBlock(?Instructor $instructor, bool $shareInstructorContact, bool $hasSchedule): string
+    {
         if ($shareInstructorContact && $instructor) {
             $name = trim((string) ($instructor->full_title_name ?? ''));
             $phone = trim((string) ($instructor->phone ?? ''));
-            $connectBlock = '<p>Jeżeli ten termin Państwu nie odpowiada, można skontaktować się bezpośrednio z prowadzącym'
+            $intro = $hasSchedule
+                ? 'Jeżeli ten termin Państwu nie odpowiada, można skontaktować się bezpośrednio z prowadzącym'
+                : 'W sprawie terminu można skontaktować się bezpośrednio z prowadzącym';
+
+            return '<p>'.$intro
                 .($name !== '' ? ' '.$this->e($name) : '')
                 .($phone !== '' ? ', tel. '.$this->e($phone) : '')
                 .' i powołać się na Platformę Nowoczesnej Edukacji (Waldemar Grabowski). '
                 .'Po ustaleniu terminu proszę o informację zwrotną do nas, żebyśmy przygotowali realizację.</p>';
-        } else {
-            $connectBlock = '<p>Proszę o odpowiedź na tę wiadomość — po potwierdzeniu z prowadzącym wrócimy z ostatecznym terminem.</p>';
         }
 
-        $html = '<p>Dzień dobry,</p>'
-            .'<p>możemy takie szkolenie dla Państwa zorganizować. '
-            .'Najbliższy możliwy termin (roboczo): <strong>'.$this->e($schedule).'</strong>.</p>'
-            .$priceLine
-            .$connectBlock
-            .$quote
-            .ClosedTrainingCase::defaultSchoolEmailBodyHtml();
+        return '<p>Proszę o odpowiedź na tę wiadomość — po potwierdzeniu z prowadzącym wrócimy z ostatecznym terminem.</p>';
+    }
 
-        return [
-            'ok' => true,
-            'subject' => $case->withCaseReferenceInSubject('Propozycja terminu – '.$topic),
-            'html' => ClosedTrainingCase::sanitizeSchoolEmailHtml($html),
-        ];
+    private function publicOfferUrl(?TrainingOffer $offer): ?string
+    {
+        if (! $offer || ! $offer->is_active || ! $offer->show_on_pnedu) {
+            return null;
+        }
+
+        $slug = trim((string) $offer->slug);
+        if ($slug === '') {
+            return null;
+        }
+
+        return rtrim((string) config('marketing.pnedu_public_url'), '/').'/szkolenia-rad-pedagogicznych/'.$slug;
     }
 
     private function schoolContactBlock(ClosedTrainingCase $case): string

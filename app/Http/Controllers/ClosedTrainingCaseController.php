@@ -374,6 +374,26 @@ class ClosedTrainingCaseController extends Controller
             ->with('success', 'Zapisano obsługę sprawy.');
     }
 
+    public function updateTopic(Request $request, ClosedTrainingCase $closedTrainingCase): RedirectResponse
+    {
+        $request->merge([
+            'topic' => ClosedTrainingCase::topicWithoutReferencePrefix((string) $request->input('topic')),
+        ]);
+
+        $data = $request->validate([
+            'topic' => 'required|string|max:255',
+        ], [
+            'topic.required' => 'Podaj tytuł szkolenia.',
+            'topic.max' => 'Tytuł może mieć najwyżej 255 znaków.',
+        ]);
+
+        $this->cases->updateTopic($closedTrainingCase, $data['topic'], $request->user());
+
+        return redirect()
+            ->route('closed-training-cases.show', $closedTrainingCase)
+            ->with('success', 'Zapisano tytuł szkolenia.');
+    }
+
     public function updateContact(Request $request, ClosedTrainingCase $closedTrainingCase): RedirectResponse
     {
         if ($request->input('pedagogical_council_size') === '') {

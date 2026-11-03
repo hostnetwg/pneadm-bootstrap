@@ -45,6 +45,55 @@ class ClosedTrainingCaseTest extends TestCase
             ->assertRedirect(route('login'));
     }
 
+    public function test_topic_edit_keeps_the_case_code_and_changes_only_the_title(): void
+    {
+        $user = User::factory()->create(['is_active' => true]);
+        $case = $this->makeCase([
+            'topic' => 'Zagrożenie przemocą i atak w szkole',
+        ]);
+        $code = '['.$case->referenceCode().']';
+
+        $this->actingAs($user)
+            ->get(route('closed-training-cases.show', $case))
+            ->assertOk()
+            ->assertSee('Temat szkolenia', false)
+            ->assertSee($code, false)
+            ->assertSee('value="Zagrożenie przemocą i atak w szkole"', false)
+            ->assertDontSee('value="'.$code, false);
+
+        $this->actingAs($user)
+            ->put(route('closed-training-cases.topic.update', $case), [
+                'topic' => '[SZ-99] Jak reagować, gdy sprawcą jest uczeń',
+            ])
+            ->assertRedirect(route('closed-training-cases.show', $case))
+            ->assertSessionHas('success');
+
+        $case->refresh();
+        $this->assertSame($code, '['.$case->referenceCode().']');
+        $this->assertSame('Jak reagować, gdy sprawcą jest uczeń', $case->topic);
+
+        $event = $case->events()->where('event_type', ClosedTrainingCaseEvent::TYPE_UPDATED)->first();
+        $this->assertNotNull($event);
+        $this->assertStringContainsString('Zagrożenie przemocą i atak w szkole', (string) $event->body);
+        $this->assertStringContainsString('Jak reagować, gdy sprawcą jest uczeń', (string) $event->body);
+        $this->assertStringNotContainsString('[SZ-99]', (string) $event->body);
+
+        $this->actingAs($user)
+            ->put(route('closed-training-cases.topic.update', $case), [
+                'topic' => '[SZ-'.$case->id.']',
+            ])
+            ->assertSessionHasErrors('topic');
+
+        $case->refresh();
+        $this->assertSame('Jak reagować, gdy sprawcą jest uczeń', $case->topic);
+
+        auth()->logout();
+
+        $this->put(route('closed-training-cases.topic.update', $case), [
+            'topic' => 'Inny tytuł',
+        ])->assertRedirect(route('login'));
+    }
+
     public function test_operator_can_create_a_case_and_record_the_next_action(): void
     {
         $user = User::factory()->create(['is_active' => true, 'name' => 'Operator Test']);
@@ -1258,6 +1307,31 @@ class ClosedTrainingCaseTest extends TestCase
             ->assertSessionHasErrors('notify_instructor');
 
         Mail::assertNothingSent();
+    }
+
+    public function test_school_proposal_button_also_sits_above_save_negotiation(): void
+    {
+        $user = User::factory()->create(['is_active' => true]);
+        $case = $this->makeCase([
+            'topic' => 'Oferta do poprawy',
+            'contact_email' => 'szkola@example.com',
+        ]);
+
+        $html = $this->actingAs($user)
+            ->get(route('closed-training-cases.show', $case))
+            ->assertOk()
+            ->getContent();
+
+        $this->assertSame(2, substr_count($html, 'Przygotuj propozycję dla szkoły'));
+        $negotiationButton = strpos($html, 'bi-envelope');
+        $saveButton = strpos($html, 'Zapisz ustalenia');
+        $this->assertNotFalse($negotiationButton);
+        $this->assertNotFalse($saveButton);
+        $this->assertLessThan($saveButton, $negotiationButton);
+        $this->assertStringContainsString(
+            'action="'.route('closed-training-cases.email.prepare-school-proposal', $case).'"',
+            substr($html, 0, $saveButton)
+        );
     }
 
     public function test_scheduled_onsite_notice_does_not_require_meeting_link(): void

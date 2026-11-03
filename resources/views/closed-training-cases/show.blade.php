@@ -1,11 +1,12 @@
 <x-app-layout>
     <x-slot name="header">
         <div class="d-flex justify-content-between align-items-center gap-3">
-            <h2 class="fw-semibold fs-4 text-dark mb-0">
-                <span class="font-monospace text-secondary me-2" title="Identyfikator w temacie e-maila do szkoły">[{{ $case->referenceCode() }}]</span>
-                {{ $case->trainingTopicLabel() }}
-            </h2>
-            <a href="{{ route('closed-training-cases.index') }}" class="btn btn-outline-secondary">Lista spraw</a>
+            @include('closed-training-cases.partials.topic-editor', [
+                'inputId' => 'case_topic_header',
+                'compact' => true,
+                'formClass' => 'flex-grow-1 mb-0',
+            ])
+            <a href="{{ route('closed-training-cases.index') }}" class="btn btn-outline-secondary text-nowrap">Lista spraw</a>
         </div>
     </x-slot>
 
@@ -24,7 +25,11 @@
                     <div class="card mb-4">
                         <div class="card-header fw-semibold">Temat szkolenia</div>
                         <div class="card-body">
-                            <p class="fs-5 fw-bold mb-0">{{ $case->trainingTopicLabel() }}</p>
+                            @include('closed-training-cases.partials.topic-editor', [
+                                'inputId' => 'case_topic',
+                                'compact' => false,
+                                'formClass' => 'mb-0',
+                            ])
                         </div>
                     </div>
 
@@ -280,7 +285,7 @@
                                 <div class="small text-uppercase text-secondary mb-2">Ustalenia sprzed powiązania (historyczne)</div>
                             @endif
 
-                            <form method="POST" action="{{ route('closed-training-cases.negotiation.update', $case) }}">
+                            <form method="POST" action="{{ route('closed-training-cases.negotiation.update', $case) }}" id="negotiation-form">
                                 @csrf
                                 @method('PUT')
                                 <div class="mb-3">
@@ -383,9 +388,27 @@
                                     </div>
                                 </div>
                                 <div class="form-text mb-3">Można zapisać sam początek. Koniec wymaga początku. Wpisanie terminu nie tworzy szkolenia.</div>
-
-                                <button type="submit" class="btn btn-primary">Zapisz ustalenia</button>
                             </form>
+
+                            @unless($case->isLinkedToCourse())
+                                @if($case->hasAnyContactEmail())
+                                    @php
+                                        $proposalShareOn = (string) old(
+                                            'share_contacts',
+                                            is_array($emailDraft ?? null) && ! empty($emailDraft['share_contacts']) ? '1' : ''
+                                        ) === '1';
+                                    @endphp
+                                    <form method="POST" action="{{ route('closed-training-cases.email.prepare-school-proposal', $case) }}" class="mb-2">
+                                        @csrf
+                                        <input type="hidden" name="share_contacts" value="{{ $proposalShareOn ? '1' : '0' }}" data-share-sync>
+                                        <button type="submit" class="btn btn-success">
+                                            <i class="bi bi-envelope me-1" aria-hidden="true"></i>Przygotuj propozycję dla szkoły
+                                        </button>
+                                    </form>
+                                @endif
+                            @endunless
+
+                            <button type="submit" form="negotiation-form" class="btn btn-primary">Zapisz ustalenia</button>
                         </div>
                     </div>
 

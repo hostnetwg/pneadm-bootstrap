@@ -3,6 +3,14 @@
 Data utworzenia/aktualizacji: 2026-10-28
 Status: plan roboczy, do potwierdzenia przez właściciela
 
+## Ostatnio (2026-11-03) — Tytuł sprawy bez zmiany kodu SZ
+
+Na karcie sprawy tytuł da się poprawić w nagłówku i w **Temat szkolenia**. Kod `[SZ-numer]` jest obok pola i nie jest edytowalny. Wpisanie go w tytuł jest przy zapisie obcinane.
+
+## Ostatnio (2026-11-03) — Propozycja dla szkoły bez daty
+
+Przycisk **Przygotuj propozycję dla szkoły** (tylko zanim sprawa ma szkolenie) wstawia tytuł, formę, cenę, czas trwania do uzupełnienia i prowadzącego. Termin pojawia się w mailu tylko wtedy, gdy jest wpisany na sprawie. Ten sam przycisk jest też nad **Zapisz ustalenia** (zielony, z kopertą). Osobnej treści oferty nie ma.
+
 ## Ostatnio (2026-11-02) — Stała cena wariantu szkolenia
 
 Na wariancie cenowym jest pole **Stała cena niezależnie od ilości uczestników w zamówieniu**. Przy nowym wariancie szkolenia zamkniętego jest zaznaczone, przy otwartym puste. Istniejące warianty zostają puste, dopóki nie zaznaczysz. Na formularzu zamówienia pnedu.pl suma, płatność i zapisane `product_price` zostają ceną wariantu. Faktura ma jedną sztukę. Zamówienia złożone wcześniej trzymają swoją kwotę. Kanon: [FORM_ORDERS_PARTICIPANTS.md](./FORM_ORDERS_PARTICIPANTS.md). Migracja: `2026_11_02_222000_add_flat_order_price_to_price_variants_and_form_orders`.

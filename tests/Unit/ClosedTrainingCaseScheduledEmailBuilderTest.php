@@ -2,8 +2,12 @@
 
 namespace Tests\Unit;
 
+use App\Models\ClosedTrainingCase;
 use App\Models\Course;
 use App\Models\CoursePriceVariant;
+use App\Models\Instructor;
+use App\Models\TrainingOffer;
+use App\Services\ClosedTrainingCaseCoordinationEmailBuilder;
 use App\Services\ClosedTrainingCaseScheduledEmailBuilder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -95,5 +99,59 @@ class ClosedTrainingCaseScheduledEmailBuilderTest extends TestCase
         $this->assertStringContainsString('zaświadczenia.<br>Faktura z 14-dniowym terminem płatności', $html);
         $this->assertStringNotContainsString('(Jako uczestnika', $html);
         $this->assertStringNotContainsString('(Faktura', $html);
+    }
+
+    public function test_school_proposal_lists_the_offer_without_inventing_a_date(): void
+    {
+        config(['marketing.pnedu_public_url' => 'https://pnedu.pl']);
+
+        $instructor = Instructor::query()->create([
+            'title' => 'dr',
+            'first_name' => 'Roman',
+            'last_name' => 'Lorens',
+            'email' => 'roman.offer.'.uniqid('', true).'@example.com',
+            'phone' => '500 100 200',
+            'bio' => 'Prawnik oświatowy.',
+            'is_active' => true,
+        ]);
+        $offer = TrainingOffer::query()->create([
+            'title' => 'Odpowiedzialność prawna nauczyciela',
+            'slug' => 'odpowiedzialnosc-prawna-nauczyciela',
+            'price_mode' => TrainingOffer::PRICE_MODE_FIXED,
+            'price_amount' => 1800,
+            'instructor_id' => $instructor->id,
+            'is_active' => true,
+            'show_on_pnedu' => true,
+        ]);
+        $case = ClosedTrainingCase::query()->create([
+            'source' => ClosedTrainingCase::SOURCE_MANUAL,
+            'status' => ClosedTrainingCase::STATUS_NEW,
+            'topic' => 'Temat ze sprawy',
+            'contact_name' => 'Dyrektor',
+            'message' => 'Prosimy o ofertę.',
+            'inquired_at' => now()->subDay(),
+            'preferred_format' => ClosedTrainingCase::FORMAT_ONLINE,
+            'client_price' => 2500,
+            'training_offer_id' => $offer->id,
+        ]);
+
+        $draft = app(ClosedTrainingCaseCoordinationEmailBuilder::class)->buildSchoolProposal($case, false);
+
+        $this->assertTrue($draft['ok']);
+        $this->assertStringContainsString('Propozycja szkolenia – Odpowiedzialność prawna nauczyciela', $draft['subject']);
+        $this->assertStringContainsString('Szkolenie:', $draft['html']);
+        $this->assertStringContainsString('Odpowiedzialność prawna nauczyciela', $draft['html']);
+        $this->assertStringContainsString('Forma:', $draft['html']);
+        $this->assertStringContainsString('Online', $draft['html']);
+        $this->assertStringContainsString('2 500,00 PLN brutto', $draft['html']);
+        $this->assertStringNotContainsString('1 800,00', $draft['html']);
+        $this->assertStringContainsString('Czas trwania:', $draft['html']);
+        $this->assertStringContainsString('(uzupełnij przed wysyłką)', $draft['html']);
+        $this->assertStringContainsString('dr Roman Lorens', $draft['html']);
+        $this->assertStringContainsString('Prawnik oświatowy.', $draft['html']);
+        $this->assertStringContainsString('Termin ustalimy wspólnie.', $draft['html']);
+        $this->assertStringNotContainsString('Najbliższy możliwy termin', $draft['html']);
+        $this->assertStringContainsString('https://pnedu.pl/szkolenia-rad-pedagogicznych/odpowiedzialnosc-prawna-nauczyciela', $draft['html']);
+        $this->assertStringNotContainsString('500 100 200', $draft['html']);
     }
 }

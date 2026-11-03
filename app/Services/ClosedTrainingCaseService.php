@@ -303,6 +303,25 @@ class ClosedTrainingCaseService
         ]);
     }
 
+    public function updateTopic(ClosedTrainingCase $case, string $topic, User $user): void
+    {
+        $topic = ClosedTrainingCase::topicWithoutReferencePrefix($topic);
+        if ($topic === trim((string) $case->topic)) {
+            return;
+        }
+
+        $before = $case->trainingTopicLabel();
+        $case->topic = $topic;
+        $case->save();
+
+        $case->events()->create([
+            'user_id' => $user->id,
+            'event_type' => ClosedTrainingCaseEvent::TYPE_UPDATED,
+            'body' => 'Temat szkolenia: '.$before.' → '.$case->trainingTopicLabel().'.',
+            'happened_at' => now(),
+        ]);
+    }
+
     public function recordSchoolEmail(ClosedTrainingCase $case, User $user, string $recipient, string $subject, string $body): ClosedTrainingCaseEvent
     {
         return $case->events()->create([
