@@ -91,6 +91,9 @@ class ParticipantDataDocxExportTest extends TestCase
         $this->assertStringContainsString('RODO', $documentXml);
         $this->assertStringContainsString('bez odrębnej, dobrowolnej zgody', $documentXml);
         $this->assertSame(12, substr_count($documentXml, '<w:tr>')); // nagłówek + uczestnik + 10 pustych wierszy
+        $this->assertStringContainsString('<w:vAlign w:val="center"/>', $documentXml);
+        $this->assertStringContainsString('<w:jc w:val="center"/>', $documentXml);
+        $this->assertStringContainsString('<w:tcMar><w:top w:w="30" w:type="dxa"/>', $documentXml);
     }
 
     public function test_docx_export_contains_selected_birth_data_and_email(): void

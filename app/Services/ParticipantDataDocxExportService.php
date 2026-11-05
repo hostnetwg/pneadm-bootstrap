@@ -110,8 +110,10 @@ class ParticipantDataDocxExportService
 
     private function tableCell(string $text, bool $header = false): string
     {
-        return '<w:tc><w:tcPr><w:tcW w:w="2400" w:type="dxa"/></w:tcPr>'
-            .$this->paragraph($text, ['bold' => $header, 'size' => 18])
+        return '<w:tc><w:tcPr><w:tcW w:w="2400" w:type="dxa"/><w:vAlign w:val="center"/>'
+            .'<w:tcMar><w:top w:w="30" w:type="dxa"/><w:left w:w="30" w:type="dxa"/><w:bottom w:w="30" w:type="dxa"/><w:right w:w="30" w:type="dxa"/></w:tcMar>'
+            .'</w:tcPr>'
+            .$this->paragraph($text, ['bold' => $header, 'size' => 18, 'align' => 'center'])
             .'</w:tc>';
     }
 
