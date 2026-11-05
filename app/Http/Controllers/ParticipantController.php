@@ -20,6 +20,7 @@ use App\Services\Mail\SystemMailDiagnostics;
 use App\Services\ParticipantAccessExpiryReminderService;
 use App\Services\ParticipantAccessExpiryService;
 use App\Services\ParticipantCustomNoticeMailService;
+use App\Services\ParticipantDataDocxExportService;
 use App\Services\ParticipantLiveAccessService;
 use App\Services\ParticipantLiveMeetingLinkMailService;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -2191,6 +2192,41 @@ class ParticipantController extends Controller
         $fileName = preg_replace('/[^A-Za-z0-9_\-\.]/', '_', $fileName);
 
         return $pdf->download($fileName);
+    }
+
+    /**
+     * Generowanie edytowalnej listy uczestników z danymi w formacie DOCX.
+     */
+    public function downloadParticipantsDataDocx(Request $request, Course $course, ParticipantDataDocxExportService $exporter)
+    {
+        $query = Participant::where('course_id', $course->id);
+
+        if ($request->filled('search')) {
+            $searchTerm = $request->get('search');
+            $query->where(function ($q) use ($searchTerm) {
+                $q->where('first_name', 'LIKE', "%{$searchTerm}%")
+                    ->orWhere('last_name', 'LIKE', "%{$searchTerm}%")
+                    ->orWhere('email', 'LIKE', "%{$searchTerm}%")
+                    ->orWhere('birth_place', 'LIKE', "%{$searchTerm}%")
+                    ->orWhere('phone', 'LIKE', "%{$searchTerm}%")
+                    ->orWhere('notes', 'LIKE', "%{$searchTerm}%");
+            });
+        }
+
+        $participants = $query->orderBy('order')->orderBy('last_name')->orderBy('first_name')->get();
+        $course->loadMissing('instructor');
+
+        $courseDate = $course->start_date ? Carbon::parse($course->start_date)->format('Y-m-d') : date('Y-m-d');
+        $courseTitle = Str::ascii(strip_tags((string) $course->title));
+        $searchInfo = $request->filled('search') ? '_WYSZUKIWANIE_'.Str::slug($request->get('search')) : '';
+        $fileName = 'Lista_uczestnikow_z_danymi_'.$courseDate.'_'.$courseTitle.$searchInfo.'.docx';
+        $fileName = preg_replace('/[^A-Za-z0-9_\-\.]/', '_', $fileName);
+
+        return response($exporter->generate($course, $participants), 200, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'Content-Disposition' => 'attachment; filename="'.$fileName.'"',
+            'Cache-Control' => 'private, no-store, no-cache',
+        ]);
     }
 
     /**

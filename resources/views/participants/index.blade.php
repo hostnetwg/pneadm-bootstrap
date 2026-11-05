@@ -121,6 +121,9 @@
                     <a href="{{ route('participants.download-registry', $course) }}" class="btn btn-outline-secondary">
                         <i class="fas fa-file-pdf me-1"></i> Pobierz rejestr zaświadczeń
                     </a>
+                    <a href="{{ route('participants.download-data-docx', array_merge(['course' => $course], request()->query())) }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-file-word me-1"></i> Pobierz listę uczestników z danymi .docx
+                    </a>
                 </div>
             </div>
             @php

@@ -75,6 +75,7 @@ Testy integracyjne z prawdziwym API Sendy — wyjątki mockowane przez `Http::fa
 | ClickMeeting sync `room_url` / maile live | `--filter=ClickMeetingTrainingAdminTest`, `--filter=ParticipantLiveMeetingLinkMailServiceTest` |
 | Ręczne dodanie/usunięcie uczestnika + token CM | `--filter=ParticipantManualClickMeetingTest`, `--filter=ParticipantLiveAccessServiceTest`; kanon: [FORM_ORDERS_PNEDU_PROVISION.md](./FORM_ORDERS_PNEDU_PROVISION.md) |
 | Wiadomość do wszystkich uczestników szkolenia | `--filter=ParticipantCustomNoticeMailTest`; kanon: [FORM_ORDERS_PNEDU_PROVISION.md](./FORM_ORDERS_PNEDU_PROVISION.md) |
+| Eksport listy uczestników z danymi DOCX | `--filter=ParticipantDataDocxExportTest`; kanon: [CERTIFICATES.md](./CERTIFICATES.md) |
 | Zaświadczenie dashboard (imię i nazwisko) | **pnedu:** `--filter=DashboardCertificateParticipantNameTest`; kanon: `pnedu/docs/CERTIFICATES.md` |
 | Ustawienie hasła (nowe konto PNEDU) | **pnedu:** `sail test --filter=PasswordResetTest` |
 | ClickMeeting embed PoC (local) | `docs/DEV_CLICKMEETING_EMBED_POC.md`, `--filter=ClickMeetingEmbedPocTest` |

@@ -150,6 +150,20 @@ Puste pola w serii = brak automatyzacji. Serwis: `App\Services\Certificate\Cours
 
 Migracja `2026_09_13_191300_add_certificate_defaults_to_course_series_table` dodaje kolumny i wstępnie wypełnia serię `tik-w-pracy-nauczyciela` (format TIK + szablon 5, jeśli istnieje).
 
+### Lista uczestników z danymi DOCX
+
+Na liście uczestników szkolenia (`/courses/{course}/participants`) przy przyciskach eksportu jest opcja **Pobierz listę uczestników z danymi .docx**.
+
+Eksport generuje edytowalny dokument Word (`.docx`) z:
+
+- nagłówkiem: tytuł szkolenia, data, prowadzący, liczba uczestników,
+- tabelą: imię, nazwisko, data urodzenia, miejsce urodzenia, adres e-mail,
+- informacją, że e-mail nie jest obowiązkowy, służy do dostępu do platformy z nagraniem, materiałami i zaświadczeniem, a bez odrębnej zgody nie jest używany marketingowo.
+
+Trasa: `participants.download-data-docx`.  
+Serwis: `App\Services\ParticipantDataDocxExportService`.  
+Test: `tests/Feature/ParticipantDataDocxExportTest.php`.
+
 ### pnedu
 
 - Zalogowany użytkownik: `/dashboard/zaswiadczenia` oraz `/dashboard/zaswiadczenia/{course}` (imię i nazwisko uczestnika z rekordu `participants` na formularzu / podglądzie / stronie pobierania)
