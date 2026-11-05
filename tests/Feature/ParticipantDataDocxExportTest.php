@@ -81,6 +81,9 @@ class ParticipantDataDocxExportTest extends TestCase
         $this->assertStringContainsString('Lista uczestników szkolenia', $documentXml);
         $this->assertStringContainsString('Szkolenie testowe', $documentXml);
         $this->assertStringContainsString('mgr Jan Nowak', $documentXml);
+        $this->assertStringContainsString('L.p.', $documentXml);
+        $this->assertStringContainsString('>1</w:t>', $documentXml);
+        $this->assertStringContainsString('>11</w:t>', $documentXml);
         $this->assertStringContainsString('Anna', $documentXml);
         $this->assertStringContainsString('Kowalska', $documentXml);
         $this->assertStringNotContainsString('12.05.1985', $documentXml);

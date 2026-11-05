@@ -55,8 +55,9 @@ class ParticipantDataDocxExportService
 
     private function documentXml(Course $course, Collection $participants, bool $includeBirthData, bool $includeEmail): string
     {
-        $rows = $participants->map(function ($participant) use ($includeBirthData, $includeEmail): string {
+        $rows = $participants->values()->map(function ($participant, int $index) use ($includeBirthData, $includeEmail): string {
             return $this->tableRow([
+                (string) ($index + 1),
                 $participant->first_name,
                 $participant->last_name,
                 $this->exportValue($participant->birth_date?->format('d.m.Y'), $includeBirthData),
@@ -64,7 +65,9 @@ class ParticipantDataDocxExportService
                 $this->exportValue($participant->email, $includeEmail),
             ]);
         })->implode('');
-        $emptyRows = str_repeat($this->tableRow(['', '', '', '', '']), self::EMPTY_ROWS_FOR_MANUAL_COMPLETION);
+        $emptyRows = collect(range(1, self::EMPTY_ROWS_FOR_MANUAL_COMPLETION))
+            ->map(fn (int $offset): string => $this->tableRow([(string) ($participants->count() + $offset), '', '', '', '', '']))
+            ->implode('');
 
         return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
             .'<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
@@ -76,7 +79,7 @@ class ParticipantDataDocxExportService
             .$this->paragraph('Liczba uczestników: '.$participants->count(), ['size' => 22])
             .$this->paragraph('', ['size' => 10])
             .$this->table(
-                $this->tableRow(['Imię', 'Nazwisko', 'Data urodzenia', 'Miejsce urodzenia', 'Adres e-mail'], true)
+                $this->tableRow(['L.p.', 'Imię', 'Nazwisko', 'Data urodzenia', 'Miejsce urodzenia', 'Adres e-mail'], true)
                 .$rows
                 .$emptyRows
             )

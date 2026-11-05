@@ -157,7 +157,7 @@ Na liście uczestników szkolenia (`/courses/{course}/participants`) przy przyci
 Eksport generuje edytowalny dokument Word (`.docx`) z:
 
 - nagłówkiem: tytuł szkolenia, data, prowadzący, liczba uczestników,
-- tabelą: imię, nazwisko, data urodzenia, miejsce urodzenia, adres e-mail,
+- tabelą: L.p., imię, nazwisko, data urodzenia, miejsce urodzenia, adres e-mail,
 - 10 pustymi wierszami na ręczne uzupełnienie listy przez szkołę,
 - informacją, że e-mail nie jest obowiązkowy, służy do dostępu do platformy z nagraniem, materiałami i zaświadczeniem, a bez odrębnej zgody nie jest używany marketingowo.
 
