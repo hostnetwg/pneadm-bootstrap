@@ -10,6 +10,8 @@ use ZipArchive;
 
 class ParticipantDataDocxExportService
 {
+    private const EMPTY_ROWS_FOR_MANUAL_COMPLETION = 10;
+
     public function generate(Course $course, Collection $participants): string
     {
         if (! class_exists(ZipArchive::class)) {
@@ -58,6 +60,7 @@ class ParticipantDataDocxExportService
                 $participant->email,
             ]);
         })->implode('');
+        $emptyRows = str_repeat($this->tableRow(['', '', '', '', '']), self::EMPTY_ROWS_FOR_MANUAL_COMPLETION);
 
         return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
             .'<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
@@ -71,6 +74,7 @@ class ParticipantDataDocxExportService
             .$this->table(
                 $this->tableRow(['Imię', 'Nazwisko', 'Data urodzenia', 'Miejsce urodzenia', 'Adres e-mail'], true)
                 .$rows
+                .$emptyRows
             )
             .$this->paragraph('', ['size' => 10])
             .$this->paragraph($this->complianceNote(), ['size' => 18])

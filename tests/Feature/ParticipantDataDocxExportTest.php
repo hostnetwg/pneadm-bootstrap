@@ -84,6 +84,7 @@ class ParticipantDataDocxExportTest extends TestCase
         $this->assertStringContainsString('Adres e-mail nie jest obowiązkowy', $documentXml);
         $this->assertStringContainsString('RODO', $documentXml);
         $this->assertStringContainsString('bez odrębnej, dobrowolnej zgody', $documentXml);
+        $this->assertSame(12, substr_count($documentXml, '<w:tr>')); // nagłówek + uczestnik + 10 pustych wierszy
     }
 
     private function createCourse(): Course
