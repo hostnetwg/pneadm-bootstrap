@@ -149,6 +149,7 @@ class RecoveredOverduePaymentReportService
                     $row['notification_counts']['phone'],
                 ),
                 'rows_count' => 1,
+                'case_id' => $row['case']?->id,
             ];
         }
 

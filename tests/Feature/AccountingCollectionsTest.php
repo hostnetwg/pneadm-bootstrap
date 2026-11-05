@@ -1232,11 +1232,12 @@ class AccountingCollectionsTest extends TestCase
             ->post(route('accounting.collections.bank-transactions.link', [$case, $transaction]));
 
         $response->assertRedirect(route('accounting.collections.show', $case));
-        $response->assertSessionHas(RecoveredOverduePaymentReportService::SESSION_KEY, function (array $payload) {
+        $response->assertSessionHas(RecoveredOverduePaymentReportService::SESSION_KEY, function (array $payload) use ($case) {
             return str_contains($payload['message'], '10 dni po terminie')
                 && str_contains($payload['message'], 'powiadomienia: 2')
                 && str_contains($payload['message'], 'e-mail 1')
-                && str_contains($payload['message'], 'telefon 1');
+                && str_contains($payload['message'], 'telefon 1')
+                && ($payload['case_id'] ?? null) === $case->id;
         });
 
         $report = $this->actingAs($user)

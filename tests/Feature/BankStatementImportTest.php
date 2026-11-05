@@ -183,9 +183,10 @@ class BankStatementImportTest extends TestCase
             ->post(route('accounting.bank-imports.matches.accept', [$import, $match]));
 
         $response->assertRedirect();
-        $response->assertSessionHas(RecoveredOverduePaymentReportService::SESSION_KEY, function (array $payload) {
+        $response->assertSessionHas(RecoveredOverduePaymentReportService::SESSION_KEY, function (array $payload) use ($case) {
             return str_contains($payload['message'], '8 dni po terminie')
-                && str_contains($payload['message'], 'SMS 1');
+                && str_contains($payload['message'], 'SMS 1')
+                && ($payload['case_id'] ?? null) === $case->id;
         });
     }
 
