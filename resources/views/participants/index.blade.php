@@ -121,9 +121,9 @@
                     <a href="{{ route('participants.download-registry', $course) }}" class="btn btn-outline-secondary">
                         <i class="fas fa-file-pdf me-1"></i> Pobierz rejestr zaświadczeń
                     </a>
-                    <a href="{{ route('participants.download-data-docx', array_merge(['course' => $course], request()->query())) }}" class="btn btn-outline-secondary">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#participantsDataDocxModal">
                         <i class="fas fa-file-word me-1"></i> Pobierz listę uczestników z danymi .docx
-                    </a>
+                    </button>
                 </div>
             </div>
             @php
@@ -1170,6 +1170,57 @@
             </div>
         </div>
         @endif
+
+        <div class="modal fade" id="participantsDataDocxModal" tabindex="-1" aria-labelledby="participantsDataDocxModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header bg-secondary text-white">
+                        <h5 class="modal-title" id="participantsDataDocxModalLabel">
+                            <i class="fas fa-file-word me-2"></i>Lista uczestników z danymi .docx
+                        </h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+                    </div>
+                    <form action="{{ route('participants.download-data-docx', $course) }}" method="GET">
+                        @foreach(request()->except(['include_birth_data', 'include_email']) as $key => $value)
+                            @if(is_array($value))
+                                @foreach($value as $item)
+                                    <input type="hidden" name="{{ $key }}[]" value="{{ $item }}">
+                                @endforeach
+                            @else
+                                <input type="hidden" name="{{ $key }}" value="{{ $value }}">
+                            @endif
+                        @endforeach
+                        <div class="modal-body">
+                            <p class="mb-3">
+                                Wybierz, które dane mają zostać wpisane do tabeli. Kolumny pozostaną w dokumencie zawsze.
+                                Jeśli opcja nie jest zaznaczona, istniejąca wartość zostanie zastąpiona tekstem <strong>( .... )</strong>,
+                                a brakująca wartość zostanie pustą rubryką.
+                            </p>
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" value="1" id="participantsDataDocxIncludeBirthData" name="include_birth_data">
+                                <label class="form-check-label" for="participantsDataDocxIncludeBirthData">
+                                    data i miejsce urodzenia
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" value="1" id="participantsDataDocxIncludeEmail" name="include_email">
+                                <label class="form-check-label" for="participantsDataDocxIncludeEmail">
+                                    adres e-mail
+                                </label>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                                <i class="fas fa-times me-1"></i>Anuluj
+                            </button>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-download me-1"></i>Pobierz
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
 
         <div class="modal fade" id="customNoticeModal" tabindex="-1" aria-labelledby="customNoticeModalLabel" aria-hidden="true"
              data-sample-link="{{ e($customNoticeSampleJoinUrl ?? '') }}"

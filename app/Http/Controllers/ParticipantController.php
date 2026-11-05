@@ -2222,7 +2222,14 @@ class ParticipantController extends Controller
         $fileName = 'Lista_uczestnikow_z_danymi_'.$courseDate.'_'.$courseTitle.$searchInfo.'.docx';
         $fileName = preg_replace('/[^A-Za-z0-9_\-\.]/', '_', $fileName);
 
-        return response($exporter->generate($course, $participants), 200, [
+        $docx = $exporter->generate(
+            $course,
+            $participants,
+            $request->boolean('include_birth_data'),
+            $request->boolean('include_email')
+        );
+
+        return response($docx, 200, [
             'Content-Type' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
             'Content-Disposition' => 'attachment; filename="'.$fileName.'"',
             'Cache-Control' => 'private, no-store, no-cache',

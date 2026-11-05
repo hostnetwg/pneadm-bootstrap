@@ -152,7 +152,7 @@ Migracja `2026_09_13_191300_add_certificate_defaults_to_course_series_table` dod
 
 ### Lista uczestników z danymi DOCX
 
-Na liście uczestników szkolenia (`/courses/{course}/participants`) przy przyciskach eksportu jest opcja **Pobierz listę uczestników z danymi .docx**.
+Na liście uczestników szkolenia (`/courses/{course}/participants`) przy przyciskach eksportu jest opcja **Pobierz listę uczestników z danymi .docx**. Przycisk otwiera modal z opcjami, czy wypełnić w dokumencie dane urodzenia i adresy e-mail.
 
 Eksport generuje edytowalny dokument Word (`.docx`) z:
 
@@ -160,6 +160,8 @@ Eksport generuje edytowalny dokument Word (`.docx`) z:
 - tabelą: imię, nazwisko, data urodzenia, miejsce urodzenia, adres e-mail,
 - 10 pustymi wierszami na ręczne uzupełnienie listy przez szkołę,
 - informacją, że e-mail nie jest obowiązkowy, służy do dostępu do platformy z nagraniem, materiałami i zaświadczeniem, a bez odrębnej zgody nie jest używany marketingowo.
+
+Kolumny danych urodzenia i e-maila są zawsze obecne. Gdy admin nie zaznaczy danej opcji w modalu, istniejące wartości są maskowane jako `( .... )`, a brakujące zostają pustymi rubrykami.
 
 Trasa: `participants.download-data-docx`.  
 Serwis: `App\Services\ParticipantDataDocxExportService`.  

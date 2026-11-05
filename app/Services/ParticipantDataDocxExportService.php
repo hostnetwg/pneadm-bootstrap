@@ -12,8 +12,12 @@ class ParticipantDataDocxExportService
 {
     private const EMPTY_ROWS_FOR_MANUAL_COMPLETION = 10;
 
-    public function generate(Course $course, Collection $participants): string
-    {
+    public function generate(
+        Course $course,
+        Collection $participants,
+        bool $includeBirthData = false,
+        bool $includeEmail = false
+    ): string {
         if (! class_exists(ZipArchive::class)) {
             throw new RuntimeException('Rozszerzenie PHP ZipArchive jest wymagane do wygenerowania pliku DOCX.');
         }
@@ -31,7 +35,7 @@ class ParticipantDataDocxExportService
 
         $zip->addFromString('[Content_Types].xml', $this->contentTypesXml());
         $zip->addFromString('_rels/.rels', $this->rootRelsXml());
-        $zip->addFromString('word/document.xml', $this->documentXml($course, $participants));
+        $zip->addFromString('word/document.xml', $this->documentXml($course, $participants, $includeBirthData, $includeEmail));
         $zip->close();
 
         $content = file_get_contents($path);
@@ -49,15 +53,15 @@ class ParticipantDataDocxExportService
         return 'Adres e-mail nie jest obowiązkowy. Jego podanie umożliwia uczestnikowi bezpośredni dostęp do platformy z nagraniem szkolenia, materiałami oraz zaświadczeniem. Dane osobowe uczestników są przetwarzane przez organizatora szkolenia w celu organizacji i udokumentowania udziału w szkoleniu, prowadzenia listy uczestników oraz rejestru wydanych zaświadczeń, zgodnie z przepisami prawa oświatowego dotyczącymi placówek doskonalenia nauczycieli i dokumentacji kształcenia oraz z obowiązkami wynikającymi z RODO. Adresy e-mail nie są wykorzystywane do celów marketingowych bez odrębnej, dobrowolnej zgody uczestnika.';
     }
 
-    private function documentXml(Course $course, Collection $participants): string
+    private function documentXml(Course $course, Collection $participants, bool $includeBirthData, bool $includeEmail): string
     {
-        $rows = $participants->map(function ($participant): string {
+        $rows = $participants->map(function ($participant) use ($includeBirthData, $includeEmail): string {
             return $this->tableRow([
                 $participant->first_name,
                 $participant->last_name,
-                $participant->birth_date?->format('d.m.Y') ?? '',
-                $participant->birth_place,
-                $participant->email,
+                $this->exportValue($participant->birth_date?->format('d.m.Y'), $includeBirthData),
+                $this->exportValue($participant->birth_place, $includeBirthData),
+                $this->exportValue($participant->email, $includeEmail),
             ]);
         })->implode('');
         $emptyRows = str_repeat($this->tableRow(['', '', '', '', '']), self::EMPTY_ROWS_FOR_MANUAL_COMPLETION);
@@ -145,6 +149,17 @@ class ParticipantDataDocxExportService
         $instructor = $course->instructor;
 
         return $instructor?->full_title_name ?: '';
+    }
+
+    private function exportValue(?string $value, bool $include): string
+    {
+        $value = trim((string) $value);
+
+        if ($include || $value === '') {
+            return $value;
+        }
+
+        return '( .... )';
     }
 
     private function plainText(?string $value): string

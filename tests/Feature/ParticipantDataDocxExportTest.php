@@ -42,10 +42,15 @@ class ParticipantDataDocxExportTest extends TestCase
         $response->assertOk();
         $response->assertSee('Pobierz rejestr zaświadczeń', false);
         $response->assertSee('Pobierz listę uczestników z danymi .docx', false);
+        $response->assertSee('id="participantsDataDocxModal"', false);
+        $response->assertSee('name="include_birth_data"', false);
+        $response->assertSee('name="include_email"', false);
+        $response->assertSee('Anuluj', false);
+        $response->assertSee('Pobierz', false);
         $response->assertSee(route('participants.download-data-docx', $course), false);
     }
 
-    public function test_docx_export_contains_course_header_participants_and_compliance_note(): void
+    public function test_docx_export_masks_birth_data_and_email_by_default(): void
     {
         if (! class_exists(ZipArchive::class)) {
             $this->markTestSkipped('ZipArchive is required to inspect DOCX files.');
@@ -78,13 +83,48 @@ class ParticipantDataDocxExportTest extends TestCase
         $this->assertStringContainsString('mgr Jan Nowak', $documentXml);
         $this->assertStringContainsString('Anna', $documentXml);
         $this->assertStringContainsString('Kowalska', $documentXml);
-        $this->assertStringContainsString('12.05.1985', $documentXml);
-        $this->assertStringContainsString('Warszawa', $documentXml);
-        $this->assertStringContainsString('anna@example.test', $documentXml);
+        $this->assertStringNotContainsString('12.05.1985', $documentXml);
+        $this->assertStringNotContainsString('Warszawa', $documentXml);
+        $this->assertStringNotContainsString('anna@example.test', $documentXml);
+        $this->assertSame(3, substr_count($documentXml, '( .... )'));
         $this->assertStringContainsString('Adres e-mail nie jest obowiązkowy', $documentXml);
         $this->assertStringContainsString('RODO', $documentXml);
         $this->assertStringContainsString('bez odrębnej, dobrowolnej zgody', $documentXml);
         $this->assertSame(12, substr_count($documentXml, '<w:tr>')); // nagłówek + uczestnik + 10 pustych wierszy
+    }
+
+    public function test_docx_export_contains_selected_birth_data_and_email(): void
+    {
+        if (! class_exists(ZipArchive::class)) {
+            $this->markTestSkipped('ZipArchive is required to inspect DOCX files.');
+        }
+
+        $user = User::factory()->create();
+        $course = $this->createCourse();
+
+        Participant::query()->create([
+            'course_id' => $course->id,
+            'order' => 1,
+            'first_name' => 'Anna',
+            'last_name' => 'Kowalska',
+            'email' => 'anna@example.test',
+            'birth_date' => '1985-05-12',
+            'birth_place' => 'Warszawa',
+        ]);
+
+        $response = $this->actingAs($user)->get(route('participants.download-data-docx', [
+            'course' => $course,
+            'include_birth_data' => 1,
+            'include_email' => 1,
+        ]));
+
+        $response->assertOk();
+        $documentXml = $this->readDocumentXml($response->getContent());
+
+        $this->assertStringContainsString('12.05.1985', $documentXml);
+        $this->assertStringContainsString('Warszawa', $documentXml);
+        $this->assertStringContainsString('anna@example.test', $documentXml);
+        $this->assertStringNotContainsString('( .... )', $documentXml);
     }
 
     private function createCourse(): Course
