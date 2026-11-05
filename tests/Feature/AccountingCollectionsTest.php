@@ -11,6 +11,7 @@ use App\Models\DebtCaseContact;
 use App\Models\FormOrder;
 use App\Models\FormOrderParticipant;
 use App\Models\User;
+use App\Services\Accounting\RecoveredOverduePaymentReportService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -1165,6 +1166,92 @@ class AccountingCollectionsTest extends TestCase
         $withoutDateFilter->assertJsonCount(2, 'candidates');
         $withoutDateFilter->assertJsonFragment(['description_short' => 'PRZELEW PO ZAMOWIENIU BETA']);
         $withoutDateFilter->assertJsonFragment(['description_short' => 'PRZELEW PRZED ZAMOWIENIEM ALPHA']);
+    }
+
+    public function test_linking_overdue_bank_payment_from_case_shows_notice_and_report(): void
+    {
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+            'is_active' => 1,
+        ]);
+
+        $order = FormOrder::create([
+            'product_name' => 'Szkolenie odzyskane',
+            'product_price' => 365,
+            'order_date' => '2026-08-01',
+            'invoice_number' => '99/8/2026',
+            'invoice_due_date' => '2026-08-10',
+            'recipient_name' => 'Szkoła Testowa',
+            'orderer_email' => 'sekretariat@example.test',
+            'payment_mode' => FormOrder::PAYMENT_MODE_DEFERRED_INVOICE,
+            'payment_status' => FormOrder::PAYMENT_STATUS_SUBMITTED,
+        ]);
+        $case = DebtCase::create([
+            'form_order_id' => $order->id,
+            'status' => DebtCase::STATUS_OPEN,
+            'invoice_number' => '99/8/2026',
+            'amount_gross' => 365,
+            'due_date' => '2026-08-10',
+            'opened_at' => '2026-08-11 09:00:00',
+        ]);
+        DebtCaseAction::create([
+            'debt_case_id' => $case->id,
+            'user_id' => $user->id,
+            'action_type' => DebtCaseAction::TYPE_EMAIL,
+            'outcome' => 'sent',
+            'happened_at' => '2026-08-12 10:00:00',
+        ]);
+        DebtCaseAction::create([
+            'debt_case_id' => $case->id,
+            'user_id' => $user->id,
+            'action_type' => DebtCaseAction::TYPE_PHONE,
+            'happened_at' => '2026-08-13 10:00:00',
+        ]);
+
+        $import = BankStatementImport::create([
+            'uploaded_by' => $user->id,
+            'original_filename' => 'lista_operacji_test.csv',
+            'file_hash' => str_repeat('c', 64),
+            'source' => 'mbank',
+            'status' => 'parsed',
+            'rows_total' => 1,
+            'rows_incoming' => 1,
+        ]);
+        $transaction = BankTransaction::create([
+            'bank_statement_import_id' => $import->id,
+            'operation_date' => '2026-08-20',
+            'amount' => 365,
+            'currency' => 'PLN',
+            'description' => 'WPŁATA ZA FV 99/8/2026',
+            'account_label' => 'Szkoła Testowa',
+            'fingerprint' => str_repeat('d', 64),
+            'is_incoming' => true,
+        ]);
+
+        $response = $this->actingAs($user)
+            ->post(route('accounting.collections.bank-transactions.link', [$case, $transaction]));
+
+        $response->assertRedirect(route('accounting.collections.show', $case));
+        $response->assertSessionHas(RecoveredOverduePaymentReportService::SESSION_KEY, function (array $payload) {
+            return str_contains($payload['message'], '10 dni po terminie')
+                && str_contains($payload['message'], 'powiadomienia: 2')
+                && str_contains($payload['message'], 'e-mail 1')
+                && str_contains($payload['message'], 'telefon 1');
+        });
+
+        $report = $this->actingAs($user)
+            ->get(route('accounting.collections.recovered-overdue', ['days' => 0]));
+
+        $report->assertOk();
+        $report->assertSee('Szkoła Testowa', false);
+        $report->assertSee('99/8/2026', false);
+        $report->assertSee('10 dni', false);
+
+        $csv = $this->actingAs($user)
+            ->get(route('accounting.collections.recovered-overdue.export-csv', ['days' => 0]));
+
+        $csv->assertOk();
+        $this->assertStringContainsString('99/8/2026', $csv->streamedContent());
     }
 
     public function test_bank_transfer_search_requires_query_and_does_not_run_on_show(): void

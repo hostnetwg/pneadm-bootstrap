@@ -802,6 +802,8 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
             Route::get('/', [AccountingController::class, 'collectionsIndex'])->name('index');
             Route::post('/', [AccountingController::class, 'collectionsStore'])->name('store');
             Route::get('/effectiveness', [AccountingController::class, 'collectionsEffectiveness'])->name('effectiveness');
+            Route::get('/recovered-overdue', [AccountingController::class, 'collectionsRecoveredOverdue'])->name('recovered-overdue');
+            Route::get('/recovered-overdue/export-csv', [AccountingController::class, 'collectionsRecoveredOverdueExportCsv'])->name('recovered-overdue.export-csv');
             Route::get('/settings', [AccountingController::class, 'collectionsSettingsEdit'])->name('settings.edit');
             Route::post('/settings', [AccountingController::class, 'collectionsSettingsUpdate'])->name('settings.update');
             Route::get('/{debtCase}', [AccountingController::class, 'collectionsShow'])->name('show');

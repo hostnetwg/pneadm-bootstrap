@@ -13,6 +13,7 @@ use App\Models\DebtCollectionSetting;
 use App\Models\FormOrder;
 use App\Models\OnlinePaymentOrder;
 use App\Models\RevenueRecord;
+use App\Services\Accounting\RecoveredOverduePaymentReportService;
 use App\Services\Bank\BankStatementImportService;
 use App\Services\Bank\BankTransactionUnlinkService;
 use App\Services\DebtCaseAutoCloseService;
@@ -478,6 +479,104 @@ class AccountingController extends Controller
             'search' => $search,
             'days' => $days,
         ]);
+    }
+
+    public function collectionsRecoveredOverdue(Request $request, RecoveredOverduePaymentReportService $reportService)
+    {
+        $filters = $this->recoveredOverdueFilters($request);
+        $matches = $reportService->baseQuery($filters)
+            ->paginate(50)
+            ->withQueryString();
+
+        $rows = $matches->getCollection()
+            ->map(fn (BankTransactionMatch $match): ?array => $reportService->rowForMatch($match))
+            ->filter()
+            ->values();
+
+        $matches->setCollection($rows);
+
+        $summaryRows = $reportService->baseQuery($filters)
+            ->get()
+            ->map(fn (BankTransactionMatch $match): ?array => $reportService->rowForMatch($match))
+            ->filter()
+            ->values();
+
+        $stats = [
+            'total' => $matches->total(),
+            'with_notifications' => $summaryRows->filter(fn (array $row): bool => $row['notification_counts']['total'] > 0)->count(),
+            'amount' => $summaryRows->sum('allocated_amount'),
+            'max_delay' => $summaryRows->max('delay_days'),
+        ];
+
+        return view('accounting.collections.recovered-overdue', [
+            'rows' => $matches,
+            'filters' => $filters,
+            'stats' => $stats,
+        ]);
+    }
+
+    public function collectionsRecoveredOverdueExportCsv(Request $request, RecoveredOverduePaymentReportService $reportService)
+    {
+        $filters = $this->recoveredOverdueFilters($request);
+        $rows = $reportService->baseQuery($filters)
+            ->limit(10000)
+            ->get()
+            ->map(fn (BankTransactionMatch $match): ?array => $reportService->rowForMatch($match))
+            ->filter()
+            ->values();
+
+        $filename = 'odzyskane_opoznione_wplaty_'.now()->format('Y-m-d_His').'.csv';
+
+        return response()->streamDownload(function () use ($reportService, $rows) {
+            $handle = fopen('php://output', 'w');
+            fprintf($handle, chr(0xEF).chr(0xBB).chr(0xBF));
+            fputcsv($handle, [
+                'data_wplaty',
+                'dni_po_terminie',
+                'kwota',
+                'sprawa_id',
+                'zamowienie_id',
+                'faktura',
+                'klient',
+                'email',
+                'sms',
+                'telefon',
+                'powiadomienia_razem',
+                'przelew_id',
+                'import_id',
+            ]);
+
+            foreach ($reportService->csvRows($rows) as $row) {
+                fputcsv($handle, $row);
+            }
+
+            fclose($handle);
+        }, $filename, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+        ]);
+    }
+
+    private function recoveredOverdueFilters(Request $request): array
+    {
+        $search = trim((string) $request->get('search', ''));
+        if (mb_strlen($search) > 128) {
+            $search = mb_substr($search, 0, 128);
+        }
+
+        $daysRaw = $request->get('days', '90');
+        $allowedDays = [30, 90, 180, 365, 0];
+        $days = in_array((int) $daysRaw, $allowedDays, true) ? (int) $daysRaw : 90;
+        $contact = in_array($request->get('contact'), ['all', 'with', 'without'], true)
+            ? (string) $request->get('contact')
+            : 'all';
+
+        return [
+            'search' => $search,
+            'days' => $days,
+            'from' => $days > 0 ? now()->subDays($days)->toDateString() : null,
+            'to' => null,
+            'contact' => $contact,
+        ];
     }
 
     /**
@@ -1350,7 +1449,8 @@ class AccountingController extends Controller
         BankTransaction $transaction,
         BankStatementImportService $importService,
         IfirmaInvoicePaymentRegistrationService $paymentRegistration,
-        DebtCaseAutoCloseService $autoClose
+        DebtCaseAutoCloseService $autoClose,
+        RecoveredOverduePaymentReportService $recoveredOverdueReport
     ) {
         $validated = $request->validate([
             'register_ifirma_payment' => ['nullable', 'boolean'],
@@ -1383,10 +1483,14 @@ class AccountingController extends Controller
             } catch (\Throwable $e) {
                 report($e);
 
-                return redirect()
-                    ->route('accounting.collections.show', $debtCase)
-                    ->with('success', $message.' Akceptacja lokalna OK.')
-                    ->with('warning', 'Wpłata w iFirma nie przeszła: '.$e->getMessage());
+                return $this->withRecoveredOverdueNotice(
+                    redirect()
+                        ->route('accounting.collections.show', $debtCase)
+                        ->with('success', $message.' Akceptacja lokalna OK.')
+                        ->with('warning', 'Wpłata w iFirma nie przeszła: '.$e->getMessage()),
+                    $recoveredOverdueReport,
+                    $accepted
+                );
             }
 
             if ($paymentResult['success']) {
@@ -1395,20 +1499,32 @@ class AccountingController extends Controller
                     $message .= ' Sprawę zamknięto automatycznie.';
                 }
 
-                return redirect()
-                    ->route('accounting.collections.show', $debtCase)
-                    ->with('success', $message);
+                return $this->withRecoveredOverdueNotice(
+                    redirect()
+                        ->route('accounting.collections.show', $debtCase)
+                        ->with('success', $message),
+                    $recoveredOverdueReport,
+                    $accepted
+                );
             }
 
-            return redirect()
-                ->route('accounting.collections.show', $debtCase)
-                ->with('success', $message.' Akceptacja lokalna OK.')
-                ->with('warning', 'Wpłata w iFirma nie przeszła: '.$paymentResult['message']);
+            return $this->withRecoveredOverdueNotice(
+                redirect()
+                    ->route('accounting.collections.show', $debtCase)
+                    ->with('success', $message.' Akceptacja lokalna OK.')
+                    ->with('warning', 'Wpłata w iFirma nie przeszła: '.$paymentResult['message']),
+                $recoveredOverdueReport,
+                $accepted
+            );
         }
 
-        return redirect()
-            ->route('accounting.collections.show', $debtCase)
-            ->with('success', $message.' Status iFirma nie został zmieniony (powiązanie tylko lokalne).');
+        return $this->withRecoveredOverdueNotice(
+            redirect()
+                ->route('accounting.collections.show', $debtCase)
+                ->with('success', $message.' Status iFirma nie został zmieniony (powiązanie tylko lokalne).'),
+            $recoveredOverdueReport,
+            $accepted
+        );
     }
 
     public function collectionsBankTransactionUnlink(
@@ -1444,6 +1560,18 @@ class AccountingController extends Controller
         }
 
         return $redirect;
+    }
+
+    private function withRecoveredOverdueNotice(
+        $redirect,
+        RecoveredOverduePaymentReportService $reportService,
+        BankTransactionMatch $match
+    ) {
+        $payload = $reportService->sessionPayloadForMatches([$match]);
+
+        return $payload
+            ? $redirect->with(RecoveredOverduePaymentReportService::SESSION_KEY, $payload)
+            : $redirect;
     }
 
     public function collectionsBankTransactionRegisterIfirma(

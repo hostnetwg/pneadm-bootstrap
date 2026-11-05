@@ -14,6 +14,9 @@
                 <a href="{{ route('accounting.collections.effectiveness') }}" class="btn btn-outline-info btn-sm">
                     <i class="bi bi-graph-up"></i> Skuteczność
                 </a>
+                <a href="{{ route('accounting.collections.recovered-overdue') }}" class="btn btn-outline-success btn-sm">
+                    <i class="bi bi-cash-coin"></i> Odzyskane wpłaty
+                </a>
                 <a href="{{ route('accounting.collections.settings.edit') }}" class="btn btn-outline-dark btn-sm">
                     <i class="bi bi-gear"></i> Ustawienia
                 </a>

@@ -161,6 +161,8 @@
                 </div>
             @endif
 
+            @include('accounting.collections.partials.recovered-overdue-notice')
+
             @if(session('warning'))
                 <div class="alert alert-warning alert-dismissible fade show" role="alert">
                     {{ session('warning') }}

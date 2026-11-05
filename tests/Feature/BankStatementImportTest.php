@@ -9,6 +9,7 @@ use App\Models\DebtCase;
 use App\Models\DebtCaseAction;
 use App\Models\FormOrder;
 use App\Models\User;
+use App\Services\Accounting\RecoveredOverduePaymentReportService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -115,6 +116,77 @@ class BankStatementImportTest extends TestCase
             ->assertOk()
             ->assertSee('Import wyciągu mBank', false)
             ->assertSee('id="bankImportsSearch"', false);
+    }
+
+    public function test_accepting_overdue_match_from_import_shows_recovered_payment_notice(): void
+    {
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+            'is_active' => 1,
+        ]);
+
+        $order = FormOrder::create([
+            'product_name' => 'Szkolenie import',
+            'product_price' => 500,
+            'order_date' => '2026-08-01',
+            'invoice_number' => '100/8/2026',
+            'invoice_due_date' => '2026-08-10',
+            'buyer_name' => 'Gmina Testowa',
+            'payment_mode' => FormOrder::PAYMENT_MODE_DEFERRED_INVOICE,
+            'payment_status' => FormOrder::PAYMENT_STATUS_SUBMITTED,
+        ]);
+        $case = DebtCase::create([
+            'form_order_id' => $order->id,
+            'status' => DebtCase::STATUS_OPEN,
+            'invoice_number' => '100/8/2026',
+            'amount_gross' => 500,
+            'due_date' => '2026-08-10',
+            'opened_at' => '2026-08-11 09:00:00',
+        ]);
+        DebtCaseAction::create([
+            'debt_case_id' => $case->id,
+            'user_id' => $user->id,
+            'action_type' => DebtCaseAction::TYPE_SMS,
+            'outcome' => 'sent',
+            'happened_at' => '2026-08-12 10:00:00',
+        ]);
+
+        $import = BankStatementImport::create([
+            'uploaded_by' => $user->id,
+            'original_filename' => 'lista_operacji_test.csv',
+            'file_hash' => str_repeat('e', 64),
+            'source' => 'mbank',
+            'status' => 'parsed',
+            'rows_total' => 1,
+            'rows_incoming' => 1,
+        ]);
+        $transaction = BankTransaction::create([
+            'bank_statement_import_id' => $import->id,
+            'operation_date' => '2026-08-18',
+            'amount' => 500,
+            'currency' => 'PLN',
+            'description' => 'FV 100/8/2026',
+            'account_label' => 'Gmina Testowa',
+            'fingerprint' => str_repeat('f', 64),
+            'is_incoming' => true,
+        ]);
+        $match = BankTransactionMatch::create([
+            'bank_transaction_id' => $transaction->id,
+            'form_order_id' => $order->id,
+            'debt_case_id' => $case->id,
+            'confidence' => BankTransactionMatch::CONFIDENCE_HIGH,
+            'match_reasons' => ['amount_match'],
+            'status' => BankTransactionMatch::STATUS_SUGGESTED,
+        ]);
+
+        $response = $this->actingAs($user)
+            ->post(route('accounting.bank-imports.matches.accept', [$import, $match]));
+
+        $response->assertRedirect();
+        $response->assertSessionHas(RecoveredOverduePaymentReportService::SESSION_KEY, function (array $payload) {
+            return str_contains($payload['message'], '8 dni po terminie')
+                && str_contains($payload['message'], 'SMS 1');
+        });
     }
 
     public function test_index_page_can_search_imports(): void

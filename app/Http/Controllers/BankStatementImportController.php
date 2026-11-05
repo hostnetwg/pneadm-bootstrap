@@ -8,6 +8,7 @@ use App\Models\BankTransactionMatch;
 use App\Models\DebtCase;
 use App\Models\FormOrder;
 use App\Models\User;
+use App\Services\Accounting\RecoveredOverduePaymentReportService;
 use App\Services\Bank\BankStatementCoverageService;
 use App\Services\Bank\BankStatementImportService;
 use App\Services\Bank\BankTransactionUnlinkService;
@@ -332,7 +333,8 @@ class BankStatementImportController extends Controller
         BankTransactionMatch $match,
         BankStatementImportService $importService,
         IfirmaInvoicePaymentRegistrationService $paymentRegistration,
-        DebtCaseAutoCloseService $autoClose
+        DebtCaseAutoCloseService $autoClose,
+        RecoveredOverduePaymentReportService $recoveredOverdueReport
     ) {
         $this->assertMatchBelongsToImport($bankImport, $match);
 
@@ -365,11 +367,15 @@ class BankStatementImportController extends Controller
             } catch (\Throwable $e) {
                 report($e);
 
-                return $this->redirectAfterReview(
-                    $request,
-                    $bankImport,
-                    $message.' Akceptacja lokalna OK.'
-                )->with('warning', 'Wpłata w iFirma nie przeszła: '.$e->getMessage());
+                return $this->withRecoveredOverdueNotice(
+                    $this->redirectAfterReview(
+                        $request,
+                        $bankImport,
+                        $message.' Akceptacja lokalna OK.'
+                    )->with('warning', 'Wpłata w iFirma nie przeszła: '.$e->getMessage()),
+                    $recoveredOverdueReport,
+                    $accepted
+                );
             }
 
             if ($paymentResult['success']) {
@@ -381,14 +387,22 @@ class BankStatementImportController extends Controller
                     $paymentResult['status'] ?? null
                 );
 
-                return $this->redirectAfterReview($request, $bankImport, $message);
+                return $this->withRecoveredOverdueNotice(
+                    $this->redirectAfterReview($request, $bankImport, $message),
+                    $recoveredOverdueReport,
+                    $accepted
+                );
             }
 
-            return $this->redirectAfterReview(
-                $request,
-                $bankImport,
-                $message.' Akceptacja lokalna OK.'
-            )->with('warning', 'Wpłata w iFirma nie przeszła: '.$paymentResult['message']);
+            return $this->withRecoveredOverdueNotice(
+                $this->redirectAfterReview(
+                    $request,
+                    $bankImport,
+                    $message.' Akceptacja lokalna OK.'
+                )->with('warning', 'Wpłata w iFirma nie przeszła: '.$paymentResult['message']),
+                $recoveredOverdueReport,
+                $accepted
+            );
         }
 
         if ($request->boolean('ifirma_already_paid')) {
@@ -400,13 +414,21 @@ class BankStatementImportController extends Controller
                 IfirmaInvoicePaymentStatusService::STATUS_PAID
             );
 
-            return $this->redirectAfterReview($request, $bankImport, $message);
+            return $this->withRecoveredOverdueNotice(
+                $this->redirectAfterReview($request, $bankImport, $message),
+                $recoveredOverdueReport,
+                $accepted
+            );
         }
 
-        return $this->redirectAfterReview(
-            $request,
-            $bankImport,
-            $message.' Status iFirma nie został zmieniony (akceptacja tylko lokalna).'
+        return $this->withRecoveredOverdueNotice(
+            $this->redirectAfterReview(
+                $request,
+                $bankImport,
+                $message.' Status iFirma nie został zmieniony (akceptacja tylko lokalna).'
+            ),
+            $recoveredOverdueReport,
+            $accepted
         );
     }
 
@@ -416,7 +438,8 @@ class BankStatementImportController extends Controller
         BankTransaction $transaction,
         BankStatementImportService $importService,
         IfirmaInvoicePaymentRegistrationService $paymentRegistration,
-        DebtCaseAutoCloseService $autoClose
+        DebtCaseAutoCloseService $autoClose,
+        RecoveredOverduePaymentReportService $recoveredOverdueReport
     ) {
         if ((int) $transaction->bank_statement_import_id !== (int) $bankImport->id) {
             abort(404);
@@ -450,10 +473,14 @@ class BankStatementImportController extends Controller
         );
 
         if (! $request->boolean('register_ifirma_payment')) {
-            return $this->redirectAfterReview(
-                $request,
-                $bankImport,
-                $message.' Status iFirma nie został zmieniony (akceptacja tylko lokalna).'
+            return $this->withRecoveredOverdueNotice(
+                $this->redirectAfterReview(
+                    $request,
+                    $bankImport,
+                    $message.' Status iFirma nie został zmieniony (akceptacja tylko lokalna).'
+                ),
+                $recoveredOverdueReport,
+                $accepted
             );
         }
 
@@ -497,7 +524,11 @@ class BankStatementImportController extends Controller
             $message .= sprintf(' Zarejestrowano wpłaty w iFirma: %d/%d.', $ifirmaOk, count($accepted));
         }
 
-        $redirect = $this->redirectAfterReview($request, $bankImport, $message);
+        $redirect = $this->withRecoveredOverdueNotice(
+            $this->redirectAfterReview($request, $bankImport, $message),
+            $recoveredOverdueReport,
+            $accepted
+        );
 
         if ($ifirmaFail !== []) {
             $redirect->with(
@@ -1015,7 +1046,8 @@ class BankStatementImportController extends Controller
         BankTransaction $transaction,
         BankStatementImportService $importService,
         IfirmaInvoicePaymentRegistrationService $paymentRegistration,
-        DebtCaseAutoCloseService $autoClose
+        DebtCaseAutoCloseService $autoClose,
+        RecoveredOverduePaymentReportService $recoveredOverdueReport
     ) {
         if ((int) $transaction->bank_statement_import_id !== (int) $bankImport->id) {
             abort(404);
@@ -1081,11 +1113,15 @@ class BankStatementImportController extends Controller
             } catch (\Throwable $e) {
                 report($e);
 
-                return $this->redirectAfterReview(
-                    $request,
-                    $bankImport,
-                    $message.' Akceptacja lokalna OK.'
-                )->with('warning', 'Wpłata w iFirma nie przeszła: '.$e->getMessage());
+                return $this->withRecoveredOverdueNotice(
+                    $this->redirectAfterReview(
+                        $request,
+                        $bankImport,
+                        $message.' Akceptacja lokalna OK.'
+                    )->with('warning', 'Wpłata w iFirma nie przeszła: '.$e->getMessage()),
+                    $recoveredOverdueReport,
+                    $accepted
+                );
             }
 
             if ($paymentResult['success']) {
@@ -1097,20 +1133,32 @@ class BankStatementImportController extends Controller
                     $paymentResult['status'] ?? null
                 );
 
-                return $this->redirectAfterReview($request, $bankImport, $message);
+                return $this->withRecoveredOverdueNotice(
+                    $this->redirectAfterReview($request, $bankImport, $message),
+                    $recoveredOverdueReport,
+                    $accepted
+                );
             }
 
-            return $this->redirectAfterReview(
-                $request,
-                $bankImport,
-                $message.' Akceptacja lokalna OK.'
-            )->with('warning', 'Wpłata w iFirma nie przeszła: '.$paymentResult['message']);
+            return $this->withRecoveredOverdueNotice(
+                $this->redirectAfterReview(
+                    $request,
+                    $bankImport,
+                    $message.' Akceptacja lokalna OK.'
+                )->with('warning', 'Wpłata w iFirma nie przeszła: '.$paymentResult['message']),
+                $recoveredOverdueReport,
+                $accepted
+            );
         }
 
-        return $this->redirectAfterReview(
-            $request,
-            $bankImport,
-            $message.' Status iFirma nie został zmieniony (powiązanie tylko lokalne).'
+        return $this->withRecoveredOverdueNotice(
+            $this->redirectAfterReview(
+                $request,
+                $bankImport,
+                $message.' Status iFirma nie został zmieniony (powiązanie tylko lokalne).'
+            ),
+            $recoveredOverdueReport,
+            $accepted
         );
     }
 
@@ -1188,6 +1236,18 @@ class BankStatementImportController extends Controller
         return redirect()
             ->route('accounting.bank-imports.show', $this->reviewRedirectParams($request, $import))
             ->with('success', $message);
+    }
+
+    private function withRecoveredOverdueNotice(
+        $redirect,
+        RecoveredOverduePaymentReportService $reportService,
+        BankTransactionMatch|array $matches
+    ) {
+        $payload = $reportService->sessionPayloadForMatches(is_array($matches) ? $matches : [$matches]);
+
+        return $payload
+            ? $redirect->with(RecoveredOverduePaymentReportService::SESSION_KEY, $payload)
+            : $redirect;
     }
 
     /**
