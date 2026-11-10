@@ -111,6 +111,41 @@ class GrowthOsDirectionWorkspaceAiTest extends TestCase
         $this->assertSame(DirectionPlanningTask::MODE_GENERATE, $project['direction_ai_proposal']['mode']);
     }
 
+    public function test_direction_ai_strips_unexpected_urls_instead_of_failing(): void
+    {
+        $user = $this->superAdmin();
+        $this->createProject($user);
+
+        $this->provider->payload = [
+            ...$this->provider->payload,
+            'why_now' => "Narzędzie jest aktualne.\nWięcej: https://random-tool.example/docs\nwww.spam.pl/x",
+            'audience' => 'Nauczyciele przedmiotowi — https://evil.example/page',
+            'problem' => 'Brak czasu na research.',
+            'takeaway' => 'Uczestnik ułoży prosty proces.',
+            'change_summary' => 'Kierunek bez zbędnych linków.',
+            'title_suggestions' => ['Tytuł bez linku', 'Tytuł z https://bad.example/t'],
+        ];
+
+        $this->actingAs($user)
+            ->post(route('growth.projects.direction.ai', DemoTikWebinarProject::PROJECT_ID), $this->revisePayload([
+                'planning_mode' => DirectionPlanningTask::MODE_GENERATE,
+            ]))
+            ->assertRedirect(route('growth.projects.show', DemoTikWebinarProject::PROJECT_ID).'#direction')
+            ->assertSessionHas('success');
+
+        $proposal = DemoTikWebinarProject::project()['direction_ai_proposal'];
+        $this->assertStringNotContainsString('https://random-tool.example', $proposal['direction']['why_now']);
+        $this->assertStringNotContainsString('www.spam.pl', $proposal['direction']['why_now']);
+        $this->assertStringNotContainsString('https://evil.example', $proposal['direction']['audience']);
+        $this->assertStringContainsString('Narzędzie jest aktualne.', $proposal['direction']['why_now']);
+        $this->assertStringContainsString('Nauczyciele przedmiotowi', $proposal['direction']['audience']);
+        $this->assertContains('Tytuł bez linku', $proposal['title_suggestions']);
+        foreach ($proposal['title_suggestions'] as $suggestion) {
+            $this->assertStringNotContainsString('https://', $suggestion);
+            $this->assertStringNotContainsString('www.', $suggestion);
+        }
+    }
+
     public function test_applied_ai_origin_stays_visible_after_direction_approval(): void
     {
         $user = $this->superAdmin();

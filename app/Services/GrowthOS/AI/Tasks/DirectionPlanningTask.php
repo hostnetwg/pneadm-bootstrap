@@ -265,18 +265,21 @@ PROMPT;
             throw GrowthAiException::invalidResponse('unexpected_fields');
         }
 
-        $workingTopic = trim((string) $response->payload['working_topic']);
+        $workingTopic = $this->scrubDisallowedUrls(trim((string) $response->payload['working_topic']), $input);
         $direction = [
-            'why_now' => AiListFormatter::lineBreaks((string) $response->payload['why_now']),
-            'audience' => AiListFormatter::lineBreaks((string) $response->payload['audience']),
-            'problem' => AiListFormatter::lineBreaks((string) $response->payload['problem']),
-            'takeaway' => AiListFormatter::lineBreaks((string) $response->payload['takeaway']),
+            'why_now' => $this->scrubDisallowedUrls(AiListFormatter::lineBreaks((string) $response->payload['why_now']), $input),
+            'audience' => $this->scrubDisallowedUrls(AiListFormatter::lineBreaks((string) $response->payload['audience']), $input),
+            'problem' => $this->scrubDisallowedUrls(AiListFormatter::lineBreaks((string) $response->payload['problem']), $input),
+            'takeaway' => $this->scrubDisallowedUrls(AiListFormatter::lineBreaks((string) $response->payload['takeaway']), $input),
             'sell_later' => trim((string) $response->payload['sell_later']),
         ];
-        $changeSummary = AiListFormatter::lineBreaks((string) $response->payload['change_summary']);
+        $changeSummary = $this->scrubDisallowedUrls(
+            AiListFormatter::lineBreaks((string) $response->payload['change_summary']),
+            $input,
+        );
         $suggestions = [];
         foreach ($response->payload['title_suggestions'] as $suggestion) {
-            $suggestion = trim((string) $suggestion);
+            $suggestion = $this->scrubDisallowedUrls(trim((string) $suggestion), $input);
             if ($suggestion !== '') {
                 $suggestions[] = $suggestion;
             }
@@ -310,12 +313,23 @@ PROMPT;
     /**
      * @param  array<string, mixed>  $input
      */
+    private function scrubDisallowedUrls(string $text, array $input): string
+    {
+        $allowedUrls = ProhibitedData::urls(json_encode($input, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR));
+
+        return ProhibitedData::replaceDisallowedUrls($text, $allowedUrls, '');
+    }
+
+    /**
+     * @param  array<string, mixed>  $input
+     */
     private function assertSafeOutput(string $output, array $input): void
     {
         if (ProhibitedData::containsIgnoringDates($output)) {
             throw GrowthAiException::invalidResponse('prohibited_output_data');
         }
 
+        // Unexpected URLs are scrubbed earlier. Remaining URLs must already be allow-listed in the input.
         $allowedUrls = ProhibitedData::urls(json_encode($input, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR));
         foreach (ProhibitedData::urls($output) as $url) {
             if (! in_array($url, $allowedUrls, true)) {

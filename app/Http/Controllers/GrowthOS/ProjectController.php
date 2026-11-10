@@ -156,11 +156,16 @@ class ProjectController extends Controller
                 $inherit,
             );
         } catch (GrowthAiException $exception) {
-            $message = $exception->errorType === 'web_search_missing' || $exception->userMessage === GrowthAiException::RESEARCH_FAILED_MESSAGE
-                ? GrowthAiException::RESEARCH_FAILED_MESSAGE
-                : ($exception->userMessage === GrowthAiException::INVALID_RESPONSE_MESSAGE
-                    ? 'Nie udało się przygotować poprawnej propozycji AI. Możesz przygotować kierunek ręcznie.'
-                    : $exception->userMessage);
+            $message = match ($exception->errorType) {
+                'web_search_missing' => GrowthAiException::RESEARCH_FAILED_MESSAGE,
+                'incomplete_output', 'invalid_json', 'missing_output_text' => 'AI nie dokończyło odpowiedzi kierunku. Spróbuj wyższy wysiłek w ⚙ albo ponów. Możesz też przygotować kierunek ręcznie.',
+                'unexpected_url' => 'AI wstawiło niedozwolony adres URL do kierunku. Spróbuj ponownie. Możesz też przygotować kierunek ręcznie.',
+                default => $exception->userMessage === GrowthAiException::RESEARCH_FAILED_MESSAGE
+                    ? GrowthAiException::RESEARCH_FAILED_MESSAGE
+                    : ($exception->userMessage === GrowthAiException::INVALID_RESPONSE_MESSAGE
+                        ? 'Nie udało się przygotować poprawnej propozycji AI. Możesz przygotować kierunek ręcznie.'
+                        : $exception->userMessage),
+            };
 
             return $back->with('error', $message);
         }
@@ -434,11 +439,16 @@ class ProjectController extends Controller
                 $inherit,
             );
         } catch (GrowthAiException $exception) {
-            $message = $exception->errorType === 'web_search_missing' || $exception->userMessage === GrowthAiException::RESEARCH_FAILED_MESSAGE
-                ? GrowthAiException::RESEARCH_FAILED_MESSAGE
-                : ($exception->userMessage === GrowthAiException::INVALID_RESPONSE_MESSAGE
-                    ? 'Nie udało się przygotować poprawnej propozycji AI. Możesz przygotować kierunek ręcznie.'
-                    : $exception->userMessage);
+            $message = match ($exception->errorType) {
+                'web_search_missing' => GrowthAiException::RESEARCH_FAILED_MESSAGE,
+                'incomplete_output', 'invalid_json', 'missing_output_text' => 'AI nie dokończyło odpowiedzi kierunku. Spróbuj wyższy wysiłek w ⚙ albo ponów. Możesz też przygotować kierunek ręcznie.',
+                'unexpected_url' => 'AI wstawiło niedozwolony adres URL do kierunku. Spróbuj ponownie. Możesz też przygotować kierunek ręcznie.',
+                default => $exception->userMessage === GrowthAiException::RESEARCH_FAILED_MESSAGE
+                    ? GrowthAiException::RESEARCH_FAILED_MESSAGE
+                    : ($exception->userMessage === GrowthAiException::INVALID_RESPONSE_MESSAGE
+                        ? 'Nie udało się przygotować poprawnej propozycji AI. Możesz przygotować kierunek ręcznie.'
+                        : $exception->userMessage),
+            };
 
             return $back->with('error', $message);
         }
