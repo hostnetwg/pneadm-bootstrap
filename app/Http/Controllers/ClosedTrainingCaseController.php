@@ -723,12 +723,16 @@ class ClosedTrainingCaseController extends Controller
             'share_contacts' => ['nullable', 'boolean'],
             'update_waiting_on' => ['nullable', 'boolean'],
             'suggested_waiting_on' => ['nullable', Rule::in(array_keys(ClosedTrainingCase::waitingOnOptions()))],
+            'certificate_link_days' => ['nullable', 'integer', 'min:1', 'max:'.ClosedTrainingCase::SCHOOL_CERTIFICATE_LINK_MAX_DAYS],
         ], [
             'email_subject.required' => 'Podaj temat wiadomości.',
             'email_body.required' => 'Wpisz treść wiadomości.',
             'send_mode.required' => 'Wybierz tryb wysyłki.',
             'email_recipients.*.in' => 'Wybierz adres spośród zapisanych przy sprawie.',
             'test_recipient.in' => 'Wybierz dozwolony adres testowy.',
+            'certificate_link_days.integer' => 'Podaj liczbę dni ważności linku.',
+            'certificate_link_days.min' => 'Link musi być ważny co najmniej 1 dzień.',
+            'certificate_link_days.max' => 'Link może być ważny najwyżej '.ClosedTrainingCase::SCHOOL_CERTIFICATE_LINK_MAX_DAYS.' dni.',
         ]);
 
         $sendMode = $data['send_mode'];
@@ -795,7 +799,18 @@ class ClosedTrainingCaseController extends Controller
         }
 
         $subject = $closedTrainingCase->withCaseReferenceInSubject($data['email_subject']);
-        $body = ClosedTrainingCase::sanitizeSchoolEmailHtml($data['email_body']);
+        $linkToken = null;
+        $linkDays = null;
+        $bodySource = $data['email_body'];
+        if ($isThankYou && $sendMode === 'school' && ! $isTest) {
+            $linkDays = (int) ($data['certificate_link_days'] ?? ClosedTrainingCase::SCHOOL_CERTIFICATE_LINK_DEFAULT_DAYS);
+            $currentToken = $closedTrainingCase->schoolCertificateToken();
+            $pending = $closedTrainingCase->hasSchoolCertificateToken()
+                && $closedTrainingCase->school_certificate_token_expires_at === null;
+            $linkToken = $pending ? $currentToken : bin2hex(random_bytes(32));
+            $bodySource = $this->thankYouBodyWithLink($bodySource, $linkToken, $linkDays);
+        }
+        $body = ClosedTrainingCase::sanitizeSchoolEmailHtml($bodySource);
 
         if ($body === '' || trim(strip_tags($body)) === '') {
             throw ValidationException::withMessages([
@@ -815,6 +830,13 @@ class ClosedTrainingCaseController extends Controller
                 ->route('closed-training-cases.show', $closedTrainingCase)
                 ->withInput()
                 ->with('error', 'Nie udało się wysłać e-maila. Sprawa i historia nie zostały zmienione.');
+        }
+
+        if ($linkToken !== null && $linkDays !== null) {
+            $closedTrainingCase->forceFill([
+                'school_certificate_token' => $linkToken,
+                'school_certificate_token_expires_at' => now()->addDays($linkDays),
+            ])->save();
         }
 
         $kind = match (true) {
@@ -1081,5 +1103,26 @@ class ClosedTrainingCaseController extends Controller
         }
 
         return $value;
+    }
+
+    private function thankYouBodyWithLink(string $body, string $token, int $days): string
+    {
+        $url = $this->thankYouEmailBuilder->publicUrl($token);
+        $body = preg_replace(
+            '#https?://[^\s"\'<>]+/szkolenie-zamkniete/zaswiadczenia/[a-f0-9]{64}#i',
+            $url,
+            $body
+        ) ?? $body;
+        $body = preg_replace(
+            '/Link wygaśnie za \d+ (?:dzień|dni)\. Proszę o pobranie zaświadczeń przed tym terminem\./u',
+            ClosedTrainingCase::schoolCertificateExpirySentence($days),
+            $body
+        ) ?? $body;
+
+        return preg_replace(
+            '/Link jest ważny do \d{2}\.\d{2}\.\d{4} r\. Po tej dacie albo po unieważnieniu na karcie sprawy przestanie działać\./u',
+            ClosedTrainingCase::schoolCertificateValidUntilSentence($days),
+            $body
+        ) ?? $body;
     }
 }

@@ -41,22 +41,29 @@ class ClosedTrainingCaseThankYouEmailBuilder
             ];
         }
 
-        $token = $case->ensureSchoolCertificateToken();
+        $token = $case->rotateSchoolCertificateToken();
         $case->refresh();
         $url = $this->publicUrl($token);
         $title = $this->trainingTitle($case, $course);
         $when = $this->scheduleLabel($course);
         $rows = $this->participantRows($course);
-        $validUntil = $case->formatLocal($case->school_certificate_token_expires_at, 'd.m.Y') ?? '';
+        $days = ClosedTrainingCase::SCHOOL_CERTIFICATE_LINK_DEFAULT_DAYS;
+        $expiry = e(ClosedTrainingCase::schoolCertificateExpirySentence($days));
+        $validUntil = e(ClosedTrainingCase::schoolCertificateValidUntilSentence($days));
+        $safeUrl = e($url);
 
         $html = '<p style="margin:0;">Dzień dobry,<br><br>'
             .'dziękujemy za skorzystanie z oferty Platformy Nowoczesnej Edukacji oraz za udział Państwa placówki w szkoleniu <strong>'.e($title).'</strong>'
             .($when !== '' ? ' ('.e($when).')' : '')
             .'.<br><br>'
-            .'Poniżej lista uczestników zapisanych na to szkolenie. Przy każdej osobie widać, czy link do zaświadczenia został wysłany na jej e-mail oraz czy zaświadczenie zostało już pobrane. '
-            .'Aktualny stan jest też na stronie do pobrania: <a href="'.e($url).'">'.e($url).'</a></p>'
+            .'Poniżej lista uczestników zapisanych na to szkolenie. Przy każdej osobie widać, czy link do zaświadczenia został wysłany na jej e-mail. '
+            .'Czy uczestnik już pobrał zaświadczenie, widać na stronie do pobrania — tam stan jest aktualny: <a href="'.$safeUrl.'">'.$safeUrl.'</a><br>'
+            .$expiry.'<br>'
+            .'<span style="color:#dc3545;">'.$validUntil.'</span></p>'
+            .'<p>Po pobraniu wszystkich zaświadczeń możesz od razu unieważnić ten link wyświetlający listę uczestników. '
+            .'Przycisk jest na stronie pobierania. Samo otwarcie tej wiadomości linku nie wyłącza. '
+            .'<strong><a href="'.$safeUrl.'#uniewaznij-link">Unieważnij link do listy uczestników</a></strong></p>'
             .$this->participantTableHtml($rows)
-            .'<p>Link jest ważny do '.e((string) $validUntil).' r. Po tej dacie albo po unieważnieniu na karcie sprawy przestanie działać.</p>'
             .'<p>Wydrukowane zaświadczenia można przekazać nauczycielom. Pobranie pliku przez szkołę nie zmienia informacji, czy uczestnik sam pobrał zaświadczenie.</p>'
             .$this->signatureHtml();
 
@@ -180,7 +187,6 @@ class ClosedTrainingCaseThankYouEmailBuilder
             .'<th align="left">Lp</th>'
             .'<th align="left">Uczestnik</th>'
             .'<th align="left">Link do zaświadczenia</th>'
-            .'<th align="left">Pobranie przez uczestnika</th>'
             .'</tr></thead><tbody>';
 
         foreach ($rows as $index => $row) {
@@ -192,7 +198,6 @@ class ClosedTrainingCaseThankYouEmailBuilder
                 .'<td>'.($index + 1).'</td>'
                 .'<td>'.$who.'</td>'
                 .'<td>'.$this->statusCell($row['link_sent'], 'wysłany na e-mail', 'nie wysłany').'</td>'
-                .'<td>'.$this->statusCell($row['downloaded'], 'pobrane', 'nie pobrane').'</td>'
                 .'</tr>';
         }
 

@@ -466,12 +466,16 @@
                                             <i class="bi bi-envelope me-1" aria-hidden="true"></i>Przygotuj e-mail z podziękowaniem
                                         </button>
                                     </form>
-                                    <p class="form-text mb-0 mt-2">Wstawi podziękowanie, listę uczestników oraz link do pobrania zaświadczeń tylko tego szkolenia. Link działa 2 miesiące. Treść można poprawić przed wysłaniem.</p>
+                                    <p class="form-text mb-0 mt-2">Wstawi podziękowanie, listę uczestników oraz link do pobrania zaświadczeń tylko tego szkolenia. Nad tematem ustawisz, ile dni link ma działać od wysłania (domyślnie 7). Każde kolejne przygotowanie wyłącza poprzedni link. Nowy zaczyna działać po wysłaniu do szkoły.</p>
                                 @elseif($case->course && strtolower((string) ($case->course->type ?? '')) === 'online' && ! $case->course->hasEnded())
                                     <p class="form-text mb-0 mt-3">E-mail z podziękowaniem i listą uczestników będzie dostępny po zakończeniu szkolenia online.</p>
                                 @endif
-                                @if($case->schoolCertificateLinkIsActive())
-                                    <p class="form-text mb-2 mt-3">Link dla szkoły jest ważny do {{ $case->formatLocal($case->school_certificate_token_expires_at, 'd.m.Y') }} r.</p>
+                                @if($case->hasSchoolCertificateToken())
+                                    @if($case->schoolCertificateLinkIsActive())
+                                        <p class="form-text mb-2 mt-3">Link dla szkoły jest ważny do {{ $case->formatLocal($case->school_certificate_token_expires_at, 'd.m.Y') }} r. Kolejny e-mail z podziękowaniem wyłączy go.</p>
+                                    @else
+                                        <p class="form-text mb-2 mt-3">Link jest w treści e-maila i zacznie działać po wysłaniu do szkoły.</p>
+                                    @endif
                                     <button type="button" class="btn btn-outline-danger btn-sm" data-bs-toggle="modal" data-bs-target="#closedTrainingCaseRevokeCertificatesModal">
                                         Unieważnij link do zaświadczeń
                                     </button>
@@ -827,6 +831,15 @@
                                             <div class="form-text">Ułatwia ustalenie terminu, ale strony mogą dogadać się poza PNE. Ceny i tak nie wysyłamy trenerowi.</div>
                                         </div>
                                     @endunless
+
+                                    @if($emailIntent === 'thank_you')
+                                        <div class="mb-3">
+                                            <label for="certificate_link_days" class="form-label">Ważność linku do zaświadczeń (dni od wysłania)</label>
+                                            <input type="number" name="certificate_link_days" id="certificate_link_days" value="{{ old('certificate_link_days', \App\Models\ClosedTrainingCase::SCHOOL_CERTIFICATE_LINK_DEFAULT_DAYS) }}" min="1" max="{{ \App\Models\ClosedTrainingCase::SCHOOL_CERTIFICATE_LINK_MAX_DAYS }}" required class="form-control @error('certificate_link_days') is-invalid @enderror" style="max-width: 8rem;">
+                                            @error('certificate_link_days')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                            <div class="form-text">Domyślnie 7 dni. Odliczanie startuje w chwili wysłania do szkoły. Każdy kolejny taki e-mail wyłącza poprzedni link. Zdanie przy linku w treści podąża za tą liczbą.</div>
+                                        </div>
+                                    @endif
 
                                     <div class="mb-3">
                                         <label for="email_subject" class="form-label">Temat</label>
@@ -1332,6 +1345,30 @@
                 if (field) {
                     field.value = html;
                 }
+            }
+
+            const certificateLinkDays = document.getElementById('certificate_link_days');
+            if (certificateLinkDays) {
+                const applyCertificateLinkDays = function () {
+                    const days = parseInt(certificateLinkDays.value, 10);
+                    if (!days || days < 1) {
+                        return;
+                    }
+                    const sentence = 'Link wygaśnie za ' + days + ' ' + (days === 1 ? 'dzień' : 'dni') + '. Proszę o pobranie zaświadczeń przed tym terminem.';
+                    const until = new Date();
+                    until.setDate(until.getDate() + days);
+                    const pad = function (value) {
+                        return String(value).padStart(2, '0');
+                    };
+                    const dated = 'Link jest ważny do ' + pad(until.getDate()) + '.' + pad(until.getMonth() + 1) + '.' + until.getFullYear() + ' r. Po tej dacie albo po unieważnieniu na karcie sprawy przestanie działać.';
+                    const html = readEmailHtml();
+                    let next = html.replace(/Link wygaśnie za \d+ (?:dzień|dni)\. Proszę o pobranie zaświadczeń przed tym terminem\./, sentence);
+                    next = next.replace(/Link jest ważny do \d{2}\.\d{2}\.\d{4} r\. Po tej dacie albo po unieważnieniu na karcie sprawy przestanie działać\./, dated);
+                    if (next !== html) {
+                        writeEmailHtml(next);
+                    }
+                };
+                certificateLinkDays.addEventListener('input', applyCertificateLinkDays);
             }
 
             function bindOrderFormNoticeToggle() {

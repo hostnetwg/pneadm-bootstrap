@@ -153,10 +153,23 @@ class ClosedTrainingCase extends Model
         return $this->hasOne(Course::class, 'closed_training_case_id');
     }
 
+    public const SCHOOL_CERTIFICATE_LINK_DEFAULT_DAYS = 7;
+
+    public const SCHOOL_CERTIFICATE_LINK_MAX_DAYS = 365;
+
+    public function hasSchoolCertificateToken(): bool
+    {
+        return preg_match('/^[a-f0-9]{64}$/', $this->schoolCertificateToken()) === 1;
+    }
+
+    public function schoolCertificateToken(): string
+    {
+        return strtolower(trim((string) $this->school_certificate_token));
+    }
+
     public function schoolCertificateLinkIsActive(): bool
     {
-        $token = strtolower(trim((string) $this->school_certificate_token));
-        if (preg_match('/^[a-f0-9]{64}$/', $token) !== 1) {
+        if (! $this->hasSchoolCertificateToken()) {
             return false;
         }
 
@@ -164,19 +177,31 @@ class ClosedTrainingCase extends Model
             && $this->school_certificate_token_expires_at->isFuture();
     }
 
-    public function ensureSchoolCertificateToken(): string
+    public function rotateSchoolCertificateToken(): string
     {
-        if ($this->schoolCertificateLinkIsActive()) {
-            return strtolower(trim((string) $this->school_certificate_token));
-        }
-
         $token = bin2hex(random_bytes(32));
         $this->forceFill([
             'school_certificate_token' => $token,
-            'school_certificate_token_expires_at' => now()->addMonths(2),
+            'school_certificate_token_expires_at' => null,
         ])->save();
 
         return $token;
+    }
+
+    public static function schoolCertificateExpirySentence(int $days): string
+    {
+        $days = max(1, min(self::SCHOOL_CERTIFICATE_LINK_MAX_DAYS, $days));
+        $unit = $days === 1 ? 'dzień' : 'dni';
+
+        return 'Link wygaśnie za '.$days.' '.$unit.'. Proszę o pobranie zaświadczeń przed tym terminem.';
+    }
+
+    public static function schoolCertificateValidUntilSentence(int $days): string
+    {
+        $days = max(1, min(self::SCHOOL_CERTIFICATE_LINK_MAX_DAYS, $days));
+        $date = now()->timezone('Europe/Warsaw')->addDays($days)->format('d.m.Y');
+
+        return 'Link jest ważny do '.$date.' r. Po tej dacie albo po unieważnieniu na karcie sprawy przestanie działać.';
     }
 
     public function revokeSchoolCertificateLink(): bool

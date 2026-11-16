@@ -2255,26 +2255,41 @@ class ClosedTrainingCaseTest extends TestCase
         $this->assertStringContainsString('Podziękowanie za szkolenie', $draft['subject']);
         $this->assertStringContainsString('Anna Kowalska', $draft['body']);
         $this->assertStringContainsString('anna.kowalska@example.com', $draft['body']);
-        $this->assertStringContainsString('Pobranie przez uczestnika', $draft['body']);
+        $this->assertStringNotContainsString('Pobranie przez uczestnika', $draft['body']);
         $this->assertStringContainsString('<span style="color:#0d6efd;">wysłany na e-mail</span>', $draft['body']);
-        $this->assertStringContainsString('<span style="color:#0d6efd;">pobrane</span>', $draft['body']);
         $this->assertStringContainsString('nie wysłany', $draft['body']);
         $this->assertStringContainsString('Jan Nowak', $draft['body']);
-        $this->assertStringContainsString('nie pobrane', $draft['body']);
+        $this->assertStringNotContainsString('nie pobrane', $draft['body']);
 
         $token = (string) $case->fresh()->school_certificate_token;
         $this->assertSame(64, strlen($token));
-        $this->assertTrue($case->fresh()->school_certificate_token_expires_at?->greaterThan(now()->addMonths(2)->subHour()) ?? false);
+        $this->assertNull($case->fresh()->school_certificate_token_expires_at);
         $this->assertStringContainsString(
-            'Aktualny stan jest też na stronie do pobrania: <a href="https://pnedu.pl/szkolenie-zamkniete/zaswiadczenia/'.$token.'">',
+            'Czy uczestnik już pobrał zaświadczenie, widać na stronie do pobrania — tam stan jest aktualny: <a href="https://pnedu.pl/szkolenie-zamkniete/zaswiadczenia/'.$token.'">',
             $draft['body']
         );
-        $this->assertStringContainsString('Link jest ważny do', $draft['body']);
+        $this->assertStringContainsString(
+            'Link wygaśnie za 7 dni. Proszę o pobranie zaświadczeń przed tym terminem.',
+            $draft['body']
+        );
+        $validUntil = now()->timezone('Europe/Warsaw')->addDays(7)->format('d.m.Y');
+        $this->assertStringContainsString(
+            '<span style="color:#dc3545;">Link jest ważny do '.$validUntil.' r. Po tej dacie albo po unieważnieniu na karcie sprawy przestanie działać.</span>',
+            $draft['body']
+        );
+        $this->assertStringContainsString($token.'#uniewaznij-link', $draft['body']);
+
+        $this->actingAs($user)
+            ->get(route('closed-training-cases.show', $case))
+            ->assertOk()
+            ->assertSee('name="certificate_link_days"', false)
+            ->assertSee('value="7"', false);
 
         $this->actingAs($user)
             ->post(route('closed-training-cases.email.prepare-thank-you', $case))
             ->assertRedirect(route('closed-training-cases.show', $case).'#closed-training-case-email');
-        $this->assertSame($token, $case->fresh()->school_certificate_token);
+        $this->assertNotSame($token, $case->fresh()->school_certificate_token);
+        $this->assertNull($case->fresh()->school_certificate_token_expires_at);
 
         $this->actingAs($user)
             ->post(route('closed-training-cases.email.revoke-school-certificates', $case))
@@ -2298,14 +2313,51 @@ class ClosedTrainingCaseTest extends TestCase
                 'send_mode' => 'school',
                 'email_recipients' => ['szkola@example.com'],
                 'email_intent' => 'thank_you',
+                'certificate_link_days' => 7,
             ])
             ->assertRedirect(route('closed-training-cases.show', $case))
             ->assertSessionHas('success');
 
         $case->refresh();
+        $this->assertSame($renewed, $case->school_certificate_token);
+        $this->assertTrue($case->school_certificate_token_expires_at?->between(
+            now()->addDays(7)->subMinute(),
+            now()->addDays(7)->addMinute()
+        ) ?? false);
         $this->assertSame(ClosedTrainingCase::STATUS_IN_PROGRESS, $case->status);
-        $event = $case->events()->where('event_type', ClosedTrainingCaseEvent::TYPE_EMAIL_SENT)->latest('id')->first();
+        $event = $case->events()->reorder()->where('event_type', ClosedTrainingCaseEvent::TYPE_EMAIL_SENT)->latest('id')->first();
         $this->assertStringContainsString('E-mail: podziękowanie i zaświadczenia', (string) $event?->body);
+        $this->assertStringContainsString(
+            'https://pnedu.pl/szkolenie-zamkniete/zaswiadczenia/'.$renewed,
+            (string) $event?->body
+        );
+        $this->assertStringContainsString('Link wygaśnie za 7 dni. Proszę o pobranie zaświadczeń przed tym terminem.', (string) $event?->body);
+
+        $this->actingAs($user)
+            ->post(route('closed-training-cases.email.send', $case), [
+                'email_subject' => $draft['subject'],
+                'email_body' => (string) $event?->body,
+                'send_mode' => 'school',
+                'email_recipients' => ['szkola@example.com'],
+                'email_intent' => 'thank_you',
+                'certificate_link_days' => 3,
+            ])
+            ->assertRedirect(route('closed-training-cases.show', $case))
+            ->assertSessionHas('success');
+
+        $case->refresh();
+        $this->assertNotSame($renewed, $case->school_certificate_token);
+        $this->assertTrue($case->school_certificate_token_expires_at?->between(
+            now()->addDays(3)->subMinute(),
+            now()->addDays(3)->addMinute()
+        ) ?? false);
+        $resent = $case->events()->reorder()->where('event_type', ClosedTrainingCaseEvent::TYPE_EMAIL_SENT)->latest('id')->first();
+        $this->assertStringContainsString('Link wygaśnie za 3 dni. Proszę o pobranie zaświadczeń przed tym terminem.', (string) $resent?->body);
+        $this->assertStringContainsString(
+            'Link jest ważny do '.now()->timezone('Europe/Warsaw')->addDays(3)->format('d.m.Y').' r.',
+            (string) $resent?->body
+        );
+        $this->assertStringContainsString((string) $case->school_certificate_token, (string) $resent?->body);
 
         $course->update(['type' => 'offline']);
         $this->actingAs($user)
