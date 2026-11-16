@@ -2208,7 +2208,12 @@ class ClosedTrainingCaseTest extends TestCase
 
         $this->assertNull($case->fresh()->school_certificate_token);
 
-        $course->update(['end_date' => now()->subHour()]);
+        $registrationToken = str_repeat('a', 64);
+        $course->update([
+            'end_date' => now()->subHour(),
+            'certificate_registration_open' => true,
+            'certificate_registration_token' => $registrationToken,
+        ]);
 
         $sent = Participant::query()->create([
             'course_id' => $course->id,
@@ -2278,6 +2283,17 @@ class ClosedTrainingCaseTest extends TestCase
             $draft['body']
         );
         $this->assertStringContainsString($token.'#uniewaznij-link', $draft['body']);
+        $this->assertStringContainsString('Wydrukowane zaświadczenia można przekazać nauczycielom.', $draft['body']);
+        $this->assertStringNotContainsString('nie zmienia informacji', $draft['body']);
+        $this->assertStringContainsString(
+            'Jeżeli lista zawiera błędy lub nie jest kompletna, proszę o informację w odpowiedzi na tę wiadomość.',
+            $draft['body']
+        );
+        $this->assertStringContainsString(
+            'https://pnedu.pl/certificate-registration/'.$registrationToken,
+            $draft['body']
+        );
+        $this->assertStringNotContainsString('kSGCWWmQze6cdEty59IG11ME7YiZOB3KxQDNWkNXvuepkQH5bkYKXuLRoyzcxqpi', $draft['body']);
 
         $this->actingAs($user)
             ->get(route('closed-training-cases.show', $case))
