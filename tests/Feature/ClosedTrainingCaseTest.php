@@ -2279,7 +2279,9 @@ class ClosedTrainingCaseTest extends TestCase
             '<span style="color:#dc3545;">Link jest ważny do '.$validUntil.' r. Po tej dacie albo po unieważnieniu na karcie sprawy przestanie działać.</span>',
             $draft['body']
         );
-        $this->assertStringContainsString($token.'#uniewaznij-link', $draft['body']);
+        $this->assertStringNotContainsString('Samo otwarcie tej wiadomości', $draft['body']);
+        $this->assertStringNotContainsString('Unieważnij link do listy uczestników', $draft['body']);
+        $this->assertStringNotContainsString('#uniewaznij-link', $draft['body']);
         $this->assertStringContainsString('Wydrukowane zaświadczenia można przekazać nauczycielom.', $draft['body']);
         $this->assertStringNotContainsString('nie zmienia informacji', $draft['body']);
         $this->assertStringContainsString(

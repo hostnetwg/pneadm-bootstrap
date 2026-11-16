@@ -61,8 +61,7 @@ class ClosedTrainingCaseThankYouEmailBuilder
             .$expiry.'<br>'
             .'<span style="color:#dc3545;">'.$validUntil.'</span></p>'
             .'<p>Po pobraniu wszystkich zaświadczeń możesz od razu unieważnić ten link wyświetlający listę uczestników. '
-            .'Przycisk jest na stronie pobierania. Samo otwarcie tej wiadomości linku nie wyłącza. '
-            .'<strong><a href="'.$safeUrl.'#uniewaznij-link">Unieważnij link do listy uczestników</a></strong></p>'
+            .'Przycisk jest na stronie pobierania.</p>'
             .$this->participantTableHtml($rows)
             .'<p>Wydrukowane zaświadczenia można przekazać nauczycielom.</p>'
             .'<p>Jeżeli lista zawiera błędy lub nie jest kompletna, proszę o informację w odpowiedzi na tę wiadomość. Niezbędne dane to: imię, nazwisko, e-mail, data i miejsce urodzenia.</p>'
