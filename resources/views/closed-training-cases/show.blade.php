@@ -466,7 +466,7 @@
                                             <i class="bi bi-envelope me-1" aria-hidden="true"></i>Przygotuj e-mail z podziękowaniem
                                         </button>
                                     </form>
-                                    <p class="form-text mb-0 mt-2">Wstawi podziękowanie, listę uczestników oraz link do pobrania zaświadczeń tylko tego szkolenia. Nad tematem ustawisz, ile dni link ma działać od wysłania (domyślnie 7). Każde kolejne przygotowanie wyłącza poprzedni link. Nowy zaczyna działać po wysłaniu do szkoły.</p>
+                                    <p class="form-text mb-0 mt-2">Wstawi podziękowanie, listę uczestników oraz link do pobrania zaświadczeń tylko tego szkolenia. Link można otworzyć od razu. Nad tematem ustawisz, ile dni ma działać od wysłania (domyślnie 7). Każde kolejne przygotowanie wyłącza poprzedni link.</p>
                                 @elseif($case->course && strtolower((string) ($case->course->type ?? '')) === 'online' && ! $case->course->hasEnded())
                                     <p class="form-text mb-0 mt-3">E-mail z podziękowaniem i listą uczestników będzie dostępny po zakończeniu szkolenia online.</p>
                                 @endif
@@ -474,7 +474,7 @@
                                     @if($case->schoolCertificateLinkIsActive())
                                         <p class="form-text mb-2 mt-3">Link dla szkoły jest ważny do {{ $case->formatLocal($case->school_certificate_token_expires_at, 'd.m.Y') }} r. Kolejny e-mail z podziękowaniem wyłączy go.</p>
                                     @else
-                                        <p class="form-text mb-2 mt-3">Link jest w treści e-maila i zacznie działać po wysłaniu do szkoły.</p>
+                                        <p class="form-text mb-2 mt-3">Link już działa. Termin ważności zostanie policzony od wysłania wiadomości do szkoły.</p>
                                     @endif
                                     <button type="button" class="btn btn-outline-danger btn-sm" data-bs-toggle="modal" data-bs-target="#closedTrainingCaseRevokeCertificatesModal">
                                         Unieważnij link do zaświadczeń
