@@ -85,7 +85,7 @@ class ClosedTrainingCaseService
 
     /**
      * @param  list<string>|string  $toEmails
-     * @param  'school'|'test'|'scheduled_notice'|'instructor'  $kind
+     * @param  'school'|'test'|'scheduled_notice'|'instructor'|'thank_you'  $kind
      */
     public function recordSchoolEmailSent(
         ClosedTrainingCase $case,
@@ -105,6 +105,7 @@ class ClosedTrainingCaseService
         $header = match ($kind) {
             'test' => 'E-mail testowy (nie do szkoły)',
             'scheduled_notice' => 'E-mail: info o terminie szkolenia',
+            'thank_you' => 'E-mail: podziękowanie i zaświadczenia',
             'instructor' => 'E-mail do prowadzącego',
             default => 'E-mail wysłany do szkoły',
         };

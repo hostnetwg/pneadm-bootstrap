@@ -459,6 +459,17 @@
                                 @elseif($case->course && ($case->course->type ?? '') === 'online')
                                     <p class="form-text text-warning mb-0 mt-3">Aby przygotować e-mail z linkiem, uzupełnij link ClickMeeting (meeting_link) albo włącz gościnny live na pnedu.pl.</p>
                                 @endif
+                                @if($canPrepareThankYouEmail ?? false)
+                                    <form method="POST" action="{{ route('closed-training-cases.email.prepare-thank-you', $case) }}" class="mt-3">
+                                        @csrf
+                                        <button type="submit" class="btn btn-success btn-sm">
+                                            <i class="bi bi-envelope me-1" aria-hidden="true"></i>Przygotuj e-mail z podziękowaniem
+                                        </button>
+                                    </form>
+                                    <p class="form-text mb-0 mt-2">Wstawi podziękowanie, listę uczestników oraz link do pobrania zaświadczeń tylko tego szkolenia. Treść można poprawić przed wysłaniem.</p>
+                                @elseif($case->course && strtolower((string) ($case->course->type ?? '')) === 'online' && ! $case->course->hasEnded())
+                                    <p class="form-text mb-0 mt-3">E-mail z podziękowaniem i listą uczestników będzie dostępny po zakończeniu szkolenia online.</p>
+                                @endif
                                 @if($case->status !== \App\Models\ClosedTrainingCase::STATUS_CLOSED)
                                     <p class="form-text mb-0 mt-3">Zwykły e-mail nie zmienia statusu. E-mail z terminem (do szkoły) pozostawia sprawę w toku.</p>
                                 @endif
@@ -910,6 +921,10 @@
                                     @elseif($emailIntent === 'instructor_details')
                                         <div class="alert alert-info py-2 small">
                                             Tryb: szczegóły zaplanowanego szkolenia dla prowadzącego. W treści jest wynagrodzenie, nie ma ceny dla szkoły. Status sprawy bez zmian.
+                                        </div>
+                                    @elseif($emailIntent === 'thank_you')
+                                        <div class="alert alert-info py-2 small">
+                                            Tryb: podziękowanie po szkoleniu online. Lista i link dotyczą tylko powiązanego szkolenia. Status sprawy bez zmian.
                                         </div>
                                     @endif
 

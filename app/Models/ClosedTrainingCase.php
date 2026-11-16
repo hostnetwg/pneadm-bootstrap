@@ -107,6 +107,7 @@ class ClosedTrainingCase extends Model
         'next_action_at',
         'waiting_on',
         'closed_at',
+        'school_certificate_token',
     ];
 
     protected $casts = [
@@ -148,6 +149,19 @@ class ClosedTrainingCase extends Model
     public function course(): HasOne
     {
         return $this->hasOne(Course::class, 'closed_training_case_id');
+    }
+
+    public function ensureSchoolCertificateToken(): string
+    {
+        $existing = strtolower(trim((string) $this->school_certificate_token));
+        if (preg_match('/^[a-f0-9]{64}$/', $existing) === 1) {
+            return $existing;
+        }
+
+        $token = bin2hex(random_bytes(32));
+        $this->forceFill(['school_certificate_token' => $token])->save();
+
+        return $token;
     }
 
     public function isLinkedToCourse(): bool

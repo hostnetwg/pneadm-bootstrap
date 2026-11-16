@@ -38,6 +38,18 @@ Uczestnicy z przypisanym adresem e-mail mogą pobrać swoje zaświadczenia ze st
 3. Przy każdym szkoleniu: **Pobierz zaświadczenie** (gdy admin włączył pobieranie i zaświadczenie istnieje) lub **W przygotowaniu**.
 4. Klik „Pobierz zaświadczenie” → `https://pnedu.pl/certificate/{token}/{course_id}` → pobranie PDF.
 
+## Link dla szkoły po szkoleniu zamkniętym online
+
+Po zakończeniu szkolenia online powiązanego ze sprawą (`closed_training_cases`) operator w ADM klika **Przygotuj e-mail z podziękowaniem**. Mail (do edycji przed wysyłką) zawiera podziękowanie, listę wszystkich uczestników tego szkolenia oraz jeden adres:
+
+`https://pnedu.pl/szkolenie-zamkniete/zaswiadczenia/{token}`
+
+Token (`school_certificate_token`, 64 znaki hex) jest na sprawie, nie na e-mailu uczestnika. Strona pokazuje tylko to szkolenie: imię i nazwisko, e-mail, czy link do zaświadczenia został wysłany (`certificate_email_logs` typu `list_link` / `single_certificate`, status `sent`) i czy uczestnik sam pobrał plik (`download_count` albo `first_downloaded_at`). Przycisk **Pobierz PDF** działa, gdy na szkoleniu jest status `download_enabled`. To pobranie **nie** wywołuje oznaczenia pobrania uczestnika.
+
+Osobisty link `https://pnedu.pl/certificates/{token}` zostaje dla uczestnika i nie trafia do maila szkoły, bo pokazuje wszystkie jego szkolenia.
+
+Strona ma `noindex` i nie wchodzi do sitemapy. Przed końcem szkolenia adres zwraca 404.
+
 ## Admin
 
 - **Gdzie włączyć pobieranie:** Panel pneadm → Szkolenia → Edycja kursu → **Status zaświadczeń** → „Udostępnij pobieranie zaświadczeń (link na pnedu.pl)”.

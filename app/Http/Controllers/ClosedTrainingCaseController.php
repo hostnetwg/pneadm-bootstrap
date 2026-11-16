@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Services\ClosedTrainingCaseCoordinationEmailBuilder;
 use App\Services\ClosedTrainingCaseScheduledEmailBuilder;
 use App\Services\ClosedTrainingCaseService;
+use App\Services\ClosedTrainingCaseThankYouEmailBuilder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -32,6 +33,7 @@ class ClosedTrainingCaseController extends Controller
         private readonly ClosedTrainingCaseService $cases,
         private readonly ClosedTrainingCaseScheduledEmailBuilder $scheduledEmailBuilder,
         private readonly ClosedTrainingCaseCoordinationEmailBuilder $coordinationEmailBuilder,
+        private readonly ClosedTrainingCaseThankYouEmailBuilder $thankYouEmailBuilder,
     ) {}
 
     public function index(Request $request): View
@@ -215,6 +217,7 @@ class ClosedTrainingCaseController extends Controller
             'instructors' => $this->instructorsForSelect($closedTrainingCase),
             'negotiationLocked' => $closedTrainingCase->isLinkedToCourse(),
             'canPrepareScheduledEmail' => $this->scheduledEmailBuilder->canPrepare($closedTrainingCase),
+            'canPrepareThankYouEmail' => $this->thankYouEmailBuilder->canPrepare($closedTrainingCase),
             'canEmailInstructor' => $this->coordinationEmailBuilder->canEmailInstructor($closedTrainingCase),
             'instructorEmail' => $this->coordinationEmailBuilder->instructorEmail($closedTrainingCase),
             'coordinationInstructor' => $this->coordinationEmailBuilder->coordinationInstructor($closedTrainingCase),
@@ -584,6 +587,28 @@ class ClosedTrainingCaseController extends Controller
             ]);
     }
 
+    public function prepareThankYouEmail(ClosedTrainingCase $closedTrainingCase): RedirectResponse
+    {
+        $draft = $this->thankYouEmailBuilder->build($closedTrainingCase);
+        if ($draft['ok'] !== true) {
+            return redirect()
+                ->route('closed-training-cases.show', $closedTrainingCase)
+                ->with('error', $draft['error']);
+        }
+
+        return redirect()
+            ->route('closed-training-cases.show', $closedTrainingCase)
+            ->withFragment('closed-training-case-email')
+            ->with('success', 'Przygotowano e-mail z podziękowaniem. Sprawdź listę uczestników i wyślij.')
+            ->with('email_draft', [
+                'subject' => $draft['subject'],
+                'body' => $draft['html'],
+                'intent' => 'thank_you',
+                'send_mode' => 'school',
+                'share_contacts' => false,
+            ]);
+    }
+
     public function prepareSchoolProposalEmail(Request $request, ClosedTrainingCase $closedTrainingCase): RedirectResponse
     {
         if ($closed = $this->negotiationEmailClosed($closedTrainingCase)) {
@@ -666,12 +691,12 @@ class ClosedTrainingCaseController extends Controller
 
         $data = $request->validate([
             'email_subject' => 'required|string|max:255',
-            'email_body' => 'required|string|max:20000',
+            'email_body' => 'required|string|max:80000',
             'send_mode' => ['required', Rule::in(['school', 'test', 'instructor'])],
             'email_recipients' => ['nullable', 'array'],
             'email_recipients.*' => ['string', 'email', Rule::in($allowedSchool)],
             'test_recipient' => ['nullable', 'string', 'email', Rule::in($allowedTest)],
-            'email_intent' => ['nullable', Rule::in(['general', 'scheduled_notice', 'instructor_brief', 'instructor_details'])],
+            'email_intent' => ['nullable', Rule::in(['general', 'scheduled_notice', 'instructor_brief', 'instructor_details', 'thank_you'])],
             'notify_instructor' => ['nullable', 'boolean'],
             'instructor_brief_subject' => ['nullable', 'string', 'max:255'],
             'instructor_brief_body' => ['nullable', 'string', 'max:20000'],
@@ -690,6 +715,7 @@ class ClosedTrainingCaseController extends Controller
         $isTest = $sendMode === 'test';
         $isInstructorOnly = $sendMode === 'instructor';
         $isScheduledNotice = ($data['email_intent'] ?? 'general') === 'scheduled_notice';
+        $isThankYou = ($data['email_intent'] ?? 'general') === 'thank_you';
         $notifyInstructor = $request->boolean('notify_instructor');
         $updateWaitingOn = $request->boolean('update_waiting_on');
         $instructorBriefSubject = null;
@@ -775,6 +801,7 @@ class ClosedTrainingCaseController extends Controller
             $isTest => 'test',
             $isInstructorOnly => 'instructor',
             $isScheduledNotice => 'scheduled_notice',
+            $isThankYou && $sendMode === 'school' => 'thank_you',
             default => 'school',
         };
 

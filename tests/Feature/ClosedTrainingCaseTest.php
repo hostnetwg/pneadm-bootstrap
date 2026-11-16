@@ -3,11 +3,14 @@
 namespace Tests\Feature;
 
 use App\Mail\ClosedTrainingCaseSchoolMail;
+use App\Models\Certificate;
+use App\Models\CertificateEmailLog;
 use App\Models\ClosedTrainingCase;
 use App\Models\ClosedTrainingCaseEvent;
 use App\Models\Course;
 use App\Models\CoursePriceVariant;
 use App\Models\Instructor;
+use App\Models\Participant;
 use App\Models\TrainingOffer;
 use App\Models\User;
 use App\Services\ClosedTrainingSubmissionBackfill;
@@ -2170,6 +2173,121 @@ class ClosedTrainingCaseTest extends TestCase
         $this->assertNull($case->instructor_fee_confirmed_at);
         $this->assertNotNull($case->client_price_confirmed_at);
         $this->assertNotNull($case->start_date);
+    }
+
+    public function test_thank_you_email_lists_participants_after_online_training_ends(): void
+    {
+        config(['marketing.pnedu_public_url' => 'https://pnedu.pl']);
+
+        $user = User::factory()->create(['is_active' => true]);
+        $case = $this->makeCase([
+            'contact_email' => 'szkola@example.com',
+            'status' => ClosedTrainingCase::STATUS_IN_PROGRESS,
+            'topic' => 'Rada pedagogiczna',
+        ]);
+        $start = Carbon::parse('2026-11-10 09:00:00', 'Europe/Warsaw');
+        $course = $this->makeCourse([
+            'title' => 'Szkolenie rady online',
+            'type' => 'online',
+            'category' => 'closed',
+            'start_date' => $start,
+            'end_date' => now()->addDay(),
+            'closed_training_case_id' => $case->id,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('closed-training-cases.show', $case))
+            ->assertOk()
+            ->assertSee('E-mail z podziękowaniem i listą uczestników będzie dostępny po zakończeniu szkolenia online.', false)
+            ->assertDontSee('Przygotuj e-mail z podziękowaniem', false);
+
+        $this->actingAs($user)
+            ->post(route('closed-training-cases.email.prepare-thank-you', $case))
+            ->assertRedirect(route('closed-training-cases.show', $case))
+            ->assertSessionHas('error');
+
+        $this->assertNull($case->fresh()->school_certificate_token);
+
+        $course->update(['end_date' => now()->subHour()]);
+
+        $sent = Participant::query()->create([
+            'course_id' => $course->id,
+            'order' => 1,
+            'first_name' => 'Anna',
+            'last_name' => 'Kowalska',
+            'email' => 'anna.kowalska@example.com',
+        ]);
+        $waiting = Participant::query()->create([
+            'course_id' => $course->id,
+            'order' => 2,
+            'first_name' => 'Jan',
+            'last_name' => 'Nowak',
+            'email' => 'jan.nowak@example.com',
+        ]);
+        Certificate::query()->create([
+            'participant_id' => $sent->id,
+            'course_id' => $course->id,
+            'certificate_number' => 'TY-'.$sent->id.'/PNE',
+            'download_count' => 1,
+            'first_downloaded_at' => now()->subMinutes(10),
+        ]);
+        CertificateEmailLog::query()->create([
+            'course_id' => $course->id,
+            'participant_id' => $sent->id,
+            'type' => CertificateEmailLog::TYPE_LIST_LINK,
+            'status' => CertificateEmailLog::STATUS_SENT,
+            'sent_at' => now()->subHour(),
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('closed-training-cases.show', $case))
+            ->assertOk()
+            ->assertSee('Przygotuj e-mail z podziękowaniem', false);
+
+        $this->actingAs($user)
+            ->post(route('closed-training-cases.email.prepare-thank-you', $case))
+            ->assertRedirect(route('closed-training-cases.show', $case).'#closed-training-case-email')
+            ->assertSessionHas('email_draft');
+
+        $draft = session('email_draft');
+        $this->assertIsArray($draft);
+        $this->assertSame('thank_you', $draft['intent']);
+        $this->assertStringContainsString('Podziękowanie za szkolenie', $draft['subject']);
+        $this->assertStringContainsString('Anna Kowalska', $draft['body']);
+        $this->assertStringContainsString('anna.kowalska@example.com', $draft['body']);
+        $this->assertStringContainsString('wysłany na e-mail', $draft['body']);
+        $this->assertStringContainsString('pobrane', $draft['body']);
+        $this->assertStringContainsString('Jan Nowak', $draft['body']);
+        $this->assertStringContainsString('nie wysłany', $draft['body']);
+        $this->assertStringContainsString('nie pobrane', $draft['body']);
+
+        $token = (string) $case->fresh()->school_certificate_token;
+        $this->assertSame(64, strlen($token));
+        $this->assertStringContainsString('https://pnedu.pl/szkolenie-zamkniete/zaswiadczenia/'.$token, $draft['body']);
+
+        $this->actingAs($user)
+            ->post(route('closed-training-cases.email.send', $case), [
+                'email_subject' => $draft['subject'],
+                'email_body' => $draft['body'],
+                'send_mode' => 'school',
+                'email_recipients' => ['szkola@example.com'],
+                'email_intent' => 'thank_you',
+            ])
+            ->assertRedirect(route('closed-training-cases.show', $case))
+            ->assertSessionHas('success');
+
+        $case->refresh();
+        $this->assertSame(ClosedTrainingCase::STATUS_IN_PROGRESS, $case->status);
+        $event = $case->events()->where('event_type', ClosedTrainingCaseEvent::TYPE_EMAIL_SENT)->latest('id')->first();
+        $this->assertStringContainsString('E-mail: podziękowanie i zaświadczenia', (string) $event?->body);
+
+        $course->update(['type' => 'offline']);
+        $this->actingAs($user)
+            ->get(route('closed-training-cases.show', $case))
+            ->assertOk()
+            ->assertDontSee('Przygotuj e-mail z podziękowaniem', false);
+
+        $this->assertNotNull($waiting->id);
     }
 
     private function makeCase(array $overrides = []): ClosedTrainingCase
