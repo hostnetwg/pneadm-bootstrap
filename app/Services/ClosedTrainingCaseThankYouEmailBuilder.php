@@ -47,7 +47,6 @@ class ClosedTrainingCaseThankYouEmailBuilder
         $title = $this->trainingTitle($case, $course);
         $when = $this->scheduleLabel($course);
         $rows = $this->participantRows($course);
-        $attendanceUrl = $this->attendanceFormUrl($course);
         $days = ClosedTrainingCase::SCHOOL_CERTIFICATE_LINK_DEFAULT_DAYS;
         $expiry = e(ClosedTrainingCase::schoolCertificateExpirySentence($days));
         $validUntil = e(ClosedTrainingCase::schoolCertificateValidUntilSentence($days));
@@ -66,7 +65,6 @@ class ClosedTrainingCaseThankYouEmailBuilder
             .'<strong><a href="'.$safeUrl.'#uniewaznij-link">Unieważnij link do listy uczestników</a></strong></p>'
             .$this->participantTableHtml($rows)
             .'<p>Wydrukowane zaświadczenia można przekazać nauczycielom.</p>'
-            .$this->attendanceFormHtml($attendanceUrl)
             .'<p>Jeżeli lista zawiera błędy lub nie jest kompletna, proszę o informację w odpowiedzi na tę wiadomość.</p>'
             .$this->signatureHtml();
 
@@ -75,30 +73,6 @@ class ClosedTrainingCaseThankYouEmailBuilder
             'subject' => $case->withCaseReferenceInSubject('Podziękowanie za szkolenie – '.$title),
             'html' => ClosedTrainingCase::sanitizeSchoolEmailHtml($html),
         ];
-    }
-
-    private function attendanceFormUrl(Course $course): ?string
-    {
-        if (! $course->isCertificateRegistrationActiveNow()) {
-            return null;
-        }
-
-        $token = trim((string) $course->certificate_registration_token);
-        $base = rtrim((string) config('marketing.pnedu_public_url', 'https://pnedu.pl'), '/');
-
-        return $base.'/certificate-registration/'.$token;
-    }
-
-    private function attendanceFormHtml(?string $url): string
-    {
-        if ($url === null || $url === '') {
-            return '';
-        }
-
-        $safeUrl = e($url);
-
-        return '<p>Kolejne osoby można dopisać formularzem listy obecności: <a href="'.$safeUrl.'">'.$safeUrl.'</a>. '
-            .'Każda osoba podaje własne imię, nazwisko i swój adres e-mail. Po zapisie pojawi się na stronie do pobrania zaświadczeń.</p>';
     }
 
     public function publicUrl(string $token): string
