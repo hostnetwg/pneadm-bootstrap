@@ -489,6 +489,8 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
         ->name('closed-training-cases.email.prepare-scheduled');
     Route::post('/closed-training-cases/{closedTrainingCase}/email/prepare-thank-you', [ClosedTrainingCaseController::class, 'prepareThankYouEmail'])
         ->name('closed-training-cases.email.prepare-thank-you');
+    Route::post('/closed-training-cases/{closedTrainingCase}/email/revoke-school-certificates', [ClosedTrainingCaseController::class, 'revokeSchoolCertificateLink'])
+        ->name('closed-training-cases.email.revoke-school-certificates');
     Route::post('/closed-training-cases/{closedTrainingCase}/email/prepare-school-proposal', [ClosedTrainingCaseController::class, 'prepareSchoolProposalEmail'])
         ->name('closed-training-cases.email.prepare-school-proposal');
     Route::post('/closed-training-cases/{closedTrainingCase}/email/prepare-instructor', [ClosedTrainingCaseController::class, 'prepareInstructorEmail'])

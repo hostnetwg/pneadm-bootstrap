@@ -466,9 +466,15 @@
                                             <i class="bi bi-envelope me-1" aria-hidden="true"></i>Przygotuj e-mail z podziękowaniem
                                         </button>
                                     </form>
-                                    <p class="form-text mb-0 mt-2">Wstawi podziękowanie, listę uczestników oraz link do pobrania zaświadczeń tylko tego szkolenia. Treść można poprawić przed wysłaniem.</p>
+                                    <p class="form-text mb-0 mt-2">Wstawi podziękowanie, listę uczestników oraz link do pobrania zaświadczeń tylko tego szkolenia. Link działa 2 miesiące. Treść można poprawić przed wysłaniem.</p>
                                 @elseif($case->course && strtolower((string) ($case->course->type ?? '')) === 'online' && ! $case->course->hasEnded())
                                     <p class="form-text mb-0 mt-3">E-mail z podziękowaniem i listą uczestników będzie dostępny po zakończeniu szkolenia online.</p>
+                                @endif
+                                @if($case->schoolCertificateLinkIsActive())
+                                    <p class="form-text mb-2 mt-3">Link dla szkoły jest ważny do {{ $case->formatLocal($case->school_certificate_token_expires_at, 'd.m.Y') }} r.</p>
+                                    <button type="button" class="btn btn-outline-danger btn-sm" data-bs-toggle="modal" data-bs-target="#closedTrainingCaseRevokeCertificatesModal">
+                                        Unieważnij link do zaświadczeń
+                                    </button>
                                 @endif
                                 @if($case->status !== \App\Models\ClosedTrainingCase::STATUS_CLOSED)
                                     <p class="form-text mb-0 mt-3">Zwykły e-mail nie zmienia statusu. E-mail z terminem (do szkoły) pozostawia sprawę w toku.</p>
@@ -960,6 +966,30 @@
                         <div class="modal-footer">
                             <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Wróć</button>
                             <button type="submit" class="btn btn-danger">Odłącz</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal fade" id="closedTrainingCaseRevokeCertificatesModal" tabindex="-1" aria-labelledby="closedTrainingCaseRevokeCertificatesModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <form method="POST" action="{{ route('closed-training-cases.email.revoke-school-certificates', $case) }}">
+                        @csrf
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="closedTrainingCaseRevokeCertificatesModalLabel">Unieważnij link do zaświadczeń</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+                        </div>
+                        <div class="modal-body">
+                            <p class="mb-2">Unieważnić link, którym szkoła otwiera listę zaświadczeń?</p>
+                            <div class="alert alert-warning mb-0">
+                                Dotychczasowy adres przestanie działać od razu. Nowy link powstanie przy kolejnym przygotowaniu e-maila z podziękowaniem.
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Wróć</button>
+                            <button type="submit" class="btn btn-danger">Unieważnij link</button>
                         </div>
                     </form>
                 </div>

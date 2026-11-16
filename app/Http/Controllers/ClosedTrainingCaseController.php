@@ -609,6 +609,26 @@ class ClosedTrainingCaseController extends Controller
             ]);
     }
 
+    public function revokeSchoolCertificateLink(Request $request, ClosedTrainingCase $closedTrainingCase): RedirectResponse
+    {
+        if (! $closedTrainingCase->revokeSchoolCertificateLink()) {
+            return redirect()
+                ->route('closed-training-cases.show', $closedTrainingCase)
+                ->with('error', 'Nie ma linku do zaświadczeń, który można unieważnić.');
+        }
+
+        $closedTrainingCase->events()->create([
+            'user_id' => $request->user()?->id,
+            'event_type' => ClosedTrainingCaseEvent::TYPE_UPDATED,
+            'body' => 'Unieważniono link dla szkoły do listy zaświadczeń. Dotychczasowy adres przestaje działać.',
+            'happened_at' => now(),
+        ]);
+
+        return redirect()
+            ->route('closed-training-cases.show', $closedTrainingCase)
+            ->with('success', 'Link do zaświadczeń został unieważniony. Dotychczasowy adres już nie działa.');
+    }
+
     public function prepareSchoolProposalEmail(Request $request, ClosedTrainingCase $closedTrainingCase): RedirectResponse
     {
         if ($closed = $this->negotiationEmailClosed($closedTrainingCase)) {

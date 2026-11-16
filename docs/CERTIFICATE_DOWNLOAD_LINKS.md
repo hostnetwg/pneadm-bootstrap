@@ -44,7 +44,7 @@ Po zakończeniu szkolenia online powiązanego ze sprawą (`closed_training_cases
 
 `https://pnedu.pl/szkolenie-zamkniete/zaswiadczenia/{token}`
 
-Token (`school_certificate_token`, 64 znaki hex) jest na sprawie, nie na e-mailu uczestnika. Strona pokazuje tylko to szkolenie: imię i nazwisko, e-mail, czy link do zaświadczenia został wysłany (`certificate_email_logs` typu `list_link` / `single_certificate`, status `sent`) i czy uczestnik sam pobrał plik (`download_count` albo `first_downloaded_at`). Przycisk **Pobierz PDF** działa, gdy na szkoleniu jest status `download_enabled`. To pobranie **nie** wywołuje oznaczenia pobrania uczestnika.
+Token (`school_certificate_token`, 64 znaki hex) jest na sprawie, nie na e-mailu uczestnika. Ważność to 2 miesiące od wystawienia (`school_certificate_token_expires_at`). Na karcie sprawy **Unieważnij link do zaświadczeń** kasuje adres od razu; kolejny e-mail z podziękowaniem dostaje nowy. Po terminie i po unieważnieniu strona zwraca 404. Strona pokazuje tylko to szkolenie: imię i nazwisko, e-mail, czy link do zaświadczenia został wysłany (`certificate_email_logs` typu `list_link` / `single_certificate`, status `sent`) i czy uczestnik sam pobrał plik (`download_count` albo `first_downloaded_at`). Przycisk **Pobierz PDF** działa, gdy na szkoleniu jest status `download_enabled`. To pobranie **nie** wywołuje oznaczenia pobrania uczestnika.
 
 Osobisty link `https://pnedu.pl/certificates/{token}` zostaje dla uczestnika i nie trafia do maila szkoły, bo pokazuje wszystkie jego szkolenia.
 

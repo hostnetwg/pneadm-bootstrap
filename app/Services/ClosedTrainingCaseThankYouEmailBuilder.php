@@ -42,20 +42,21 @@ class ClosedTrainingCaseThankYouEmailBuilder
         }
 
         $token = $case->ensureSchoolCertificateToken();
+        $case->refresh();
         $url = $this->publicUrl($token);
         $title = $this->trainingTitle($case, $course);
         $when = $this->scheduleLabel($course);
         $rows = $this->participantRows($course);
+        $validUntil = $case->formatLocal($case->school_certificate_token_expires_at, 'd.m.Y') ?? '';
 
         $html = '<p style="margin:0;">Dzień dobry,<br><br>'
             .'dziękujemy za skorzystanie z oferty Platformy Nowoczesnej Edukacji oraz za udział Państwa placówki w szkoleniu <strong>'.e($title).'</strong>'
             .($when !== '' ? ' ('.e($when).')' : '')
             .'.<br><br>'
             .'Poniżej lista uczestników zapisanych na to szkolenie. Przy każdej osobie widać, czy link do zaświadczenia został wysłany na jej e-mail oraz czy zaświadczenie zostało już pobrane. '
-            .'Aktualny stan jest też na stronie do pobrania.</p>'
+            .'Aktualny stan jest też na stronie do pobrania: <a href="'.e($url).'">'.e($url).'</a></p>'
             .$this->participantTableHtml($rows)
-            .'<p><strong>Zaświadczenia tego szkolenia można pobrać i wydrukować tutaj</strong> (link tylko do tego szkolenia):<br>'
-            .'<a href="'.e($url).'">'.e($url).'</a></p>'
+            .'<p>Link jest ważny do '.e((string) $validUntil).' r. Po tej dacie albo po unieważnieniu na karcie sprawy przestanie działać.</p>'
             .'<p>Wydrukowane zaświadczenia można przekazać nauczycielom. Pobranie pliku przez szkołę nie zmienia informacji, czy uczestnik sam pobrał zaświadczenie.</p>'
             .$this->signatureHtml();
 
@@ -179,7 +180,7 @@ class ClosedTrainingCaseThankYouEmailBuilder
             .'<th align="left">Lp</th>'
             .'<th align="left">Uczestnik</th>'
             .'<th align="left">Link do zaświadczenia</th>'
-            .'<th align="left">Pobranie</th>'
+            .'<th align="left">Pobranie przez uczestnika</th>'
             .'</tr></thead><tbody>';
 
         foreach ($rows as $index => $row) {
@@ -190,12 +191,21 @@ class ClosedTrainingCaseThankYouEmailBuilder
             $html .= '<tr>'
                 .'<td>'.($index + 1).'</td>'
                 .'<td>'.$who.'</td>'
-                .'<td>'.($row['link_sent'] ? 'wysłany na e-mail' : 'nie wysłany').'</td>'
-                .'<td>'.($row['downloaded'] ? 'pobrane' : 'nie pobrane').'</td>'
+                .'<td>'.$this->statusCell($row['link_sent'], 'wysłany na e-mail', 'nie wysłany').'</td>'
+                .'<td>'.$this->statusCell($row['downloaded'], 'pobrane', 'nie pobrane').'</td>'
                 .'</tr>';
         }
 
         return $html.'</tbody></table>';
+    }
+
+    private function statusCell(bool $done, string $doneLabel, string $pendingLabel): string
+    {
+        if (! $done) {
+            return e($pendingLabel);
+        }
+
+        return '<span style="color:#0d6efd;">'.e($doneLabel).'</span>';
     }
 
     private function onlineCourse(ClosedTrainingCase $case): ?Course

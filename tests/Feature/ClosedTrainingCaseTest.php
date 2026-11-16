@@ -2255,15 +2255,41 @@ class ClosedTrainingCaseTest extends TestCase
         $this->assertStringContainsString('Podziękowanie za szkolenie', $draft['subject']);
         $this->assertStringContainsString('Anna Kowalska', $draft['body']);
         $this->assertStringContainsString('anna.kowalska@example.com', $draft['body']);
-        $this->assertStringContainsString('wysłany na e-mail', $draft['body']);
-        $this->assertStringContainsString('pobrane', $draft['body']);
-        $this->assertStringContainsString('Jan Nowak', $draft['body']);
+        $this->assertStringContainsString('Pobranie przez uczestnika', $draft['body']);
+        $this->assertStringContainsString('<span style="color:#0d6efd;">wysłany na e-mail</span>', $draft['body']);
+        $this->assertStringContainsString('<span style="color:#0d6efd;">pobrane</span>', $draft['body']);
         $this->assertStringContainsString('nie wysłany', $draft['body']);
+        $this->assertStringContainsString('Jan Nowak', $draft['body']);
         $this->assertStringContainsString('nie pobrane', $draft['body']);
 
         $token = (string) $case->fresh()->school_certificate_token;
         $this->assertSame(64, strlen($token));
-        $this->assertStringContainsString('https://pnedu.pl/szkolenie-zamkniete/zaswiadczenia/'.$token, $draft['body']);
+        $this->assertTrue($case->fresh()->school_certificate_token_expires_at?->greaterThan(now()->addMonths(2)->subHour()) ?? false);
+        $this->assertStringContainsString(
+            'Aktualny stan jest też na stronie do pobrania: <a href="https://pnedu.pl/szkolenie-zamkniete/zaswiadczenia/'.$token.'">',
+            $draft['body']
+        );
+        $this->assertStringContainsString('Link jest ważny do', $draft['body']);
+
+        $this->actingAs($user)
+            ->post(route('closed-training-cases.email.prepare-thank-you', $case))
+            ->assertRedirect(route('closed-training-cases.show', $case).'#closed-training-case-email');
+        $this->assertSame($token, $case->fresh()->school_certificate_token);
+
+        $this->actingAs($user)
+            ->post(route('closed-training-cases.email.revoke-school-certificates', $case))
+            ->assertRedirect(route('closed-training-cases.show', $case))
+            ->assertSessionHas('success');
+        $this->assertNull($case->fresh()->school_certificate_token);
+        $revoked = $case->events()->where('event_type', ClosedTrainingCaseEvent::TYPE_UPDATED)->latest('id')->first();
+        $this->assertStringContainsString('Unieważniono link dla szkoły', (string) $revoked?->body);
+
+        $this->actingAs($user)
+            ->post(route('closed-training-cases.email.prepare-thank-you', $case))
+            ->assertRedirect(route('closed-training-cases.show', $case).'#closed-training-case-email');
+        $renewed = (string) $case->fresh()->school_certificate_token;
+        $this->assertNotSame($token, $renewed);
+        $this->assertSame(64, strlen($renewed));
 
         $this->actingAs($user)
             ->post(route('closed-training-cases.email.send', $case), [

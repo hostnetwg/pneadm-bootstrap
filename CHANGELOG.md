@@ -7,6 +7,7 @@ Krótka numeracja panelu. Szczegóły zawsze w `docs/`. Nowy numer wersji (np. 1
 Zaświadczenia: automatyczne czyszczenie starych plików PDF. Narzędzia deweloperskie: odświeżanie komputera deva jedną komendą.
 
 - **Hotfix 2026-11-16:** na [sprawie szkolenia zamkniętego](/closed-training-cases), po zakończeniu szkolenia online, jest **Przygotuj e-mail z podziękowaniem**. Wstawia podziękowanie, listę uczestników (czy link do zaświadczenia poszedł na e-mail i czy zostało pobrane) oraz jeden link, z którego szkoła pobiera zaświadczenia tylko tego szkolenia. Kanon: [CERTIFICATE_DOWNLOAD_LINKS.md](docs/CERTIFICATE_DOWNLOAD_LINKS.md)
+- **Hotfix 2026-11-16:** link szkoły do listy zaświadczeń działa 2 miesiące. Na karcie sprawy można go **unieważnić** wcześniej. Kanon: [CERTIFICATE_DOWNLOAD_LINKS.md](docs/CERTIFICATE_DOWNLOAD_LINKS.md)
 - **Hotfix 2026-11-03:** na [sprawie szkolenia zamkniętego](/closed-training-cases) tytuł przy kodzie `[SZ-numer]` i w **Temat szkolenia** da się poprawić. Sam kod zostaje i nie wchodzi do pola.
 - **Hotfix 2026-11-03:** na [sprawie szkolenia zamkniętego](/closed-training-cases), w ustaleniach, nad **Zapisz ustalenia** jest zielony przycisk **Przygotuj propozycję dla szkoły**. Robi to samo co ten w zakładce e-mail i znika po powiązaniu szkolenia.
 - **Hotfix 2026-11-03:** na [sprawie szkolenia zamkniętego](/closed-training-cases) przycisk **Przygotuj propozycję dla szkoły** wstawia ofertę: tytuł, forma, cena, czas trwania do uzupełnienia i prowadzący. Bez daty nie wymyśla terminu.

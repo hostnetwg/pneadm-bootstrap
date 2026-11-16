@@ -108,6 +108,7 @@ class ClosedTrainingCase extends Model
         'waiting_on',
         'closed_at',
         'school_certificate_token',
+        'school_certificate_token_expires_at',
     ];
 
     protected $casts = [
@@ -124,6 +125,7 @@ class ClosedTrainingCase extends Model
         'end_date' => 'datetime',
         'schedule_time_known' => 'boolean',
         'submitted_payload' => 'array',
+        'school_certificate_token_expires_at' => 'datetime',
     ];
 
     public function trainingOffer(): BelongsTo
@@ -151,17 +153,44 @@ class ClosedTrainingCase extends Model
         return $this->hasOne(Course::class, 'closed_training_case_id');
     }
 
+    public function schoolCertificateLinkIsActive(): bool
+    {
+        $token = strtolower(trim((string) $this->school_certificate_token));
+        if (preg_match('/^[a-f0-9]{64}$/', $token) !== 1) {
+            return false;
+        }
+
+        return $this->school_certificate_token_expires_at !== null
+            && $this->school_certificate_token_expires_at->isFuture();
+    }
+
     public function ensureSchoolCertificateToken(): string
     {
-        $existing = strtolower(trim((string) $this->school_certificate_token));
-        if (preg_match('/^[a-f0-9]{64}$/', $existing) === 1) {
-            return $existing;
+        if ($this->schoolCertificateLinkIsActive()) {
+            return strtolower(trim((string) $this->school_certificate_token));
         }
 
         $token = bin2hex(random_bytes(32));
-        $this->forceFill(['school_certificate_token' => $token])->save();
+        $this->forceFill([
+            'school_certificate_token' => $token,
+            'school_certificate_token_expires_at' => now()->addMonths(2),
+        ])->save();
 
         return $token;
+    }
+
+    public function revokeSchoolCertificateLink(): bool
+    {
+        if (trim((string) $this->school_certificate_token) === '') {
+            return false;
+        }
+
+        $this->forceFill([
+            'school_certificate_token' => null,
+            'school_certificate_token_expires_at' => null,
+        ])->save();
+
+        return true;
     }
 
     public function isLinkedToCourse(): bool
