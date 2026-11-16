@@ -2253,6 +2253,8 @@ class ClosedTrainingCaseTest extends TestCase
         $this->assertIsArray($draft);
         $this->assertSame('thank_you', $draft['intent']);
         $this->assertStringContainsString('Podziękowanie za szkolenie', $draft['subject']);
+        $this->assertStringContainsString('Poniżej lista uczestników szkolenia, którzy wypełnili formularz obecności udostępniony podczas szkolenia.', $draft['body']);
+        $this->assertStringNotContainsString('zapisanych na to szkolenie', $draft['body']);
         $this->assertStringContainsString('Anna Kowalska', $draft['body']);
         $this->assertStringContainsString('anna.kowalska@example.com', $draft['body']);
         $this->assertStringNotContainsString('Pobranie przez uczestnika', $draft['body']);

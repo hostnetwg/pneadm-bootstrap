@@ -56,7 +56,7 @@ class ClosedTrainingCaseThankYouEmailBuilder
             .'dziękujemy za skorzystanie z oferty Platformy Nowoczesnej Edukacji oraz za udział Państwa placówki w szkoleniu <strong>'.e($title).'</strong>'
             .($when !== '' ? ' ('.e($when).')' : '')
             .'.<br><br>'
-            .'Poniżej lista uczestników zapisanych na to szkolenie. Przy każdej osobie widać, czy link do zaświadczenia został wysłany na jej e-mail. '
+            .'Poniżej lista uczestników szkolenia, którzy wypełnili formularz obecności udostępniony podczas szkolenia. Przy każdej osobie widać, czy link do zaświadczenia został wysłany na jej e-mail. '
             .'Czy uczestnik już pobrał zaświadczenie, widać na stronie do pobrania — tam stan jest aktualny: <a href="'.$safeUrl.'">'.$safeUrl.'</a><br>'
             .$expiry.'<br>'
             .'<span style="color:#dc3545;">'.$validUntil.'</span></p>'
