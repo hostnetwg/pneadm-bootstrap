@@ -2283,7 +2283,7 @@ class ClosedTrainingCaseTest extends TestCase
         $this->assertStringContainsString('Wydrukowane zaświadczenia można przekazać nauczycielom.', $draft['body']);
         $this->assertStringNotContainsString('nie zmienia informacji', $draft['body']);
         $this->assertStringContainsString(
-            'Jeżeli lista zawiera błędy lub nie jest kompletna, proszę o informację w odpowiedzi na tę wiadomość.',
+            'Jeżeli lista zawiera błędy lub nie jest kompletna, proszę o informację w odpowiedzi na tę wiadomość. Niezbędne dane to: imię, nazwisko, e-mail, data i miejsce urodzenia.',
             $draft['body']
         );
         $this->assertStringNotContainsString('Kolejne osoby można dopisać', $draft['body']);
