@@ -690,6 +690,7 @@ class ProjectController extends Controller
 
         $aiDraftSupported = MaterialDraftTask::supports($material);
         $isFacebookPost = $material === MaterialDraftTask::FACEBOOK_MATERIAL_KEY;
+        $isLanding = $material === MaterialDraftTask::LANDING_MATERIAL_KEY;
         $skipped = DemoTikWebinarProject::isMaterialSkipped($item);
         $aiDraftProposal = $aiDraftSupported ? DemoTikWebinarProject::materialAiProposal($projectItem, $material) : null;
         $mailFields = null;
@@ -708,7 +709,7 @@ class ProjectController extends Controller
         }
 
         $materialEditorDraft = (string) session('material_restored_draft', $item['draft'] ?? '');
-        if ($isFacebookPost) {
+        if ($isFacebookPost || $isLanding) {
             $registrationUrl = $projectItem['registration_url'] ?? null;
             $materialEditorDraft = \App\Support\GrowthOS\GrowthMailUrls::withRegistrationLink(
                 $materialEditorDraft,
@@ -734,6 +735,7 @@ class ProjectController extends Controller
             'aiDraftUsesWorkModes' => MaterialDraftTask::usesWorkModes($material),
             'aiDraftVoice' => MaterialDraftTask::usesVoice($material) ? GrowthPeople::voice($projectItem) : null,
             'aiDraftIsFacebookPost' => $isFacebookPost,
+            'aiDraftIsLanding' => $isLanding,
             'aiDraftIsGraphic' => $material === MaterialDraftTask::GRAPHIC_MATERIAL_KEY,
             'aiDraftIsMail' => MaterialDraftTask::isMail($material),
             'aiDraftIsReminder' => $material === MaterialDraftTask::REMINDER_MATERIAL_KEY,
@@ -1414,6 +1416,11 @@ class ProjectController extends Controller
         } elseif ($material === MaterialDraftTask::FACEBOOK_MATERIAL_KEY && array_key_exists('draft', $data)) {
             $data['draft'] = \App\Support\GrowthOS\GrowthMailUrls::withRegistrationLink(
                 (string) ($data['draft'] ?? ''),
+                DemoTikWebinarProject::requireProject($project)['registration_url'] ?? null,
+            );
+        } elseif ($material === MaterialDraftTask::LANDING_MATERIAL_KEY && array_key_exists('draft', $data)) {
+            $data['draft'] = \App\Support\GrowthOS\GrowthMailUrls::withRegistrationLink(
+                \App\Support\GrowthOS\LandingHtmlFormatter::sanitize((string) ($data['draft'] ?? '')),
                 DemoTikWebinarProject::requireProject($project)['registration_url'] ?? null,
             );
         }

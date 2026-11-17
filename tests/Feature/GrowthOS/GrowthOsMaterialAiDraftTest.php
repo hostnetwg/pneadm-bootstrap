@@ -96,14 +96,31 @@ class GrowthOsMaterialAiDraftTest extends TestCase
         $this->actingAs($user)
             ->get(route('growth.projects.materials.show', [DemoTikWebinarProject::PROJECT_ID, 'landing']))
             ->assertOk()
-            ->assertDontSee('Poproś AI o szkic');
+            ->assertSee('Poproś AI o nowy szkic')
+            ->assertSee('Kod HTML');
+    }
+
+    public function test_landing_ai_returns_sanitized_bootstrap_html(): void
+    {
+        $user = $this->readyProject();
+        $this->provider->payload['draft'] = '<section class="py-5"><h1 class="display-6">Canva</h1><script>alert(1)</script><a class="btn btn-primary btn-lg" href="[LINK DO ZAPISU]" onclick="evil()">Zapisz się</a></section>';
+
+        $this->requestFor($user, 'landing');
+
+        $draft = (string) $this->proposal('landing')['draft'];
+        $this->assertStringContainsString('<h1', $draft);
+        $this->assertStringContainsString('btn btn-primary', $draft);
+        $this->assertStringContainsString('[LINK DO ZAPISU]', $draft);
+        $this->assertStringNotContainsString('<script', strtolower($draft));
+        $this->assertStringNotContainsString('onclick', strtolower($draft));
+        $this->assertArrayHasKey('youtube_description', $this->provider->input['source_materials']);
     }
 
     public function test_other_material_key_cannot_use_the_ai_flow(): void
     {
         $user = $this->readyProject();
 
-        foreach (['landing', 'participant-material', 'follow-up'] as $key) {
+        foreach (['participant-material', 'follow-up'] as $key) {
             $this->actingAs($user)
                 ->post(route('growth.projects.materials.ai', [DemoTikWebinarProject::PROJECT_ID, $key]))
                 ->assertNotFound();

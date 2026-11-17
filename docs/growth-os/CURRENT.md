@@ -44,6 +44,7 @@ Etap v0.2. Pierwszy wycinek, szkic AI dla materiału `youtube-description` (DEC-
 - **Asystent planowania** (DEC-037 / DEC-039): zadanie `direction_planning`, prompt `direction_planning_v3`. Generate / iterate; search z checkboxa. Propozycja tylko w sesji.
 - **Asystent kierunku w projekcie** (DEC-039 / DEC-053): na karcie „Pomysł i kierunek” generate / iterate oraz checkbox „Wyszukiwanie w sieci”. Propozycja w sesji projektu. „Zastosuj” zapisuje szkic, „Odrzuć” zostawia kierunek. Zatwierdzonego kierunku AI nie rusza.
 - **Prompty systemowe do API**: na karcie projektu, pod etapami, instrukcje wysyłane do API. Da się je zapisać i przywrócić wersję z kodu. Zapis działa dla wszystkich projektów. Akapit o wyszukiwaniu w sieci zostaje dopisywany przez aplikację. Migracja `growth_ai_prompts`.
+- **Formularz zapisu / landing** (DEC-055): „Poproś AI o nowy szkic” i „Popraw mój szkic”. Wynik to fragment HTML Bootstrap 5 do wklejenia na pnedu.pl. Przycisk zapisu używa linku z karty projektu. Bez publikacji.
 - Sesyjny projekt webinaru (`DemoTikWebinarProject`).
 - Modele Eloquent v0.1 i relacje: właściciel, instruktor, materiał, zadanie, decyzja. Workspace używa kampanii, kierunku, koncepcji, decyzji przy kierunku i koncepcji, 9 zadań operacyjnych i 10 materiałów roboczych.
 - Testy integralności: unikalny klucz materiału w kampanii, puste relacje, usuwanie kampanii razem z dziećmi, czyszczenie opcjonalnych powiązań.
@@ -109,7 +110,7 @@ Zaplanuj webinar
 - Brak Meta / Canva API.
 - Brak publikacji, wysyłek, jobów i biznesowych side effectów.
 - Propozycje AI działają w sesji HTTP. Poza sesją zostaje kampania, prowadzący, zapisany kierunek, zapisana koncepcja, decyzje przy kierunku, koncepcji i szkicach AI materiałów, 9 zadań operacyjnych, 10 materiałów (po jawnym zapisie) z historią do 20 wersji i techniczny log metadanych AI.
-- Brak AI poza Asystentem planowania na create, asystentem kierunku w otwartym projekcie (DEC-039), etapem Koncepcja oraz materiałami „Opis YouTube”, „Post Facebook”, „Grafika główna” (brief i obraz) , „Mailing główny”, „Mailing przypominający” i „Scenariusz prowadzącego”. Innymi materiałami w kontekście AI są tylko zatwierdzony opis YouTube (dla posta, briefu grafiki i obu mailingów) oraz zatwierdzony mailing główny (dla przypomnienia). Scenariusz nie dostaje opisu YouTube.
+- Brak AI poza Asystentem planowania na create, asystentem kierunku w otwartym projekcie (DEC-039), etapem Koncepcja oraz materiałami „Opis YouTube”, „Post Facebook”, „Grafika główna” (brief i obraz), „Mailing główny”, „Mailing przypominający”, „Formularz zapisu / landing” i „Scenariusz prowadzącego”. Innymi materiałami w kontekście AI są tylko zatwierdzony opis YouTube (dla posta, briefu grafiki, landingu i obu mailingów) oraz zatwierdzony mailing główny (dla przypomnienia). Scenariusz nie dostaje opisu YouTube.
 - Brak czatu, odkrywania tematu i głosu komunikacji w Asystencie planowania.
 - Brak wysyłki maili i integracji z Sendy: mailing główny to tekst do skopiowania.
 - Brak integracji z Canvą i innych dostawców obrazów niż OpenAI. Edycja obrazu służy do wersji kwadratowej (DEC-030) i do jednej poprawki gotowego zdjęcia (DEC-043). Brak wariantów w jednym kliknięciu i obu formatów naraz.

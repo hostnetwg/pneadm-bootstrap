@@ -2580,6 +2580,7 @@ class DemoTikWebinarProject
                     MaterialDraftTask::reminderTiming($style['timing'] ?? null),
                     $addressForm,
                 ),
+                MaterialDraftTask::LANDING_MATERIAL_KEY => self::simulatedLanding($project, $concept, $addressForm),
                 MaterialDraftTask::HOST_SCRIPT_MATERIAL_KEY => self::simulatedHostScript(
                     $project,
                     $concept,
@@ -3252,6 +3253,47 @@ class DemoTikWebinarProject
      * @param  array<string, mixed>  $project
      * @param  array<string, mixed>  $concept
      */
+    private static function simulatedLanding(array $project, array $concept, string $addressForm): string
+    {
+        $escape = static fn (string $value): string => htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        $ty = AddressFormPolicy::normalize($addressForm) === AddressFormPolicy::TY;
+        $title = trim((string) ($concept['title'] ?? $project['topic'] ?? ''));
+        $promise = trim((string) ($concept['promise'] ?? ''));
+        $plan = trim((string) ($concept['plan'] ?? ''));
+        $cta = trim((string) ($concept['cta'] ?? ''));
+        $host = trim((string) ($project['host'] ?? ''));
+        $when = trim((string) (($project['live_date'] ?? '').' godz. '.($project['live_time'] ?? '')));
+        $learn = $ty ? 'Czego się dowiesz' : 'Czego dowiedzą się Państwo';
+        $invite = $ty ? 'Zapisz się bezpłatnie' : 'Zapiszą się Państwo bezpłatnie';
+        $points = collect(is_array($concept['points'] ?? null) ? $concept['points'] : [])
+            ->map(fn (mixed $point): string => trim((string) $point))
+            ->filter(fn (string $point): bool => $point !== '')
+            ->take(5)
+            ->map(fn (string $point): string => '<li class="list-group-item">'.$escape($point).'</li>')
+            ->implode('');
+
+        $html = '<section class="py-5"><p class="text-primary fw-semibold mb-2">Bezpłatny webinar</p>'
+            .'<h1 class="display-6 fw-bold">'.$escape($title).'</h1>'
+            .($promise !== '' ? '<p class="lead">'.$escape($promise).'</p>' : '')
+            .'<p class="mb-4"><span class="badge text-bg-light border">'.$escape($when).'</span></p>'
+            .'<a class="btn btn-primary btn-lg" href="'.MaterialDraftTask::LINK_PLACEHOLDER.'">'.$invite.'</a></section>';
+
+        if ($points !== '') {
+            $html .= '<section class="py-4 bg-light rounded-3 px-4"><h2 class="h3">'.$learn.'</h2><ul class="list-group list-group-flush">'.$points.'</ul></section>';
+        }
+        if ($plan !== '') {
+            $html .= '<section class="py-4"><h2 class="h3">Plan spotkania</h2><p>'.$escape($plan).'</p></section>';
+        }
+        if ($host !== '') {
+            $html .= '<section class="py-4"><h2 class="h3">Prowadzący</h2><p>'.$escape($host).'</p></section>';
+        }
+        $html .= '<section class="py-5 text-center"><h2 class="h3">Zapisz się</h2>'
+            .($cta !== '' ? '<p class="mb-4">'.$escape($cta).'</p>' : '')
+            .'<a class="btn btn-primary btn-lg" href="'.MaterialDraftTask::LINK_PLACEHOLDER.'">'.$invite.'</a></section>';
+
+        return LandingHtmlFormatter::sanitize($html);
+    }
+
     private static function simulatedFacebookPost(
         array $project,
         array $concept,

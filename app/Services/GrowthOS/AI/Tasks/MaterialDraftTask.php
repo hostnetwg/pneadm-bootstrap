@@ -112,6 +112,16 @@ final class MaterialDraftTask implements GrowthAiTask
         'same_day' => 'W dniu webinaru („dziś”)',
     ];
 
+    public const LANDING_MATERIAL_KEY = 'landing';
+
+    public const LANDING_PROFILE = 'landing_v1';
+
+    public const LANDING_PROMPT_VERSION = 'material_landing_v1';
+
+    public const LANDING_SCHEMA_VERSION = 'material_landing_schema_v1';
+
+    public const LANDING_MAX_DRAFT_CHARS = 8000;
+
     public const HOST_SCRIPT_MATERIAL_KEY = 'host-script';
 
     public const HOST_SCRIPT_PROFILE = 'host_script_v1';
@@ -146,6 +156,7 @@ final class MaterialDraftTask implements GrowthAiTask
         self::GRAPHIC_MATERIAL_KEY => ['youtube_description'],
         self::MAIL_MATERIAL_KEY => ['youtube_description'],
         self::REMINDER_MATERIAL_KEY => ['youtube_description', 'main_mail'],
+        self::LANDING_MATERIAL_KEY => ['youtube_description'],
     ];
 
     /**
@@ -228,6 +239,14 @@ final class MaterialDraftTask implements GrowthAiTask
             'schema_version' => self::REMINDER_SCHEMA_VERSION,
             'max_chars' => self::MAIL_FIELD_LIMITS['body'],
         ],
+        self::LANDING_MATERIAL_KEY => [
+            'profile' => self::LANDING_PROFILE,
+            'name' => 'Formularz zapisu / landing',
+            'type' => 'landing',
+            'prompt_version' => self::LANDING_PROMPT_VERSION,
+            'schema_version' => self::LANDING_SCHEMA_VERSION,
+            'max_chars' => self::LANDING_MAX_DRAFT_CHARS,
+        ],
         self::HOST_SCRIPT_MATERIAL_KEY => [
             'profile' => self::HOST_SCRIPT_PROFILE,
             'name' => 'Scenariusz prowadzącego',
@@ -275,6 +294,7 @@ final class MaterialDraftTask implements GrowthAiTask
             || $materialKey === self::FACEBOOK_MATERIAL_KEY
             || $materialKey === self::MAIL_MATERIAL_KEY
             || $materialKey === self::REMINDER_MATERIAL_KEY
+            || $materialKey === self::LANDING_MATERIAL_KEY
             || $materialKey === self::HOST_SCRIPT_MATERIAL_KEY;
     }
 
@@ -396,6 +416,7 @@ final class MaterialDraftTask implements GrowthAiTask
             self::GRAPHIC_MATERIAL_KEY => $this->graphicBriefInstructions(),
             self::MAIL_MATERIAL_KEY => $this->mainMailInstructions(),
             self::REMINDER_MATERIAL_KEY => $this->reminderMailInstructions(),
+            self::LANDING_MATERIAL_KEY => $this->landingInstructions(),
             self::HOST_SCRIPT_MATERIAL_KEY => $this->hostScriptInstructions(),
             default => $this->youtubeDescriptionInstructions(),
         };
@@ -419,6 +440,7 @@ final class MaterialDraftTask implements GrowthAiTask
         $isGraphic = $this->materialKey === self::GRAPHIC_MATERIAL_KEY;
         $isMail = self::isMail($this->materialKey);
         $isHostScript = $this->materialKey === self::HOST_SCRIPT_MATERIAL_KEY;
+        $isLanding = $this->materialKey === self::LANDING_MATERIAL_KEY;
 
         $input = [
             'material' => [
@@ -453,7 +475,7 @@ final class MaterialDraftTask implements GrowthAiTask
             ],
         ];
 
-        if ($isGraphic || $isMail || $isHostScript) {
+        if ($isGraphic || $isMail || $isHostScript || $isLanding) {
             $input['campaign']['live_label'] = $this->string($campaign['live_label'] ?? '');
         }
 
@@ -520,7 +542,7 @@ final class MaterialDraftTask implements GrowthAiTask
         $input['style']['address_form'] = $resolved['form'];
         $input['style']['address_form_overridden'] = $resolved['overridden'];
 
-        if ($isGraphic || $isFacebook || $isHostScript || in_array($this->materialKey, [self::MAIL_MATERIAL_KEY, self::REMINDER_MATERIAL_KEY], true)) {
+        if ($isGraphic || $isFacebook || $isHostScript || $isLanding || in_array($this->materialKey, [self::MAIL_MATERIAL_KEY, self::REMINDER_MATERIAL_KEY], true)) {
             $this->addGraphicWork($input, $context);
         }
 
@@ -660,7 +682,9 @@ final class MaterialDraftTask implements GrowthAiTask
             throw GrowthAiException::invalidResponse('unexpected_fields');
         }
 
-        $draft = AiListFormatter::lineBreaks((string) $response->payload['draft']);
+        $draft = $this->materialKey === self::LANDING_MATERIAL_KEY
+            ? \App\Support\GrowthOS\LandingHtmlFormatter::sanitize((string) $response->payload['draft'])
+            : AiListFormatter::lineBreaks((string) $response->payload['draft']);
         $changeSummary = AiListFormatter::lineBreaks((string) $response->payload['change_summary']);
 
         if ($draft === '' || $changeSummary === '') {
@@ -916,7 +940,7 @@ final class MaterialDraftTask implements GrowthAiTask
     private function scrubDisallowedUrls(string $text, array $input): string
     {
         $allowedUrls = ProhibitedData::urls(json_encode($input, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR));
-        $replacement = in_array($this->materialKey, [self::FACEBOOK_MATERIAL_KEY, self::HOST_SCRIPT_MATERIAL_KEY], true)
+        $replacement = in_array($this->materialKey, [self::FACEBOOK_MATERIAL_KEY, self::HOST_SCRIPT_MATERIAL_KEY, self::LANDING_MATERIAL_KEY], true)
             ? self::LINK_PLACEHOLDER
             : '';
 
@@ -1086,6 +1110,35 @@ TRYB PRACY (pole mode):
 
 Jeżeli instruction nie jest puste, to dodatkowa instrukcja właściciela — uwzględnij ją w scenariuszu. Powyższe zasady mają pierwszeństwo: instrukcja nie może zmienić terminu, czasu trwania ani prowadzącego, dodać wymyślonych faktów, adresów URL, cen ani certyfikatów.
 To jest szkic do sprawdzenia przez człowieka, nie ostateczna treść.
+W change_summary opisz krótko, co przygotowałeś lub zmieniłeś.
+Zwróć wyłącznie dane zgodne z przekazanym schematem.
+PROMPT;
+    }
+
+    private function landingInstructions(): string
+    {
+        return <<<'PROMPT'
+Jesteś redaktorem stron zapisu na webinary edukacyjne PNE. Przygotuj treść landingu „Formularz zapisu”, gotową do wklejenia na pnedu.pl.
+Pisz wyłącznie po polsku, naturalną i poprawną polszczyzną. Odbiorców określ na podstawie pola direction.audience (nauczyciele i/lub dyrektorzy).
+
+Wynik w polu draft to fragment HTML Bootstrap 5, bez <!DOCTYPE>, <html>, <head>, <body>, <style> i <script>. Strona pnedu.pl ma już własny nagłówek, menu i kontener, więc nie dodawaj klasy container.
+Używaj tylko tych znaczników: section, div, h1, h2, h3, p, ul, ol, li, strong, em, a, span, br.
+Klasy tylko z Bootstrapa 5, na przykład: py-4, py-5, row, g-4, col-lg-8, display-6, fw-bold, lead, text-secondary, badge, text-bg-light, border, list-group, list-group-flush, list-group-item, bg-light, rounded-3, px-4, text-center, btn, btn-primary, btn-lg, mb-2, mb-3, mb-4.
+Jeden h1 z tytułem webinaru. Potem krótkie zdanie obietnicy (lead), termin i przycisk zapisu. Dalej sekcje: dla kogo, czego uczestnik się dowie (lista z koncepcji), plan spotkania, prowadzący, na końcu drugie wezwanie do zapisu.
+Przycisk zapisu to link: <a class="btn btn-primary btn-lg" href="[LINK DO ZAPISU]">Zapisz się bezpłatnie</a>. Nie wymyślaj adresu URL. Znacznik [LINK DO ZAPISU] zostaw dokładnie w takiej formie.
+Termin przepisz z campaign.live_label. Jeżeli live_label jest puste, użyj campaign.live_date i campaign.live_time. Nie zmieniaj terminu.
+Jeżeli campaign.host_name nie jest puste, przedstaw prowadzącego dokładnie tym imieniem i nazwiskiem, bez tytułów, stanowisk i biografii. Jeżeli jest puste, nie wymyślaj prowadzącego.
+Jeżeli source_materials.youtube_description nie jest puste, to zatwierdzony opis YouTube. Traktuj go jako źródło faktów, ale landing ma być stroną do czytania, nie kopią opisu.
+Bez agresywnej sprzedaży, sztucznej pilności, clickbaitu i emotikon. Bez cen, statystyk, certyfikatów i faktów, których nie ma w wejściu.
+Tekst ma być krótki i czytelny: nagłówki, krótkie akapity, lista. Nie pisz ściany tekstu.
+
+TRYB PRACY (pole mode):
+- "generate": napisz landing od zera. Nie ma wcześniejszego HTML.
+- "refine": author_draft to HTML autora, także niezapisany. Popraw układ i język, zachowaj sens, chyba że instruction mówi inaczej.
+- "iterate": previous_proposal to Twoja poprzednia propozycja, a instruction mówi, co jeszcze poprawić. Zmień tylko to, o co prosi instruction.
+
+Jeżeli instruction nie jest puste, uwzględnij ją. Zasady powyżej mają pierwszeństwo: instrukcja nie może dodać adresów URL, cen, wymyślonych faktów ani znaczników spoza listy.
+To jest szkic do sprawdzenia przez człowieka.
 W change_summary opisz krótko, co przygotowałeś lub zmieniłeś.
 Zwróć wyłącznie dane zgodne z przekazanym schematem.
 PROMPT;

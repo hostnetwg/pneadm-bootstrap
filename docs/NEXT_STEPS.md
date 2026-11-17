@@ -3,6 +3,10 @@
 Data utworzenia/aktualizacji: 2026-11-17
 Status: plan roboczy, do potwierdzenia przez właściciela
 
+## Ostatnio (2026-11-17) — Landing zapisu z AI
+
+Na materiale **Formularz zapisu / landing** AI przygotowuje fragment HTML Bootstrap 5. Jest podgląd i kod do wklejenia na pnedu.pl. Przycisk zapisu używa linku z karty projektu. Nic nie jest publikowane samo. Bez migracji. Kanon: [growth-os/CURRENT.md](./growth-os/CURRENT.md).
+
 ## Ostatnio (2026-11-17) — Edycja promptów systemowych Growth OS
 
 Na karcie projektu prompty systemowe da się zapisać i później przywrócić do wersji z kodu. Zapisana treść idzie do API we wszystkich projektach. Akapit o wyszukiwaniu w sieci dopisuje aplikacja. Migracja: `2026_11_17_000001_create_growth_ai_prompts_table`. Kanon: [growth-os/CURRENT.md](./growth-os/CURRENT.md).

@@ -431,3 +431,11 @@ Status: ACTIVE<br>
 Decision: Prompty systemowe Growth OS da się podmienić z karty projektu. Zapis jest wspólny dla wszystkich projektów. Brak zapisu oznacza treść z kodu. „Przywróć wersję z kodu” kasuje podmianę. Akapit o `web_search` dopisuje aplikacja i nie wchodzi do edytowanego tekstu. Szablon obrazu używa miejsc `{{opis}}`, `{{naglowek}}`, `{{napis_terminu}}`, `{{uwaga}}` i `{{blok_opisu}}`.<br>
 Rationale: Właściciel chce widzieć i poprawiać instrukcje wysyłane do API bez zmiany kodu przy każdej korekcie.<br>
 Consequences: Tabela `growth_ai_prompts`. Edytor na karcie projektu. `GrowthAiPromptLibrary` wstawia zapis zamiast `instructions()` i szablonów obrazu. Bez zmiany schematu odpowiedzi AI.
+
+## DEC-055
+
+Date: 2026-11-17<br>
+Status: ACTIVE<br>
+Decision: Materiał **Formularz zapisu / landing** dostaje szkic AI w tym samym obiegu co opis YouTube: nowy szkic, poprawka własnego HTML i ponowna poprawka. Wynik to fragment HTML Bootstrap 5, bez dokumentu, menu i kontenera, bo pnedu.pl ma własny układ. Przycisk zapisu ma znacznik `[LINK DO ZAPISU]`, który aplikacja podmienia na link z karty projektu. Zatwierdzony opis YouTube jest źródłem faktów. Szkic nie publikuje strony.<br>
+Rationale: Właściciel chce treść landingu gotową do wklejenia na pnedu.pl, czytelną i w Bootstrapie.<br>
+Consequences: Profil `material_landing_v1`. `LandingHtmlFormatter` zostawia bezpieczne znaczniki i klasy Bootstrapa. Bez migracji i bez zapisu na pnedu.pl.
