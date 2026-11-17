@@ -143,6 +143,13 @@ class OnlineCourseMigrationNoticeTest extends TestCase
         if ($accountsBefore !== null) {
             $this->assertSame($accountsBefore, $this->pneduAccountCount('anna.dwa@example.test'));
         }
+
+        $this->postJson(route('online-courses.migration-notice.send'), ['email' => 'anna.dwa@example.test'])
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('email', 'anna.dwa@example.test')
+            ->assertJsonPath('sent_count', 2)
+            ->assertJsonPath('unsent_count', 0);
     }
 
     public function test_bulk_sends_one_job_per_person_and_skips_already_sent(): void

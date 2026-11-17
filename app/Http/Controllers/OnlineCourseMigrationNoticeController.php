@@ -7,6 +7,7 @@ use App\Services\OnlineCourseMigrationNoticeService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 
@@ -52,7 +53,7 @@ class OnlineCourseMigrationNoticeController extends Controller
         ]);
     }
 
-    public function send(Request $request, OnlineCourseMigrationNoticeService $notices): RedirectResponse
+    public function send(Request $request, OnlineCourseMigrationNoticeService $notices): RedirectResponse|JsonResponse
     {
         $data = $request->validate([
             'email' => ['required', 'string', 'email', 'max:255'],
@@ -61,11 +62,38 @@ class OnlineCourseMigrationNoticeController extends Controller
         try {
             $result = $notices->sendToEmail($data['email'], Auth::id());
         } catch (\Throwable $e) {
-            return $this->back($request)->with('error', 'Nie udało się wysłać e-maila: '.$e->getMessage());
+            $message = 'Nie udało się wysłać e-maila: '.$e->getMessage();
+
+            return $request->expectsJson()
+                ? response()->json(['success' => false, 'error' => $message], 422)
+                : $this->back($request)->with('error', $message);
         }
 
         if (! ($result['success'] ?? false)) {
-            return $this->back($request)->with('error', $result['error'] ?? 'Nie udało się wysłać e-maila.');
+            $message = $result['error'] ?? 'Nie udało się wysłać e-maila.';
+
+            return $request->expectsJson()
+                ? response()->json(['success' => false, 'error' => $message], 422)
+                : $this->back($request)->with('error', $message);
+        }
+
+        if ($request->expectsJson()) {
+            $filters = $this->filters($request);
+            $email = (string) $result['email'];
+            $stats = $notices->sendStatsFor(Collection::make([(object) ['email' => $email]]));
+            $stat = $stats[$email] ?? null;
+            $sentCount = (int) ($stat['sent_count'] ?? 0);
+            $sentLabel = ($stat['last_sent_at'] ?? null)
+                ? $stat['last_sent_at']->timezone('Europe/Warsaw')->format('d.m.Y H:i').' ('.$sentCount.')'
+                : null;
+
+            return response()->json([
+                'success' => true,
+                'email' => $email,
+                'sent_count' => $sentCount,
+                'sent_label' => $sentLabel,
+                'unsent_count' => $notices->unsentCount($filters['course_id'], $filters['q'], $filters['account']),
+            ]);
         }
 
         return $this->back($request)->with(

@@ -13,6 +13,7 @@
             @if(session('info'))
                 <div class="alert alert-info">{{ session('info') }}</div>
             @endif
+            <div id="migrationNoticeLiveAlert" class="d-none" role="status"></div>
 
             @include('participants.partials.mail-system-config-alert')
 
@@ -78,7 +79,7 @@
                         @disabled($batch['active'] ?? false)>
                     <i class="bi bi-send me-1"></i> Wyślij e-mail z informacją o przeniesieniu
                 </button>
-                <span class="text-muted small">Do wysłania przy obecnych filtrach: <strong>{{ $unsentCount }}</strong> osób, które jeszcze nie dostały listu.</span>
+                <span class="text-muted small">Do wysłania przy obecnych filtrach: <strong id="migrationNoticeUnsentCount">{{ $unsentCount }}</strong> osób, które jeszcze nie dostały listu.</span>
             </div>
 
             <form method="get" action="{{ route('online-courses.migration-notice.index') }}" class="row g-2 align-items-end mb-3">
@@ -145,7 +146,7 @@
                                 $sentCount = (int) ($stats['sent_count'] ?? 0);
                                 $lastSent = $stats['last_sent_at'] ?? null;
                             @endphp
-                            <tr>
+                            <tr data-migration-email="{{ $email }}">
                                 <td>{{ $person->first_name ?: '—' }}</td>
                                 <td>{{ $person->last_name ?: '—' }}</td>
                                 <td>{{ $email }}</td>
@@ -159,7 +160,7 @@
                                         <span class="badge bg-secondary">nie</span>
                                     @endif
                                 </td>
-                                <td>
+                                <td class="migration-notice-sent">
                                     @if($sentCount > 0 && $lastSent)
                                         {{ $lastSent->timezone('Europe/Warsaw')->format('d.m.Y H:i') }} ({{ $sentCount }})
                                     @else
@@ -249,7 +250,7 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Anuluj</button>
-                    <form id="migrationNoticeOneForm" method="post" action="{{ route('online-courses.migration-notice.send') }}" data-loading-submit>
+                    <form id="migrationNoticeOneForm" method="post" action="{{ route('online-courses.migration-notice.send') }}">
                         @csrf
                         <input type="hidden" name="q" value="{{ $filters['q'] }}">
                         <input type="hidden" name="course_id" value="{{ $filters['course_id'] }}">
@@ -352,6 +353,73 @@
                             errorEl.classList.remove('d-none');
                         });
                 });
+
+                var oneForm = document.getElementById('migrationNoticeOneForm');
+                if (oneForm) {
+                    oneForm.addEventListener('submit', function (event) {
+                        event.preventDefault();
+                        if (oneForm.dataset.busy === '1' || !oneSend || oneSend.disabled) {
+                            return;
+                        }
+                        oneForm.dataset.busy = '1';
+                        var originalHtml = oneSend.innerHTML;
+                        oneSend.disabled = true;
+                        oneSend.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Wysyłanie…';
+                        var body = new URLSearchParams(new FormData(oneForm));
+                        var headers = {
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'Content-Type': 'application/x-www-form-urlencoded'
+                        };
+                        if (body.get('_token')) {
+                            headers['X-CSRF-TOKEN'] = body.get('_token');
+                        }
+                        fetch(oneForm.action, {
+                            method: 'POST',
+                            credentials: 'same-origin',
+                            headers: headers,
+                            body: body
+                        }).then(function (r) {
+                            return r.json().then(function (data) { return { ok: r.ok, data: data }; });
+                        }).then(function (result) {
+                            oneForm.dataset.busy = '0';
+                            oneSend.disabled = false;
+                            oneSend.innerHTML = originalHtml;
+                            if (!result.ok || !result.data.success) {
+                                errorEl.textContent = (result.data && result.data.error) || 'Nie udało się wysłać e-maila.';
+                                errorEl.classList.remove('d-none');
+                                return;
+                            }
+                            var email = result.data.email || '';
+                            var row = email && window.CSS && CSS.escape
+                                ? document.querySelector('tr[data-migration-email="' + CSS.escape(email) + '"]')
+                                : null;
+                            var sentCell = row && row.querySelector('.migration-notice-sent');
+                            if (sentCell) {
+                                sentCell.textContent = result.data.sent_label || '—';
+                            }
+                            var unsentEl = document.getElementById('migrationNoticeUnsentCount');
+                            if (unsentEl && result.data.unsent_count !== undefined && result.data.unsent_count !== null) {
+                                unsentEl.textContent = String(result.data.unsent_count);
+                            }
+                            var live = document.getElementById('migrationNoticeLiveAlert');
+                            if (live) {
+                                live.className = 'alert alert-success';
+                                live.textContent = 'E-mail o przeniesieniu kursów został wysłany na adres ' + email + '.';
+                            }
+                            var modal = window.bootstrap && window.bootstrap.Modal.getInstance(oneModal);
+                            if (modal) {
+                                modal.hide();
+                            }
+                        }).catch(function () {
+                            oneForm.dataset.busy = '0';
+                            oneSend.disabled = false;
+                            oneSend.innerHTML = originalHtml;
+                            errorEl.textContent = 'Nie udało się wysłać e-maila.';
+                            errorEl.classList.remove('d-none');
+                        });
+                    });
+                }
             }
 
             var alertEl = document.getElementById('migrationNoticeBatchAlert');
