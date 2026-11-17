@@ -96,6 +96,18 @@ class OnlineCourseMigrationNoticeTest extends TestCase
             ->assertOk()
             ->assertJsonPath('unsent_count', 1);
 
+        $byCount = $this->actingAs($admin)
+            ->get(route('online-courses.migration-notice.index', ['course_count' => 1]));
+        $byCount->assertOk()
+            ->assertSee('bartek.jeden@example.test')
+            ->assertDontSee('anna.dwa@example.test')
+            ->assertSee('name="course_count"', false);
+
+        $this->actingAs($admin)
+            ->getJson(route('online-courses.migration-notice.unsent-count', ['course_count' => 2]))
+            ->assertOk()
+            ->assertJsonPath('unsent_count', 1);
+
         $this->get(route('online-courses.index'))
             ->assertOk()
             ->assertSee('Informacje o przeniesieniu kursów z nowoczesna-edukacja.pl');

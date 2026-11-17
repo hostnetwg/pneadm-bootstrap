@@ -87,7 +87,7 @@
                     <label for="migration_notice_q" class="form-label">Szukaj</label>
                     <input id="migration_notice_q" type="search" name="q" value="{{ $filters['q'] }}" class="form-control" placeholder="Imię, nazwisko lub e-mail">
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <label for="migration_notice_course" class="form-label">Kurs online nagrany</label>
                     <select id="migration_notice_course" name="course_id" class="form-select">
                         <option value="">Wszystkie kursy</option>
@@ -96,13 +96,18 @@
                         @endforeach
                     </select>
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <label for="migration_notice_account" class="form-label">Konto pnedu.pl</label>
                     <select id="migration_notice_account" name="account" class="form-select">
                         <option value="all" @selected($filters['account'] === 'all')>Wszyscy</option>
                         <option value="yes" @selected($filters['account'] === 'yes')>Ma konto</option>
                         <option value="no" @selected($filters['account'] === 'no')>Brak konta</option>
                     </select>
+                </div>
+                <div class="col-md-2">
+                    <label for="migration_notice_course_count" class="form-label">Liczba kursów</label>
+                    <input id="migration_notice_course_count" type="number" name="course_count" min="1" max="99" inputmode="numeric"
+                           value="{{ $filters['course_count'] }}" class="form-control" placeholder="np. 4">
                 </div>
                 <input type="hidden" name="direction" value="{{ $filters['direction'] }}">
                 <div class="col-md-2 d-flex gap-2">
@@ -211,6 +216,7 @@
                         <input type="hidden" name="q" value="{{ $filters['q'] }}">
                         <input type="hidden" name="course_id" value="{{ $filters['course_id'] }}">
                         <input type="hidden" name="account" value="{{ $filters['account'] }}">
+                        <input type="hidden" name="course_count" value="{{ $filters['course_count'] }}">
                         <input type="hidden" name="direction" value="{{ $filters['direction'] }}">
                         <button type="submit" class="btn btn-primary" id="migrationNoticeBulkSendBtn" disabled data-loading-text="Zlecanie…">
                             Zatwierdź i wyślij
@@ -254,6 +260,7 @@
                         <input type="hidden" name="q" value="{{ $filters['q'] }}">
                         <input type="hidden" name="course_id" value="{{ $filters['course_id'] }}">
                         <input type="hidden" name="account" value="{{ $filters['account'] }}">
+                        <input type="hidden" name="course_count" value="{{ $filters['course_count'] }}">
                         <input type="hidden" name="direction" value="{{ $filters['direction'] }}">
                         <input type="hidden" name="email" id="migrationNoticeOneEmail" value="">
                         <button type="submit" class="btn btn-primary" id="migrationNoticeOneSendBtn" disabled data-loading-text="Wysyłanie…">

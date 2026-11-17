@@ -112,9 +112,9 @@ class OnlineCourseMigrationNoticeService
     /**
      * @return array{success: bool, error: ?string, queued: int}
      */
-    public function sendBulk(?int $courseId, string $search, string $account = 'all', ?int $createdBy = null): array
+    public function sendBulk(?int $courseId, string $search, string $account = 'all', ?int $createdBy = null, ?int $courseCount = null): array
     {
-        $emails = $this->unsentEmails($courseId, $search, $account);
+        $emails = $this->unsentEmails($courseId, $search, $account, $courseCount);
         if ($emails->isEmpty()) {
             return [
                 'success' => false,
@@ -196,11 +196,11 @@ class OnlineCourseMigrationNoticeService
         $this->markFailed($notice, 'Wysyłka przerwana.');
     }
 
-    public function people(?int $courseId, string $search, string $account, string $direction): LengthAwarePaginator
+    public function people(?int $courseId, string $search, string $account, string $direction, ?int $courseCount = null): LengthAwarePaginator
     {
         $direction = $direction === 'asc' ? 'asc' : 'desc';
 
-        return $this->peopleQuery($courseId, $search, $account)
+        return $this->peopleQuery($courseId, $search, $account, $courseCount)
             ->orderBy('course_count', $direction)
             ->orderBy('online_course_enrollments.email')
             ->paginate(50)
@@ -249,9 +249,9 @@ class OnlineCourseMigrationNoticeService
         }
     }
 
-    public function unsentCount(?int $courseId, string $search, string $account = 'all'): int
+    public function unsentCount(?int $courseId, string $search, string $account = 'all', ?int $courseCount = null): int
     {
-        return $this->unsentEmails($courseId, $search, $account)->count();
+        return $this->unsentEmails($courseId, $search, $account, $courseCount)->count();
     }
 
     /**
@@ -394,7 +394,7 @@ class OnlineCourseMigrationNoticeService
         ];
     }
 
-    private function peopleQuery(?int $courseId, string $search, string $account = 'all'): Builder
+    private function peopleQuery(?int $courseId, string $search, string $account = 'all', ?int $courseCount = null): Builder
     {
         $latest = $this->eligibleQuery()
             ->selectRaw('MAX(id) as id')
@@ -437,9 +437,23 @@ class OnlineCourseMigrationNoticeService
             });
         }
 
+        $this->applyCourseCountFilter($query, $courseCount);
         $this->applyAccountFilter($query, $account);
 
         return $query;
+    }
+
+    private function applyCourseCountFilter(Builder $query, ?int $courseCount): void
+    {
+        if ($courseCount === null) {
+            return;
+        }
+
+        $count = $this->courseCountSubquery();
+        $query->whereRaw(
+            '('.$count->toSql().') = ?',
+            [...$count->getBindings(), $courseCount]
+        );
     }
 
     private function applyAccountFilter(Builder $query, string $account): void
@@ -484,9 +498,9 @@ class OnlineCourseMigrationNoticeService
     /**
      * @return Collection<int, string>
      */
-    private function unsentEmails(?int $courseId, string $search, string $account = 'all'): Collection
+    private function unsentEmails(?int $courseId, string $search, string $account = 'all', ?int $courseCount = null): Collection
     {
-        return $this->peopleQuery($courseId, $search, $account)
+        return $this->peopleQuery($courseId, $search, $account, $courseCount)
             ->whereNotExists(function ($sub) {
                 $sub->selectRaw('1')
                     ->from('online_course_migration_notices')

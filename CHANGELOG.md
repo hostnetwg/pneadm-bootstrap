@@ -6,6 +6,7 @@ Krótka numeracja panelu. Szczegóły zawsze w `docs/`. Nowy numer wersji (np. 1
 
 Zaświadczenia: automatyczne czyszczenie starych plików PDF. Narzędzia deweloperskie: odświeżanie komputera deva jedną komendą.
 
+- **Hotfix 2026-11-17:** na [informacji o przeniesieniu kursów](/online-courses/migration-notice) jest filtr **Liczba kursów**. Wpisana liczba pokazuje tylko osoby z dokładnie tyloma kursami i tak samo zawęża wysyłkę zbiorczą. Kanon: [ONLINE-COURSES.md](docs/ONLINE-COURSES.md)
 - **Hotfix 2026-11-17:** na [informacji o przeniesieniu kursów](/online-courses/migration-notice) kolejne „Wyślij e-mail” otwiera okienko, a ekran nie zostaje przyciemniony. Poprzednia poprawka tego nie zdejmowała, bo panel ładuje okienka dwa razy. Kanon: [ONLINE-COURSES.md](docs/ONLINE-COURSES.md)
 - **Hotfix 2026-11-17:** na [informacji o przeniesieniu kursów](/online-courses/migration-notice) po wysłaniu jednego listu wiersz i licznik aktualizują się bez przeładowania strony. Kanon: [ONLINE-COURSES.md](docs/ONLINE-COURSES.md)
 - **Hotfix 2026-11-17:** na [informacji o przeniesieniu kursów](/online-courses/migration-notice) jest filtr **Konto pnedu.pl** (wszyscy, ma konto, brak konta). Zbiorcza wysyłka pokazuje postęp w kolejce i przycisk **Przerwij wysyłkę**. Kanon: [ONLINE-COURSES.md](docs/ONLINE-COURSES.md)

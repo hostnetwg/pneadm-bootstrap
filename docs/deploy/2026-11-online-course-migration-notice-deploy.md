@@ -40,7 +40,7 @@ Poprawka okienka (kolejne „Wyślij e-mail” nie zostawia przyciemnionego ekra
 ## Po deployu
 
 1. Wejdź na `/online-courses` i otwórz **Informacje o przeniesieniu kursów z nowoczesna-edukacja.pl**.
-2. Sprawdź dwa wzory listu na stronie i filtr **Konto pnedu.pl** (wszyscy, ma konto, brak konta).
+2. Sprawdź dwa wzory listu na stronie, filtr **Konto pnedu.pl** (wszyscy, ma konto, brak konta) i filtr **Liczba kursów** (wpisana liczba, dokładnie tyle osób).
 3. Wyślij **jeden** list na skrzynkę testową (przycisk przy osobie albo filtr, który zostawia jedną osobę). Sprawdź treść i kolumnę „wysłano”. Przy wysyłce zbiorczej na stronie zostaje pasek postępu i **Przerwij wysyłkę**.
 4. Nie uruchamiaj wysyłki zbiorczej do całej bazy w tym samym kroku co deploy.
 
