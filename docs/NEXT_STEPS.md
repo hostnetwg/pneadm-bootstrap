@@ -5,7 +5,7 @@ Status: plan roboczy, do potwierdzenia przez właściciela
 
 ## Ostatnio (2026-11-17) — Jeden list o przeniesieniu kursów na pnedu.pl
 
-Na liście kursów online jest **Informacje o przeniesieniu kursów z nowoczesna-edukacja.pl**. Strona pokazuje dwa wzory listu (bez konta i z kontem) oraz osoby z ważnym dostępem przeniesionym ze starej platformy, jedna linia na adres. Zbiorcza wysyłka idzie tylko do tych, którzy listu jeszcze nie dostali, i najpierw prosi o zatwierdzenie. Przy osobie jest podgląd jej wariantu. List nie zakłada konta: bez konta jest link rejestracji na ten sam e-mail. Migracja: `2026_11_17_140000_create_online_course_migration_notices_table`. Deploy: [2026-11-online-course-migration-notice-deploy.md](./deploy/2026-11-online-course-migration-notice-deploy.md). Kanon: [ONLINE-COURSES.md](./ONLINE-COURSES.md).
+Na liście kursów online jest **Informacje o przeniesieniu kursów z nowoczesna-edukacja.pl**. Strona pokazuje dwa wzory listu (bez konta i z kontem) oraz osoby z ważnym dostępem przeniesionym ze starej platformy, jedna linia na adres. Zbiorcza wysyłka idzie tylko do tych, którzy listu jeszcze nie dostali, i najpierw prosi o zatwierdzenie. Przy osobie jest podgląd jej wariantu. Filtr konta pnedu.pl: wszyscy, ma konto, brak konta. List nie zakłada konta: bez konta jest link rejestracji na ten sam e-mail. Migracja: `2026_11_17_140000_create_online_course_migration_notices_table`. Deploy: [2026-11-online-course-migration-notice-deploy.md](./deploy/2026-11-online-course-migration-notice-deploy.md). Kanon: [ONLINE-COURSES.md](./ONLINE-COURSES.md).
 
 ## Ostatnio (2026-11-17) — Landing zapisu z AI
 

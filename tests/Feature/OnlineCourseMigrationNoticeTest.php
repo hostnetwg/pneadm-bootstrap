@@ -9,6 +9,7 @@ use App\Models\OnlineCourseEnrollment;
 use App\Models\OnlineCourseMigrationNotice;
 use App\Models\PneduUser;
 use App\Models\User;
+use App\Services\OnlineCourseEnrollmentPneduAccountLookup;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
@@ -56,6 +57,9 @@ class OnlineCourseMigrationNoticeTest extends TestCase
             ->assertOk()
             ->assertSee('anna.dwa@example.test')
             ->assertSee('bartek.jeden@example.test')
+            ->assertSee('Przerwij wysyłkę')
+            ->assertSee('Ma konto')
+            ->assertSee('Brak konta')
             ->assertSee('nie zakłada konta')
             ->assertSee('Załóż konto na pnedu.pl')
             ->assertSee('Nie pamiętam hasła')
@@ -72,6 +76,25 @@ class OnlineCourseMigrationNoticeTest extends TestCase
             '/anna\.dwa@example\.test<\/td>\s*<td>2<\/td>/',
             $filtered->getContent()
         );
+
+        $this->app->instance(OnlineCourseEnrollmentPneduAccountLookup::class, $this->accountLookup(['bartek.jeden@example.test']));
+
+        $withAccount = $this->actingAs($admin)
+            ->get(route('online-courses.migration-notice.index', ['account' => 'yes']));
+        $withAccount->assertOk()
+            ->assertSee('bartek.jeden@example.test')
+            ->assertDontSee('anna.dwa@example.test');
+
+        $withoutAccount = $this->actingAs($admin)
+            ->get(route('online-courses.migration-notice.index', ['account' => 'no']));
+        $withoutAccount->assertOk()
+            ->assertSee('anna.dwa@example.test')
+            ->assertDontSee('bartek.jeden@example.test');
+
+        $this->actingAs($admin)
+            ->getJson(route('online-courses.migration-notice.unsent-count', ['account' => 'yes']))
+            ->assertOk()
+            ->assertJsonPath('unsent_count', 1);
 
         $this->get(route('online-courses.index'))
             ->assertOk()
@@ -159,6 +182,41 @@ class OnlineCourseMigrationNoticeTest extends TestCase
         $this->getJson(route('online-courses.migration-notice.batch-status'))
             ->assertOk()
             ->assertJsonPath('active', false);
+    }
+
+    /**
+     * @param  list<string>  $emailsWithAccount
+     */
+    private function accountLookup(array $emailsWithAccount): OnlineCourseEnrollmentPneduAccountLookup
+    {
+        $lookup = $this->createMock(OnlineCourseEnrollmentPneduAccountLookup::class);
+        $lookup->method('emailsHavingAccounts')->willReturnCallback(function ($emails) use ($emailsWithAccount) {
+            $found = [];
+            foreach ($emails as $email) {
+                $normalized = strtolower(trim((string) $email));
+                if (in_array($normalized, $emailsWithAccount, true)) {
+                    $found[] = $normalized;
+                }
+            }
+
+            return $found;
+        });
+        $lookup->method('byEmails')->willReturnCallback(function ($emails) use ($emailsWithAccount) {
+            $found = [];
+            foreach ($emails as $email) {
+                $normalized = strtolower(trim((string) $email));
+                if (! in_array($normalized, $emailsWithAccount, true)) {
+                    continue;
+                }
+                $user = new PneduUser;
+                $user->forceFill(['email' => $normalized]);
+                $found[$normalized] = $user;
+            }
+
+            return $found;
+        });
+
+        return $lookup;
     }
 
     private function course(string $title): OnlineCourse

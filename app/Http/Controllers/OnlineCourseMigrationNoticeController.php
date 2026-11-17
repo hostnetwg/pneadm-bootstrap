@@ -15,7 +15,7 @@ class OnlineCourseMigrationNoticeController extends Controller
     public function index(Request $request, OnlineCourseMigrationNoticeService $notices): View
     {
         $filters = $this->filters($request);
-        $people = $notices->people($filters['course_id'], $filters['q'], $filters['direction']);
+        $people = $notices->people($filters['course_id'], $filters['q'], $filters['account'], $filters['direction']);
         $rows = collect($people->items());
 
         return view('online-courses.migration-notice.index', [
@@ -26,7 +26,8 @@ class OnlineCourseMigrationNoticeController extends Controller
             'accounts' => $notices->accountsFor($rows->pluck('email')),
             'sampleWithoutAccount' => $notices->samplePreview(false),
             'sampleWithAccount' => $notices->samplePreview(true),
-            'unsentCount' => $notices->unsentCount($filters['course_id'], $filters['q']),
+            'unsentCount' => $notices->unsentCount($filters['course_id'], $filters['q'], $filters['account']),
+            'batch' => $notices->batchStatus(),
             'mailSystemConfig' => SystemMailDiagnostics::currentConfig(),
         ]);
     }
@@ -47,7 +48,7 @@ class OnlineCourseMigrationNoticeController extends Controller
         $filters = $this->filters($request);
 
         return response()->json([
-            'unsent_count' => $notices->unsentCount($filters['course_id'], $filters['q']),
+            'unsent_count' => $notices->unsentCount($filters['course_id'], $filters['q'], $filters['account']),
         ]);
     }
 
@@ -76,7 +77,11 @@ class OnlineCourseMigrationNoticeController extends Controller
     public function sendBulk(Request $request, OnlineCourseMigrationNoticeService $notices): RedirectResponse
     {
         $filters = $this->filters($request);
-        $result = $notices->sendBulk($filters['course_id'], $filters['q'], Auth::id());
+        $result = $notices->sendBulk($filters['course_id'], $filters['q'], $filters['account'], Auth::id());
+
+        if ($request->expectsJson()) {
+            return response()->json($result, ($result['success'] ?? false) ? 200 : 422);
+        }
 
         if (! ($result['success'] ?? false)) {
             return $this->back($request)->with('info', $result['error'] ?? 'Brak osób do wysyłki.');
@@ -84,7 +89,7 @@ class OnlineCourseMigrationNoticeController extends Controller
 
         return $this->back($request)->with(
             'success',
-            'Zlecono wysyłkę '.$result['queued'].' e-maili o przeniesieniu kursów na pnedu.pl. Wysyłka odbywa się w tle.'
+            'Zlecono wysyłkę '.$result['queued'].' e-maili o przeniesieniu kursów na pnedu.pl. Postęp jest na tej stronie.'
         );
     }
 
@@ -103,16 +108,18 @@ class OnlineCourseMigrationNoticeController extends Controller
     }
 
     /**
-     * @return array{q: string, course_id: ?int, direction: string}
+     * @return array{q: string, course_id: ?int, account: string, direction: string}
      */
     private function filters(Request $request): array
     {
         $courseId = $request->input('course_id', $request->query('course_id'));
         $courseId = is_numeric($courseId) ? (int) $courseId : null;
+        $account = (string) $request->input('account', $request->query('account', 'all'));
 
         return [
             'q' => trim((string) $request->input('q', $request->query('q', ''))),
             'course_id' => $courseId > 0 ? $courseId : null,
+            'account' => in_array($account, ['yes', 'no'], true) ? $account : 'all',
             'direction' => $request->input('direction', $request->query('direction')) === 'asc' ? 'asc' : 'desc',
         ];
     }

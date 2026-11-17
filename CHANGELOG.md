@@ -6,6 +6,7 @@ Krótka numeracja panelu. Szczegóły zawsze w `docs/`. Nowy numer wersji (np. 1
 
 Zaświadczenia: automatyczne czyszczenie starych plików PDF. Narzędzia deweloperskie: odświeżanie komputera deva jedną komendą.
 
+- **Hotfix 2026-11-17:** na [informacji o przeniesieniu kursów](/online-courses/migration-notice) jest filtr **Konto pnedu.pl** (wszyscy, ma konto, brak konta). Zbiorcza wysyłka pokazuje postęp w kolejce i przycisk **Przerwij wysyłkę**. Kanon: [ONLINE-COURSES.md](docs/ONLINE-COURSES.md)
 - **Hotfix 2026-11-17:** na [kursach online](/online-courses) jest **Informacje o przeniesieniu kursów z nowoczesna-edukacja.pl**. Jeden list na osobę, z listą jej ważnych kursów ze starej platformy. Nie zakłada konta. Kanon: [ONLINE-COURSES.md](docs/ONLINE-COURSES.md)
 - **Hotfix 2026-11-16:** na [sprawie szkolenia zamkniętego](/closed-training-cases), po zakończeniu szkolenia online, jest **Przygotuj e-mail z podziękowaniem**. Wstawia podziękowanie, listę uczestników (czy link do zaświadczenia poszedł na e-mail i czy zostało pobrane) oraz jeden link, z którego szkoła pobiera zaświadczenia tylko tego szkolenia. Kanon: [CERTIFICATE_DOWNLOAD_LINKS.md](docs/CERTIFICATE_DOWNLOAD_LINKS.md)
 - **Hotfix 2026-11-16:** link szkoły do listy zaświadczeń działa 2 miesiące. Na karcie sprawy można go **unieważnić** wcześniej. Kanon: [CERTIFICATE_DOWNLOAD_LINKS.md](docs/CERTIFICATE_DOWNLOAD_LINKS.md)

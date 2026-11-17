@@ -112,9 +112,9 @@ class OnlineCourseMigrationNoticeService
     /**
      * @return array{success: bool, error: ?string, queued: int}
      */
-    public function sendBulk(?int $courseId, string $search, ?int $createdBy = null): array
+    public function sendBulk(?int $courseId, string $search, string $account = 'all', ?int $createdBy = null): array
     {
-        $emails = $this->unsentEmails($courseId, $search);
+        $emails = $this->unsentEmails($courseId, $search, $account);
         if ($emails->isEmpty()) {
             return [
                 'success' => false,
@@ -196,11 +196,11 @@ class OnlineCourseMigrationNoticeService
         $this->markFailed($notice, 'Wysyłka przerwana.');
     }
 
-    public function people(?int $courseId, string $search, string $direction): LengthAwarePaginator
+    public function people(?int $courseId, string $search, string $account, string $direction): LengthAwarePaginator
     {
         $direction = $direction === 'asc' ? 'asc' : 'desc';
 
-        return $this->peopleQuery($courseId, $search)
+        return $this->peopleQuery($courseId, $search, $account)
             ->orderBy('course_count', $direction)
             ->orderBy('online_course_enrollments.email')
             ->paginate(50)
@@ -249,9 +249,9 @@ class OnlineCourseMigrationNoticeService
         }
     }
 
-    public function unsentCount(?int $courseId, string $search): int
+    public function unsentCount(?int $courseId, string $search, string $account = 'all'): int
     {
-        return $this->unsentEmails($courseId, $search)->count();
+        return $this->unsentEmails($courseId, $search, $account)->count();
     }
 
     /**
@@ -394,7 +394,7 @@ class OnlineCourseMigrationNoticeService
         ];
     }
 
-    private function peopleQuery(?int $courseId, string $search): Builder
+    private function peopleQuery(?int $courseId, string $search, string $account = 'all'): Builder
     {
         $latest = $this->eligibleQuery()
             ->selectRaw('MAX(id) as id')
@@ -437,7 +437,37 @@ class OnlineCourseMigrationNoticeService
             });
         }
 
+        $this->applyAccountFilter($query, $account);
+
         return $query;
+    }
+
+    private function applyAccountFilter(Builder $query, string $account): void
+    {
+        if ($account !== 'yes' && $account !== 'no') {
+            return;
+        }
+
+        try {
+            $emails = (clone $query)->pluck('online_course_enrollments.email');
+            $withAccount = $this->accounts->emailsHavingAccounts($emails);
+        } catch (\Throwable) {
+            return;
+        }
+
+        if ($account === 'yes') {
+            if ($withAccount === []) {
+                $query->whereRaw('0 = 1');
+            } else {
+                $query->whereIn('online_course_enrollments.email', $withAccount);
+            }
+
+            return;
+        }
+
+        if ($withAccount !== []) {
+            $query->whereNotIn('online_course_enrollments.email', $withAccount);
+        }
     }
 
     private function courseCountSubquery(): Builder
@@ -454,9 +484,9 @@ class OnlineCourseMigrationNoticeService
     /**
      * @return Collection<int, string>
      */
-    private function unsentEmails(?int $courseId, string $search): Collection
+    private function unsentEmails(?int $courseId, string $search, string $account = 'all'): Collection
     {
-        return $this->peopleQuery($courseId, $search)
+        return $this->peopleQuery($courseId, $search, $account)
             ->whereNotExists(function ($sub) {
                 $sub->selectRaw('1')
                     ->from('online_course_migration_notices')

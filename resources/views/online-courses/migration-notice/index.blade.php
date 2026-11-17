@@ -26,18 +26,26 @@
                 W tabeli są tylko ważne dostępy ze źródła przeniesienia. Zakupy złożone już na pnedu.pl, zapisy bezpłatne i wpisy ręczne są pominięte.
             </div>
 
-            <div id="migrationNoticeBatchAlert" class="alert alert-info d-none mb-3" role="alert"
+            <div id="migrationNoticeBatchAlert" class="alert alert-info {{ ($batch['active'] ?? false) ? '' : 'd-none' }} mb-3 sticky-top shadow-sm" style="z-index: 1020;" role="alert"
                  data-status-url="{{ route('online-courses.migration-notice.batch-status') }}"
                  data-cancel-url="{{ route('online-courses.migration-notice.batch-cancel') }}">
                 <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
-                    <span class="spinner-border spinner-border-sm sending-emails-spinner" aria-hidden="true"></span>
-                    <span class="sending-emails-text"><strong>Trwa wysyłanie e-maili.</strong></span>
-                    <span class="sending-emails-cancel-wrap d-none ms-auto">
+                    <span class="spinner-border spinner-border-sm sending-emails-spinner {{ ($batch['active'] ?? false) ? '' : 'd-none' }}" aria-hidden="true"></span>
+                    <span class="sending-emails-text">
+                        @if($batch['active'] ?? false)
+                            <strong>Trwa wysyłanie e-maili (informacja o przeniesieniu).</strong>
+                            Wykonano <strong>{{ (int) $batch['processed'] }} z {{ (int) $batch['total'] }}</strong>,
+                            błędów: <strong>{{ (int) $batch['failed'] }}</strong>.
+                        @else
+                            <strong>Trwa wysyłanie e-maili.</strong> Na koniec zobaczysz komunikat z potwierdzeniem.
+                        @endif
+                    </span>
+                    <span class="sending-emails-cancel-wrap {{ ($batch['active'] ?? false) ? '' : 'd-none' }} ms-auto">
                         <button type="button" class="btn btn-sm btn-outline-danger" id="cancelMigrationNoticeBatchBtn">Przerwij wysyłkę</button>
                     </span>
                 </div>
-                <div class="progress" style="height: 10px;" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Postęp wysyłki informacji o przeniesieniu">
-                    <div class="progress-bar progress-bar-striped progress-bar-animated" id="migrationNoticeProgressBar" style="width: 0%"></div>
+                <div class="progress" style="height: 10px;" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ ($batch['active'] ?? false) && (int) $batch['total'] > 0 ? (int) round(100 * (int) $batch['processed'] / (int) $batch['total']) : 0 }}" aria-label="Postęp wysyłki informacji o przeniesieniu">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated" id="migrationNoticeProgressBar" style="width: {{ ($batch['active'] ?? false) && (int) $batch['total'] > 0 ? (int) round(100 * (int) $batch['processed'] / (int) $batch['total']) : 0 }}%"></div>
                 </div>
             </div>
 
@@ -66,18 +74,19 @@
 
             <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
                 <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#migrationNoticeBulkModal"
-                        data-count-url="{{ route('online-courses.migration-notice.unsent-count', $filters) }}">
+                        data-count-url="{{ route('online-courses.migration-notice.unsent-count', $filters) }}"
+                        @disabled($batch['active'] ?? false)>
                     <i class="bi bi-send me-1"></i> Wyślij e-mail z informacją o przeniesieniu
                 </button>
                 <span class="text-muted small">Do wysłania przy obecnych filtrach: <strong>{{ $unsentCount }}</strong> osób, które jeszcze nie dostały listu.</span>
             </div>
 
             <form method="get" action="{{ route('online-courses.migration-notice.index') }}" class="row g-2 align-items-end mb-3">
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <label for="migration_notice_q" class="form-label">Szukaj</label>
                     <input id="migration_notice_q" type="search" name="q" value="{{ $filters['q'] }}" class="form-control" placeholder="Imię, nazwisko lub e-mail">
                 </div>
-                <div class="col-md-5">
+                <div class="col-md-4">
                     <label for="migration_notice_course" class="form-label">Kurs online nagrany</label>
                     <select id="migration_notice_course" name="course_id" class="form-select">
                         <option value="">Wszystkie kursy</option>
@@ -86,8 +95,16 @@
                         @endforeach
                     </select>
                 </div>
+                <div class="col-md-3">
+                    <label for="migration_notice_account" class="form-label">Konto pnedu.pl</label>
+                    <select id="migration_notice_account" name="account" class="form-select">
+                        <option value="all" @selected($filters['account'] === 'all')>Wszyscy</option>
+                        <option value="yes" @selected($filters['account'] === 'yes')>Ma konto</option>
+                        <option value="no" @selected($filters['account'] === 'no')>Brak konta</option>
+                    </select>
+                </div>
                 <input type="hidden" name="direction" value="{{ $filters['direction'] }}">
-                <div class="col-md-3 d-flex gap-2">
+                <div class="col-md-2 d-flex gap-2">
                     <button type="submit" class="btn btn-outline-secondary">Filtruj</button>
                     <a href="{{ route('online-courses.migration-notice.index') }}" class="btn btn-outline-secondary">Wyczyść</a>
                 </div>
@@ -193,6 +210,7 @@
                         @csrf
                         <input type="hidden" name="q" value="{{ $filters['q'] }}">
                         <input type="hidden" name="course_id" value="{{ $filters['course_id'] }}">
+                        <input type="hidden" name="account" value="{{ $filters['account'] }}">
                         <input type="hidden" name="direction" value="{{ $filters['direction'] }}">
                         <button type="submit" class="btn btn-primary" id="migrationNoticeBulkSendBtn" disabled data-loading-text="Zlecanie…">
                             Zatwierdź i wyślij
@@ -235,6 +253,7 @@
                         @csrf
                         <input type="hidden" name="q" value="{{ $filters['q'] }}">
                         <input type="hidden" name="course_id" value="{{ $filters['course_id'] }}">
+                        <input type="hidden" name="account" value="{{ $filters['account'] }}">
                         <input type="hidden" name="direction" value="{{ $filters['direction'] }}">
                         <input type="hidden" name="email" id="migrationNoticeOneEmail" value="">
                         <button type="submit" class="btn btn-primary" id="migrationNoticeOneSendBtn" disabled data-loading-text="Wysyłanie…">
@@ -342,10 +361,11 @@
                 return;
             }
             var pollId = null;
-            var seenActive = false;
+            var seenActive = !alertEl.classList.contains('d-none');
 
             function csrfHeaders() {
-                var token = document.querySelector('meta[name="csrf-token"]') && document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+                var token = (document.querySelector('meta[name="csrf-token"]') && document.querySelector('meta[name="csrf-token"]').getAttribute('content'))
+                    || (document.querySelector('input[name="_token"]') && document.querySelector('input[name="_token"]').value);
                 var headers = { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'Content-Type': 'application/x-www-form-urlencoded' };
                 if (token) {
                     headers['X-CSRF-TOKEN'] = token;
@@ -367,11 +387,60 @@
                 }
             }
 
+            function setSpinnerVisible(visible) {
+                var spinner = alertEl.querySelector('.sending-emails-spinner');
+                if (!spinner) {
+                    return;
+                }
+                spinner.classList.toggle('d-none', !visible);
+            }
+
             function stopPolling() {
                 if (pollId) {
                     clearInterval(pollId);
                     pollId = null;
                 }
+            }
+
+            function showBanner(kind) {
+                alertEl.classList.remove('d-none', 'alert-info', 'alert-success', 'alert-warning', 'alert-danger');
+                alertEl.classList.add(kind || 'alert-info');
+                alertEl.scrollIntoView({ block: 'nearest' });
+            }
+
+            function wireCancel() {
+                var cancelWrap = alertEl.querySelector('.sending-emails-cancel-wrap');
+                var textEl = alertEl.querySelector('.sending-emails-text');
+                if (!cancelWrap || !cancelUrl) {
+                    return;
+                }
+                cancelWrap.classList.remove('d-none');
+                var btn = cancelWrap.querySelector('#cancelMigrationNoticeBatchBtn');
+                if (!btn || btn.dataset.wired) {
+                    return;
+                }
+                btn.dataset.wired = '1';
+                btn.addEventListener('click', function () {
+                    btn.disabled = true;
+                    var csrf = csrfHeaders();
+                    fetch(cancelUrl, {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: csrf.headers,
+                        body: csrf.body
+                    }).then(function (r) { return r.json(); }).then(function () {
+                        stopPolling();
+                        cancelWrap.classList.add('d-none');
+                        setSpinnerVisible(false);
+                        showBanner('alert-warning');
+                        if (textEl) {
+                            textEl.innerHTML = '<strong>Wysyłka przerwana.</strong> Kończę odczyt kolejki…';
+                        }
+                        update();
+                    }).catch(function () {
+                        btn.disabled = false;
+                    });
+                });
             }
 
             function update() {
@@ -385,45 +454,46 @@
                             if (cancelWrap) {
                                 cancelWrap.classList.add('d-none');
                             }
+                            setSpinnerVisible(false);
                             if (!seenActive) {
                                 alertEl.classList.add('d-none');
                                 return;
                             }
                             if (data.state === 'finished') {
-                                alertEl.classList.remove('d-none', 'alert-info');
-                                alertEl.classList.add('alert-success');
+                                showBanner('alert-success');
                                 setProgressBar(data.processed, data.total, 'bg-success');
                                 if (textEl) {
-                                    textEl.innerHTML = '<strong>Wysyłka zakończona.</strong> Odświeżanie listy…';
+                                    textEl.innerHTML =
+                                        '<strong>Wysyłka zakończona.</strong> ' +
+                                        'Wysłano/obsłużono <strong>' + data.processed + ' z ' + data.total + '</strong>, ' +
+                                        'błędów: <strong>' + data.failed + '</strong>. Odświeżanie listy…';
                                 }
-                                setTimeout(function () { window.location.reload(); }, 1500);
+                                setTimeout(function () { window.location.reload(); }, 2500);
                             } else if (data.state === 'cancelled') {
-                                alertEl.classList.remove('d-none', 'alert-info');
-                                alertEl.classList.add('alert-warning');
+                                showBanner('alert-warning');
+                                setProgressBar(data.processed, data.total, 'bg-warning');
                                 if (textEl) {
-                                    textEl.innerHTML = '<strong>Wysyłka przerwana.</strong>';
+                                    textEl.innerHTML =
+                                        '<strong>Wysyłka przerwana.</strong> ' +
+                                        'Wykonano <strong>' + data.processed + ' z ' + data.total + '</strong>, ' +
+                                        'błędów: <strong>' + data.failed + '</strong>.';
                                 }
+                            } else {
+                                alertEl.classList.add('d-none');
                             }
                             return;
                         }
                         seenActive = true;
-                        alertEl.classList.remove('d-none');
+                        showBanner('alert-info');
+                        setSpinnerVisible(true);
                         setProgressBar(data.processed, data.total);
                         if (textEl) {
-                            textEl.innerHTML = '<strong>Trwa wysyłanie.</strong> Wykonano <strong>' + data.processed + ' z ' + data.total + '</strong>.';
+                            textEl.innerHTML =
+                                '<strong>Trwa wysyłanie e-maili (informacja o przeniesieniu).</strong> ' +
+                                'Wykonano <strong>' + data.processed + ' z ' + data.total + '</strong>, ' +
+                                'błędów: <strong>' + data.failed + '</strong>.';
                         }
-                        if (cancelWrap && cancelUrl) {
-                            cancelWrap.classList.remove('d-none');
-                            var btn = document.getElementById('cancelMigrationNoticeBatchBtn');
-                            if (btn && !btn.dataset.wired) {
-                                btn.dataset.wired = '1';
-                                btn.addEventListener('click', function () {
-                                    btn.disabled = true;
-                                    var csrf = csrfHeaders();
-                                    fetch(cancelUrl, { method: 'POST', credentials: 'same-origin', headers: csrf.headers, body: csrf.body });
-                                });
-                            }
-                        }
+                        wireCancel();
                         if (!pollId) {
                             pollId = setInterval(update, 2000);
                         }
@@ -431,6 +501,69 @@
                     .catch(function () {});
             }
 
+            var bulkForm = bulkModal && bulkModal.querySelector('form');
+            if (bulkForm) {
+                bulkForm.addEventListener('submit', function (event) {
+                    event.preventDefault();
+                    if (bulkForm.dataset.busy === '1') {
+                        return;
+                    }
+                    bulkForm.dataset.busy = '1';
+                    if (sendBtn) {
+                        sendBtn.disabled = true;
+                    }
+                    var modal = window.bootstrap && window.bootstrap.Modal.getInstance(bulkModal);
+                    if (modal) {
+                        modal.hide();
+                    }
+                    seenActive = true;
+                    showBanner('alert-info');
+                    setSpinnerVisible(true);
+                    setProgressBar(0, 0);
+                    var textEl = alertEl.querySelector('.sending-emails-text');
+                    if (textEl) {
+                        textEl.innerHTML = '<strong>Przygotowuję wysyłkę w kolejce.</strong> Za chwilę pojawi się postęp i przycisk przerwania.';
+                    }
+                    var body = new URLSearchParams(new FormData(bulkForm));
+                    var headers = csrfHeaders().headers;
+                    fetch(bulkForm.action, {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: headers,
+                        body: body
+                    }).then(function (r) {
+                        return r.json().then(function (data) { return { ok: r.ok, data: data }; });
+                    }).then(function (result) {
+                        bulkForm.dataset.busy = '0';
+                        if (!result.ok || !result.data.success) {
+                            setSpinnerVisible(false);
+                            showBanner('alert-danger');
+                            if (textEl) {
+                                textEl.textContent = (result.data && result.data.error) || 'Nie udało się zlecić wysyłki.';
+                            }
+                            if (sendBtn) {
+                                sendBtn.disabled = false;
+                            }
+                            return;
+                        }
+                        update();
+                    }).catch(function () {
+                        bulkForm.dataset.busy = '0';
+                        setSpinnerVisible(false);
+                        showBanner('alert-danger');
+                        if (textEl) {
+                            textEl.textContent = 'Nie udało się zlecić wysyłki.';
+                        }
+                        if (sendBtn) {
+                            sendBtn.disabled = false;
+                        }
+                    });
+                });
+            }
+
+            if (seenActive) {
+                wireCancel();
+            }
             update();
         })();
     </script>
