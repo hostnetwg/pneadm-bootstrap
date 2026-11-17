@@ -38,6 +38,7 @@
                         <a href="{{ route('online-courses.index') }}" class="btn btn-outline-secondary">Wyczyść</a>
                     @endif
                 </form>
+                <a href="{{ route('online-courses.migration-notice.index') }}" class="btn btn-outline-primary">Informacje o przeniesieniu kursów z nowoczesna-edukacja.pl</a>
                 <a href="{{ route('online-courses.create') }}" class="btn btn-primary">Nowy kurs online</a>
             </div>
             @if($canReorder)

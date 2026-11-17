@@ -96,6 +96,7 @@ Testy integracyjne z prawdziwym API Sendy — wyjątki mockowane przez `Http::fa
 | Import CSV dostępów kursów online (Publigo) | `--filter=OnlineCourseEnrollmentPubligoImport` |
 | Lista dostępów kursu online (wyszukiwarka, filtry, sort) | `--filter=OnlineCourseEnrollmentListQueryTest` |
 | E-mail przeniesienia kursu online na pnedu.pl | `--filter=OnlineCourseEnrollmentPlatformMigrationMailTest`, `--filter=test_online_course_platform_migration_mail_uses_system_mailer` |
+| Jeden list o przeniesieniu kursów (osoba, nie kurs) | `--filter=OnlineCourseMigrationNoticeTest` |
 | Katalog sprzedaży i warianty cenowe kursów online | `--filter=OnlineCourseSalesCatalogTest`, `--filter=ProductPriceTest` |
 | Kolejność kursów na `/kursy` | **pneadm:** `--filter=OnlineCourseCatalogOrderTest`; **pnedu:** `--filter=StorefrontCatalogOrderTest` |
 | Seria — auto format/szablon zaświadczeń | `--filter=CourseSeriesCertificateSettingsTest` |

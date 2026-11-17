@@ -42,6 +42,7 @@ use App\Http\Controllers\MarketingHelpController;
 use App\Http\Controllers\MarketingSourceTypeController;
 use App\Http\Controllers\NODNSzkoleniaController;
 use App\Http\Controllers\OnlineCourseEnrollmentController;
+use App\Http\Controllers\OnlineCourseMigrationNoticeController;
 use App\Http\Controllers\OnlineCourseLessonController;
 use App\Http\Controllers\OnlineCourseModuleController;
 use App\Http\Controllers\OnlineCourseSalesController;
@@ -619,6 +620,20 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
         ->name('online-courses.linkable-courses.search');
     Route::post('online-courses/reorder', [OnlineCoursesController::class, 'reorder'])
         ->name('online-courses.reorder');
+    Route::get('online-courses/migration-notice', [OnlineCourseMigrationNoticeController::class, 'index'])
+        ->name('online-courses.migration-notice.index');
+    Route::get('online-courses/migration-notice/preview', [OnlineCourseMigrationNoticeController::class, 'preview'])
+        ->name('online-courses.migration-notice.preview');
+    Route::get('online-courses/migration-notice/unsent-count', [OnlineCourseMigrationNoticeController::class, 'unsentCount'])
+        ->name('online-courses.migration-notice.unsent-count');
+    Route::post('online-courses/migration-notice/send', [OnlineCourseMigrationNoticeController::class, 'send'])
+        ->name('online-courses.migration-notice.send');
+    Route::post('online-courses/migration-notice/send-bulk', [OnlineCourseMigrationNoticeController::class, 'sendBulk'])
+        ->name('online-courses.migration-notice.send-bulk');
+    Route::get('online-courses/migration-notice/batch-status', [OnlineCourseMigrationNoticeController::class, 'batchStatus'])
+        ->name('online-courses.migration-notice.batch-status');
+    Route::post('online-courses/migration-notice/batch-cancel', [OnlineCourseMigrationNoticeController::class, 'cancelBatch'])
+        ->name('online-courses.migration-notice.batch-cancel');
     Route::resource('online-courses', OnlineCoursesController::class);
     Route::get('online-courses/{online_course}/sales', [OnlineCourseSalesController::class, 'edit'])
         ->name('online-courses.sales.edit');
