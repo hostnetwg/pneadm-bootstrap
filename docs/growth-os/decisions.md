@@ -436,6 +436,6 @@ Consequences: Tabela `growth_ai_prompts`. Edytor na karcie projektu. `GrowthAiPr
 
 Date: 2026-11-17<br>
 Status: ACTIVE<br>
-Decision: Materiał **Formularz zapisu / landing** dostaje szkic AI w tym samym obiegu co opis YouTube: nowy szkic, poprawka własnego HTML i ponowna poprawka. Wynik to fragment HTML Bootstrap 5, bez dokumentu, menu i kontenera, bo pnedu.pl ma własny układ. Przycisk zapisu ma znacznik `[LINK DO ZAPISU]`, który aplikacja podmienia na link z karty projektu. Zatwierdzony opis YouTube jest źródłem faktów. Szkic nie publikuje strony.<br>
-Rationale: Właściciel chce treść landingu gotową do wklejenia na pnedu.pl, czytelną i w Bootstrapie.<br>
-Consequences: Profil `material_landing_v1`. `LandingHtmlFormatter` zostawia bezpieczne znaczniki i klasy Bootstrapa. Bez migracji i bez zapisu na pnedu.pl.
+Decision: Materiał **Formularz zapisu / landing** dostaje szkic AI w tym samym obiegu co opis YouTube: nowy szkic, poprawka własnego HTML i ponowna poprawka. Wynik to sam opis w HTML Bootstrap 5, bez dokumentu, menu, kontenera i przycisku, bo pnedu.pl ma własny układ i własny przycisk zapisu. Zatwierdzony opis YouTube jest źródłem faktów. Szkic nie publikuje strony.<br>
+Rationale: Właściciel chce treść landingu gotową do wklejenia na pnedu.pl, czytelną i w Bootstrapie. Przycisk „Zapisz się bezpłatnie” jest już na stronie zapisu.<br>
+Consequences: Profil `material_landing_v2`. `LandingHtmlFormatter` zostawia bezpieczne znaczniki i klasy Bootstrapa oraz usuwa przycisk zapisu. Bez migracji i bez zapisu na pnedu.pl.

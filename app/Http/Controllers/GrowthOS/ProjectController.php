@@ -709,7 +709,14 @@ class ProjectController extends Controller
         }
 
         $materialEditorDraft = (string) session('material_restored_draft', $item['draft'] ?? '');
-        if ($isFacebookPost || $isLanding) {
+        if ($isLanding) {
+            $materialEditorDraft = \App\Support\GrowthOS\LandingHtmlFormatter::sanitize($materialEditorDraft);
+            if (is_array($aiDraftProposal)) {
+                $aiDraftProposal['draft'] = \App\Support\GrowthOS\LandingHtmlFormatter::sanitize((string) ($aiDraftProposal['draft'] ?? ''));
+                $aiDraftProposal['compare_draft'] = \App\Support\GrowthOS\LandingHtmlFormatter::sanitize((string) ($aiDraftProposal['compare_draft'] ?? ''));
+            }
+        }
+        if ($isFacebookPost) {
             $registrationUrl = $projectItem['registration_url'] ?? null;
             $materialEditorDraft = \App\Support\GrowthOS\GrowthMailUrls::withRegistrationLink(
                 $materialEditorDraft,
@@ -1419,10 +1426,7 @@ class ProjectController extends Controller
                 DemoTikWebinarProject::requireProject($project)['registration_url'] ?? null,
             );
         } elseif ($material === MaterialDraftTask::LANDING_MATERIAL_KEY && array_key_exists('draft', $data)) {
-            $data['draft'] = \App\Support\GrowthOS\GrowthMailUrls::withRegistrationLink(
-                \App\Support\GrowthOS\LandingHtmlFormatter::sanitize((string) ($data['draft'] ?? '')),
-                DemoTikWebinarProject::requireProject($project)['registration_url'] ?? null,
-            );
+            $data['draft'] = \App\Support\GrowthOS\LandingHtmlFormatter::sanitize((string) ($data['draft'] ?? ''));
         }
 
         $wasSkipped = DemoTikWebinarProject::isMaterialSkipped(DemoTikWebinarProject::material($project, $material));

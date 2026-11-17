@@ -104,16 +104,16 @@
                             @error('mail_body')<div class="invalid-feedback">{{ $message }}</div>@enderror
                         @else
                             @if($aiDraftIsLanding)
-                                <p class="small text-secondary">Podgląd fragmentu Bootstrap 5. Na pnedu.pl dokleja się do istniejącej strony, bez menu i bez własnego kontenera.</p>
+                                <p class="small text-secondary">Podgląd samego opisu. Na pnedu.pl dokleja się do istniejącej strony. Przycisk zapisu dodaje pnedu.pl.</p>
                                 <div class="border rounded p-3 mb-3 bg-white" data-landing-preview>
-                                    {!! \App\Support\GrowthOS\LandingHtmlFormatter::preview($materialEditorDraft ?? '', $project['registration_url'] ?? null) !!}
+                                    {!! \App\Support\GrowthOS\LandingHtmlFormatter::preview($materialEditorDraft ?? '') !!}
                                 </div>
                                 <label for="draft" class="form-label">Kod HTML</label>
                             @else
                                 <label for="draft" class="visually-hidden">Szkic</label>
                             @endif
                             <textarea id="draft" name="draft" class="form-control growth-draft-editor" rows="14" @readonly($materialSkipped)>{{ old('draft', $materialEditorDraft ?? session('material_restored_draft', $material['draft'])) }}</textarea>
-                            @if($aiDraftIsFacebookPost || $aiDraftIsLanding)
+                            @if($aiDraftIsFacebookPost)
                                 @if(filled($project['registration_url'] ?? null))
                                     <p class="form-text mb-0">Link do zapisów z karty projektu jest wstawiany zamiast {{ \App\Services\GrowthOS\AI\Tasks\MaterialDraftTask::LINK_PLACEHOLDER }}.</p>
                                 @else
@@ -549,7 +549,7 @@
                                 </p>
                             @endif
 
-                            @if($aiDraftIsFacebookPost || $aiDraftIsLanding)
+                            @if($aiDraftIsFacebookPost)
                                 <p class="small text-secondary mb-3">
                                     AI nie poda adresu URL — wstawi {{ \App\Services\GrowthOS\AI\Tasks\MaterialDraftTask::LINK_PLACEHOLDER }}.
                                     Aplikacja podmieni go na link do zapisów z karty projektu (gdy jest uzupełniony).
@@ -557,7 +557,7 @@
                             @endif
                             @if($aiDraftIsLanding)
                                 <p class="small text-secondary mb-3">
-                                    Szkic to fragment HTML Bootstrap 5: tytuł, termin, przycisk zapisu, dla kogo, lista korzyści, plan i prowadzący.
+                                    Szkic to sam opis w HTML Bootstrap 5: tytuł, termin, dla kogo, lista korzyści, plan i prowadzący. Bez przycisku „Zapisz się” — ten dodaje pnedu.pl.
                                     „Poproś AI o nowy szkic” pisze od zera. „Popraw mój szkic” redaguje kod z pola powyżej, także niezapisany.
                                 </p>
                             @endif
@@ -835,7 +835,7 @@
                         <div class="col-lg-6">
                             <div class="small fw-semibold mb-1">{{ $compareLabel }}</div>
                             @if($aiDraftIsLanding)
-                                <div class="border rounded p-3 bg-white">{!! \App\Support\GrowthOS\LandingHtmlFormatter::preview((string) ($proposalMode !== null ? ($aiDraftProposal['compare_draft'] ?? '') : $material['draft']), $project['registration_url'] ?? null) !!}</div>
+                                <div class="border rounded p-3 bg-white">{!! \App\Support\GrowthOS\LandingHtmlFormatter::preview((string) ($proposalMode !== null ? ($aiDraftProposal['compare_draft'] ?? '') : $material['draft'])) !!}</div>
                             @else
                                 <div class="growth-compare">{{ $proposalMode !== null ? ($aiDraftProposal['compare_draft'] ?? '') : $material['draft'] }}</div>
                             @endif
@@ -843,7 +843,7 @@
                         <div class="col-lg-6">
                             <div class="small fw-semibold mb-1">Propozycja AI</div>
                             @if($aiDraftIsLanding)
-                                <div class="border rounded p-3 bg-white">{!! \App\Support\GrowthOS\LandingHtmlFormatter::preview((string) ($aiDraftProposal['draft'] ?? ''), $project['registration_url'] ?? null) !!}</div>
+                                <div class="border rounded p-3 bg-white">{!! \App\Support\GrowthOS\LandingHtmlFormatter::preview((string) ($aiDraftProposal['draft'] ?? '')) !!}</div>
                             @else
                             @php
                                 $proposalMail = $aiDraftIsMail ? \App\Services\GrowthOS\AI\Tasks\MaterialDraftTask::parseMainMail((string) $aiDraftProposal['draft']) : null;

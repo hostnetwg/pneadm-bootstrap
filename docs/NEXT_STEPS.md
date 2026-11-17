@@ -5,7 +5,7 @@ Status: plan roboczy, do potwierdzenia przez właściciela
 
 ## Ostatnio (2026-11-17) — Landing zapisu z AI
 
-Na materiale **Formularz zapisu / landing** AI przygotowuje fragment HTML Bootstrap 5. Jest podgląd i kod do wklejenia na pnedu.pl. Przycisk zapisu używa linku z karty projektu. Nic nie jest publikowane samo. Bez migracji. Kanon: [growth-os/CURRENT.md](./growth-os/CURRENT.md).
+Na materiale **Formularz zapisu / landing** AI przygotowuje sam opis w HTML Bootstrap 5. Jest podgląd i kod do wklejenia na pnedu.pl. Przycisku „Zapisz się” nie ma, bo dodaje go pnedu.pl. Nic nie jest publikowane samo. Bez migracji. Kanon: [growth-os/CURRENT.md](./growth-os/CURRENT.md).
 
 ## Ostatnio (2026-11-17) — Edycja promptów systemowych Growth OS
 

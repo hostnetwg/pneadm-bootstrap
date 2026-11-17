@@ -116,7 +116,7 @@ final class MaterialDraftTask implements GrowthAiTask
 
     public const LANDING_PROFILE = 'landing_v1';
 
-    public const LANDING_PROMPT_VERSION = 'material_landing_v1';
+    public const LANDING_PROMPT_VERSION = 'material_landing_v2';
 
     public const LANDING_SCHEMA_VERSION = 'material_landing_schema_v1';
 
@@ -940,7 +940,7 @@ final class MaterialDraftTask implements GrowthAiTask
     private function scrubDisallowedUrls(string $text, array $input): string
     {
         $allowedUrls = ProhibitedData::urls(json_encode($input, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR));
-        $replacement = in_array($this->materialKey, [self::FACEBOOK_MATERIAL_KEY, self::HOST_SCRIPT_MATERIAL_KEY, self::LANDING_MATERIAL_KEY], true)
+        $replacement = in_array($this->materialKey, [self::FACEBOOK_MATERIAL_KEY, self::HOST_SCRIPT_MATERIAL_KEY], true)
             ? self::LINK_PLACEHOLDER
             : '';
 
@@ -1121,11 +1121,11 @@ PROMPT;
 Jesteś redaktorem stron zapisu na webinary edukacyjne PNE. Przygotuj treść landingu „Formularz zapisu”, gotową do wklejenia na pnedu.pl.
 Pisz wyłącznie po polsku, naturalną i poprawną polszczyzną. Odbiorców określ na podstawie pola direction.audience (nauczyciele i/lub dyrektorzy).
 
-Wynik w polu draft to fragment HTML Bootstrap 5, bez <!DOCTYPE>, <html>, <head>, <body>, <style> i <script>. Strona pnedu.pl ma już własny nagłówek, menu i kontener, więc nie dodawaj klasy container.
-Używaj tylko tych znaczników: section, div, h1, h2, h3, p, ul, ol, li, strong, em, a, span, br.
-Klasy tylko z Bootstrapa 5, na przykład: py-4, py-5, row, g-4, col-lg-8, display-6, fw-bold, lead, text-secondary, badge, text-bg-light, border, list-group, list-group-flush, list-group-item, bg-light, rounded-3, px-4, text-center, btn, btn-primary, btn-lg, mb-2, mb-3, mb-4.
-Jeden h1 z tytułem webinaru. Potem krótkie zdanie obietnicy (lead), termin i przycisk zapisu. Dalej sekcje: dla kogo, czego uczestnik się dowie (lista z koncepcji), plan spotkania, prowadzący, na końcu drugie wezwanie do zapisu.
-Przycisk zapisu to link: <a class="btn btn-primary btn-lg" href="[LINK DO ZAPISU]">Zapisz się bezpłatnie</a>. Nie wymyślaj adresu URL. Znacznik [LINK DO ZAPISU] zostaw dokładnie w takiej formie.
+Wynik w polu draft to sam opis: fragment HTML Bootstrap 5, bez <!DOCTYPE>, <html>, <head>, <body>, <style> i <script>. Strona pnedu.pl ma już własny nagłówek, menu, kontener i przycisk zapisu, więc nie dodawaj klasy container ani żadnego przycisku.
+Używaj tylko tych znaczników: section, div, h1, h2, h3, p, ul, ol, li, strong, em, span, br.
+Klasy tylko z Bootstrapa 5, na przykład: py-4, py-5, row, g-4, col-lg-8, display-6, fw-bold, lead, text-secondary, badge, text-bg-light, border, list-group, list-group-flush, list-group-item, bg-light, rounded-3, px-4, mb-2, mb-3, mb-4.
+Jeden h1 z tytułem webinaru. Potem krótkie zdanie obietnicy (lead) i termin. Dalej sekcje: dla kogo, czego uczestnik się dowie (lista z koncepcji), plan spotkania i prowadzący.
+Nie wstawiaj przycisku, linku ani wezwania „Zapisz się”, „Zapisz się bezpłatnie” ani znacznika [LINK DO ZAPISU]. Nie wymyślaj adresu URL.
 Termin przepisz z campaign.live_label. Jeżeli live_label jest puste, użyj campaign.live_date i campaign.live_time. Nie zmieniaj terminu.
 Jeżeli campaign.host_name nie jest puste, przedstaw prowadzącego dokładnie tym imieniem i nazwiskiem, bez tytułów, stanowisk i biografii. Jeżeli jest puste, nie wymyślaj prowadzącego.
 Jeżeli source_materials.youtube_description nie jest puste, to zatwierdzony opis YouTube. Traktuj go jako źródło faktów, ale landing ma być stroną do czytania, nie kopią opisu.

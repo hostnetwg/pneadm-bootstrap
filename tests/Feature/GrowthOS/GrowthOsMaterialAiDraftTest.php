@@ -109,8 +109,9 @@ class GrowthOsMaterialAiDraftTest extends TestCase
 
         $draft = (string) $this->proposal('landing')['draft'];
         $this->assertStringContainsString('<h1', $draft);
-        $this->assertStringContainsString('btn btn-primary', $draft);
-        $this->assertStringContainsString('[LINK DO ZAPISU]', $draft);
+        $this->assertStringNotContainsString('btn', $draft);
+        $this->assertStringNotContainsString('Zapisz się', $draft);
+        $this->assertStringNotContainsString('[LINK DO ZAPISU]', $draft);
         $this->assertStringNotContainsString('<script', strtolower($draft));
         $this->assertStringNotContainsString('onclick', strtolower($draft));
         $this->assertArrayHasKey('youtube_description', $this->provider->input['source_materials']);

@@ -2866,6 +2866,9 @@ class DemoTikWebinarProject
                 if ($materialId === MaterialDraftTask::FACEBOOK_MATERIAL_KEY) {
                     $draft = GrowthMailUrls::withRegistrationLink($draft, $project['registration_url'] ?? null);
                 }
+                if ($materialId === MaterialDraftTask::LANDING_MATERIAL_KEY) {
+                    $draft = LandingHtmlFormatter::sanitize($draft);
+                }
                 $project['materials'][$index]['draft'] = $draft;
                 $project['materials'][$index]['status'] = 'DRAFT';
                 $project['materials'][$index]['updated_at'] = now()->toIso8601String();
@@ -3264,7 +3267,6 @@ class DemoTikWebinarProject
         $host = trim((string) ($project['host'] ?? ''));
         $when = trim((string) (($project['live_date'] ?? '').' godz. '.($project['live_time'] ?? '')));
         $learn = $ty ? 'Czego się dowiesz' : 'Czego dowiedzą się Państwo';
-        $invite = $ty ? 'Zapisz się bezpłatnie' : 'Zapiszą się Państwo bezpłatnie';
         $points = collect(is_array($concept['points'] ?? null) ? $concept['points'] : [])
             ->map(fn (mixed $point): string => trim((string) $point))
             ->filter(fn (string $point): bool => $point !== '')
@@ -3275,8 +3277,7 @@ class DemoTikWebinarProject
         $html = '<section class="py-5"><p class="text-primary fw-semibold mb-2">Bezpłatny webinar</p>'
             .'<h1 class="display-6 fw-bold">'.$escape($title).'</h1>'
             .($promise !== '' ? '<p class="lead">'.$escape($promise).'</p>' : '')
-            .'<p class="mb-4"><span class="badge text-bg-light border">'.$escape($when).'</span></p>'
-            .'<a class="btn btn-primary btn-lg" href="'.MaterialDraftTask::LINK_PLACEHOLDER.'">'.$invite.'</a></section>';
+            .'<p class="mb-0"><span class="badge text-bg-light border">'.$escape($when).'</span></p></section>';
 
         if ($points !== '') {
             $html .= '<section class="py-4 bg-light rounded-3 px-4"><h2 class="h3">'.$learn.'</h2><ul class="list-group list-group-flush">'.$points.'</ul></section>';
@@ -3287,9 +3288,9 @@ class DemoTikWebinarProject
         if ($host !== '') {
             $html .= '<section class="py-4"><h2 class="h3">Prowadzący</h2><p>'.$escape($host).'</p></section>';
         }
-        $html .= '<section class="py-5 text-center"><h2 class="h3">Zapisz się</h2>'
-            .($cta !== '' ? '<p class="mb-4">'.$escape($cta).'</p>' : '')
-            .'<a class="btn btn-primary btn-lg" href="'.MaterialDraftTask::LINK_PLACEHOLDER.'">'.$invite.'</a></section>';
+        if ($cta !== '' && preg_match('/^zapi(?:sz|szcie|szą)\b/iu', $cta) !== 1) {
+            $html .= '<section class="py-4"><p>'.$escape($cta).'</p></section>';
+        }
 
         return LandingHtmlFormatter::sanitize($html);
     }

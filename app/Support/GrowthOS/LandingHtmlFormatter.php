@@ -46,17 +46,21 @@ final class LandingHtmlFormatter
         }
 
         self::sanitizeChildren($root);
+        self::pruneEmpty($root);
 
         $result = '';
         foreach ($root->childNodes as $child) {
             $result .= $document->saveHTML($child);
         }
 
-        // DOM encodes the registration placeholder inside href. Keep the readable token
-        // so the project link can still replace it.
         $result = str_ireplace(
-            ['%5BLINK%20DO%20ZAPISU%5D', '&#91;LINK DO ZAPISU&#93;', '&#x5B;LINK DO ZAPISU&#x5D;'],
-            MaterialDraftTask::LINK_PLACEHOLDER,
+            [
+                MaterialDraftTask::LINK_PLACEHOLDER,
+                '%5BLINK%20DO%20ZAPISU%5D',
+                '&#91;LINK DO ZAPISU&#93;',
+                '&#x5B;LINK DO ZAPISU&#x5D;',
+            ],
+            '',
             $result,
         );
 
@@ -64,11 +68,11 @@ final class LandingHtmlFormatter
     }
 
     /**
-     * Safe HTML for the admin preview. A known registration URL replaces the placeholder.
+     * Safe HTML for the admin preview. The registration button stays on pnedu.pl.
      */
-    public static function preview(string $html, mixed $registrationUrl = null): string
+    public static function preview(string $html): string
     {
-        return self::sanitize(GrowthMailUrls::withRegistrationLink($html, $registrationUrl));
+        return self::sanitize($html);
     }
 
     private static function sanitizeChildren(DOMNode $node): void
@@ -84,7 +88,7 @@ final class LandingHtmlFormatter
             }
 
             $tag = strtolower($child->tagName);
-            if (in_array($tag, ['script', 'style', 'iframe', 'object', 'embed', 'form', 'input', 'button', 'link', 'meta'], true)) {
+            if (self::isSignupControl($child) || in_array($tag, ['script', 'style', 'iframe', 'object', 'embed', 'form', 'input', 'button', 'link', 'meta'], true)) {
                 $child->parentNode?->removeChild($child);
 
                 continue;
@@ -137,6 +141,53 @@ final class LandingHtmlFormatter
 
         foreach ($allowed as $name => $value) {
             $element->setAttribute($name, $value);
+        }
+    }
+
+    private static function isSignupControl(DOMElement $element): bool
+    {
+        $tag = strtolower($element->tagName);
+        $class = $element->getAttribute('class');
+        $href = html_entity_decode(trim($element->getAttribute('href')), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+        if ($tag === 'a' && preg_match('/(?:^|\s)btn(?:\s|$)/', $class) === 1) {
+            return true;
+        }
+
+        if ($tag === 'a' && str_contains($href, MaterialDraftTask::LINK_PLACEHOLDER)) {
+            return true;
+        }
+
+        $label = trim(mb_strtolower(preg_replace('/\s+/u', ' ', $element->textContent) ?? ''));
+        $label = trim($label, " \t\n\r\0\x0B.,:;!");
+
+        return in_array($tag, ['a', 'h2', 'h3', 'p'], true) && in_array($label, [
+            'zapisz się',
+            'zapisz się bezpłatnie',
+            'zapiszcie się',
+            'zapiszcie się bezpłatnie',
+            'zapiszą się państwo',
+            'zapiszą się państwo bezpłatnie',
+        ], true);
+    }
+
+    private static function pruneEmpty(DOMElement $element): void
+    {
+        $children = [];
+        foreach ($element->childNodes as $child) {
+            $children[] = $child;
+        }
+
+        foreach ($children as $child) {
+            if (! $child instanceof DOMElement) {
+                continue;
+            }
+
+            self::pruneEmpty($child);
+            $tag = strtolower($child->tagName);
+            if (in_array($tag, ['section', 'div', 'p'], true) && trim($child->textContent) === '') {
+                $child->parentNode?->removeChild($child);
+            }
         }
     }
 }
