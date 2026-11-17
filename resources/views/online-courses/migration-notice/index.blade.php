@@ -271,9 +271,58 @@
     @push('scripts')
     <script>
         (function () {
+            function moveModalToBody(modalEl) {
+                if (modalEl && modalEl.parentNode !== document.body) {
+                    document.body.appendChild(modalEl);
+                }
+            }
+
+            function closeModal(modalEl) {
+                if (!modalEl) {
+                    return;
+                }
+                var token = String(Date.now());
+                modalEl.dataset.closing = token;
+                modalEl.addEventListener('show.bs.modal', function () {
+                    if (modalEl.dataset.closing === token) {
+                        delete modalEl.dataset.closing;
+                    }
+                }, { once: true });
+                function clearBackdrop() {
+                    if (document.querySelector('.modal.show')) {
+                        return;
+                    }
+                    document.querySelectorAll('.modal-backdrop').forEach(function (el) {
+                        el.remove();
+                    });
+                    document.body.classList.remove('modal-open');
+                    document.body.style.removeProperty('overflow');
+                    document.body.style.removeProperty('padding-right');
+                }
+                var instance = window.bootstrap && window.bootstrap.Modal.getInstance(modalEl);
+                if (instance) {
+                    modalEl.addEventListener('hidden.bs.modal', clearBackdrop, { once: true });
+                    instance.hide();
+                }
+                window.setTimeout(function () {
+                    if (modalEl.dataset.closing !== token) {
+                        return;
+                    }
+                    delete modalEl.dataset.closing;
+                    if (modalEl.classList.contains('show')) {
+                        modalEl.classList.remove('show');
+                        modalEl.style.display = 'none';
+                        modalEl.setAttribute('aria-hidden', 'true');
+                        modalEl.removeAttribute('aria-modal');
+                    }
+                    clearBackdrop();
+                }, 400);
+            }
+
             var bulkModal = document.getElementById('migrationNoticeBulkModal');
             var countEl = document.getElementById('migrationNoticeBulkCount');
             var sendBtn = document.getElementById('migrationNoticeBulkSendBtn');
+            moveModalToBody(bulkModal);
             if (bulkModal) {
                 bulkModal.addEventListener('show.bs.modal', function (event) {
                     var trigger = event.relatedTarget;
@@ -297,6 +346,7 @@
             }
 
             var oneModal = document.getElementById('migrationNoticeOneModal');
+            moveModalToBody(oneModal);
             if (oneModal) {
                 var loadingEl = document.getElementById('migrationNoticeOneLoading');
                 var errorEl = document.getElementById('migrationNoticeOneError');
@@ -407,10 +457,7 @@
                                 live.className = 'alert alert-success';
                                 live.textContent = 'E-mail o przeniesieniu kursów został wysłany na adres ' + email + '.';
                             }
-                            var modal = window.bootstrap && window.bootstrap.Modal.getInstance(oneModal);
-                            if (modal) {
-                                modal.hide();
-                            }
+                            closeModal(oneModal);
                         }).catch(function () {
                             oneForm.dataset.busy = '0';
                             oneSend.disabled = false;
@@ -580,10 +627,7 @@
                     if (sendBtn) {
                         sendBtn.disabled = true;
                     }
-                    var modal = window.bootstrap && window.bootstrap.Modal.getInstance(bulkModal);
-                    if (modal) {
-                        modal.hide();
-                    }
+                    closeModal(bulkModal);
                     seenActive = true;
                     showBanner('alert-info');
                     setSpinnerVisible(true);

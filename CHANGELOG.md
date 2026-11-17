@@ -6,6 +6,7 @@ Krótka numeracja panelu. Szczegóły zawsze w `docs/`. Nowy numer wersji (np. 1
 
 Zaświadczenia: automatyczne czyszczenie starych plików PDF. Narzędzia deweloperskie: odświeżanie komputera deva jedną komendą.
 
+- **Hotfix 2026-11-17:** na [informacji o przeniesieniu kursów](/online-courses/migration-notice) kolejne „Wyślij e-mail” znów otwiera okienko. Po poprzedniej wysyłce ekran zostawał przyciemniony i niedostępny. Kanon: [ONLINE-COURSES.md](docs/ONLINE-COURSES.md)
 - **Hotfix 2026-11-17:** na [informacji o przeniesieniu kursów](/online-courses/migration-notice) po wysłaniu jednego listu wiersz i licznik aktualizują się bez przeładowania strony. Kanon: [ONLINE-COURSES.md](docs/ONLINE-COURSES.md)
 - **Hotfix 2026-11-17:** na [informacji o przeniesieniu kursów](/online-courses/migration-notice) jest filtr **Konto pnedu.pl** (wszyscy, ma konto, brak konta). Zbiorcza wysyłka pokazuje postęp w kolejce i przycisk **Przerwij wysyłkę**. Kanon: [ONLINE-COURSES.md](docs/ONLINE-COURSES.md)
 - **Hotfix 2026-11-17:** na [kursach online](/online-courses) jest **Informacje o przeniesieniu kursów z nowoczesna-edukacja.pl**. Jeden list na osobę, z listą jej ważnych kursów ze starej platformy. Nie zakłada konta. Kanon: [ONLINE-COURSES.md](docs/ONLINE-COURSES.md)
