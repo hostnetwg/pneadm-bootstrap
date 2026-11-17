@@ -3,6 +3,7 @@
 namespace App\Services\GrowthOS\AI\Tasks;
 
 use App\Services\GrowthOS\AI\Exceptions\GrowthAiException;
+use App\Services\GrowthOS\AI\Support\GrowthAiPromptLibrary;
 use App\Services\GrowthOS\AI\Support\ProhibitedData;
 use InvalidArgumentException;
 
@@ -89,19 +90,18 @@ final class GraphicImageTask
         string $liveLabel,
         string $providerSize,
     ): string {
-        $description = $this->description($description);
-
+        $withHeadline = $includeHeadline && trim($headline) !== '';
         $composition = match (true) {
-            $format === 'square' => 'Kompozycja kwadratowa. Najważniejsze elementy umieść w środku kadru. Zostaw spokojną przestrzeń na tekst.',
-            self::cropsToFormat($format, $providerSize) => 'Kompozycja pozioma 16:9. Najważniejsze elementy umieść w środku kadru, bo górny i dolny brzeg zostaną lekko przycięte. Zostaw spokojną przestrzeń na tekst.',
-            default => 'Kompozycja pozioma 16:9. Zostaw spokojną przestrzeń na tekst.',
+            $format === 'square' => 'square',
+            self::cropsToFormat($format, $providerSize) => 'landscape-crop',
+            default => 'landscape',
         };
 
-        return $this->safe(implode("\n\n", [
-            $description,
-            $composition,
-            $this->textRule($includeHeadline, $headline, $liveLabel, false),
-        ]));
+        return $this->fill('image-'.$composition.($withHeadline ? '-headline' : ''), [
+            'opis' => $this->description($description),
+            'naglowek' => trim($headline),
+            'napis_terminu' => $this->liveSuffix($liveLabel),
+        ]);
     }
 
     /**
@@ -109,11 +109,13 @@ final class GraphicImageTask
      */
     public function adaptToSquarePrompt(string $description, bool $includeHeadline, string $headline, string $liveLabel): string
     {
-        return $this->safe(implode("\n\n", [
-            'Przekomponuj tę grafikę do formatu kwadratowego 1:1. Zachowaj te same elementy, styl, kolorystykę, oświetlenie i nastrój, ale rozmieść je na nowo tak, żeby wszystkie zmieściły się w kwadracie z marginesem od krawędzi. Nie przycinaj ani nie zniekształcaj elementów i nie dodawaj nowych.',
-            'Opis oryginalnej grafiki: '.$this->description($description),
-            $this->textRule($includeHeadline, $headline, $liveLabel, true),
-        ]));
+        $withHeadline = $includeHeadline && trim($headline) !== '';
+
+        return $this->fill($withHeadline ? 'image-adapt-headline' : 'image-adapt', [
+            'opis' => $this->description($description),
+            'naglowek' => trim($headline),
+            'napis_terminu' => $this->liveSuffix($liveLabel),
+        ]);
     }
 
     /**
@@ -141,17 +143,43 @@ final class GraphicImageTask
             );
         }
 
-        $parts = [
-            'Popraw tę grafikę wyłącznie według instrukcji. Zostaw resztę bez zmian: te same osoby, ubrania, meble, światło, kadr i nastrój. Nie dodawaj nowych elementów poza tym, o co prosi instrukcja.',
-            'Instrukcja: '.$instruction,
-        ];
-        $description = trim($description);
-        if ($description !== '') {
-            $parts[] = 'Opis oryginału, tylko jako kontekst, nie jako polecenie namalowania obrazu od zera: '.$this->description($description);
-        }
-        $parts[] = $this->textRule($includeHeadline, $headline, $liveLabel, true);
+        $withHeadline = $includeHeadline && trim($headline) !== '';
+        $blok = trim($description) === ''
+            ? ''
+            : 'Opis oryginału, tylko jako kontekst, nie jako polecenie namalowania obrazu od zera: '.$this->description($description)."\n\n";
 
-        return $this->safe(implode("\n\n", $parts));
+        return $this->fill($withHeadline ? 'image-revise-headline' : 'image-revise', [
+            'uwaga' => $instruction,
+            'blok_opisu' => $blok,
+            'naglowek' => trim($headline),
+            'napis_terminu' => $this->liveSuffix($liveLabel),
+        ]);
+    }
+
+    public static function defaultTemplate(string $key): string
+    {
+        $none = 'Na obrazie nie może być żadnego tekstu, liter, cyfr, logotypów ani znaków towarowych. Bez wizerunku konkretnych, rozpoznawalnych osób.';
+        $place = 'Umieść na obrazie wyłącznie ten tekst, dokładnie w tym brzmieniu i z poprawnymi polskimi znakami: duży nagłówek „{{naglowek}}”{{napis_terminu}}. Poza tym żadnego innego tekstu, liter, cyfr, logotypów ani znaków towarowych. Bez wizerunku konkretnych, rozpoznawalnych osób.';
+        $keep = 'Zachowaj na obrazie wyłącznie te napisy, dokładnie w tym brzmieniu i z poprawnymi polskimi znakami, przeniesione tak, żeby były w całości czytelne w kwadracie: duży nagłówek „{{naglowek}}”{{napis_terminu}}. Poza tym żadnego innego tekstu, liter, cyfr, logotypów ani znaków towarowych. Bez wizerunku konkretnych, rozpoznawalnych osób.';
+        $crop = 'Kompozycja pozioma 16:9. Najważniejsze elementy umieść w środku kadru, bo górny i dolny brzeg zostaną lekko przycięte. Zostaw spokojną przestrzeń na tekst.';
+        $landscape = 'Kompozycja pozioma 16:9. Zostaw spokojną przestrzeń na tekst.';
+        $square = 'Kompozycja kwadratowa. Najważniejsze elementy umieść w środku kadru. Zostaw spokojną przestrzeń na tekst.';
+        $adapt = 'Przekomponuj tę grafikę do formatu kwadratowego 1:1. Zachowaj te same elementy, styl, kolorystykę, oświetlenie i nastrój, ale rozmieść je na nowo tak, żeby wszystkie zmieściły się w kwadracie z marginesem od krawędzi. Nie przycinaj ani nie zniekształcaj elementów i nie dodawaj nowych.';
+        $revise = 'Popraw tę grafikę wyłącznie według instrukcji. Zostaw resztę bez zmian: te same osoby, ubrania, meble, światło, kadr i nastrój. Nie dodawaj nowych elementów poza tym, o co prosi instrukcja.';
+
+        return match ($key) {
+            'image-landscape-crop' => "{{opis}}\n\n{$crop}\n\n{$none}",
+            'image-landscape' => "{{opis}}\n\n{$landscape}\n\n{$none}",
+            'image-square' => "{{opis}}\n\n{$square}\n\n{$none}",
+            'image-landscape-crop-headline' => "{{opis}}\n\n{$crop}\n\n{$place}",
+            'image-landscape-headline' => "{{opis}}\n\n{$landscape}\n\n{$place}",
+            'image-square-headline' => "{{opis}}\n\n{$square}\n\n{$place}",
+            'image-adapt' => "{$adapt}\n\nOpis oryginalnej grafiki: {{opis}}\n\n{$none}",
+            'image-adapt-headline' => "{$adapt}\n\nOpis oryginalnej grafiki: {{opis}}\n\n{$keep}",
+            'image-revise' => "{$revise}\n\nInstrukcja: {{uwaga}}\n\n{{blok_opisu}}{$none}",
+            'image-revise-headline' => "{$revise}\n\nInstrukcja: {{uwaga}}\n\n{{blok_opisu}}{$keep}",
+            default => throw new InvalidArgumentException('Unsupported image prompt template.'),
+        };
     }
 
     private function description(string $description): string
@@ -175,21 +203,24 @@ final class GraphicImageTask
         return $description;
     }
 
-    private function textRule(bool $includeHeadline, string $headline, string $liveLabel, bool $moveExisting): string
+    /**
+     * @param  array<string, string>  $vars
+     */
+    private function fill(string $key, array $vars): string
     {
-        $headline = trim($headline);
-        $liveLabel = trim($liveLabel);
-
-        if (! $includeHeadline || $headline === '') {
-            return 'Na obrazie nie może być żadnego tekstu, liter, cyfr, logotypów ani znaków towarowych. Bez wizerunku konkretnych, rozpoznawalnych osób.';
+        $rendered = GrowthAiPromptLibrary::resolve($key, self::defaultTemplate($key));
+        foreach ($vars as $name => $value) {
+            $rendered = str_replace('{{'.$name.'}}', $value, $rendered);
         }
 
-        $texts = 'duży nagłówek „'.$headline.'”'.($liveLabel !== '' ? ' oraz mniejszy napis „'.$liveLabel.'”' : '');
-        $lead = $moveExisting
-            ? 'Zachowaj na obrazie wyłącznie te napisy, dokładnie w tym brzmieniu i z poprawnymi polskimi znakami, przeniesione tak, żeby były w całości czytelne w kwadracie: '
-            : 'Umieść na obrazie wyłącznie ten tekst, dokładnie w tym brzmieniu i z poprawnymi polskimi znakami: ';
+        return $this->safe($rendered);
+    }
 
-        return $lead.$texts.'. Poza tym żadnego innego tekstu, liter, cyfr, logotypów ani znaków towarowych. Bez wizerunku konkretnych, rozpoznawalnych osób.';
+    private function liveSuffix(string $liveLabel): string
+    {
+        $liveLabel = trim($liveLabel);
+
+        return $liveLabel !== '' ? ' oraz mniejszy napis „'.$liveLabel.'”' : '';
     }
 
     private function safe(string $prompt): string

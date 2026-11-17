@@ -43,6 +43,7 @@ Etap v0.2. Pierwszy wycinek, szkic AI dla materiału `youtube-description` (DEC-
 - **Wyszukiwanie w sieci** (DEC-053): checkbox w panelu ⚙ modelu/wysiłku, domyślnie włączony (kierunek, koncepcja, materiały). Soft-fail z komunikatem, gdy sieć nie zadziała. Osobny przycisk „szukaj w Internecie” usunięty.
 - **Asystent planowania** (DEC-037 / DEC-039): zadanie `direction_planning`, prompt `direction_planning_v3`. Generate / iterate; search z checkboxa. Propozycja tylko w sesji.
 - **Asystent kierunku w projekcie** (DEC-039 / DEC-053): na karcie „Pomysł i kierunek” generate / iterate oraz checkbox „Wyszukiwanie w sieci”. Propozycja w sesji projektu. „Zastosuj” zapisuje szkic, „Odrzuć” zostawia kierunek. Zatwierdzonego kierunku AI nie rusza.
+- **Prompty systemowe do API**: na karcie projektu, pod etapami, instrukcje wysyłane do API. Da się je zapisać i przywrócić wersję z kodu. Zapis działa dla wszystkich projektów. Akapit o wyszukiwaniu w sieci zostaje dopisywany przez aplikację. Migracja `growth_ai_prompts`.
 - Sesyjny projekt webinaru (`DemoTikWebinarProject`).
 - Modele Eloquent v0.1 i relacje: właściciel, instruktor, materiał, zadanie, decyzja. Workspace używa kampanii, kierunku, koncepcji, decyzji przy kierunku i koncepcji, 9 zadań operacyjnych i 10 materiałów roboczych.
 - Testy integralności: unikalny klucz materiału w kampanii, puste relacje, usuwanie kampanii razem z dziećmi, czyszczenie opcjonalnych powiązań.

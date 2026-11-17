@@ -6,6 +6,7 @@ use App\Services\GrowthOS\AI\Contracts\GrowthAiTask;
 use App\Services\GrowthOS\AI\Data\AiProviderResponse;
 use App\Services\GrowthOS\AI\Data\MaterialDraftResult;
 use App\Services\GrowthOS\AI\Exceptions\GrowthAiException;
+use App\Services\GrowthOS\AI\Support\GrowthAiPromptLibrary;
 use App\Services\GrowthOS\AI\Support\ProhibitedData;
 use App\Support\GrowthOS\AiListFormatter;
 use Illuminate\Support\Facades\Validator;
@@ -37,7 +38,17 @@ final class GraphicImageDescriptionTask implements GrowthAiTask
         return self::SCHEMA_VERSION;
     }
 
+    public function promptKey(): string
+    {
+        return 'image-description';
+    }
+
     public function instructions(): string
+    {
+        return GrowthAiPromptLibrary::resolve($this->promptKey(), $this->defaultInstructions());
+    }
+
+    public function defaultInstructions(): string
     {
         return <<<'PROMPT'
 Jesteś projektantem ilustracji do webinarów edukacyjnych PNE. Przygotowujesz wyłącznie opis obrazu dla modelu graficznego.

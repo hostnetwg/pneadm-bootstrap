@@ -111,6 +111,9 @@
                             <i class="bi bi-file-earmark-pdf" aria-hidden="true"></i>
                             Zapisz do PDF aktualny stan projektu
                         </a>
+                        <a href="#system-prompts" class="btn btn-outline-secondary btn-sm">
+                            Prompty systemowe do API
+                        </a>
                         <div class="form-text text-lg-end mt-1">
                             Zatwierdzone elementy — do ChatGPT.com / zewnętrznego AI.
                         </div>
@@ -149,6 +152,8 @@
                 @endforeach
             </div>
         </section>
+
+        @include('growth-os.projects.partials.system-prompts')
 
         <section id="direction" class="card border mb-4 {{ isset($project['completed_steps']['direction']) ? 'growth-done' : '' }}" aria-labelledby="direction-heading">
             <div class="card-header bg-white d-flex flex-wrap justify-content-between gap-2">

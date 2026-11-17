@@ -423,3 +423,11 @@ Status: ACTIVE<br>
 Decision: Growth OS ma trwałe **domyślne ustawienia wykonania AI** (model + reasoning effort) oraz **lokalny override** przy każdym requestcie tekstowym. Katalog modeli jest kontrolowaną allowlistą (Luna / Sol / Astra / gpt-5-mini / gpt-5.5). Domyślnie: general = `gpt-6.1-sol` + `medium`, research = `gpt-6.1-sol` + `high`. Lokalny wybór dotyczy tylko bieżącego workflow/proposal i nie zmienia globalnych ustawień. Iterate dziedziczy model/effort z poprzedniej propozycji, chyba że użytkownik zmieni. Model/effort **nie** wchodzą do fingerprintu treści. Image API pozostaje osobne (bez reasoning effort w tym etapie).<br>
 Rationale: Właściciel chce jednym kliknięciem sensowne defaulty, a przy słabym wyniku — świadomie mocniejszy model i większy wysiłek, bez przebudowy całego Growth OS.<br>
 Consequences: Tabela `growth_ai_settings` (singleton). Ekran `/growth/ai-settings`. Kontrolka Model/Wysiłek przy requestach AI (kierunek, koncepcja, materiały, opis obrazu). `GrowthAiExecutionOptions` + `GrowthAiModelCatalog`. Provider Responses API dostaje `model`, `reasoning.effort` i effort-aware `max_output_tokens`. Log: `reasoning_effort`, `selection_source`; koszt ze stawek katalogu wybranego modelu. Bez image model picker w tym etapie.
+
+## DEC-054
+
+Date: 2026-11-17<br>
+Status: ACTIVE<br>
+Decision: Prompty systemowe Growth OS da się podmienić z karty projektu. Zapis jest wspólny dla wszystkich projektów. Brak zapisu oznacza treść z kodu. „Przywróć wersję z kodu” kasuje podmianę. Akapit o `web_search` dopisuje aplikacja i nie wchodzi do edytowanego tekstu. Szablon obrazu używa miejsc `{{opis}}`, `{{naglowek}}`, `{{napis_terminu}}`, `{{uwaga}}` i `{{blok_opisu}}`.<br>
+Rationale: Właściciel chce widzieć i poprawiać instrukcje wysyłane do API bez zmiany kodu przy każdej korekcie.<br>
+Consequences: Tabela `growth_ai_prompts`. Edytor na karcie projektu. `GrowthAiPromptLibrary` wstawia zapis zamiast `instructions()` i szablonów obrazu. Bez zmiany schematu odpowiedzi AI.

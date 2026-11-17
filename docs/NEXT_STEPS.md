@@ -1,7 +1,15 @@
 # Następne Kroki
 
-Data utworzenia/aktualizacji: 2026-10-28
+Data utworzenia/aktualizacji: 2026-11-17
 Status: plan roboczy, do potwierdzenia przez właściciela
+
+## Ostatnio (2026-11-17) — Edycja promptów systemowych Growth OS
+
+Na karcie projektu prompty systemowe da się zapisać i później przywrócić do wersji z kodu. Zapisana treść idzie do API we wszystkich projektach. Akapit o wyszukiwaniu w sieci dopisuje aplikacja. Migracja: `2026_11_17_000001_create_growth_ai_prompts_table`. Kanon: [growth-os/CURRENT.md](./growth-os/CURRENT.md).
+
+## Ostatnio (2026-11-16) — Podgląd promptów systemowych Growth OS
+
+Na karcie projektu, pod etapami, jest **Prompty systemowe do API**. Po rozwinięciu widać instrukcję wysyłaną do API na danym etapie. Tekst jest z tych samych klas, które budują żądanie. Podgląd niczego nie zapisuje. Bez migracji. Kanon: [growth-os/CURRENT.md](./growth-os/CURRENT.md).
 
 ## Ostatnio (2026-11-03) — Tytuł sprawy bez zmiany kodu SZ
 

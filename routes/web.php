@@ -32,6 +32,7 @@ use App\Http\Controllers\GrowthOS\ApprovalController as GrowthOsApprovalControll
 use App\Http\Controllers\GrowthOS\DashboardController as GrowthOsDashboardController;
 use App\Http\Controllers\GrowthOS\IdeaController as GrowthOsIdeaController;
 use App\Http\Controllers\GrowthOS\ProjectController as GrowthOsProjectController;
+use App\Http\Controllers\GrowthOS\PromptController as GrowthOsPromptController;
 use App\Http\Controllers\GusLookupController;
 use App\Http\Controllers\IfirmaController;
 use App\Http\Controllers\InstructorsController;
@@ -85,6 +86,12 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
         Route::get('/ai-settings', [GrowthOsAiSettingsController::class, 'edit'])->name('ai-settings.edit');
         Route::put('/ai-settings', [GrowthOsAiSettingsController::class, 'update'])->name('ai-settings.update');
         Route::post('/ai-settings/restore', [GrowthOsAiSettingsController::class, 'restoreRecommended'])->name('ai-settings.restore');
+        Route::put('/prompts/{key}', [GrowthOsPromptController::class, 'update'])
+            ->where('key', '[a-z0-9\-]+')
+            ->name('prompts.update');
+        Route::delete('/prompts/{key}', [GrowthOsPromptController::class, 'reset'])
+            ->where('key', '[a-z0-9\-]+')
+            ->name('prompts.reset');
         Route::get('/projects', [GrowthOsProjectController::class, 'index'])->name('projects.index');
         Route::get('/projects/create', [GrowthOsProjectController::class, 'create'])->name('projects.create');
         Route::post('/projects', [GrowthOsProjectController::class, 'store'])->name('projects.store');

@@ -7,6 +7,7 @@ use App\Services\GrowthOS\AI\Data\AiProviderResponse;
 use App\Services\GrowthOS\AI\Data\DirectionPlanningResult;
 use App\Services\GrowthOS\AI\Exceptions\GrowthAiException;
 use App\Services\GrowthOS\AI\Support\AddressFormPolicy;
+use App\Services\GrowthOS\AI\Support\GrowthAiPromptLibrary;
 use App\Services\GrowthOS\AI\Support\ProhibitedData;
 use App\Support\GrowthOS\AiListFormatter;
 use Illuminate\Support\Facades\Validator;
@@ -82,7 +83,24 @@ final class DirectionPlanningTask implements GrowthAiResearchTask
         return $this->mode !== self::MODE_ITERATE;
     }
 
+    public function promptKey(): string
+    {
+        $iterate = $this->mode === self::MODE_ITERATE || $this->mode === self::MODE_REFRESH;
+
+        return match (true) {
+            ! $iterate && $this->requiresWebSearch() => 'direction-generate-search',
+            ! $iterate => 'direction-generate',
+            $this->requiresWebSearch() => 'direction-iterate-search',
+            default => 'direction-iterate',
+        };
+    }
+
     public function instructions(): string
+    {
+        return GrowthAiPromptLibrary::resolve($this->promptKey(), $this->defaultInstructions());
+    }
+
+    public function defaultInstructions(): string
     {
         $searchOn = $this->requiresWebSearch();
 

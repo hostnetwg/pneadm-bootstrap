@@ -12,6 +12,26 @@ class GrowthOsProjectChatgptPdfTest extends TestCase
 {
     use RefreshDatabase;
 
+    private int $outputBufferLevel = 0;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->withoutVite();
+        $this->outputBufferLevel = ob_get_level();
+        config()->set('growth_os.enabled', true);
+    }
+
+    protected function tearDown(): void
+    {
+        while (ob_get_level() > $this->outputBufferLevel) {
+            ob_end_clean();
+        }
+
+        parent::tearDown();
+    }
+
     public function test_project_page_offers_chatgpt_pdf_export(): void
     {
         $user = $this->readyProject();
@@ -20,6 +40,8 @@ class GrowthOsProjectChatgptPdfTest extends TestCase
             ->get(route('growth.projects.show', DemoTikWebinarProject::PROJECT_ID))
             ->assertOk()
             ->assertSee('Zapisz do PDF aktualny stan projektu')
+            ->assertSee('Prompty systemowe do API')
+            ->assertSee('Jesteś strategicznym konsultantem PNE', false)
             ->assertSee(route('growth.projects.chatgpt-pdf', DemoTikWebinarProject::PROJECT_ID), false);
     }
 

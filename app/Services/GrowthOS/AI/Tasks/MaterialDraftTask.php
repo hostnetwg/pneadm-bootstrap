@@ -7,6 +7,7 @@ use App\Services\GrowthOS\AI\Data\AiProviderResponse;
 use App\Services\GrowthOS\AI\Data\MaterialDraftResult;
 use App\Services\GrowthOS\AI\Exceptions\GrowthAiException;
 use App\Services\GrowthOS\AI\Support\AddressFormPolicy;
+use App\Services\GrowthOS\AI\Support\GrowthAiPromptLibrary;
 use App\Services\GrowthOS\AI\Support\PneVoice;
 use App\Services\GrowthOS\AI\Support\ProhibitedData;
 use App\Support\GrowthOS\AiListFormatter;
@@ -359,6 +360,11 @@ final class MaterialDraftTask implements GrowthAiTask
         return self::TYPE;
     }
 
+    public function materialName(): string
+    {
+        return self::PROFILES[$this->materialKey]['name'];
+    }
+
     public function promptVersion(): string
     {
         return self::PROFILES[$this->materialKey]['prompt_version'];
@@ -369,7 +375,17 @@ final class MaterialDraftTask implements GrowthAiTask
         return self::PROFILES[$this->materialKey]['schema_version'];
     }
 
+    public function promptKey(): string
+    {
+        return 'material-'.$this->materialKey;
+    }
+
     public function instructions(): string
+    {
+        return GrowthAiPromptLibrary::resolve($this->promptKey(), $this->defaultInstructions());
+    }
+
+    public function defaultInstructions(): string
     {
         $channel = $this->materialKey === self::HOST_SCRIPT_MATERIAL_KEY
             ? AddressFormPolicy::CHANNEL_LIVE

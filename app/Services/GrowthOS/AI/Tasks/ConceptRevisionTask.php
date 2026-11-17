@@ -7,6 +7,7 @@ use App\Services\GrowthOS\AI\Data\AiProviderResponse;
 use App\Services\GrowthOS\AI\Data\ConceptRevisionResult;
 use App\Services\GrowthOS\AI\Exceptions\GrowthAiException;
 use App\Services\GrowthOS\AI\Support\AddressFormPolicy;
+use App\Services\GrowthOS\AI\Support\GrowthAiPromptLibrary;
 use App\Services\GrowthOS\AI\Support\ProhibitedData;
 use App\Support\GrowthOS\AiListFormatter;
 use Illuminate\Support\Facades\Validator;
@@ -50,7 +51,17 @@ final class ConceptRevisionTask implements GrowthAiTask
         return (string) config('growth_ai.schema_version');
     }
 
+    public function promptKey(): string
+    {
+        return $this->fromDirection ? 'concept-from-direction' : 'concept-revise';
+    }
+
     public function instructions(): string
+    {
+        return GrowthAiPromptLibrary::resolve($this->promptKey(), $this->defaultInstructions());
+    }
+
+    public function defaultInstructions(): string
     {
         $mode = $this->fromDirection
             ? <<<'TEXT'

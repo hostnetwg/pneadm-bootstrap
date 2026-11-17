@@ -9,6 +9,9 @@ use App\Services\GrowthOS\AI\Exceptions\GrowthAiException;
 use App\Services\GrowthOS\AI\GrowthAiService;
 use App\Services\GrowthOS\AI\GrowthImageService;
 use App\Services\GrowthOS\AI\Support\GraphicImageProcessor;
+use App\Services\GrowthOS\AI\Support\GrowthAiExecutionOptions;
+use App\Services\GrowthOS\AI\Support\GrowthAiModelCatalog;
+use App\Services\GrowthOS\AI\Support\GrowthAiPromptLibrary;
 use App\Services\GrowthOS\AI\Tasks\DirectionPlanningTask;
 use App\Services\GrowthOS\AI\Tasks\GraphicImageTask;
 use App\Services\GrowthOS\AI\Tasks\MaterialDraftTask;
@@ -17,8 +20,6 @@ use App\Support\GrowthOS\DemoTikWebinarProject;
 use App\Support\GrowthOS\GraphicLogoStore;
 use App\Support\GrowthOS\GrowthAiRequestOptions;
 use App\Support\GrowthOS\GrowthPeople;
-use App\Services\GrowthOS\AI\Support\GrowthAiExecutionOptions;
-use App\Services\GrowthOS\AI\Support\GrowthAiModelCatalog;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
@@ -315,6 +316,7 @@ class ProjectController extends Controller
                 $item['voice_instructor_id'] ?? null,
             ]),
             'voice' => GrowthPeople::voice($item),
+            'systemPrompts' => GrowthAiPromptLibrary::stages(),
         ]);
     }
 
