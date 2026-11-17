@@ -74,7 +74,7 @@
             </div>
 
             <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
-                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#migrationNoticeBulkModal"
+                <button type="button" class="btn btn-primary" data-migration-open="bulk"
                         data-count-url="{{ route('online-courses.migration-notice.unsent-count', $filters) }}"
                         @disabled($batch['active'] ?? false)>
                     <i class="bi bi-send me-1"></i> Wyślij e-mail z informacją o przeniesieniu
@@ -170,8 +170,7 @@
                                 <td class="text-end">
                                     <button type="button"
                                             class="btn btn-sm btn-outline-primary"
-                                            data-bs-toggle="modal"
-                                            data-bs-target="#migrationNoticeOneModal"
+                                            data-migration-open="one"
                                             data-preview-url="{{ route('online-courses.migration-notice.preview', ['email' => $email]) }}"
                                             data-send-email="{{ $email }}">
                                         Wyślij e-mail
@@ -277,46 +276,45 @@
                 }
             }
 
+            function clearBackdrop() {
+                if (document.querySelector('.modal.show')) {
+                    return;
+                }
+                document.querySelectorAll('.modal-backdrop').forEach(function (el) {
+                    el.remove();
+                });
+                document.body.classList.remove('modal-open');
+                document.body.style.removeProperty('overflow');
+                document.body.style.removeProperty('padding-right');
+            }
+
             function closeModal(modalEl) {
                 if (!modalEl) {
                     return;
                 }
-                var token = String(Date.now());
-                modalEl.dataset.closing = token;
-                modalEl.addEventListener('show.bs.modal', function () {
-                    if (modalEl.dataset.closing === token) {
-                        delete modalEl.dataset.closing;
-                    }
-                }, { once: true });
-                function clearBackdrop() {
-                    if (document.querySelector('.modal.show')) {
-                        return;
-                    }
-                    document.querySelectorAll('.modal-backdrop').forEach(function (el) {
-                        el.remove();
-                    });
-                    document.body.classList.remove('modal-open');
-                    document.body.style.removeProperty('overflow');
-                    document.body.style.removeProperty('padding-right');
+                if (modalEl.contains(document.activeElement) && document.activeElement.blur) {
+                    document.activeElement.blur();
                 }
-                var instance = window.bootstrap && window.bootstrap.Modal.getInstance(modalEl);
+                var Modal = window.bootstrap && window.bootstrap.Modal;
+                var instance = Modal && Modal.getInstance(modalEl);
+                modalEl.classList.remove('show');
+                modalEl.style.display = 'none';
+                modalEl.setAttribute('aria-hidden', 'true');
+                modalEl.removeAttribute('aria-modal');
+                modalEl.removeAttribute('role');
                 if (instance) {
-                    modalEl.addEventListener('hidden.bs.modal', clearBackdrop, { once: true });
-                    instance.hide();
+                    instance.dispose();
                 }
-                window.setTimeout(function () {
-                    if (modalEl.dataset.closing !== token) {
-                        return;
-                    }
-                    delete modalEl.dataset.closing;
-                    if (modalEl.classList.contains('show')) {
-                        modalEl.classList.remove('show');
-                        modalEl.style.display = 'none';
-                        modalEl.setAttribute('aria-hidden', 'true');
-                        modalEl.removeAttribute('aria-modal');
-                    }
-                    clearBackdrop();
-                }, 400);
+                clearBackdrop();
+            }
+
+            function openModal(modalEl, trigger) {
+                if (!modalEl || !window.bootstrap || !window.bootstrap.Modal) {
+                    return;
+                }
+                moveModalToBody(modalEl);
+                clearBackdrop();
+                window.bootstrap.Modal.getOrCreateInstance(modalEl).show(trigger || undefined);
             }
 
             var bulkModal = document.getElementById('migrationNoticeBulkModal');
@@ -347,6 +345,15 @@
 
             var oneModal = document.getElementById('migrationNoticeOneModal');
             moveModalToBody(oneModal);
+            document.addEventListener('click', function (event) {
+                var opener = event.target.closest('[data-migration-open]');
+                if (!opener || opener.disabled) {
+                    return;
+                }
+                event.preventDefault();
+                var which = opener.getAttribute('data-migration-open');
+                openModal(which === 'bulk' ? bulkModal : oneModal, opener);
+            });
             if (oneModal) {
                 var loadingEl = document.getElementById('migrationNoticeOneLoading');
                 var errorEl = document.getElementById('migrationNoticeOneError');

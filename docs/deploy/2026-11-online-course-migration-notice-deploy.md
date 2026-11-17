@@ -35,7 +35,7 @@ git pull origin main
 
 `pnedu` nie wymaga pulla. Kolejka panelu musi działać, zanim ktokolwiek kliknie wysyłkę zbiorczą. Kanon: [`PRODUCTION_QUEUE_OPS.md`](./PRODUCTION_QUEUE_OPS.md).
 
-Poprawka okienka (kolejne „Wyślij e-mail” nie zostawia przyciemnionego ekranu) to tylko widok. Nowej migracji nie ma. Wystarczy `git pull`, potem `view:clear` i `view:cache`. `migrate` i `queue:restart` nic tu nie zmieniają.
+Poprawka okienka (kolejne „Wyślij e-mail” nie zostawia przyciemnionego ekranu) to tylko widok. Sam `git pull` nie wystarczy, jeśli widoki są już zcache'owane: po pullu trzeba `optimize:clear`, `view:clear` i `view:cache`. Nowej migracji nie ma. `migrate` i `queue:restart` nic tu nie zmieniają.
 
 ## Po deployu
 
