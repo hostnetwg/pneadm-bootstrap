@@ -82,8 +82,10 @@
                 <span class="text-muted small">
                     @if($filters['sent'] === 'yes')
                         Do ponownej wysyłki przy obecnych filtrach: <strong id="migrationNoticeUnsentCount">{{ $unsentCount }}</strong> osób, które list już dostały.
-                    @else
+                    @elseif($filters['sent'] === 'no')
                         Do wysłania przy obecnych filtrach: <strong id="migrationNoticeUnsentCount">{{ $unsentCount }}</strong> osób, które jeszcze nie dostały listu.
+                    @else
+                        Do wysyłki przy obecnych filtrach: <strong id="migrationNoticeUnsentCount">{{ $unsentCount }}</strong> osób, także tych, które list już dostały.
                     @endif
                 </span>
             </div>
@@ -220,8 +222,9 @@
                     <p class="mb-0">
                         Każda osoba dostaje jeden list. Wariant zależy od tego, czy ma już konto na pnedu.pl. Oba wzory są na stronie powyżej.
                         Lista kursów w liście obejmuje wszystkie ważne kursy tej osoby ze starej platformy, także gdy filtr pokazuje jeden kurs.
-                        Przy filtrze „Jeszcze nie wysłany” albo „Wszyscy” idą tylko osoby, które listu jeszcze nie dostały.
-                        Przy filtrze „Już wysłany” list idzie ponownie. Konta nie są zakładane.
+                        Przy „Wszyscy” list idzie do całej przefiltrowanej listy, także ponownie.
+                        Przy „Jeszcze nie wysłany” tylko do osób bez wcześniejszego listu.
+                        Przy „Już wysłany” tylko ponownie. Konta nie są zakładane.
                     </p>
                 </div>
                 <div class="modal-footer">
@@ -358,9 +361,13 @@
                         .then(function (r) { return r.json(); })
                         .then(function (data) {
                             var count = Number(data.unsent_count || 0);
-                            countEl.innerHTML = data.resend
-                                ? 'List zostanie wysłany ponownie do <strong>' + count + '</strong> osób, które już go dostały.'
-                                : 'Zostanie wysłany jeden list do <strong>' + count + '</strong> osób, które jeszcze go nie dostały.';
+                            if (data.sent === 'yes') {
+                                countEl.innerHTML = 'List zostanie wysłany ponownie do <strong>' + count + '</strong> osób, które już go dostały.';
+                            } else if (data.sent === 'no') {
+                                countEl.innerHTML = 'Zostanie wysłany jeden list do <strong>' + count + '</strong> osób, które jeszcze go nie dostały.';
+                            } else {
+                                countEl.innerHTML = 'List zostanie wysłany do <strong>' + count + '</strong> osób z obecnych filtrów, także do tych, które już go dostały.';
+                            }
                             sendBtn.disabled = count < 1;
                         })
                         .catch(function () {

@@ -137,6 +137,11 @@ class OnlineCourseMigrationNoticeTest extends TestCase
             ->assertJsonPath('unsent_count', 1);
 
         $this->actingAs($admin)
+            ->getJson(route('online-courses.migration-notice.unsent-count', ['sent' => 'all', 'account' => 'no']))
+            ->assertOk()
+            ->assertJsonPath('unsent_count', 1);
+
+        $this->actingAs($admin)
             ->getJson(route('online-courses.migration-notice.unsent-count', ['sent' => 'no']))
             ->assertOk()
             ->assertJsonPath('unsent_count', 1);
@@ -194,7 +199,7 @@ class OnlineCourseMigrationNoticeTest extends TestCase
             ->assertJsonPath('success', true)
             ->assertJsonPath('email', 'anna.dwa@example.test')
             ->assertJsonPath('sent_count', 2)
-            ->assertJsonPath('unsent_count', 0);
+            ->assertJsonPath('unsent_count', 1);
     }
 
     public function test_bulk_sends_one_job_per_person_and_skips_already_sent(): void
@@ -216,7 +221,7 @@ class OnlineCourseMigrationNoticeTest extends TestCase
         Bus::fake();
         $this->actingAs($admin)
             ->from(route('online-courses.migration-notice.index'))
-            ->post(route('online-courses.migration-notice.send-bulk'))
+            ->post(route('online-courses.migration-notice.send-bulk'), ['sent' => 'no'])
             ->assertRedirect()
             ->assertSessionHas('success');
 

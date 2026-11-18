@@ -124,9 +124,11 @@ class OnlineCourseMigrationNoticeService
         if ($emails->isEmpty()) {
             return [
                 'success' => false,
-                'error' => $sent === 'yes'
-                    ? 'Brak osób do ponownej wysyłki przy tych filtrach.'
-                    : 'Brak osób, które jeszcze nie dostały tego listu.',
+                'error' => match ($sent) {
+                    'yes' => 'Brak osób do ponownej wysyłki przy tych filtrach.',
+                    'no' => 'Brak osób, które jeszcze nie dostały tego listu.',
+                    default => 'Brak osób przy tych filtrach.',
+                },
                 'queued' => 0,
             ];
         }
@@ -531,12 +533,12 @@ class OnlineCourseMigrationNoticeService
      */
     private function unsentEmails(?int $courseId, string $search, string $account = 'all', ?int $courseCount = null, string $sent = 'all'): Collection
     {
-        $resend = $sent === 'yes';
+        $onlyNeverSent = $sent === 'no';
 
         return $this->peopleQuery($courseId, $search, $account, $courseCount, $sent)
-            ->whereNotExists(function ($sub) use ($resend) {
+            ->whereNotExists(function ($sub) use ($onlyNeverSent) {
                 $statuses = [OnlineCourseMigrationNotice::STATUS_QUEUED];
-                if (! $resend) {
+                if ($onlyNeverSent) {
                     $statuses[] = OnlineCourseMigrationNotice::STATUS_SENT;
                 }
                 $sub->selectRaw('1')
