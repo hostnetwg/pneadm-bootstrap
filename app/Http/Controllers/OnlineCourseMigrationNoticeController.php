@@ -102,10 +102,19 @@ class OnlineCourseMigrationNoticeController extends Controller
         );
     }
 
-    public function sendBulk(Request $request, OnlineCourseMigrationNoticeService $notices): RedirectResponse
+    public function sendBulk(Request $request, OnlineCourseMigrationNoticeService $notices): RedirectResponse|JsonResponse
     {
         $filters = $this->filters($request);
-        $result = $notices->sendBulk($filters['course_id'], $filters['q'], $filters['account'], Auth::id(), $filters['course_count']);
+        try {
+            $result = $notices->sendBulk($filters['course_id'], $filters['q'], $filters['account'], Auth::id(), $filters['course_count']);
+        } catch (\Throwable $e) {
+            report($e);
+            $result = [
+                'success' => false,
+                'error' => 'Nie udało się zlecić wysyłki. Odśwież stronę i spróbuj ponownie.',
+                'queued' => 0,
+            ];
+        }
 
         if ($request->expectsJson()) {
             return response()->json($result, ($result['success'] ?? false) ? 200 : 422);

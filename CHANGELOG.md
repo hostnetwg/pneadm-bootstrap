@@ -6,6 +6,7 @@ Krótka numeracja panelu. Szczegóły zawsze w `docs/`. Nowy numer wersji (np. 1
 
 Zaświadczenia: automatyczne czyszczenie starych plików PDF. Narzędzia deweloperskie: odświeżanie komputera deva jedną komendą.
 
+- **Hotfix 2026-11-18:** na [informacji o przeniesieniu kursów](/online-courses/migration-notice) zbiorcza wysyłka do dużej grupy (np. osoby bez konta) nie kończy się komunikatem „Nie udało się zlecić wysyłki”. Listy idą paczkami. Kanon: [ONLINE-COURSES.md](docs/ONLINE-COURSES.md)
 - **Hotfix 2026-11-18:** na [zamówieniu FORM](/form-orders) kolejne **Nadaj dostęp** otwiera okno z podglądem maila. Wcześniej po pierwszym uczestniku zostawał sam przyciemniony ekran.
 - **Hotfix 2026-11-18:** na [zamówieniu FORM](/form-orders) da się utworzyć, sklonować i edytować zamówienie **kursu online nagranego** (wariant ceny jak na pnedu.pl). **Nadaj dostęp**, **Nadaj dostęp wszystkim** i **Prześlij dostęp ponownie** najpierw pokazują podgląd maila i **Kopiuj treść**. Kanon: [PRODUCT_COMMERCE.md](docs/PRODUCT_COMMERCE.md)
 - **Hotfix 2026-11-17:** na [informacji o przeniesieniu kursów](/online-courses/migration-notice) jest filtr **Liczba kursów**. Wpisana liczba pokazuje tylko osoby z dokładnie tyloma kursami i tak samo zawęża wysyłkę zbiorczą. Kanon: [ONLINE-COURSES.md](docs/ONLINE-COURSES.md)

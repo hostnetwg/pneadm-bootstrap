@@ -203,6 +203,33 @@ class OnlineCourseMigrationNoticeTest extends TestCase
             ->assertJsonPath('active', false);
     }
 
+    public function test_bulk_retries_addresses_left_queued_without_a_batch(): void
+    {
+        $admin = User::factory()->create(['is_active' => true]);
+        $course = $this->course('Canva dla testu');
+        $this->enroll($course, 'bartek.jeden@example.test', 'Bartek', 'Jeden');
+        $stuck = OnlineCourseMigrationNotice::query()->create([
+            'email' => 'bartek.jeden@example.test',
+            'status' => OnlineCourseMigrationNotice::STATUS_QUEUED,
+            'queued_at' => now(),
+        ]);
+
+        Bus::fake();
+        $this->actingAs($admin)
+            ->post(route('online-courses.migration-notice.send-bulk'))
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $this->assertSame(OnlineCourseMigrationNotice::STATUS_FAILED, $stuck->fresh()->status);
+        $this->assertSame(
+            1,
+            OnlineCourseMigrationNotice::query()
+                ->where('email', 'bartek.jeden@example.test')
+                ->where('status', OnlineCourseMigrationNotice::STATUS_QUEUED)
+                ->count()
+        );
+    }
+
     /**
      * @param  list<string>  $emailsWithAccount
      */

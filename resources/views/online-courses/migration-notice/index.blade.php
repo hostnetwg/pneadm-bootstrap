@@ -665,7 +665,7 @@
                             setSpinnerVisible(false);
                             showBanner('alert-danger');
                             if (textEl) {
-                                textEl.textContent = (result.data && result.data.error) || 'Nie udało się zlecić wysyłki.';
+                                textEl.textContent = (result.data && (result.data.error || result.data.message)) || 'Nie udało się zlecić wysyłki.';
                             }
                             if (sendBtn) {
                                 sendBtn.disabled = false;

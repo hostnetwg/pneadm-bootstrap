@@ -114,6 +114,12 @@ class OnlineCourseMigrationNoticeService
      */
     public function sendBulk(?int $courseId, string $search, string $account = 'all', ?int $createdBy = null, ?int $courseCount = null): array
     {
+        if (function_exists('set_time_limit')) {
+            set_time_limit(180);
+        }
+
+        $this->releaseStuckQueuedNotices();
+
         $emails = $this->unsentEmails($courseId, $search, $account, $courseCount);
         if ($emails->isEmpty()) {
             return [
@@ -123,23 +129,30 @@ class OnlineCourseMigrationNoticeService
             ];
         }
 
-        $jobs = [];
-        $ids = [];
-        foreach ($emails as $email) {
-            $notice = $this->queueNotice($email, $createdBy);
-            $ids[] = $notice->id;
-            $jobs[] = new SendOnlineCourseMigrationNoticeJob($notice->id);
+        $batch = null;
+        $queued = 0;
+        foreach ($emails->chunk(100) as $chunk) {
+            $ids = $this->insertQueuedNotices($chunk->values()->all(), $createdBy);
+            $jobs = array_map(
+                fn (int $id) => new SendOnlineCourseMigrationNoticeJob($id),
+                $ids
+            );
+
+            if ($batch === null) {
+                $batch = Bus::batch($jobs)
+                    ->name($this->batchName())
+                    ->dispatch();
+            } else {
+                $batch->add($jobs);
+            }
+
+            OnlineCourseMigrationNotice::query()
+                ->whereIn('id', $ids)
+                ->update(['batch_id' => $batch->id]);
+            $queued += count($ids);
         }
 
-        $batch = Bus::batch($jobs)
-            ->name($this->batchName())
-            ->dispatch();
-
-        OnlineCourseMigrationNotice::query()
-            ->whereIn('id', $ids)
-            ->update(['batch_id' => $batch->id]);
-
-        return ['success' => true, 'error' => null, 'queued' => count($jobs)];
+        return ['success' => true, 'error' => null, 'queued' => $queued];
     }
 
     public function deliver(int $noticeId): void
@@ -511,6 +524,60 @@ class OnlineCourseMigrationNoticeService
                     ]);
             })
             ->pluck('online_course_enrollments.email');
+    }
+
+    /**
+     * Poprzednia próba mogła zapisać adresy jako „w kolejce”, a potem paść
+     * zanim powstały zadania. Bez tego kolejna wysyłka te osoby pomija.
+     */
+    private function releaseStuckQueuedNotices(): void
+    {
+        OnlineCourseMigrationNotice::query()
+            ->where('status', OnlineCourseMigrationNotice::STATUS_QUEUED)
+            ->whereNull('batch_id')
+            ->update([
+                'status' => OnlineCourseMigrationNotice::STATUS_FAILED,
+                'failed_at' => now(),
+                'error_message' => 'Wysyłka nie wystartowała. Można zlecić ponownie.',
+            ]);
+    }
+
+    /**
+     * @param  list<string>  $emails
+     * @return list<int>
+     */
+    private function insertQueuedNotices(array $emails, ?int $createdBy): array
+    {
+        $now = now();
+        $rows = [];
+        foreach ($emails as $email) {
+            $rows[] = [
+                'email' => $email,
+                'status' => OnlineCourseMigrationNotice::STATUS_QUEUED,
+                'created_by' => $createdBy,
+                'queued_at' => $now,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
+        }
+
+        OnlineCourseMigrationNotice::query()->insert($rows);
+
+        $ids = OnlineCourseMigrationNotice::query()
+            ->where('status', OnlineCourseMigrationNotice::STATUS_QUEUED)
+            ->whereNull('batch_id')
+            ->whereIn('email', $emails)
+            ->orderByDesc('id')
+            ->limit(count($emails))
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        if (count($ids) !== count($emails)) {
+            throw new \RuntimeException('Nie udało się zapisać pełnej listy wysyłki.');
+        }
+
+        return $ids;
     }
 
     private function queueNotice(string $email, ?int $createdBy): OnlineCourseMigrationNotice
