@@ -50,6 +50,7 @@ class OnlineCourseMigrationNoticeController extends Controller
 
         return response()->json([
             'unsent_count' => $notices->unsentCount($filters['course_id'], $filters['q'], $filters['account'], $filters['course_count'], $filters['sent']),
+            'resend' => $filters['sent'] === 'yes',
         ]);
     }
 

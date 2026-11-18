@@ -6,6 +6,7 @@ Krótka numeracja panelu. Szczegóły zawsze w `docs/`. Nowy numer wersji (np. 1
 
 Zaświadczenia: automatyczne czyszczenie starych plików PDF. Narzędzia deweloperskie: odświeżanie komputera deva jedną komendą.
 
+- **Hotfix 2026-11-18:** na [informacji o przeniesieniu kursów](/online-courses/migration-notice) filtr **Już wysłany** pozwala wysłać list jeszcze raz, także zbiorczo. Przy osobie z datą jest **Wyślij ponownie**. Kanon: [ONLINE-COURSES.md](docs/ONLINE-COURSES.md)
 - **Hotfix 2026-11-18:** na [informacji o przeniesieniu kursów](/online-courses/migration-notice) filtr **Wysłany e-mail** pokazuje osoby, które list już dostały, albo te, które jeszcze go nie dostały. Kanon: [ONLINE-COURSES.md](docs/ONLINE-COURSES.md)
 - **Hotfix 2026-11-18:** na [informacji o przeniesieniu kursów](/online-courses/migration-notice) zbiorcza wysyłka do dużej grupy (np. osoby bez konta) nie kończy się komunikatem „Nie udało się zlecić wysyłki”. Listy idą paczkami. Kanon: [ONLINE-COURSES.md](docs/ONLINE-COURSES.md)
 - **Hotfix 2026-11-18:** na [zamówieniu FORM](/form-orders) kolejne **Nadaj dostęp** otwiera okno z podglądem maila. Wcześniej po pierwszym uczestniku zostawał sam przyciemniony ekran.

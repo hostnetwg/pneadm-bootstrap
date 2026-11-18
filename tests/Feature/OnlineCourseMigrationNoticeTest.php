@@ -118,6 +118,8 @@ class OnlineCourseMigrationNoticeTest extends TestCase
             ->get(route('online-courses.migration-notice.index', ['sent' => 'yes']))
             ->assertOk()
             ->assertSee('Już wysłany', false)
+            ->assertSee('Do ponownej wysyłki', false)
+            ->assertSee('Wyślij ponownie', false)
             ->assertSee('anna.dwa@example.test')
             ->assertDontSee('bartek.jeden@example.test');
 
@@ -131,7 +133,8 @@ class OnlineCourseMigrationNoticeTest extends TestCase
         $this->actingAs($admin)
             ->getJson(route('online-courses.migration-notice.unsent-count', ['sent' => 'yes']))
             ->assertOk()
-            ->assertJsonPath('unsent_count', 0);
+            ->assertJsonPath('resend', true)
+            ->assertJsonPath('unsent_count', 1);
 
         $this->actingAs($admin)
             ->getJson(route('online-courses.migration-notice.unsent-count', ['sent' => 'no']))
@@ -231,6 +234,32 @@ class OnlineCourseMigrationNoticeTest extends TestCase
         $this->getJson(route('online-courses.migration-notice.batch-status'))
             ->assertOk()
             ->assertJsonPath('active', false);
+    }
+
+    public function test_bulk_can_resend_to_people_who_already_received_the_letter(): void
+    {
+        $admin = User::factory()->create(['is_active' => true]);
+        $course = $this->course('Canva dla testu');
+        $this->enroll($course, 'anna.dwa@example.test', 'Anna', 'Dwa');
+        OnlineCourseMigrationNotice::query()->create([
+            'email' => 'anna.dwa@example.test',
+            'status' => OnlineCourseMigrationNotice::STATUS_SENT,
+            'sent_at' => now(),
+        ]);
+
+        Bus::fake();
+        $this->actingAs($admin)
+            ->post(route('online-courses.migration-notice.send-bulk'), ['sent' => 'yes'])
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $this->assertSame(
+            1,
+            OnlineCourseMigrationNotice::query()
+                ->where('email', 'anna.dwa@example.test')
+                ->where('status', OnlineCourseMigrationNotice::STATUS_QUEUED)
+                ->count()
+        );
     }
 
     public function test_bulk_retries_addresses_left_queued_without_a_batch(): void

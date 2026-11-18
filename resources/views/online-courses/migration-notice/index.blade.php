@@ -79,7 +79,13 @@
                         @disabled($batch['active'] ?? false)>
                     <i class="bi bi-send me-1"></i> Wyślij e-mail z informacją o przeniesieniu
                 </button>
-                <span class="text-muted small">Do wysłania przy obecnych filtrach: <strong id="migrationNoticeUnsentCount">{{ $unsentCount }}</strong> osób, które jeszcze nie dostały listu.</span>
+                <span class="text-muted small">
+                    @if($filters['sent'] === 'yes')
+                        Do ponownej wysyłki przy obecnych filtrach: <strong id="migrationNoticeUnsentCount">{{ $unsentCount }}</strong> osób, które list już dostały.
+                    @else
+                        Do wysłania przy obecnych filtrach: <strong id="migrationNoticeUnsentCount">{{ $unsentCount }}</strong> osób, które jeszcze nie dostały listu.
+                    @endif
+                </span>
             </div>
 
             <form method="get" action="{{ route('online-courses.migration-notice.index') }}" class="row g-2 align-items-end mb-3">
@@ -186,7 +192,7 @@
                                             data-migration-open="one"
                                             data-preview-url="{{ route('online-courses.migration-notice.preview', ['email' => $email]) }}"
                                             data-send-email="{{ $email }}">
-                                        Wyślij e-mail
+                                        {{ $sentCount > 0 ? 'Wyślij ponownie' : 'Wyślij e-mail' }}
                                     </button>
                                 </td>
                             </tr>
@@ -214,7 +220,8 @@
                     <p class="mb-0">
                         Każda osoba dostaje jeden list. Wariant zależy od tego, czy ma już konto na pnedu.pl. Oba wzory są na stronie powyżej.
                         Lista kursów w liście obejmuje wszystkie ważne kursy tej osoby ze starej platformy, także gdy filtr pokazuje jeden kurs.
-                        Wysyłka obejmuje tylko osoby, które tego listu jeszcze nie dostały. Konta nie są zakładane.
+                        Przy filtrze „Jeszcze nie wysłany” albo „Wszyscy” idą tylko osoby, które listu jeszcze nie dostały.
+                        Przy filtrze „Już wysłany” list idzie ponownie. Konta nie są zakładane.
                     </p>
                 </div>
                 <div class="modal-footer">
@@ -351,7 +358,9 @@
                         .then(function (r) { return r.json(); })
                         .then(function (data) {
                             var count = Number(data.unsent_count || 0);
-                            countEl.innerHTML = 'Zostanie wysłany jeden list do <strong>' + count + '</strong> osób, które jeszcze go nie dostały.';
+                            countEl.innerHTML = data.resend
+                                ? 'List zostanie wysłany ponownie do <strong>' + count + '</strong> osób, które już go dostały.'
+                                : 'Zostanie wysłany jeden list do <strong>' + count + '</strong> osób, które jeszcze go nie dostały.';
                             sendBtn.disabled = count < 1;
                         })
                         .catch(function () {
