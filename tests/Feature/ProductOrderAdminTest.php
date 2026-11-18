@@ -191,6 +191,7 @@ class ProductOrderAdminTest extends TestCase
             ->assertSee('id="productAccessEmailModal"', false)
             ->assertSee('Kopiuj treść', false)
             ->assertSee('js-product-access-email-btn', false)
+            ->assertSee('data-product-access-open="1"', false)
             ->assertSee("document.addEventListener('DOMContentLoaded', initProductAccessEmailModal)", false);
     }
 

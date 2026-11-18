@@ -1508,6 +1508,66 @@ nowoczesna-edukacja.pl `;
             }
             modalEl.dataset.previewBound = '1';
 
+            function moveModalToBody(el) {
+                if (el && el.parentNode !== document.body) {
+                    document.body.appendChild(el);
+                }
+            }
+
+            function closeProductAccessModal() {
+                if (modalEl.contains(document.activeElement) && document.activeElement.blur) {
+                    document.activeElement.blur();
+                }
+                const Modal = window.bootstrap && window.bootstrap.Modal;
+                const instance = Modal && Modal.getInstance(modalEl);
+                modalEl.classList.remove('show');
+                modalEl.style.display = 'none';
+                modalEl.setAttribute('aria-hidden', 'true');
+                modalEl.removeAttribute('aria-modal');
+                modalEl.removeAttribute('role');
+                if (instance) {
+                    instance.dispose();
+                }
+                document.querySelectorAll('.modal-backdrop').forEach(function (el) {
+                    el.remove();
+                });
+                document.body.classList.remove('modal-open');
+                document.body.style.removeProperty('overflow');
+                document.body.style.removeProperty('padding-right');
+            }
+
+            moveModalToBody(modalEl);
+            modalEl.addEventListener('click', function (event) {
+                if (!event.target.closest('[data-bs-dismiss="modal"]')) {
+                    return;
+                }
+                event.preventDefault();
+                event.stopPropagation();
+                closeProductAccessModal();
+            });
+            document.addEventListener('click', function (event) {
+                const opener = event.target.closest('.js-product-access-email-btn');
+                if (!opener || opener.disabled) {
+                    return;
+                }
+                event.preventDefault();
+                event.stopPropagation();
+                moveModalToBody(modalEl);
+                if (!modalEl.classList.contains('show')) {
+                    document.querySelectorAll('.modal-backdrop').forEach(function (el) {
+                        el.remove();
+                    });
+                    document.body.classList.remove('modal-open');
+                    document.body.style.removeProperty('overflow');
+                    document.body.style.removeProperty('padding-right');
+                }
+                const Modal = window.bootstrap && window.bootstrap.Modal;
+                if (!Modal) {
+                    return;
+                }
+                Modal.getOrCreateInstance(modalEl).show(opener);
+            });
+
             const loadingEl = document.getElementById('productAccessEmailLoading');
             const errorEl = document.getElementById('productAccessEmailError');
             const successEl = document.getElementById('productAccessEmailSuccess');
@@ -1727,12 +1787,7 @@ nowoczesna-edukacja.pl `;
                         : 'Nadano dostęp i wysłano e-mail.';
                     successEl.classList.remove('d-none');
                     sendBtn.innerHTML = '<i class="bi bi-check2"></i> Gotowe';
-                    setTimeout(function () {
-                        const modal = bootstrap.Modal.getInstance(modalEl);
-                        if (modal) {
-                            modal.hide();
-                        }
-                    }, 900);
+                    setTimeout(closeProductAccessModal, 900);
                 } catch (e) {
                     errorEl.textContent = (e && e.message) ? e.message : 'Nie udało się wysłać wiadomości.';
                     errorEl.classList.remove('d-none');
