@@ -105,6 +105,14 @@
                     </select>
                 </div>
                 <div class="col-md-2">
+                    <label for="migration_notice_sent" class="form-label">Wysłany e-mail</label>
+                    <select id="migration_notice_sent" name="sent" class="form-select">
+                        <option value="all" @selected($filters['sent'] === 'all')>Wszyscy</option>
+                        <option value="yes" @selected($filters['sent'] === 'yes')>Już wysłany</option>
+                        <option value="no" @selected($filters['sent'] === 'no')>Jeszcze nie wysłany</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
                     <label for="migration_notice_course_count" class="form-label">Liczba kursów</label>
                     <input id="migration_notice_course_count" type="number" name="course_count" min="1" max="99" inputmode="numeric"
                            value="{{ $filters['course_count'] }}" class="form-control" placeholder="np. 4">
@@ -216,6 +224,7 @@
                         <input type="hidden" name="q" value="{{ $filters['q'] }}">
                         <input type="hidden" name="course_id" value="{{ $filters['course_id'] }}">
                         <input type="hidden" name="account" value="{{ $filters['account'] }}">
+                        <input type="hidden" name="sent" value="{{ $filters['sent'] }}">
                         <input type="hidden" name="course_count" value="{{ $filters['course_count'] }}">
                         <input type="hidden" name="direction" value="{{ $filters['direction'] }}">
                         <button type="submit" class="btn btn-primary" id="migrationNoticeBulkSendBtn" disabled data-loading-text="Zlecanie…">
@@ -260,6 +269,7 @@
                         <input type="hidden" name="q" value="{{ $filters['q'] }}">
                         <input type="hidden" name="course_id" value="{{ $filters['course_id'] }}">
                         <input type="hidden" name="account" value="{{ $filters['account'] }}">
+                        <input type="hidden" name="sent" value="{{ $filters['sent'] }}">
                         <input type="hidden" name="course_count" value="{{ $filters['course_count'] }}">
                         <input type="hidden" name="direction" value="{{ $filters['direction'] }}">
                         <input type="hidden" name="email" id="migrationNoticeOneEmail" value="">

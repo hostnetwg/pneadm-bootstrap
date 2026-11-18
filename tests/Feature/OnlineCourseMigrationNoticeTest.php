@@ -108,6 +108,36 @@ class OnlineCourseMigrationNoticeTest extends TestCase
             ->assertOk()
             ->assertJsonPath('unsent_count', 1);
 
+        OnlineCourseMigrationNotice::query()->create([
+            'email' => 'anna.dwa@example.test',
+            'status' => OnlineCourseMigrationNotice::STATUS_SENT,
+            'sent_at' => now(),
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('online-courses.migration-notice.index', ['sent' => 'yes']))
+            ->assertOk()
+            ->assertSee('Już wysłany', false)
+            ->assertSee('anna.dwa@example.test')
+            ->assertDontSee('bartek.jeden@example.test');
+
+        $this->actingAs($admin)
+            ->get(route('online-courses.migration-notice.index', ['sent' => 'no']))
+            ->assertOk()
+            ->assertSee('Jeszcze nie wysłany', false)
+            ->assertSee('bartek.jeden@example.test')
+            ->assertDontSee('anna.dwa@example.test');
+
+        $this->actingAs($admin)
+            ->getJson(route('online-courses.migration-notice.unsent-count', ['sent' => 'yes']))
+            ->assertOk()
+            ->assertJsonPath('unsent_count', 0);
+
+        $this->actingAs($admin)
+            ->getJson(route('online-courses.migration-notice.unsent-count', ['sent' => 'no']))
+            ->assertOk()
+            ->assertJsonPath('unsent_count', 1);
+
         $this->get(route('online-courses.index'))
             ->assertOk()
             ->assertSee('Informacje o przeniesieniu kursów z nowoczesna-edukacja.pl');
