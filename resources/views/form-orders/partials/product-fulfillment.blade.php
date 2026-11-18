@@ -117,21 +117,42 @@
 
                     @if(! $recipient->isCancelled() && ! $isSucceeded)
                         <button type="button"
-                                class="btn btn-warning btn-sm w-100 js-product-fulfill-btn"
-                                onclick="fulfillProductAccess({{ $zamowienie->id }}, { recipientId: {{ (int) $recipient->id }} })">
+                                class="btn btn-warning btn-sm w-100 js-product-fulfill-btn js-product-access-email-btn"
+                                data-bs-toggle="modal"
+                                data-bs-target="#productAccessEmailModal"
+                                data-mode="grant"
+                                data-order-id="{{ (int) $zamowienie->id }}"
+                                data-recipient-id="{{ (int) $recipient->id }}"
+                                data-participant-name="{{ e($fullName) }}"
+                                data-preview-url="{{ route('form-orders.product.access-email-preview', ['id' => $zamowienie->id, 'recipient_id' => $recipient->id]) }}"
+                                data-fulfill-url="{{ route('form-orders.product.fulfill', $zamowienie->id) }}">
                             <i class="bi bi-plus-circle"></i> Nadaj dostęp
                         </button>
                         <div id="productFulfillResult_{{ (int) $recipient->id }}" class="js-product-fulfill-result mt-2"></div>
-                    @elseif(! $recipient->isCancelled() && $canRevoke)
+                    @elseif(! $recipient->isCancelled() && $isSucceeded)
                         <button type="button"
-                                class="btn btn-outline-danger btn-sm w-100 js-revoke-product-btn"
+                                class="btn btn-outline-primary btn-sm w-100 js-product-access-email-btn mb-2"
                                 data-bs-toggle="modal"
-                                data-bs-target="#revokeProductAccessModal"
+                                data-bs-target="#productAccessEmailModal"
+                                data-mode="resend"
+                                data-order-id="{{ (int) $zamowienie->id }}"
                                 data-recipient-id="{{ (int) $recipient->id }}"
-                                data-participant-name="{{ $fullName }}"
-                                data-participant-email="{{ $recipient->email }}">
-                            <i class="bi bi-arrow-clockwise"></i> Wycofaj dostęp
+                                data-participant-name="{{ e($fullName) }}"
+                                data-preview-url="{{ route('form-orders.product.access-email-preview', ['id' => $zamowienie->id, 'recipient_id' => $recipient->id]) }}"
+                                data-resend-url="{{ route('form-orders.product.resend-access-email', $zamowienie->id) }}">
+                            <i class="bi bi-envelope"></i> Prześlij dostęp ponownie
                         </button>
+                        @if($canRevoke)
+                            <button type="button"
+                                    class="btn btn-outline-danger btn-sm w-100 js-revoke-product-btn"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#revokeProductAccessModal"
+                                    data-recipient-id="{{ (int) $recipient->id }}"
+                                    data-participant-name="{{ $fullName }}"
+                                    data-participant-email="{{ $recipient->email }}">
+                                <i class="bi bi-arrow-clockwise"></i> Wycofaj dostęp
+                            </button>
+                        @endif
                     @endif
                 </div>
             @empty
@@ -142,9 +163,15 @@
         @if($pendingCount > 1)
             <div class="mt-2">
                 <button type="button"
-                        class="btn w-100 js-product-fulfill-btn text-white"
+                        class="btn w-100 js-product-fulfill-btn js-product-access-email-btn text-white"
                         style="background-color: #c77700; border-color: #a86300;"
-                        onclick="fulfillProductAccess({{ $zamowienie->id }}, {})">
+                        data-bs-toggle="modal"
+                        data-bs-target="#productAccessEmailModal"
+                        data-mode="bulk"
+                        data-order-id="{{ (int) $zamowienie->id }}"
+                        data-participant-name="wszyscy oczekujący ({{ $pendingCount }})"
+                        data-preview-url="{{ route('form-orders.product.access-email-preview', ['id' => $zamowienie->id, 'bulk' => 1]) }}"
+                        data-fulfill-url="{{ route('form-orders.product.fulfill', $zamowienie->id) }}">
                     <i class="bi bi-people"></i> Nadaj dostęp wszystkim ({{ $pendingCount }})
                 </button>
                 <div id="productFulfillResultAll" class="js-product-fulfill-result mt-2"></div>

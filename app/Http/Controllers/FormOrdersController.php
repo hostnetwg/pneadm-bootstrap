@@ -652,10 +652,8 @@ class FormOrdersController extends Controller
 
         return response()->json([
             'items' => $products->map(function (\App\Models\Product $product) {
-                $offer = $product->defaultOffer;
-                $price = $offer?->activePrices
-                    ?->reject(fn (\App\Models\ProductPrice $variant) => $variant->isComplimentary())
-                    ->first();
+                $prices = $this->catalogProductPriceOptions($product);
+                $price = $prices[0] ?? null;
 
                 return [
                     'value' => (string) $product->id,
@@ -666,15 +664,31 @@ class FormOrdersController extends Controller
                     'title_html' => (string) $product->name,
                     'start_date' => null,
                     'end_date' => null,
-                    'status' => $product->is_active ? 'ongoing' : 'archived',
+                    // Bez statusu cyklu życia (upcoming/ongoing/archived) — to ma sens tylko dla courses z datami.
+                    'status' => '',
                     'instructor' => '',
-                    'default_price' => $price
-                        ? number_format((float) $price->currentPrice(), 2, '.', '')
-                        : null,
-                    'default_variant_name' => $price?->name,
+                    'default_price' => $price['amount'] ?? null,
+                    'default_price_id' => $price['id'] ?? null,
+                    'default_variant_name' => $price['name'] ?? null,
                     'default_variant_active' => $price ? true : null,
+                    'prices' => $prices,
                 ];
             })->values(),
+        ]);
+    }
+
+    /**
+     * Aktywne (płatne) warianty ceny produktu katalogowego — do selecta w ADM.
+     */
+    public function catalogProductPrices(\App\Models\Product $product)
+    {
+        abort_unless($product->type === \App\Models\Product::TYPE_ONLINE_COURSE, 404);
+
+        $product->load(['defaultOffer.activePrices', 'offers.activePrices']);
+
+        return response()->json([
+            'product_id' => (int) $product->id,
+            'prices' => $this->catalogProductPriceOptions($product),
         ]);
     }
 
@@ -688,21 +702,32 @@ class FormOrdersController extends Controller
             ->orderBy('start_date', 'desc')
             ->get();
 
-        $prefill = [];
+        $prefill = [
+            'order_kind' => 'training',
+        ];
         $cloneSourceId = null;
         $cloneWarning = null;
         $participantsPrefill = [];
+        $sourceOrder = null;
 
         $cloneFrom = (int) $request->integer('clone_from');
         if ($cloneFrom > 0) {
-            $sourceOrder = FormOrder::with(['primaryParticipant', 'participants'])->find($cloneFrom);
+            $sourceOrder = FormOrder::with([
+                'primaryParticipant',
+                'participants',
+                'orderItems.product',
+            ])->find($cloneFrom);
 
             if (! $sourceOrder) {
                 $cloneWarning = 'Nie znaleziono zamówienia do skopiowania.';
             } else {
                 $cloneSourceId = $sourceOrder->id;
+                $sourceItem = $sourceOrder->orderItems->first();
                 $prefill = [
-                    'course_id' => $sourceOrder->product_id,
+                    'order_kind' => $sourceOrder->isProductOrder() ? 'product' : 'training',
+                    'course_id' => $sourceOrder->isProductOrder() ? null : $sourceOrder->product_id,
+                    'catalog_product_id' => $sourceOrder->isProductOrder() ? $sourceItem?->product_id : null,
+                    'product_price_id' => $sourceOrder->isProductOrder() ? $sourceItem?->product_price_id : null,
                     'product_price' => $sourceOrder->product_price,
                     'orderer_name' => $sourceOrder->orderer_name,
                     'orderer_phone' => $sourceOrder->orderer_phone,
@@ -725,13 +750,19 @@ class FormOrdersController extends Controller
             }
         }
 
+        $requestedKind = (string) $request->input('order_kind', '');
+        if (in_array($requestedKind, ['training', 'product'], true)) {
+            $prefill['order_kind'] = $requestedKind;
+        }
+        $prefill['order_kind'] = old('order_kind', $prefill['order_kind'] ?? 'training');
+
         $courseIdFromQuery = (int) $request->integer('course_id');
-        if ($courseIdFromQuery > 0 && empty($prefill['course_id'])) {
+        if ($courseIdFromQuery > 0 && empty($prefill['course_id']) && $prefill['order_kind'] === 'training') {
             $prefill['course_id'] = $courseIdFromQuery;
         }
 
         $selectedCourse = null;
-        if (! empty($prefill['course_id'])) {
+        if ($prefill['order_kind'] === 'training' && ! empty($prefill['course_id'])) {
             $selectedCourse = \App\Models\Course::with(['priceVariants' => function ($q) {
                 $q->where('is_active', true)->orderBy('id');
             }])->find((int) $prefill['course_id']);
@@ -743,16 +774,41 @@ class FormOrdersController extends Controller
             }
         }
 
-        $flatOrderPrice = isset($sourceOrder) && $sourceOrder
+        $selectedCatalogProduct = null;
+        $catalogPriceOptions = [];
+        if ($prefill['order_kind'] === 'product' && ! empty($prefill['catalog_product_id'])) {
+            $selectedCatalogProduct = \App\Models\Product::query()
+                ->with(['defaultOffer.activePrices', 'offers.activePrices'])
+                ->find((int) $prefill['catalog_product_id']);
+            if ($selectedCatalogProduct) {
+                $catalogPriceOptions = $this->catalogProductPriceOptions($selectedCatalogProduct);
+                if (empty($prefill['product_price_id']) && ! empty($catalogPriceOptions[0]['id'])) {
+                    $prefill['product_price_id'] = $catalogPriceOptions[0]['id'];
+                }
+                if (empty($prefill['product_price']) && ! empty($catalogPriceOptions[0]['amount'])) {
+                    $prefill['product_price'] = $catalogPriceOptions[0]['amount'];
+                }
+            }
+        }
+
+        $flatOrderPrice = $sourceOrder
             ? (bool) $sourceOrder->flat_order_price
             : (bool) ($selectedCourse?->priceVariants->first()?->flat_order_price ?? false);
 
         $participantUnitPrice = null;
         if (! empty($prefill['product_price'])) {
             $count = max(1, count($participantsPrefill));
-            $participantUnitPrice = $flatOrderPrice
+            $participantUnitPrice = ($prefill['order_kind'] === 'product' || $flatOrderPrice)
                 ? round((float) $prefill['product_price'], 2)
                 : round(((float) $prefill['product_price']) / $count, 2);
+
+            if ($prefill['order_kind'] === 'product' && ! empty($prefill['product_price_id'])) {
+                $selectedPriceAmount = collect($catalogPriceOptions)
+                    ->firstWhere('id', (int) $prefill['product_price_id'])['amount'] ?? null;
+                if ($selectedPriceAmount !== null) {
+                    $participantUnitPrice = round((float) $selectedPriceAmount, 2);
+                }
+            }
         }
 
         return view('form-orders.create', compact(
@@ -761,6 +817,8 @@ class FormOrdersController extends Controller
             'cloneSourceId',
             'cloneWarning',
             'selectedCourse',
+            'selectedCatalogProduct',
+            'catalogPriceOptions',
             'participantsPrefill',
             'participantUnitPrice',
             'flatOrderPrice'
@@ -774,10 +832,17 @@ class FormOrdersController extends Controller
     {
         try {
             $participantService = app(FormOrderAdminParticipantService::class);
+            $orderKind = (string) $request->input('order_kind', 'training');
+            if (! in_array($orderKind, ['training', 'product'], true)) {
+                $orderKind = 'training';
+            }
+            $isProduct = $orderKind === 'product';
 
             $request->validate(array_merge([
-                // Dane produktu/szkolenia
-                'course_id' => 'required|exists:courses,id',
+                'order_kind' => 'nullable|in:training,product',
+                'course_id' => $isProduct ? 'nullable|integer|exists:courses,id' : 'required|exists:courses,id',
+                'catalog_product_id' => $isProduct ? 'required|integer|exists:products,id' : 'nullable|integer|exists:products,id',
+                'product_price_id' => $isProduct ? 'required|integer|exists:product_prices,id' : 'nullable|integer|exists:product_prices,id',
                 'product_name' => 'nullable|string|max:255',
                 'product_price' => 'nullable|numeric|min:0',
                 'product_description' => 'nullable|string',
@@ -818,10 +883,72 @@ class FormOrdersController extends Controller
 
                 // Notatki
                 'notes' => 'nullable|string',
-            ], $participantService->validationRules()), $participantService->validationMessages());
+            ], $participantService->validationRules()), array_merge($participantService->validationMessages(), [
+                'catalog_product_id.required' => 'Wybierz kurs online nagrany z listy.',
+                'product_price_id.required' => 'Wybierz wariant ceny kursu online.',
+            ]));
 
             $participantRows = $participantService->parseFromRequest($request);
             $participantService->assertEmailsUniqueOnOrder($participantRows);
+
+            if ($isProduct) {
+                $formOrder = FormOrder::create([
+                    'ident' => FormOrder::generateIdent(),
+                    'order_date' => now('UTC'),
+                    'order_kind' => 'product',
+                    'product_id' => null,
+                    'product_name' => '',
+                    'product_price' => $request->product_price ?? 0,
+                    'flat_order_price' => false,
+                    'product_description' => null,
+                    'orderer_name' => $request->orderer_name,
+                    'orderer_phone' => $request->orderer_phone,
+                    'orderer_email' => $request->orderer_email,
+                    'buyer_name' => $request->buyer_name,
+                    'buyer_address' => $request->buyer_address,
+                    'buyer_postal_code' => $request->buyer_postal_code,
+                    'buyer_city' => $request->buyer_city,
+                    'buyer_nip' => $request->buyer_nip,
+                    'recipient_name' => $request->recipient_name,
+                    'recipient_address' => $request->recipient_address,
+                    'recipient_postal_code' => $request->recipient_postal_code,
+                    'recipient_city' => $request->recipient_city,
+                    'recipient_nip' => $request->recipient_nip,
+                    'ksef_entity_source' => $request->input('ksef_entity_source', FormOrder::KSEF_ENTITY_SOURCE_RECIPIENT),
+                    'ksef_additional_entity_role' => $request->input('ksef_additional_entity_role') ?: null,
+                    'ksef_additional_entity_id_type' => $request->input('ksef_additional_entity_id_type') ?: null,
+                    'ksef_additional_entity_identifier' => $request->input('ksef_additional_entity_identifier') ?: null,
+                    'ksef_admin_note' => $request->input('ksef_admin_note') ?: null,
+                    'publigo_product_id' => null,
+                    'publigo_price_id' => null,
+                    'course_price_variant_id' => null,
+                    'invoice_notes' => $request->invoice_notes,
+                    'invoice_payment_delay' => $request->invoice_payment_delay,
+                    'notes' => $request->notes,
+                    'payment_mode' => FormOrder::PAYMENT_MODE_DEFERRED_INVOICE,
+                    'payment_status' => FormOrder::PAYMENT_STATUS_SUBMITTED,
+                    'submission_source' => FormOrder::SUBMISSION_SOURCE_PNEADM_MANUAL,
+                    'ip_address' => $request->ip(),
+                ]);
+
+                $catalogTotal = $this->syncCatalogProductOnOrder(
+                    $formOrder,
+                    (int) $request->input('catalog_product_id'),
+                    max(1, count($participantRows)),
+                    (int) $request->input('product_price_id')
+                );
+                if ($request->filled('product_price')) {
+                    $formOrder->product_price = $request->input('product_price');
+                } elseif ($catalogTotal !== null) {
+                    $formOrder->product_price = $catalogTotal;
+                }
+                $formOrder->save();
+
+                $participantService->sync($formOrder, $participantRows);
+
+                return redirect()->route('form-orders.show', $formOrder->id)
+                    ->with('success', 'Zamówienie produktowe zostało pomyślnie utworzone.');
+            }
 
             // Pobierz dane kursu
             $course = \App\Models\Course::with(['priceVariants' => function ($q) {
@@ -837,6 +964,7 @@ class FormOrdersController extends Controller
             $formOrder = FormOrder::create([
                 'ident' => FormOrder::generateIdent(),
                 'order_date' => now('UTC'),
+                'order_kind' => 'training',
                 'product_id' => $course->id, // ID kursu z bazy
                 'product_name' => $course->title,
                 'product_price' => $request->product_price ?? 0, // Można ustawić ręcznie
@@ -1197,12 +1325,24 @@ class FormOrdersController extends Controller
             // Jeśli przychodzi z pełnej strony edycji, aktualizuj wszystkie pola
             if ($isFromEditPage) {
                 $participantService = app(FormOrderAdminParticipantService::class);
+                $requestedKind = (string) $request->input(
+                    'order_kind',
+                    $zamowienie->isProductOrder() ? 'product' : 'training'
+                );
+                if (! in_array($requestedKind, ['training', 'product'], true)) {
+                    $requestedKind = $zamowienie->isProductOrder() ? 'product' : 'training';
+                }
+                $isProduct = $requestedKind === 'product';
 
                 $request->validate(array_merge([
-                    'course_id' => 'nullable|integer|exists:courses,id',
-                    'catalog_product_id' => $zamowienie->isProductOrder()
+                    'order_kind' => 'nullable|in:training,product',
+                    'course_id' => $isProduct ? 'nullable|integer|exists:courses,id' : 'required|integer|exists:courses,id',
+                    'catalog_product_id' => $isProduct
                         ? 'required|integer|exists:products,id'
                         : 'nullable|integer|exists:products,id',
+                    'product_price_id' => $isProduct
+                        ? 'required|integer|exists:product_prices,id'
+                        : 'nullable|integer|exists:product_prices,id',
                     'orderer_email' => 'required|email:filter|max:255',
                     'ksef_entity_source' => 'nullable|string|in:'.implode(',', FormOrder::KSEF_ENTITY_SOURCES),
                     'ksef_additional_entity_role' => 'nullable|string|in:'.implode(',', FormOrder::KSEF_ADDITIONAL_ENTITY_ROLES),
@@ -1210,8 +1350,10 @@ class FormOrdersController extends Controller
                     'ksef_additional_entity_identifier' => 'nullable|string|max:50',
                     'ksef_admin_note' => 'nullable|string',
                 ], $participantService->validationRules()), array_merge($participantService->validationMessages(), [
-                    'catalog_product_id.required' => 'Wybierz kurs online z listy.',
+                    'catalog_product_id.required' => 'Wybierz kurs online nagrany z listy.',
                     'catalog_product_id.exists' => 'Wybrany kurs online nie istnieje w katalogu.',
+                    'product_price_id.required' => 'Wybierz wariant ceny kursu online.',
+                    'course_id.required' => 'Wybierz szkolenie z listy.',
                     'orderer_email.email' => 'Podaj prawidłowy adres e-mail (z domeną, np. nazwa@szkola.pl).',
                 ]));
 
@@ -1219,16 +1361,36 @@ class FormOrdersController extends Controller
                 $participantService->assertEmailsUniqueOnOrder($participantRows);
 
                 $priceAfterCourseChange = null;
-                if ($zamowienie->isProductOrder()) {
+                $wasProduct = $zamowienie->isProductOrder();
+
+                if ($isProduct) {
+                    if (! $wasProduct) {
+                        $zamowienie->order_kind = 'product';
+                        $zamowienie->course_price_variant_id = null;
+                        $zamowienie->flat_order_price = false;
+                        if (empty($zamowienie->payment_mode)) {
+                            $zamowienie->payment_mode = FormOrder::PAYMENT_MODE_DEFERRED_INVOICE;
+                        }
+                        if (empty($zamowienie->payment_status)) {
+                            $zamowienie->payment_status = FormOrder::PAYMENT_STATUS_SUBMITTED;
+                        }
+                    }
+
                     $priceAfterCourseChange = $this->syncCatalogProductOnOrder(
                         $zamowienie,
                         (int) $request->input('catalog_product_id'),
-                        max(1, count($participantRows))
+                        max(1, count($participantRows)),
+                        (int) $request->input('product_price_id')
                     );
                 } else {
+                    if ($wasProduct) {
+                        $this->clearProductCatalogFromOrder($zamowienie);
+                        $zamowienie->order_kind = 'training';
+                    }
+
                     // Jeżeli zmieniono szkolenie, przepnij powiązane pola produktu (id/nazwa/publigo/wariant cenowy).
                     $newCourseId = (int) $request->input('course_id');
-                    if ($newCourseId > 0 && $newCourseId !== (int) $zamowienie->product_id) {
+                    if ($newCourseId > 0 && ($wasProduct || $newCourseId !== (int) $zamowienie->product_id)) {
                         $newCourse = \App\Models\Course::with('priceVariants')->find((int) $newCourseId);
                         if ($newCourse) {
                             $previousVariantId = $zamowienie->course_price_variant_id
@@ -1615,6 +1777,66 @@ class FormOrdersController extends Controller
                     $result['message'] ?? $result['error'] ?? 'Nie udało się nadać dostępów.'
                 );
         }
+
+        return response()->json($result, $http);
+    }
+
+    /**
+     * Podgląd e-maila dostępu do kursu online (bez wysyłki).
+     */
+    public function previewProductAccessEmail(Request $request, int $id)
+    {
+        if ($request->hasSession()) {
+            $request->session()->save();
+        }
+
+        $order = FormOrder::query()->findOrFail($id);
+        if (! $order->isProductOrder()) {
+            return response()->json([
+                'success' => false,
+                'error' => 'To nie jest zamówienie z katalogu produktów.',
+            ], 422);
+        }
+
+        $recipientId = $request->integer('recipient_id') ?: null;
+        $bulk = $request->boolean('bulk');
+        $result = app(\App\Services\PneduProductOrderFulfillmentService::class)
+            ->previewAccessEmail($id, $recipientId, $bulk);
+        $http = (int) ($result['http_code'] ?? (($result['success'] ?? false) ? 200 : 422));
+        unset($result['http_code']);
+
+        return response()->json($result, $http);
+    }
+
+    /**
+     * Ponowna wysyłka e-maila dostępu do kursu online (bez ponownego grantu).
+     */
+    public function resendProductAccessEmail(Request $request, int $id)
+    {
+        if ($request->hasSession()) {
+            $request->session()->save();
+        }
+
+        $order = FormOrder::query()->findOrFail($id);
+        if (! $order->isProductOrder()) {
+            return response()->json([
+                'success' => false,
+                'error' => 'To nie jest zamówienie z katalogu produktów.',
+            ], 422);
+        }
+
+        $recipientId = $request->integer('recipient_id');
+        if ($recipientId <= 0) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Wskaż uczestnika (recipient_id).',
+            ], 422);
+        }
+
+        $result = app(\App\Services\PneduProductOrderFulfillmentService::class)
+            ->resendAccessEmail($id, $recipientId);
+        $http = (int) ($result['http_code'] ?? (($result['success'] ?? false) ? 200 : 422));
+        unset($result['http_code']);
 
         return response()->json($result, $http);
     }
@@ -3325,12 +3547,32 @@ class FormOrdersController extends Controller
 
             $participant = $zamowienie->primaryParticipant;
 
+            $editCatalogItem = $zamowienie->orderItems->first();
+            $selectedCatalogProduct = null;
+            $catalogPriceOptions = [];
+            $selectedProductPriceId = old('product_price_id', $editCatalogItem?->product_price_id);
+            if ($zamowienie->isProductOrder() || old('order_kind') === 'product') {
+                $catalogProductId = old('catalog_product_id', $editCatalogItem?->product_id);
+                if ($catalogProductId) {
+                    $selectedCatalogProduct = \App\Models\Product::query()
+                        ->with(['defaultOffer.activePrices', 'offers.activePrices'])
+                        ->withTrashed()
+                        ->find((int) $catalogProductId);
+                    if ($selectedCatalogProduct) {
+                        $catalogPriceOptions = $this->catalogProductPriceOptions($selectedCatalogProduct);
+                    }
+                }
+            }
+
             return view('form-orders.edit', compact(
                 'zamowienie',
                 'participant',
                 'participantsPrefill',
                 'participantUnitPrice',
-                'flatOrderPrice'
+                'flatOrderPrice',
+                'selectedCatalogProduct',
+                'catalogPriceOptions',
+                'selectedProductPriceId'
             ));
         } catch (Exception $e) {
             return redirect()->route('form-orders.index')->with('error', 'Zamówienie nie zostało znalezione.');
@@ -4032,10 +4274,18 @@ class FormOrdersController extends Controller
     /**
      * Przepina pozycję katalogową zamówienia produktowego (form_orders.product_id zostaje null).
      */
-    private function syncCatalogProductOnOrder(FormOrder $order, int $catalogProductId, int $participantCount): ?float
-    {
+    private function syncCatalogProductOnOrder(
+        FormOrder $order,
+        int $catalogProductId,
+        int $participantCount,
+        ?int $productPriceId = null
+    ): ?float {
         $item = $order->orderItems()->first();
-        if ($item && (int) $item->product_id === $catalogProductId) {
+        if (
+            $item
+            && (int) $item->product_id === $catalogProductId
+            && ($productPriceId === null || (int) $item->product_price_id === $productPriceId)
+        ) {
             return null;
         }
 
@@ -4043,13 +4293,18 @@ class FormOrdersController extends Controller
             ->with(['defaultOffer.activePrices', 'offers.activePrices'])
             ->find($catalogProductId);
 
-        if (! $product) {
+        if (! $product || $product->type !== \App\Models\Product::TYPE_ONLINE_COURSE) {
             throw ValidationException::withMessages([
                 'catalog_product_id' => 'Wybrany kurs online nie istnieje w katalogu.',
             ]);
         }
 
-        $price = $this->resolveCatalogProductPrice($product);
+        $price = $this->resolveCatalogProductPrice($product, $productPriceId);
+        // Przy zmianie kursu stary product_price_id może należeć do poprzedniego produktu —
+        // wtedy bierzemy domyślny aktywny wariant nowego kursu.
+        if ($price === null && $productPriceId) {
+            $price = $this->resolveCatalogProductPrice($product, null);
+        }
         if ($price === null) {
             throw ValidationException::withMessages([
                 'catalog_product_id' => 'Wybrany kurs online nie ma aktywnej ceny. Uzupełnij ofertę w katalogu albo wybierz inny kurs.',
@@ -4064,12 +4319,15 @@ class FormOrdersController extends Controller
             ? \App\Models\OnlineCourse::query()->find((int) $product->resource_id)
             : null;
 
+        $order->order_kind = 'product';
         $order->product_id = null;
         $order->product_name = (string) $product->name;
         $order->product_description = $onlineCourse?->description;
         $order->product_price = $lineTotal;
         $order->publigo_product_id = null;
+        $order->publigo_price_id = null;
         $order->course_price_variant_id = null;
+        $order->flat_order_price = false;
 
         $snapshot = [
             'product_id' => (int) $product->id,
@@ -4110,8 +4368,79 @@ class FormOrdersController extends Controller
         return $lineTotal;
     }
 
-    private function resolveCatalogProductPrice(\App\Models\Product $product): ?\App\Models\ProductPrice
+    /**
+     * Usuwa pozycje katalogowe przy zamianie zamówienia produktowego na szkolenie (courses).
+     */
+    private function clearProductCatalogFromOrder(FormOrder $order): void
     {
+        $order->load(['orderItems.recipients.fulfillments']);
+        $revoke = app(\App\Services\ProductOrderAccessRevokeService::class);
+
+        foreach ($order->orderItems as $item) {
+            foreach ($item->recipients as $recipient) {
+                $wasFulfilled = $recipient->fulfillments->contains(
+                    fn ($fulfillment) => $fulfillment->status === \App\Models\OrderFulfillment::STATUS_SUCCEEDED
+                );
+                if ($wasFulfilled) {
+                    $revoke->revokeRecipient($recipient);
+                }
+                $recipient->delete();
+            }
+            $item->delete();
+        }
+
+        $order->unsetRelation('orderItems');
+        $revoke->syncProvisionedAt($order->fresh(['orderItems.recipients.fulfillments']) ?? $order);
+    }
+
+    /**
+     * @return list<array{id:int,name:string,amount:string,label:string}>
+     */
+    private function catalogProductPriceOptions(\App\Models\Product $product): array
+    {
+        $offer = $product->defaultOffer ?? $product->offers->first();
+        if (! $offer) {
+            return [];
+        }
+
+        return $offer->activePrices
+            ->reject(fn (\App\Models\ProductPrice $variant) => $variant->isComplimentary())
+            ->sortBy(fn (\App\Models\ProductPrice $variant) => [(int) $variant->sort_order, (int) $variant->id])
+            ->values()
+            ->map(function (\App\Models\ProductPrice $variant) {
+                $amount = number_format((float) $variant->currentPrice(), 2, '.', '');
+
+                return [
+                    'id' => (int) $variant->id,
+                    'name' => (string) $variant->name,
+                    'amount' => $amount,
+                    'label' => trim($variant->name.' — '.$amount.' PLN'),
+                ];
+            })
+            ->all();
+    }
+
+    private function resolveCatalogProductPrice(
+        \App\Models\Product $product,
+        ?int $productPriceId = null
+    ): ?\App\Models\ProductPrice {
+        if ($productPriceId) {
+            $price = \App\Models\ProductPrice::query()
+                ->with('offer')
+                ->whereKey($productPriceId)
+                ->where('is_active', true)
+                ->whereHas('offer', function ($query) use ($product) {
+                    $query->where('product_id', $product->id);
+                })
+                ->first();
+
+            if (! $price || $price->isComplimentary()) {
+                return null;
+            }
+
+            return $price;
+        }
+
         $offer = $product->defaultOffer ?? $product->offers->first();
         if (! $offer) {
             return null;

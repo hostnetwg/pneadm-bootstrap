@@ -1463,7 +1463,9 @@ nowoczesna-edukacja.pl `;
                 payload.recipient_id = recipientId;
             }
 
-            fetch(`/form-orders/${orderId}/product/fulfill`, {
+            const fulfillUrl = options.fulfillUrl || (`/form-orders/${orderId}/product/fulfill`);
+
+            return fetch(fulfillUrl, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -1475,7 +1477,7 @@ nowoczesna-edukacja.pl `;
             .then(response => response.json().then(data => ({ ok: response.ok, data })))
             .then(({ ok, data }) => {
                 if (ok && data.success) {
-                    return softRefreshProductFulfillment();
+                    return softRefreshProductFulfillment().then(() => data);
                 }
                 const message = data.message || data.error || 'Nie udało się nadać dostępu.';
                 if (resultDiv) {
@@ -1485,16 +1487,266 @@ nowoczesna-edukacja.pl `;
                     btn.disabled = false;
                     btn.innerHTML = btn.dataset.productOriginalHtml || btn.innerHTML;
                 });
+                return Promise.reject(new Error(message));
             })
-            .catch(() => {
-                if (resultDiv) {
+            .catch((err) => {
+                if (resultDiv && !resultDiv.querySelector('.alert-danger')) {
                     resultDiv.innerHTML = '<div class="alert alert-danger py-2 mb-0 small">Wystąpił błąd podczas nadawania dostępu.</div>';
                 }
                 buttons.forEach((btn) => {
                     btn.disabled = false;
                     btn.innerHTML = btn.dataset.productOriginalHtml || btn.innerHTML;
                 });
+                return Promise.reject(err);
             });
+        }
+
+        function initProductAccessEmailModal() {
+            const modalEl = document.getElementById('productAccessEmailModal');
+            if (!modalEl || modalEl.dataset.previewBound === '1') {
+                return;
+            }
+            modalEl.dataset.previewBound = '1';
+
+            const loadingEl = document.getElementById('productAccessEmailLoading');
+            const errorEl = document.getElementById('productAccessEmailError');
+            const successEl = document.getElementById('productAccessEmailSuccess');
+            const contentEl = document.getElementById('productAccessEmailContent');
+            const toEl = document.getElementById('productAccessEmailTo');
+            const subjectEl = document.getElementById('productAccessEmailSubject');
+            const bodyEl = document.getElementById('productAccessEmailBody');
+            const bodyFrameEl = document.getElementById('productAccessEmailBodyFrame');
+            const variantEl = document.getElementById('productAccessEmailVariant');
+            const hintEl = document.getElementById('productAccessEmailHint');
+            const copyBtn = document.getElementById('productAccessEmailCopyBtn');
+            const sendBtn = document.getElementById('productAccessEmailSendBtn');
+            const titleEl = document.getElementById('productAccessEmailModalLabel');
+            let lastBodyHtml = '';
+            let activeTrigger = null;
+            let previewData = null;
+
+            function csrfToken() {
+                return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+            }
+
+            function resetUi() {
+                loadingEl.classList.remove('d-none');
+                errorEl.classList.add('d-none');
+                errorEl.textContent = '';
+                successEl.classList.add('d-none');
+                successEl.textContent = '';
+                contentEl.classList.add('d-none');
+                copyBtn.disabled = true;
+                sendBtn.disabled = true;
+                sendBtn.innerHTML = '<i class="bi bi-send"></i> Wyślij';
+                toEl.value = '';
+                subjectEl.value = '';
+                bodyEl.value = '';
+                lastBodyHtml = '';
+                previewData = null;
+                if (bodyFrameEl) {
+                    bodyFrameEl.removeAttribute('srcdoc');
+                    bodyFrameEl.src = 'about:blank';
+                }
+                variantEl.textContent = '';
+                hintEl.textContent = '';
+            }
+
+            function copyText(text) {
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    return navigator.clipboard.writeText(text);
+                }
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                ta.style.position = 'fixed';
+                ta.style.left = '-9999px';
+                document.body.appendChild(ta);
+                ta.select();
+                try { document.execCommand('copy'); } finally { document.body.removeChild(ta); }
+                return Promise.resolve();
+            }
+
+            async function copyHtmlContent(html, plain) {
+                const htmlPayload = html || '';
+                const plainPayload = plain || htmlPayload.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+                if (navigator.clipboard && typeof ClipboardItem !== 'undefined') {
+                    try {
+                        await navigator.clipboard.write([
+                            new ClipboardItem({
+                                'text/html': new Blob([htmlPayload], { type: 'text/html' }),
+                                'text/plain': new Blob([plainPayload], { type: 'text/plain' }),
+                            }),
+                        ]);
+                        return;
+                    } catch (e) {}
+                }
+                await copyText(htmlPayload);
+            }
+
+            modalEl.addEventListener('show.bs.modal', async function (event) {
+                activeTrigger = event.relatedTarget && event.relatedTarget.classList.contains('js-product-access-email-btn')
+                    ? event.relatedTarget
+                    : null;
+                if (!activeTrigger) {
+                    return;
+                }
+
+                resetUi();
+                const mode = activeTrigger.getAttribute('data-mode') || 'grant';
+                const participantName = activeTrigger.getAttribute('data-participant-name') || '';
+                if (titleEl) {
+                    const titles = {
+                        grant: 'Nadaj dostęp — podgląd e-maila',
+                        bulk: 'Nadaj dostęp wszystkim — podgląd e-maila',
+                        resend: 'Prześlij dostęp ponownie',
+                    };
+                    titleEl.innerHTML = '<i class="bi bi-envelope"></i> '
+                        + (titles[mode] || 'E-mail z dostępem do kursu')
+                        + (participantName ? (' — ' + participantName) : '');
+                }
+
+                const previewUrl = activeTrigger.getAttribute('data-preview-url');
+                const controller = new AbortController();
+                const timeoutId = setTimeout(function () { controller.abort(); }, 15000);
+                try {
+                    const res = await fetch(previewUrl, {
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                        },
+                        signal: controller.signal,
+                        credentials: 'same-origin',
+                    });
+                    clearTimeout(timeoutId);
+                    const data = await res.json().catch(function () { return {}; });
+                    loadingEl.classList.add('d-none');
+                    if (!res.ok || !data.success) {
+                        errorEl.textContent = data.error || ('Błąd ' + res.status);
+                        errorEl.classList.remove('d-none');
+                        return;
+                    }
+                    previewData = data;
+                    toEl.value = data.to || '';
+                    subjectEl.value = data.subject || '';
+                    bodyEl.value = data.body || '';
+                    lastBodyHtml = data.body_html || '';
+                    if (bodyFrameEl) {
+                        if (lastBodyHtml) {
+                            bodyFrameEl.srcdoc = lastBodyHtml;
+                        } else {
+                            const esc = String(data.body || '')
+                                .replace(/&/g, '&amp;')
+                                .replace(/</g, '&lt;')
+                                .replace(/>/g, '&gt;');
+                            bodyFrameEl.srcdoc = '<pre style="font-family:system-ui,sans-serif;padding:1rem;white-space:pre-wrap;margin:0;">' + esc + '</pre>';
+                        }
+                    }
+                    const nameLabel = data.participant_name || participantName;
+                    variantEl.textContent = (nameLabel ? (nameLabel + ' — ') : '')
+                        + (data.variant_label || '');
+                    hintEl.textContent = data.hint
+                        || (data.variant === 'new_user'
+                            ? 'Przy wysyłce zostanie wygenerowany świeży link do ustawienia hasła (w podglądzie jest placeholder).'
+                            : 'Zostanie wysłany e-mail informacyjny o aktywnym dostępie.');
+                    if (mode === 'bulk' && data.pending_count) {
+                        sendBtn.innerHTML = '<i class="bi bi-send"></i> Nadaj dostęp i wyślij wszystkim (' + data.pending_count + ')';
+                    } else if (mode === 'resend') {
+                        sendBtn.innerHTML = '<i class="bi bi-send"></i> Wyślij ponownie';
+                    } else {
+                        sendBtn.innerHTML = '<i class="bi bi-send"></i> Nadaj dostęp i wyślij';
+                    }
+                    contentEl.classList.remove('d-none');
+                    copyBtn.disabled = false;
+                    sendBtn.disabled = false;
+                } catch (e) {
+                    clearTimeout(timeoutId);
+                    loadingEl.classList.add('d-none');
+                    errorEl.textContent = (e && e.name === 'AbortError')
+                        ? 'Podgląd nie odpowiedział w 15 s. Odśwież stronę i spróbuj ponownie.'
+                        : 'Nie udało się pobrać podglądu wiadomości.';
+                    errorEl.classList.remove('d-none');
+                }
+            });
+
+            copyBtn.addEventListener('click', function () {
+                const htmlToCopy = lastBodyHtml
+                    || ('<p><strong>Temat:</strong> ' + String(subjectEl.value)
+                        .replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</p><pre>'
+                        + String(bodyEl.value).replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</pre>');
+                const plainToCopy = 'Temat: ' + subjectEl.value + '\n\n' + bodyEl.value;
+                copyHtmlContent(htmlToCopy, plainToCopy).then(function () {
+                    const prev = copyBtn.innerHTML;
+                    copyBtn.innerHTML = '<i class="bi bi-check2"></i> Skopiowano';
+                    setTimeout(function () { copyBtn.innerHTML = prev; }, 1500);
+                });
+            });
+
+            sendBtn.addEventListener('click', async function () {
+                if (!activeTrigger) {
+                    return;
+                }
+                const mode = activeTrigger.getAttribute('data-mode') || 'grant';
+                const orderId = Number(activeTrigger.getAttribute('data-order-id') || '0');
+                const recipientId = Number(activeTrigger.getAttribute('data-recipient-id') || '0') || null;
+                sendBtn.disabled = true;
+                copyBtn.disabled = true;
+                sendBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Wysyłanie…';
+                errorEl.classList.add('d-none');
+                successEl.classList.add('d-none');
+
+                try {
+                    if (mode === 'resend') {
+                        const resendUrl = activeTrigger.getAttribute('data-resend-url');
+                        const res = await fetch(resendUrl, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                                'X-CSRF-TOKEN': csrfToken(),
+                                'X-Requested-With': 'XMLHttpRequest',
+                            },
+                            body: JSON.stringify({ recipient_id: recipientId }),
+                        });
+                        const data = await res.json().catch(function () { return {}; });
+                        if (!res.ok || !data.success) {
+                            throw new Error(data.error || ('Błąd ' + res.status));
+                        }
+                        successEl.textContent = data.message || 'Wysłano ponownie e-mail z dostępem.';
+                        successEl.classList.remove('d-none');
+                        sendBtn.innerHTML = '<i class="bi bi-check2"></i> Wysłano';
+                        copyBtn.disabled = false;
+                        return;
+                    }
+
+                    await fulfillProductAccess(orderId, {
+                        recipientId: mode === 'bulk' ? null : recipientId,
+                        fulfillUrl: activeTrigger.getAttribute('data-fulfill-url'),
+                    });
+                    successEl.textContent = mode === 'bulk'
+                        ? 'Nadano dostęp i wysłano e-maile do oczekujących uczestników.'
+                        : 'Nadano dostęp i wysłano e-mail.';
+                    successEl.classList.remove('d-none');
+                    sendBtn.innerHTML = '<i class="bi bi-check2"></i> Gotowe';
+                    setTimeout(function () {
+                        const modal = bootstrap.Modal.getInstance(modalEl);
+                        if (modal) {
+                            modal.hide();
+                        }
+                    }, 900);
+                } catch (e) {
+                    errorEl.textContent = (e && e.message) ? e.message : 'Nie udało się wysłać wiadomości.';
+                    errorEl.classList.remove('d-none');
+                    copyBtn.disabled = false;
+                    sendBtn.disabled = false;
+                    sendBtn.innerHTML = '<i class="bi bi-send"></i> Wyślij';
+                }
+            });
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initProductAccessEmailModal);
+        } else {
+            initProductAccessEmailModal();
         }
 
         function revokeProductAccess(orderId) {
@@ -4475,6 +4727,58 @@ nowoczesna-edukacja.pl `;
                     </button>
                     <button type="button" class="btn btn-warning" id="revokeProductAccessConfirmBtn" onclick="revokeProductAccess({{ $zamowienie->id }})">
                         <i class="bi bi-arrow-clockwise"></i> Wycofaj dostęp
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- Podgląd / wysyłka e-maila dostępu do kursu online --}}
+    <div class="modal fade" id="productAccessEmailModal" tabindex="-1" aria-labelledby="productAccessEmailModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title" id="productAccessEmailModalLabel">
+                        <i class="bi bi-envelope"></i> E-mail z dostępem do kursu
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="productAccessEmailLoading" class="text-muted small py-3 text-center">
+                        <span class="spinner-border spinner-border-sm me-2"></span>Przygotowuję podgląd…
+                    </div>
+                    <div id="productAccessEmailError" class="alert alert-danger d-none" role="alert"></div>
+                    <div id="productAccessEmailSuccess" class="alert alert-success d-none" role="alert"></div>
+                    <div id="productAccessEmailContent" class="d-none">
+                        <p class="small text-muted mb-2" id="productAccessEmailVariant"></p>
+                        <div class="mb-2">
+                            <label class="form-label small fw-semibold mb-1" for="productAccessEmailTo">Do</label>
+                            <input type="text" class="form-control form-control-sm" id="productAccessEmailTo" readonly>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label small fw-semibold mb-1" for="productAccessEmailSubject">Temat</label>
+                            <input type="text" class="form-control form-control-sm" id="productAccessEmailSubject" readonly>
+                        </div>
+                        <div class="mb-2">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <label class="form-label small fw-semibold mb-0" for="productAccessEmailBodyFrame">Treść (podgląd HTML)</label>
+                            </div>
+                            <iframe id="productAccessEmailBodyFrame"
+                                    title="Podgląd wiadomości e-mail"
+                                    class="w-100 border rounded bg-white"
+                                    style="min-height: 280px;"></iframe>
+                            <textarea class="d-none" id="productAccessEmailBody" readonly aria-hidden="true"></textarea>
+                        </div>
+                        <p class="small text-muted mt-2 mb-0" id="productAccessEmailHint"></p>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Zamknij</button>
+                    <button type="button" class="btn btn-outline-primary" id="productAccessEmailCopyBtn" disabled>
+                        <i class="bi bi-clipboard"></i> Kopiuj treść
+                    </button>
+                    <button type="button" class="btn btn-primary" id="productAccessEmailSendBtn" disabled>
+                        <i class="bi bi-send"></i> Wyślij
                     </button>
                 </div>
             </div>

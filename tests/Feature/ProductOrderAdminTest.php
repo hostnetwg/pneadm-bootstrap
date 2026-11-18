@@ -117,6 +117,83 @@ class ProductOrderAdminTest extends TestCase
             && (int) $request['recipient_id'] === (int) $recipient->id);
     }
 
+    public function test_product_access_email_preview_proxies_to_pnedu(): void
+    {
+        config([
+            'services.pnedu.internal_url' => 'http://pnedu.test',
+            'services.pnedu.internal_api_token' => 'test-internal-token',
+        ]);
+        Http::fake([
+            'http://pnedu.test/api/internal/form-orders/*/preview-product-access-email*' => Http::response([
+                'success' => true,
+                'to' => 'anna@example.test',
+                'subject' => 'Dostęp do kursu online: Test',
+                'body' => 'Treść',
+                'body_html' => '<p>Treść</p>',
+                'variant' => 'new_user',
+                'variant_label' => 'E-mail z linkiem do ustawienia hasła (nowe konto)',
+                'mode' => 'grant',
+            ]),
+        ]);
+
+        $order = $this->createProductOrder();
+        $recipient = $order->orderItems->first()->recipients->first();
+
+        $this->actingAs($this->admin())
+            ->getJson(route('form-orders.product.access-email-preview', [
+                'id' => $order->id,
+                'recipient_id' => $recipient->id,
+            ]))
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('to', 'anna@example.test');
+
+        Http::assertSent(fn ($request) => str_contains($request->url(), 'preview-product-access-email')
+            && (int) $request['recipient_id'] === (int) $recipient->id);
+    }
+
+    public function test_product_access_email_resend_proxies_to_pnedu(): void
+    {
+        config([
+            'services.pnedu.internal_url' => 'http://pnedu.test',
+            'services.pnedu.internal_api_token' => 'test-internal-token',
+        ]);
+        Http::fake([
+            'http://pnedu.test/api/internal/form-orders/*/resend-product-access-email' => Http::response([
+                'success' => true,
+                'message' => 'Wysłano ponownie e-mail z dostępem do kursu.',
+            ]),
+        ]);
+
+        $order = $this->createProductOrder();
+        $recipient = $order->orderItems->first()->recipients->first();
+
+        $this->actingAs($this->admin())
+            ->postJson(route('form-orders.product.resend-access-email', $order->id), [
+                'recipient_id' => $recipient->id,
+            ])
+            ->assertOk()
+            ->assertJsonPath('success', true);
+
+        Http::assertSent(fn ($request) => $request->url()
+            === "http://pnedu.test/api/internal/form-orders/{$order->id}/resend-product-access-email"
+            && (int) $request['recipient_id'] === (int) $recipient->id);
+    }
+
+    public function test_product_order_show_has_access_email_preview_modal(): void
+    {
+        $this->withoutVite();
+        $order = $this->createProductOrder();
+
+        $this->actingAs($this->admin())
+            ->get(route('form-orders.show', $order->id))
+            ->assertOk()
+            ->assertSee('id="productAccessEmailModal"', false)
+            ->assertSee('Kopiuj treść', false)
+            ->assertSee('js-product-access-email-btn', false)
+            ->assertSee("document.addEventListener('DOMContentLoaded', initProductAccessEmailModal)", false);
+    }
+
     public function test_admin_can_revoke_product_access_and_keep_pnedu_account(): void
     {
         $order = $this->createProductOrder();
@@ -176,11 +253,151 @@ class ProductOrderAdminTest extends TestCase
         $this->actingAs($this->admin())
             ->get(route('form-orders.edit', $order->id))
             ->assertOk()
-            ->assertSee('Kurs online', false)
+            ->assertSee('Kurs online nagrany', false)
+            ->assertSee('name="catalog_product_id"', false)
+            ->assertSee('name="product_price_id"', false)
+            ->assertSee('name="order_kind"', false)
+            ->assertSee($product->name, false)
+            ->assertSee('id="course_id"', false)
+            ->assertDontSee('Wybierz element z listy', false);
+    }
+
+    public function test_admin_can_create_product_order_with_price_variant(): void
+    {
+        $catalog = $this->createCatalogProduct('Kurs z ADM create', 'kurs-z-adm-create', '175.00');
+        $secondPrice = ProductPrice::query()->create([
+            'product_offer_id' => $catalog['offer']->id,
+            'name' => 'Dostęp 24 miesiące',
+            'is_active' => true,
+            'price' => '299.00',
+            'currency' => 'PLN',
+            'tax_treatment' => ProductPrice::TAX_EXEMPT,
+            'access_policy' => ProductPrice::ACCESS_DURATION_FROM_GRANT,
+            'access_duration_value' => 24,
+            'access_duration_unit' => 'months',
+        ]);
+
+        $this->actingAs($this->admin())
+            ->post(route('form-orders.store'), [
+                'order_kind' => 'product',
+                'catalog_product_id' => $catalog['product']->id,
+                'product_price_id' => $secondPrice->id,
+                'product_price' => '598.00',
+                'orderer_name' => 'Szkoła ADM',
+                'orderer_phone' => '501654274',
+                'orderer_email' => 'adm@example.test',
+                'buyer_name' => 'Gmina ADM',
+                'buyer_address' => 'Testowa 1',
+                'buyer_postal_code' => '00-001',
+                'buyer_city' => 'Warszawa',
+                'participants' => [
+                    ['first_name' => 'Anna', 'last_name' => 'Nowak', 'email' => 'anna@example.test'],
+                    ['first_name' => 'Jan', 'last_name' => 'Kowalski', 'email' => 'jan@example.test'],
+                ],
+            ])
+            ->assertRedirect();
+
+        $order = FormOrder::query()->latest('id')->first();
+        $this->assertNotNull($order);
+        $this->assertTrue($order->isProductOrder());
+        $this->assertNull($order->product_id);
+        $this->assertSame('Kurs z ADM create', $order->product_name);
+        $this->assertSame(FormOrder::SUBMISSION_SOURCE_PNEADM_MANUAL, $order->submission_source);
+        $item = $order->orderItems()->first();
+        $this->assertNotNull($item);
+        $this->assertSame((int) $catalog['product']->id, (int) $item->product_id);
+        $this->assertSame((int) $secondPrice->id, (int) $item->product_price_id);
+        $this->assertSame((int) $catalog['course']->id, (int) ($item->metadata['online_course_id'] ?? 0));
+        $this->assertSame(2, (int) $item->quantity);
+        $this->assertCount(2, $item->recipients);
+        $this->assertEquals(598.0, (float) $order->product_price);
+    }
+
+    public function test_clone_from_training_allows_product_kind_and_clone_from_product_prefills_catalog(): void
+    {
+        $this->withoutVite();
+        $productOrder = $this->createProductOrder();
+        $product = Product::query()->findOrFail($productOrder->orderItems->first()->product_id);
+
+        $this->actingAs($this->admin())
+            ->get(route('form-orders.create', ['clone_from' => $productOrder->id]))
+            ->assertOk()
+            ->assertSee('value="product"', false)
             ->assertSee('name="catalog_product_id"', false)
             ->assertSee($product->name, false)
-            ->assertDontSee('id="course_id"', false)
-            ->assertDontSee('Wybierz element z listy', false);
+            ->assertSee('anna@example.test', false);
+    }
+
+    public function test_admin_can_switch_training_order_to_product_on_edit(): void
+    {
+        $courseId = (int) \Illuminate\Support\Facades\DB::table('courses')->insertGetId([
+            'title' => 'Szkolenie do zamiany',
+            'description' => 'Test',
+            'start_date' => now()->addDays(3),
+            'end_date' => now()->addDays(4),
+            'is_paid' => 1,
+            'type' => 'online',
+            'category' => 'open',
+            'is_active' => 1,
+            'certificate_format' => '{nr}/{course_id}/{year}/PNE',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $order = FormOrder::query()->create([
+            'ident' => FormOrder::generateIdent(),
+            'order_date' => now('UTC'),
+            'order_kind' => 'training',
+            'product_id' => $courseId,
+            'product_name' => 'Szkolenie do zamiany',
+            'product_price' => '100.00',
+            'orderer_name' => 'Szkoła',
+            'orderer_email' => 'szkola@example.test',
+            'orderer_phone' => '501654274',
+            'buyer_name' => 'Gmina',
+            'buyer_address' => 'Ul. 1',
+            'buyer_postal_code' => '00-001',
+            'buyer_city' => 'Warszawa',
+            'payment_mode' => FormOrder::PAYMENT_MODE_DEFERRED_INVOICE,
+            'payment_status' => FormOrder::PAYMENT_STATUS_SUBMITTED,
+        ]);
+        FormOrderParticipant::query()->create([
+            'form_order_id' => $order->id,
+            'participant_firstname' => 'Anna',
+            'participant_lastname' => 'Nowak',
+            'participant_email' => 'anna@example.test',
+            'is_primary' => true,
+        ]);
+        $catalog = $this->createCatalogProduct('Kurs po zamianie', 'kurs-po-zamianie', '210.00');
+
+        $this->actingAs($this->admin())
+            ->put(route('form-orders.update', $order->id), [
+                'from_edit_page' => '1',
+                'order_kind' => 'product',
+                'catalog_product_id' => $catalog['product']->id,
+                'product_price_id' => $catalog['price']->id,
+                'product_price' => '210.00',
+                'orderer_name' => $order->orderer_name,
+                'orderer_phone' => $order->orderer_phone,
+                'orderer_email' => $order->orderer_email,
+                'buyer_name' => $order->buyer_name,
+                'buyer_address' => $order->buyer_address,
+                'buyer_postal_code' => $order->buyer_postal_code,
+                'buyer_city' => $order->buyer_city,
+                'participants' => [[
+                    'first_name' => 'Anna',
+                    'last_name' => 'Nowak',
+                    'email' => 'anna@example.test',
+                ]],
+            ])
+            ->assertRedirect(route('form-orders.show', $order->id));
+
+        $fresh = $order->fresh(['orderItems.recipients']);
+        $this->assertTrue($fresh->isProductOrder());
+        $this->assertNull($fresh->product_id);
+        $this->assertSame('Kurs po zamianie', $fresh->product_name);
+        $this->assertSame((int) $catalog['product']->id, (int) $fresh->orderItems->first()->product_id);
+        $this->assertSame((int) $catalog['price']->id, (int) $fresh->orderItems->first()->product_price_id);
+        $this->assertCount(1, $fresh->orderItems->first()->recipients);
     }
 
     public function test_product_order_update_saves_without_training_course_id(): void
@@ -316,7 +533,9 @@ class ProductOrderAdminTest extends TestCase
 
         return array_merge([
             'from_edit_page' => '1',
+            'order_kind' => 'product',
             'catalog_product_id' => $item?->product_id,
+            'product_price_id' => $item?->product_price_id,
             'product_price' => $order->product_price,
             'orderer_name' => $order->orderer_name,
             'orderer_email' => $order->orderer_email,

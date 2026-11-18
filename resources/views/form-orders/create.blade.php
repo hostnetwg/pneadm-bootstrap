@@ -62,51 +62,114 @@
                     <form action="{{ route('form-orders.store') }}" method="POST">
                         @csrf
                         
-                        {{-- SZKOLENIE --}}
+                        {{-- SZKOLENIE / KURS ONLINE --}}
+                        @php
+                            $createOrderKind = old('order_kind', $prefill['order_kind'] ?? 'training');
+                            $isCreateProduct = $createOrderKind === 'product';
+                            $selectedCourseId = old('course_id', $prefill['course_id'] ?? '');
+                            $preselectedCourse = $selectedCourse ?? ($selectedCourseId ? \App\Models\Course::find($selectedCourseId) : null);
+                            $selectedCatalogProductId = old('catalog_product_id', $prefill['catalog_product_id'] ?? '');
+                            $preselectedCatalogProduct = $selectedCatalogProduct
+                                ?? ($selectedCatalogProductId ? \App\Models\Product::withTrashed()->find($selectedCatalogProductId) : null);
+                            $selectedPriceId = old('product_price_id', $prefill['product_price_id'] ?? '');
+                            $createPriceOptions = $catalogPriceOptions ?? [];
+                        @endphp
                         <div class="card mb-4">
                             <div class="card-header bg-info text-white">
                                 <h6 class="mb-0">
-                                    <i class="bi bi-calendar-event"></i> SZKOLENIE
+                                    <i class="bi bi-calendar-event"></i> SZKOLENIE / KURS ONLINE
                                 </h6>
                             </div>
                             <div class="card-body">
+                                <div class="mb-3">
+                                    <label class="form-label d-block">Rodzaj <span class="text-danger">*</span></label>
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input" type="radio" name="order_kind" id="order_kind_training"
+                                               value="training" @checked($createOrderKind === 'training')>
+                                        <label class="form-check-label" for="order_kind_training">Szkolenie (courses)</label>
+                                    </div>
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input" type="radio" name="order_kind" id="order_kind_product"
+                                               value="product" @checked($createOrderKind === 'product')>
+                                        <label class="form-check-label" for="order_kind_product">Kurs online nagrany</label>
+                                    </div>
+                                    @error('order_kind')
+                                        <div class="text-danger small">{{ $message }}</div>
+                                    @enderror
+                                </div>
+
                                 <div class="row">
                                     <div class="col-md-8">
-                                        <label for="course_id" class="form-label">Wybierz szkolenie <span class="text-danger">*</span></label>
-                                        @php
-                                            $selectedCourseId = old('course_id', $prefill['course_id'] ?? '');
-                                            $preselectedCourse = $selectedCourse ?? ($selectedCourseId ? \App\Models\Course::find($selectedCourseId) : null);
-                                        @endphp
-                                        <select class="form-control @error('course_id') is-invalid @enderror"
-                                                id="course_id" name="course_id" required>
-                                            @if($preselectedCourse)
-                                                <option value="{{ $preselectedCourse->id }}" selected>
-                                                    #{{ $preselectedCourse->id }} · {{ $preselectedCourse->plainTitle() }}
-                                                    @if($preselectedCourse->start_date) [{{ $preselectedCourse->start_date->copy()->timezone(config('app.timezone'))->format('Y-m-d H:i') }}] @endif
-                                                </option>
-                                            @endif
-                                        </select>
-                                        @error('course_id')
-                                            <div class="invalid-feedback">{{ $message }}</div>
-                                        @enderror
-                                        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-1">
-                                            <small class="form-text text-muted mb-0">Domyślnie pokazujemy nadchodzące i trwające. Wpisz tytuł / ID / Publigo ID, by szukać też w archiwum.</small>
-                                            <div class="form-check form-check-inline mb-0">
-                                                <input class="form-check-input" type="checkbox" id="course_include_archived">
-                                                <label class="form-check-label small" for="course_include_archived">
-                                                    Pokaż również archiwalne
-                                                </label>
+                                        <div id="training-product-fields" class="{{ $isCreateProduct ? 'd-none' : '' }}">
+                                            <label for="course_id" class="form-label">Wybierz szkolenie <span class="text-danger">*</span></label>
+                                            <select class="form-control @error('course_id') is-invalid @enderror"
+                                                    id="course_id" name="course_id"
+                                                    {{ $isCreateProduct ? 'disabled' : 'required' }}>
+                                                @if($preselectedCourse)
+                                                    <option value="{{ $preselectedCourse->id }}" selected>
+                                                        #{{ $preselectedCourse->id }} · {{ $preselectedCourse->plainTitle() }}
+                                                        @if($preselectedCourse->start_date) [{{ $preselectedCourse->start_date->copy()->timezone(config('app.timezone'))->format('Y-m-d H:i') }}] @endif
+                                                    </option>
+                                                @endif
+                                            </select>
+                                            @error('course_id')
+                                                <div class="invalid-feedback">{{ $message }}</div>
+                                            @enderror
+                                            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-1">
+                                                <small class="form-text text-muted mb-0">Domyślnie pokazujemy nadchodzące i trwające. Wpisz tytuł / ID / Publigo ID, by szukać też w archiwum.</small>
+                                                <div class="form-check form-check-inline mb-0">
+                                                    <input class="form-check-input" type="checkbox" id="course_include_archived">
+                                                    <label class="form-check-label small" for="course_include_archived">
+                                                        Pokaż również archiwalne
+                                                    </label>
+                                                </div>
                                             </div>
                                         </div>
+
+                                        <div id="online-product-fields" class="{{ $isCreateProduct ? '' : 'd-none' }}">
+                                            <label for="catalog_product_id" class="form-label">Kurs online nagrany <span class="text-danger">*</span></label>
+                                            <select class="form-control @error('catalog_product_id') is-invalid @enderror"
+                                                    id="catalog_product_id" name="catalog_product_id"
+                                                    {{ $isCreateProduct ? 'required' : 'disabled' }}>
+                                                @if($preselectedCatalogProduct)
+                                                    <option value="{{ $preselectedCatalogProduct->id }}" selected>
+                                                        #{{ $preselectedCatalogProduct->id }} · {{ $preselectedCatalogProduct->name }}
+                                                    </option>
+                                                @endif
+                                            </select>
+                                            @error('catalog_product_id')
+                                                <div class="invalid-feedback">{{ $message }}</div>
+                                            @enderror
+                                            <div class="mt-3">
+                                                <label for="product_price_id" class="form-label">Wariant ceny <span class="text-danger">*</span></label>
+                                                <select class="form-select @error('product_price_id') is-invalid @enderror"
+                                                        id="product_price_id" name="product_price_id"
+                                                        {{ $isCreateProduct ? 'required' : 'disabled' }}>
+                                                    <option value="">— wybierz wariant —</option>
+                                                    @foreach($createPriceOptions as $priceOption)
+                                                        <option value="{{ $priceOption['id'] }}"
+                                                                data-amount="{{ $priceOption['amount'] }}"
+                                                                @selected((string) $selectedPriceId === (string) $priceOption['id'])>
+                                                            {{ $priceOption['label'] }}
+                                                        </option>
+                                                    @endforeach
+                                                </select>
+                                                @error('product_price_id')
+                                                    <div class="invalid-feedback">{{ $message }}</div>
+                                                @enderror
+                                                <small class="form-text text-muted">Jak `?price=` na publicznym formularzu kursu.</small>
+                                            </div>
+                                        </div>
+
                                         <div id="course-select-error" class="alert alert-warning mt-2 mb-0 py-2 small d-none" role="alert">
-                                            Nie udało się uruchomić wyszukiwarki szkoleń. Odśwież stronę.
+                                            Nie udało się uruchomić wyszukiwarki. Odśwież stronę.
                                         </div>
                                     </div>
                                     <div class="col-md-4">
                                         <label for="product_price" class="form-label">Cena (PLN)</label>
-                                        <input type="number" step="0.01" min="0" class="form-control @error('product_price') is-invalid @enderror" 
-                                               id="product_price" name="product_price" 
-                                               value="{{ old('product_price', $prefill['product_price'] ?? '') }}" 
+                                        <input type="number" step="0.01" min="0" class="form-control @error('product_price') is-invalid @enderror"
+                                               id="product_price" name="product_price"
+                                               value="{{ old('product_price', $prefill['product_price'] ?? '') }}"
                                                placeholder="Opcjonalnie">
                                         @error('product_price')
                                             <div class="invalid-feedback">{{ $message }}</div>
@@ -400,9 +463,11 @@
         </div>
     </div>
 
-    {{-- TomSelect wyboru szkolenia + lekki podgląd informacji o kursie --}}
+    {{-- TomSelect: szkolenie live albo kurs online z katalogu --}}
     @php
         $courseSearchUrl = route('form-orders.courses.search');
+        $catalogProductSearchUrl = route('form-orders.products.search');
+        $catalogProductPricesUrlTemplate = route('form-orders.products.prices', ['product' => '__ID__']);
         $courseSelectPreselected = $preselectedCourse ? [
             'id' => $preselectedCourse->id,
             'id_old' => $preselectedCourse->id_old,
@@ -412,94 +477,30 @@
             'status' => $preselectedCourse->getLifecycleStatus(),
             'instructor' => optional($preselectedCourse->instructor)->full_title_name ?? '',
         ] : null;
+        $catalogProductSelectPreselected = $preselectedCatalogProduct ? [
+            'id' => $preselectedCatalogProduct->id,
+            'id_old' => '',
+            'title_text' => $preselectedCatalogProduct->name,
+            'start_date' => null,
+            'end_date' => null,
+            'status' => '',
+            'instructor' => '',
+            'prices' => $createPriceOptions,
+            'default_price_id' => $selectedPriceId ?: ($createPriceOptions[0]['id'] ?? null),
+            'default_price' => $createPriceOptions[0]['amount'] ?? null,
+        ] : null;
     @endphp
     @include('partials.ensure-course-select-init')
-    <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            const searchUrl = @json($courseSearchUrl);
-            const preselected = @json($courseSelectPreselected);
-
-            const courseInfo = document.getElementById('course-info');
-            const courseDetails = document.getElementById('course-details');
-            const priceInput = document.getElementById('product_price');
-            const archivedToggle = document.getElementById('course_include_archived');
-            const selectError = document.getElementById('course-select-error');
-
-            const STORAGE_KEY = 'formOrders.courseSelect.includeArchived';
-            let includeArchived = false;
-            try {
-                includeArchived = window.localStorage.getItem(STORAGE_KEY) === '1';
-            } catch (e) {}
-            if (archivedToggle) {
-                archivedToggle.checked = includeArchived;
-            }
-
-            function escapeHtml(value) {
-                return String(value == null ? '' : value)
-                    .replace(/&/g, '&amp;')
-                    .replace(/</g, '&lt;')
-                    .replace(/>/g, '&gt;')
-                    .replace(/"/g, '&quot;')
-                    .replace(/'/g, '&#39;');
-            }
-
-            function renderInfo(item) {
-                if (!item) {
-                    courseInfo.style.display = 'none';
-                    return;
-                }
-                const instructor = item.instructor ? escapeHtml(item.instructor) : '<span class="text-muted">—</span>';
-                courseDetails.innerHTML =
-                    '<div class="row g-2">' +
-                        '<div class="col-md-6"><strong>Tytuł:</strong> ' + escapeHtml(item.title_text || '') + '</div>' +
-                        '<div class="col-md-6"><strong>Data rozpoczęcia:</strong> ' + (item.start_date ? '[' + escapeHtml(item.start_date) + ']' : '—') + '</div>' +
-                        '<div class="col-md-6"><strong>Prowadzący:</strong> ' + instructor + '</div>' +
-                    '</div>';
-                courseInfo.style.display = 'block';
-            }
-
-            function boot(initFn) {
-                if (!initFn) {
-                    if (selectError) {
-                        selectError.classList.remove('d-none');
-                    }
-                    return;
-                }
-                const ts = initFn('course_id', {
-                    searchUrl,
-                    preselected,
-                    includeArchived,
-                    onCourseChanged: function (item) {
-                        renderInfo(item);
-                        if (item && item.default_price !== null && item.default_price !== undefined && priceInput) {
-                            priceInput.value = item.default_price;
-                            if (typeof window.formOrderParticipantsSetUnitPrice === 'function') {
-                                window.formOrderParticipantsSetUnitPrice(item.default_price, item.default_price_flat);
-                            }
-                        }
-                    },
-                });
-
-                if (ts && preselected) {
-                    renderInfo(preselected);
-                }
-
-                if (ts && archivedToggle) {
-                    archivedToggle.addEventListener('change', function () {
-                        const checked = !!archivedToggle.checked;
-                        try { window.localStorage.setItem(STORAGE_KEY, checked ? '1' : '0'); } catch (e) {}
-                        if (typeof ts.setIncludeArchived === 'function') {
-                            ts.setIncludeArchived(checked);
-                        }
-                    });
-                }
-            }
-
-            window.ensureCourseSelectInit().then(boot).catch(function () {
-                boot(null);
-            });
-        });
-    </script>
+    @include('form-orders.partials.order-kind-product-script', [
+        'initialOrderKind' => $createOrderKind,
+        'courseSearchUrl' => $courseSearchUrl,
+        'catalogProductSearchUrl' => $catalogProductSearchUrl,
+        'catalogProductPricesUrlTemplate' => $catalogProductPricesUrlTemplate,
+        'courseSelectPreselected' => $courseSelectPreselected,
+        'catalogProductSelectPreselected' => $catalogProductSelectPreselected,
+        'selectedProductPriceId' => $selectedPriceId,
+        'showCourseInfo' => true,
+    ])
     @include('form-orders.partials.participants-form-script')
     @include('form-orders.partials.gus-nip-lookup-script')
 </x-app-layout>

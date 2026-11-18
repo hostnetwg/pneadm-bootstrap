@@ -12,7 +12,8 @@ class PneduProductOrderFulfillmentService
      */
     public function fulfill(int $formOrderId, ?int $recipientId = null): array
     {
-        return $this->postInternal(
+        return $this->requestInternal(
+            'post',
             '/api/internal/form-orders/'.$formOrderId.'/fulfill-product',
             $recipientId !== null ? ['recipient_id' => $recipientId] : [],
             'Pnedu product fulfillment request failed',
@@ -25,7 +26,8 @@ class PneduProductOrderFulfillmentService
      */
     public function revoke(int $formOrderId, ?int $recipientId = null): array
     {
-        return $this->postInternal(
+        return $this->requestInternal(
+            'post',
             '/api/internal/form-orders/'.$formOrderId.'/revoke-product',
             $recipientId !== null ? ['recipient_id' => $recipientId] : [],
             'Pnedu product revoke request failed',
@@ -34,11 +36,52 @@ class PneduProductOrderFulfillmentService
     }
 
     /**
+     * @return array<string, mixed>
+     */
+    public function previewAccessEmail(int $formOrderId, ?int $recipientId = null, bool $bulk = false): array
+    {
+        $query = [];
+        if ($recipientId !== null) {
+            $query['recipient_id'] = $recipientId;
+        }
+        if ($bulk) {
+            $query['bulk'] = 1;
+        }
+
+        return $this->requestInternal(
+            'get',
+            '/api/internal/form-orders/'.$formOrderId.'/preview-product-access-email',
+            $query,
+            'Pnedu product access email preview failed',
+            $formOrderId
+        );
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function resendAccessEmail(int $formOrderId, int $recipientId): array
+    {
+        return $this->requestInternal(
+            'post',
+            '/api/internal/form-orders/'.$formOrderId.'/resend-product-access-email',
+            ['recipient_id' => $recipientId],
+            'Pnedu product access email resend failed',
+            $formOrderId
+        );
+    }
+
+    /**
      * @param  array<string, mixed>  $payload
      * @return array<string, mixed>
      */
-    private function postInternal(string $path, array $payload, string $logMessage, int $formOrderId): array
-    {
+    private function requestInternal(
+        string $method,
+        string $path,
+        array $payload,
+        string $logMessage,
+        int $formOrderId
+    ): array {
         $baseUrl = rtrim((string) config('services.pnedu.internal_url'), '/');
         $token = (string) config('services.pnedu.internal_api_token');
 
@@ -53,10 +96,13 @@ class PneduProductOrderFulfillmentService
         $url = $baseUrl.$path;
 
         try {
-            $response = Http::timeout(60)
+            $pending = Http::timeout(60)
                 ->withToken($token)
-                ->acceptJson()
-                ->post($url, $payload);
+                ->acceptJson();
+
+            $response = strtolower($method) === 'get'
+                ? $pending->get($url, $payload)
+                : $pending->post($url, $payload);
             $body = $response->json();
 
             if (! is_array($body)) {

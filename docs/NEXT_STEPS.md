@@ -298,6 +298,14 @@ Checkbox na `/form-orders/{id}` nadal jest, ale etykieta i `NazwaPelna` zależą
 
 Na `/` tabela **Ostatnie zamówienia FORM** pokazuje nazwę z `form_orders.product_name` (szkolenie albo kurs online) pod kolumną **Produkt**. Debug eventów i „Aktywni teraz” też mówią „Produkt”; tytuł może dojść ze snapshotu, zamówienia albo ścieżki `/kursy/{slug}`. Lejek analityki nadal nie emituje osobnych eventów checkoutu kursu (to osobny etap). Kanon: [DASHBOARD_ORDERS.md](./DASHBOARD_ORDERS.md).
 
+## Ostatnio (2026-11-18) — Podgląd e-maila przy Nadaj dostęp (kurs online)
+
+Na karcie zamówienia produktowego **Nadaj dostęp** / **wszystkim** / **Prześlij dostęp ponownie** otwiera modal z podglądem (jak przy szkoleniach) + **Kopiuj treść**. Fulfillment maile → Mailpit pnedu `:8025`. Link „Ustaw hasło” bierze host z `APP_URL` pnedu. Deploy: [2026-11-product-order-access-email-deploy.md](./deploy/2026-11-product-order-access-email-deploy.md). Kanon: [PRODUCT_COMMERCE.md](./PRODUCT_COMMERCE.md).
+
+## Ostatnio (2026-11-18) — ADM: tworzenie/klon/edycja zamówienia produktowego
+
+Na `/form-orders/create`, `?clone_from=` i `/form-orders/{id}/edit` jest wybór **Szkolenie (courses)** albo **Kurs online nagrany** (z wariantem ceny jak `?price=`). Zapis produktowy buduje `order_kind=product` + `order_items` + recipients pod **Nadaj dostęp**. Kanon: [PRODUCT_COMMERCE.md](./PRODUCT_COMMERCE.md).
+
 ## Wcześniej (2026-09-15) — Edycja zamówienia kursu online w ADM
 
 `/form-orders/{id}/edit` dla zamówienia produktowego nie używa już wymaganego selectu szkoleń live (`courses`). Jest osobne pole **Kurs online** z wyszukiwarką katalogu `products`. Zapis nie wymaga `course_id`; zmiana produktu aktualizuje `order_items` i zostawia `form_orders.product_id = null`. Szkolenia live bez zmian. Kanon: [PRODUCT_COMMERCE.md](./PRODUCT_COMMERCE.md).

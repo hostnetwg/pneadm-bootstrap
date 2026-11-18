@@ -73,64 +73,81 @@
                             <div class="card-header bg-primary text-white">
                                 <h6 class="mb-0">
                                     <i class="bi bi-calendar-event"></i>
-                                    {{ $zamowienie->isProductOrder() ? 'Informacje o kursie online' : 'Informacje o szkoleniu' }}
+                                    Szkolenie / kurs online
                                 </h6>
                             </div>
                             <div class="card-body">
                                 @php
-                                    $isProductOrderEdit = $zamowienie->isProductOrder();
-                                    $editPreselectedCourseId = old('course_id', $zamowienie->product_id);
-                                    $editPreselectedCourse = (! $isProductOrderEdit && $editPreselectedCourseId)
+                                    $editOrderKind = old('order_kind', $zamowienie->isProductOrder() ? 'product' : 'training');
+                                    $isProductOrderEdit = $editOrderKind === 'product';
+                                    $editPreselectedCourseId = old('course_id', $zamowienie->isProductOrder() ? null : $zamowienie->product_id);
+                                    $editPreselectedCourse = $editPreselectedCourseId
                                         ? \App\Models\Course::find($editPreselectedCourseId)
                                         : null;
                                     $editCatalogItem = $zamowienie->orderItems->first();
                                     $editPreselectedProductId = old('catalog_product_id', $editCatalogItem?->product_id);
-                                    $editPreselectedProduct = ($isProductOrderEdit && $editPreselectedProductId)
-                                        ? ($editCatalogItem?->product && (int) $editCatalogItem->product_id === (int) $editPreselectedProductId
-                                            ? $editCatalogItem->product
-                                            : \App\Models\Product::withTrashed()->find($editPreselectedProductId))
-                                        : null;
+                                    $editPreselectedProduct = $selectedCatalogProduct
+                                        ?? ($editPreselectedProductId
+                                            ? ($editCatalogItem?->product && (int) $editCatalogItem->product_id === (int) $editPreselectedProductId
+                                                ? $editCatalogItem->product
+                                                : \App\Models\Product::withTrashed()->find($editPreselectedProductId))
+                                            : null);
+                                    $editPriceOptions = $catalogPriceOptions ?? [];
+                                    $editSelectedPriceId = old('product_price_id', $selectedProductPriceId ?? $editCatalogItem?->product_price_id);
                                     $hasPubligoSent = (int) ($zamowienie->publigo_sent ?? 0) === 1;
                                     $hasPneduProvisioned = ! empty($zamowienie->pnedu_provisioned_at);
+                                    $hasInvoice = ! empty($zamowienie->invoice_number);
                                 @endphp
 
-                                @if($hasPubligoSent || $hasPneduProvisioned)
+                                @if($hasPubligoSent || $hasPneduProvisioned || $hasInvoice)
                                     <div class="alert alert-warning small mb-3">
                                         <i class="bi bi-exclamation-triangle"></i>
-                                        <strong>Uwaga:</strong> dla tego zamówienia
-                                        @if($hasPubligoSent) zostało wysłane zamówienie do <strong>Publigo</strong> @endif
-                                        @if($hasPubligoSent && $hasPneduProvisioned) i @endif
-                                        @if($hasPneduProvisioned) został przyznany dostęp <strong>PNEDU</strong> @endif.
-                                        @if($isProductOrderEdit)
-                                            Zmiana kursu online tutaj <u>nie cofa</u> już nadanych dostępów.
-                                            Jeśli musisz przepiąć produkt, najpierw rozważ wycofanie dostępu.
-                                        @else
-                                            Zmiana szkolenia tutaj <u>nie cofa</u> tych operacji ani nie aktualizuje uczestnika w bazie pnedu.
-                                            Jeśli musisz przepiąć kurs, najpierw rozważ użycie przycisków „Resetuj status…”.
+                                        <strong>Uwaga:</strong>
+                                        @if($hasInvoice)
+                                            zamówienie ma już numer faktury
                                         @endif
+                                        @if($hasInvoice && ($hasPubligoSent || $hasPneduProvisioned))
+                                            ;
+                                        @endif
+                                        @if($hasPubligoSent)
+                                            wysłano do <strong>Publigo</strong>
+                                        @endif
+                                        @if($hasPubligoSent && $hasPneduProvisioned)
+                                            i
+                                        @endif
+                                        @if($hasPneduProvisioned)
+                                            przyznano dostęp <strong>PNEDU</strong>
+                                        @endif.
+                                        Zmiana rodzaju (szkolenie ↔ kurs online) albo produktu <u>nie cofa</u> automatycznie FV.
+                                        Przy zamianie produkt → szkolenie system wycofuje nadane dostępy produktowe.
+                                        Przy szkoleniu → produkt rozważ najpierw reset dostępu PNEDU / Publigo, jeśli był nadany.
                                     </div>
                                 @endif
 
+                                <div class="mb-3">
+                                    <label class="form-label d-block">Rodzaj <span class="text-danger">*</span></label>
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input" type="radio" name="order_kind" id="order_kind_training"
+                                               value="training" @checked($editOrderKind === 'training')>
+                                        <label class="form-check-label" for="order_kind_training">Szkolenie (courses)</label>
+                                    </div>
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input" type="radio" name="order_kind" id="order_kind_product"
+                                               value="product" @checked($editOrderKind === 'product')>
+                                        <label class="form-check-label" for="order_kind_product">Kurs online nagrany</label>
+                                    </div>
+                                    @error('order_kind')
+                                        <div class="text-danger small">{{ $message }}</div>
+                                    @enderror
+                                </div>
+
                                 <div class="row">
                                     <div class="col-md-8">
-                                        @if($isProductOrderEdit)
-                                            <label for="catalog_product_id" class="form-label">Kurs online <span class="text-danger">*</span></label>
-                                            <select class="form-control @error('catalog_product_id') is-invalid @enderror"
-                                                    id="catalog_product_id" name="catalog_product_id" required>
-                                                @if($editPreselectedProduct)
-                                                    <option value="{{ $editPreselectedProduct->id }}" selected>
-                                                        #{{ $editPreselectedProduct->id }} · {{ $editPreselectedProduct->name }}
-                                                    </option>
-                                                @endif
-                                            </select>
-                                            @error('catalog_product_id')
-                                                <div class="invalid-feedback">{{ $message }}</div>
-                                            @enderror
-                                            <small class="form-text text-muted">Wpisz tytuł, slug albo ID produktu z katalogu. Zmiana zaktualizuje nazwę zamówienia i pozycję w <code>order_items</code> (nie rusza <code>form_orders.product_id</code> — to pole jest dla szkoleń live).</small>
-                                        @else
+                                        <div id="training-product-fields" class="{{ $isProductOrderEdit ? 'd-none' : '' }}">
                                             <label for="course_id" class="form-label">Szkolenie <span class="text-danger">*</span></label>
                                             <select class="form-control @error('course_id') is-invalid @enderror"
-                                                    id="course_id" name="course_id" required>
+                                                    id="course_id" name="course_id"
+                                                    {{ $isProductOrderEdit ? 'disabled' : 'required' }}>
                                                 @if($editPreselectedCourse)
                                                     <option value="{{ $editPreselectedCourse->id }}" selected>
                                                         #{{ $editPreselectedCourse->id }} · {{ $editPreselectedCourse->plainTitle() }}
@@ -142,7 +159,7 @@
                                                 <div class="invalid-feedback">{{ $message }}</div>
                                             @enderror
                                             <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-1">
-                                                <small class="form-text text-muted mb-0">Domyślnie pokazujemy nadchodzące i trwające. Wpisz tytuł / ID / Publigo ID, by szukać też w archiwum. Zmiana zaktualizuje nazwę i ID Publigo zamówienia.</small>
+                                                <small class="form-text text-muted mb-0">Domyślnie pokazujemy nadchodzące i trwające. Wpisz tytuł / ID / Publigo ID, by szukać też w archiwum.</small>
                                                 <div class="form-check form-check-inline mb-0">
                                                     <input class="form-check-input" type="checkbox" id="course_include_archived">
                                                     <label class="form-check-label small" for="course_include_archived">
@@ -150,7 +167,43 @@
                                                     </label>
                                                 </div>
                                             </div>
-                                        @endif
+                                        </div>
+
+                                        <div id="online-product-fields" class="{{ $isProductOrderEdit ? '' : 'd-none' }}">
+                                            <label for="catalog_product_id" class="form-label">Kurs online nagrany <span class="text-danger">*</span></label>
+                                            <select class="form-control @error('catalog_product_id') is-invalid @enderror"
+                                                    id="catalog_product_id" name="catalog_product_id"
+                                                    {{ $isProductOrderEdit ? 'required' : 'disabled' }}>
+                                                @if($editPreselectedProduct)
+                                                    <option value="{{ $editPreselectedProduct->id }}" selected>
+                                                        #{{ $editPreselectedProduct->id }} · {{ $editPreselectedProduct->name }}
+                                                    </option>
+                                                @endif
+                                            </select>
+                                            @error('catalog_product_id')
+                                                <div class="invalid-feedback">{{ $message }}</div>
+                                            @enderror
+                                            <div class="mt-3">
+                                                <label for="product_price_id" class="form-label">Wariant ceny <span class="text-danger">*</span></label>
+                                                <select class="form-select @error('product_price_id') is-invalid @enderror"
+                                                        id="product_price_id" name="product_price_id"
+                                                        {{ $isProductOrderEdit ? 'required' : 'disabled' }}>
+                                                    <option value="">— wybierz wariant —</option>
+                                                    @foreach($editPriceOptions as $priceOption)
+                                                        <option value="{{ $priceOption['id'] }}"
+                                                                data-amount="{{ $priceOption['amount'] }}"
+                                                                @selected((string) $editSelectedPriceId === (string) $priceOption['id'])>
+                                                            {{ $priceOption['label'] }}
+                                                        </option>
+                                                    @endforeach
+                                                </select>
+                                                @error('product_price_id')
+                                                    <div class="invalid-feedback">{{ $message }}</div>
+                                                @enderror
+                                                <small class="form-text text-muted">Jak `?price=` na publicznym formularzu kursu. Snapshot trafia do <code>order_items</code>.</small>
+                                            </div>
+                                        </div>
+
                                         <div id="course-select-error" class="alert alert-warning mt-2 mb-0 py-2 small d-none" role="alert">
                                             Nie udało się uruchomić wyszukiwarki. Odśwież stronę.
                                         </div>
@@ -164,13 +217,13 @@
                                 </div>
                                 <div class="row mt-3">
                                     <div class="col-12">
-                                        <label for="product_name" class="form-label">{{ $isProductOrderEdit ? 'Nazwa kursu online (z katalogu, aktualizowana automatycznie)' : 'Nazwa szkolenia (z bazy kursów, aktualizowana automatycznie)' }}</label>
+                                        <label for="product_name" class="form-label">Nazwa (aktualizowana po wyborze szkolenia / kursu)</label>
                                         <input type="text" class="form-control"
                                                id="product_name" name="product_name"
                                                value="{{ old('product_name', $zamowienie->display_product_name) }}" readonly>
                                     </div>
                                 </div>
-                                @if(! $isProductOrderEdit && $zamowienie->publigo_product_id)
+                                @if(! $zamowienie->isProductOrder() && $zamowienie->publigo_product_id)
                                     <div class="mt-2">
                                         <span class="badge bg-info">Publigo Product ID: {{ $zamowienie->publigo_product_id }}</span>
                                     </div>
@@ -499,9 +552,9 @@
 
     {{-- TomSelect: szkolenie live albo kurs online z katalogu --}}
     @php
-        $isProductOrderEdit = $zamowienie->isProductOrder();
         $courseSearchUrl = route('form-orders.courses.search');
         $catalogProductSearchUrl = route('form-orders.products.search');
+        $catalogProductPricesUrlTemplate = route('form-orders.products.prices', ['product' => '__ID__']);
         $courseSelectPreselected = $editPreselectedCourse ? [
             'id' => $editPreselectedCourse->id,
             'id_old' => $editPreselectedCourse->id_old,
@@ -517,83 +570,25 @@
             'title_text' => $editPreselectedProduct->name,
             'start_date' => null,
             'end_date' => null,
-            'status' => $editPreselectedProduct->is_active ? 'ongoing' : 'archived',
+            'status' => '',
             'instructor' => '',
+            'prices' => $editPriceOptions,
+            'default_price_id' => $editSelectedPriceId ?: ($editPriceOptions[0]['id'] ?? null),
+            'default_price' => (collect($editPriceOptions)->firstWhere('id', (int) $editSelectedPriceId)['amount'] ?? null)
+                ?? ($editPriceOptions[0]['amount'] ?? null),
         ] : null;
     @endphp
     @include('partials.ensure-course-select-init')
-    <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            const priceInput = document.getElementById('product_price');
-            const nameInput = document.getElementById('product_name');
-            const selectError = document.getElementById('course-select-error');
-            const applyCatalogItem = function (item) {
-                if (!item) {
-                    return;
-                }
-                if (item.title_text && nameInput) {
-                    nameInput.value = item.title_text;
-                }
-                if (item.default_price !== null && item.default_price !== undefined && priceInput) {
-                    priceInput.value = item.default_price;
-                    if (typeof window.formOrderParticipantsSetUnitPrice === 'function') {
-                        window.formOrderParticipantsSetUnitPrice(item.default_price, item.default_price_flat);
-                    }
-                }
-            };
-
-            function boot(initFn) {
-                if (!initFn) {
-                    if (selectError) {
-                        selectError.classList.remove('d-none');
-                    }
-                    return;
-                }
-
-                @if($isProductOrderEdit)
-                initFn('catalog_product_id', {
-                    searchUrl: @json($catalogProductSearchUrl),
-                    preselected: @json($catalogProductSelectPreselected),
-                    placeholder: 'Wybierz lub wpisz tytuł / ID kursu online...',
-                    onCourseChanged: applyCatalogItem,
-                });
-                @else
-                const searchUrl = @json($courseSearchUrl);
-                const preselected = @json($courseSelectPreselected);
-                const archivedToggle = document.getElementById('course_include_archived');
-                const STORAGE_KEY = 'formOrders.courseSelect.includeArchived';
-                let includeArchived = false;
-                try {
-                    includeArchived = window.localStorage.getItem(STORAGE_KEY) === '1';
-                } catch (e) {}
-                if (archivedToggle) {
-                    archivedToggle.checked = includeArchived;
-                }
-
-                const ts = initFn('course_id', {
-                    searchUrl,
-                    preselected,
-                    includeArchived,
-                    onCourseChanged: applyCatalogItem,
-                });
-
-                if (ts && archivedToggle) {
-                    archivedToggle.addEventListener('change', function () {
-                        const checked = !!archivedToggle.checked;
-                        try { window.localStorage.setItem(STORAGE_KEY, checked ? '1' : '0'); } catch (e) {}
-                        if (typeof ts.setIncludeArchived === 'function') {
-                            ts.setIncludeArchived(checked);
-                        }
-                    });
-                }
-                @endif
-            }
-
-            window.ensureCourseSelectInit().then(boot).catch(function () {
-                boot(null);
-            });
-        });
-    </script>
+    @include('form-orders.partials.order-kind-product-script', [
+        'initialOrderKind' => $editOrderKind,
+        'courseSearchUrl' => $courseSearchUrl,
+        'catalogProductSearchUrl' => $catalogProductSearchUrl,
+        'catalogProductPricesUrlTemplate' => $catalogProductPricesUrlTemplate,
+        'courseSelectPreselected' => $courseSelectPreselected,
+        'catalogProductSelectPreselected' => $catalogProductSelectPreselected,
+        'selectedProductPriceId' => $editSelectedPriceId,
+        'showCourseInfo' => false,
+    ])
     @include('form-orders.partials.participants-form-script')
     @include('form-orders.partials.gus-nip-lookup-script')
 </x-app-layout>

@@ -344,6 +344,7 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
             Route::get('/navigation-filter-count', [FormOrdersController::class, 'navigationFilterCount'])->name('navigation-filter-count');
             Route::get('/courses/search', [FormOrdersController::class, 'searchCourses'])->name('courses.search');
             Route::get('/products/search', [FormOrdersController::class, 'searchCatalogProducts'])->name('products.search');
+            Route::get('/products/{product}/prices', [FormOrdersController::class, 'catalogProductPrices'])->name('products.prices');
             Route::get('/create', [FormOrdersController::class, 'create'])->name('create');
             Route::post('/gus-lookup-by-nip', GusLookupController::class)
                 ->middleware('throttle:30,1')
@@ -366,6 +367,8 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
             Route::post('/{id}/pnedu/provision-all', [FormOrdersController::class, 'provisionPneduAccessAll'])->name('pnedu.provision-all');
             Route::post('/{id}/product/fulfill', [FormOrdersController::class, 'fulfillProductOrder'])->name('product.fulfill');
             Route::post('/{id}/product/revoke', [FormOrdersController::class, 'revokeProductAccess'])->name('product.revoke');
+            Route::get('/{id}/product/access-email-preview', [FormOrdersController::class, 'previewProductAccessEmail'])->name('product.access-email-preview');
+            Route::post('/{id}/product/resend-access-email', [FormOrdersController::class, 'resendProductAccessEmail'])->name('product.resend-access-email');
             Route::get('/{id}/product-fulfillment', [FormOrdersController::class, 'productFulfillmentPartial'])->name('product-fulfillment');
             Route::get('/{id}/pnedu/access-email-preview', [FormOrdersController::class, 'previewPneduAccessEmail'])->name('pnedu.access-email-preview');
             Route::post('/{id}/pnedu/resend-access-email', [FormOrdersController::class, 'resendPneduAccessEmail'])->name('pnedu.resend-access-email');
