@@ -19,11 +19,11 @@
                             <input type="hidden" name="sort" value="{{ $sort }}">
                             <input type="hidden" name="dir" value="{{ $dir }}">
                         @endif
-                        <div class="col-md-5">
+                        <div class="col-lg-4">
                             <label for="q" class="form-label">Szukaj</label>
                             <input type="text" name="q" id="q" value="{{ $search }}" class="form-control" placeholder="SZ-3, temat, placówka, osoba, e-mail">
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-lg-2">
                             <label for="status" class="form-label">Status</label>
                             <select name="status" id="status" class="form-select">
                                 <option value="open" @selected($status === 'open')>Aktywne</option>
@@ -33,7 +33,20 @@
                                 <option value="all" @selected($status === 'all')>Wszystkie</option>
                             </select>
                         </div>
-                        <div class="col-md-4 d-flex gap-2">
+                        <div class="col-lg-3">
+                            <label for="trainer" class="form-label">Trener</label>
+                            <select name="trainer" id="trainer" class="form-select">
+                                <option value="" @selected($trainer === '')>Wszyscy</option>
+                                <option value="none" @selected($trainer === 'none')>Bez trenera</option>
+                                @foreach($trainers as $trainerOption)
+                                    <option value="{{ $trainerOption->id }}" @selected($trainer === (string) $trainerOption->id)>
+                                        {{ $trainerOption->full_title_name }}@unless($trainerOption->is_active) (nieaktywny)@endunless
+                                    </option>
+                                @endforeach
+                            </select>
+                            <div class="form-text">Po powiązaniu ze szkoleniem liczy się trener szkolenia.</div>
+                        </div>
+                        <div class="col-lg-3 d-flex gap-2">
                             <button type="submit" class="btn btn-outline-primary">Filtruj</button>
                             <a href="{{ route('closed-training-cases.index', array_filter(['sort' => $sort, 'dir' => $sort ? $dir : null])) }}" class="btn btn-outline-secondary">Wyczyść</a>
                         </div>
@@ -45,6 +58,7 @@
                 $sortBase = array_filter([
                     'q' => $search !== '' ? $search : null,
                     'status' => $status !== 'open' ? $status : null,
+                    'trainer' => $trainer !== '' ? $trainer : null,
                 ]);
                 $symbolDir = ($sort === 'id' && $dir === 'asc') ? 'desc' : 'asc';
                 $inquiryDir = ($sort === 'inquired_at' && $dir === 'desc') ? 'asc' : 'desc';

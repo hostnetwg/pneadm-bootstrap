@@ -42,6 +42,7 @@ class ClosedTrainingCaseController extends Controller
     {
         $status = (string) $request->query('status', 'open');
         $search = trim((string) $request->query('q', ''));
+        $trainer = $this->trainerFilter($request);
         [$sort, $dir] = $this->resolveListSort($request);
 
         $query = ClosedTrainingCase::query()
@@ -65,6 +66,26 @@ class ClosedTrainingCaseController extends Controller
                     } elseif (ctype_digit($search)) {
                         $inner->orWhere('id', (int) $search);
                     }
+                });
+            })
+            ->when($trainer === 'none', function ($query) {
+                $query->whereNull('closed_training_cases.instructor_id')
+                    ->where(function ($inner) {
+                        $inner->whereDoesntHave('course')
+                            ->orWhereHas('course', fn ($course) => $course->whereNull('instructor_id'));
+                    });
+            })
+            ->when(ctype_digit($trainer), function ($query) use ($trainer) {
+                $trainerId = (int) $trainer;
+                $query->where(function ($inner) use ($trainerId) {
+                    $inner->whereHas('course', fn ($course) => $course->where('instructor_id', $trainerId))
+                        ->orWhere(function ($onCase) use ($trainerId) {
+                            $onCase->where('closed_training_cases.instructor_id', $trainerId)
+                                ->where(function ($withoutCourseTrainer) {
+                                    $withoutCourseTrainer->whereDoesntHave('course')
+                                        ->orWhereHas('course', fn ($course) => $course->whereNull('instructor_id'));
+                                });
+                        });
                 });
             });
 
@@ -94,6 +115,11 @@ class ClosedTrainingCaseController extends Controller
             'cases' => $cases,
             'status' => $status,
             'search' => $search,
+            'trainer' => $trainer,
+            'trainers' => Instructor::query()
+                ->orderBy('last_name')
+                ->orderBy('first_name')
+                ->get(['id', 'title', 'first_name', 'last_name', 'is_active']),
             'sort' => $sort,
             'dir' => $dir,
         ]);
@@ -1017,6 +1043,20 @@ class ClosedTrainingCaseController extends Controller
             ->where('is_active', true)
             ->orderBy('name')
             ->get(['id', 'name']);
+    }
+
+    private function trainerFilter(Request $request): string
+    {
+        $trainer = trim((string) $request->query('trainer', ''));
+        if ($trainer === '' || $trainer === 'none') {
+            return $trainer;
+        }
+
+        if (! ctype_digit($trainer) || ! Instructor::query()->whereKey((int) $trainer)->exists()) {
+            return '';
+        }
+
+        return $trainer;
     }
 
     private function instructorsForSelect(ClosedTrainingCase $case)

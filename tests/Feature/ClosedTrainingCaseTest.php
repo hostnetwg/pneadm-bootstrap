@@ -2094,6 +2094,71 @@ class ClosedTrainingCaseTest extends TestCase
         );
     }
 
+    public function test_case_list_filters_by_trainer_or_missing_trainer(): void
+    {
+        $user = User::factory()->create(['is_active' => true]);
+        $anna = Instructor::query()->create([
+            'first_name' => 'Anna',
+            'last_name' => 'Filtr',
+            'email' => 'anna.filtr.'.uniqid().'@example.com',
+            'is_active' => true,
+        ]);
+        $bartek = Instructor::query()->create([
+            'first_name' => 'Bartek',
+            'last_name' => 'Filtr',
+            'email' => 'bartek.filtr.'.uniqid().'@example.com',
+            'is_active' => true,
+        ]);
+        $onCase = $this->makeCase([
+            'topic' => 'UNIQ-FILTER-ANNA',
+            'instructor_id' => $anna->id,
+        ]);
+        $this->makeCase([
+            'topic' => 'UNIQ-FILTER-BARTEK',
+            'instructor_id' => $bartek->id,
+        ]);
+        $this->makeCase([
+            'topic' => 'UNIQ-FILTER-NONE',
+        ]);
+        $linked = $this->makeCase([
+            'topic' => 'UNIQ-FILTER-COURSE',
+            'instructor_id' => $anna->id,
+        ]);
+        $this->makeCourse([
+            'instructor_id' => $bartek->id,
+            'closed_training_case_id' => $linked->id,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('closed-training-cases.index', ['status' => 'all', 'trainer' => $anna->id]))
+            ->assertOk()
+            ->assertSee('UNIQ-FILTER-ANNA')
+            ->assertDontSee('UNIQ-FILTER-BARTEK')
+            ->assertDontSee('UNIQ-FILTER-NONE')
+            ->assertDontSee('UNIQ-FILTER-COURSE');
+
+        $this->actingAs($user)
+            ->get(route('closed-training-cases.index', ['status' => 'all', 'trainer' => $bartek->id]))
+            ->assertOk()
+            ->assertSee('UNIQ-FILTER-BARTEK')
+            ->assertSee('UNIQ-FILTER-COURSE')
+            ->assertDontSee('UNIQ-FILTER-ANNA');
+
+        $this->actingAs($user)
+            ->get(route('closed-training-cases.index', ['status' => 'all', 'trainer' => 'none']))
+            ->assertOk()
+            ->assertSee('UNIQ-FILTER-NONE')
+            ->assertDontSee('UNIQ-FILTER-ANNA')
+            ->assertDontSee('UNIQ-FILTER-COURSE');
+
+        $this->actingAs($user)
+            ->get(route('closed-training-cases.index', ['status' => 'all', 'trainer' => $anna->id, 'sort' => 'id']))
+            ->assertOk()
+            ->assertSee('trainer='.$anna->id, false);
+
+        $this->assertNotNull($onCase->id);
+    }
+
     public function test_case_list_shows_planned_course_link_only_when_linked(): void
     {
         $user = User::factory()->create(['is_active' => true]);
