@@ -42,8 +42,8 @@ use App\Http\Controllers\MarketingHelpController;
 use App\Http\Controllers\MarketingSourceTypeController;
 use App\Http\Controllers\NODNSzkoleniaController;
 use App\Http\Controllers\OnlineCourseEnrollmentController;
-use App\Http\Controllers\OnlineCourseMigrationNoticeController;
 use App\Http\Controllers\OnlineCourseLessonController;
+use App\Http\Controllers\OnlineCourseMigrationNoticeController;
 use App\Http\Controllers\OnlineCourseModuleController;
 use App\Http\Controllers\OnlineCourseSalesController;
 use App\Http\Controllers\OnlineCoursesController;
@@ -494,6 +494,10 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
     Route::put('/closed-training-cases/{closedTrainingCase}/topic', [ClosedTrainingCaseController::class, 'updateTopic'])->name('closed-training-cases.topic.update');
     Route::put('/closed-training-cases/{closedTrainingCase}/negotiation', [ClosedTrainingCaseController::class, 'updateNegotiation'])
         ->name('closed-training-cases.negotiation.update');
+    Route::post('/closed-training-cases/{closedTrainingCase}/trainer-panel', [ClosedTrainingCaseController::class, 'shareWithTrainer'])
+        ->name('closed-training-cases.trainer-panel.send');
+    Route::post('/closed-training-cases/{closedTrainingCase}/trainer-panel/hide', [ClosedTrainingCaseController::class, 'hideFromTrainer'])
+        ->name('closed-training-cases.trainer-panel.hide');
     Route::post('/closed-training-cases/{closedTrainingCase}/notes', [ClosedTrainingCaseController::class, 'storeNote'])->name('closed-training-cases.notes.store');
     Route::post('/closed-training-cases/{closedTrainingCase}/email', [ClosedTrainingCaseController::class, 'sendEmail'])->name('closed-training-cases.email.send');
     Route::post('/closed-training-cases/{closedTrainingCase}/email/prepare-scheduled', [ClosedTrainingCaseController::class, 'prepareScheduledEmail'])
@@ -518,6 +522,8 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
         ->name('closed-training-cases.course.sync-negotiation');
     Route::put('/closed-training-cases/{closedTrainingCase}/events/{event}', [ClosedTrainingCaseController::class, 'updateEvent'])->name('closed-training-cases.events.update');
     Route::delete('/closed-training-cases/{closedTrainingCase}/events/{event}', [ClosedTrainingCaseController::class, 'destroyEvent'])->name('closed-training-cases.events.destroy');
+    Route::get('/powiadomienia', [\App\Http\Controllers\TrainerPortalNotificationController::class, 'index'])->name('trainer-portal.notifications');
+    Route::get('/powiadomienia/{notification}', [\App\Http\Controllers\TrainerPortalNotificationController::class, 'open'])->whereNumber('notification')->name('trainer-portal.notifications.open');
     Route::post('training-offers/reorder', [TrainingOfferController::class, 'reorder'])
         ->name('training-offers.reorder');
     Route::resource('training-offers', TrainingOfferController::class);

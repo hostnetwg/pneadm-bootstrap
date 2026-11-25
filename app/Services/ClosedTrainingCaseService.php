@@ -430,6 +430,10 @@ class ClosedTrainingCaseService
         $case->start_date = $newStart;
         $case->end_date = $newEnd;
         $case->schedule_time_known = $newTimeKnown;
+        $nextStart = $newStart?->format('Y-m-d H:i');
+        if ($case->trainer_schedule_is_test && ($beforeStart !== $nextStart || $beforeTimeKnown !== $newTimeKnown || $newStart === null)) {
+            $case->trainer_schedule_is_test = false;
+        }
 
         $afterClientConfirmed = $case->client_price_confirmed_at !== null;
         $afterFeeConfirmed = $case->instructor_fee_confirmed_at !== null;

@@ -14,6 +14,13 @@
             </svg>
         </button>
     </div>
+    <a href="{{ route('trainer-portal.notifications') }}" class="d-flex align-items-center link-light text-decoration-none mb-3">
+        <i class="bi bi-bell me-2" aria-hidden="true"></i>
+        <span>Powiadomienia</span>
+        @if(($adminNotificationUnreadCount ?? 0) > 0)
+            <span class="badge bg-danger ms-2">{{ $adminNotificationUnreadCount }}</span>
+        @endif
+    </a>
     <style>
         .release-nav-link {
             position: relative;

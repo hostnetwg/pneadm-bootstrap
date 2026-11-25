@@ -8,6 +8,7 @@ use App\Models\DebtCase;
 use App\Models\FormOrder;
 use App\Models\Participant;
 use App\Models\ProductPrice;
+use App\Models\TrainerPortalNotification;
 use App\Observers\CourseObserver;
 use App\Observers\CoursePriceVariantObserver;
 use App\Observers\DebtCaseObserver;
@@ -89,6 +90,20 @@ class AppServiceProvider extends ServiceProvider
 
         View::composer('layouts.navigation', function ($view) {
             $view->with('releaseMenu', app(ReleaseChangelogService::class)->menuItems(auth()->user()));
+            $unread = 0;
+            $userId = auth()->id();
+            if ($userId) {
+                try {
+                    $unread = TrainerPortalNotification::query()
+                        ->where('audience', TrainerPortalNotification::AUDIENCE_ADMIN)
+                        ->where('pneadm_user_id', $userId)
+                        ->whereNull('read_at')
+                        ->count();
+                } catch (\Throwable) {
+                    $unread = 0;
+                }
+            }
+            $view->with('adminNotificationUnreadCount', $unread);
         });
     }
 }

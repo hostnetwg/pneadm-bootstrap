@@ -19,6 +19,9 @@
             @if(session('error'))
                 <div class="alert alert-danger">{{ session('error') }}</div>
             @endif
+            @if(session('warning'))
+                <div class="alert alert-warning">{{ session('warning') }}</div>
+            @endif
 
             <div class="row g-4">
                 <div class="col-lg-7">
@@ -285,9 +288,19 @@
                                 <div class="small text-uppercase text-secondary mb-2">Ustalenia sprzed powiązania (historyczne)</div>
                             @endif
 
+                            <form id="trainer-panel-send" method="POST" action="{{ route('closed-training-cases.trainer-panel.send', $case) }}" class="d-none">
+                                @csrf
+                            </form>
+                            @if($case->show_in_trainer_panel)
+                                <form id="trainer-panel-hide" method="POST" action="{{ route('closed-training-cases.trainer-panel.hide', $case) }}" class="d-none">
+                                    @csrf
+                                </form>
+                            @endif
+
                             <form method="POST" action="{{ route('closed-training-cases.negotiation.update', $case) }}" id="negotiation-form">
                                 @csrf
                                 @method('PUT')
+                                <input type="hidden" name="show_in_trainer_panel" id="show_in_trainer_panel_value" value="{{ $case->show_in_trainer_panel ? '1' : '0' }}">
                                 <div class="mb-3">
                                     <label for="instructor_id" class="form-label">Instruktor</label>
                                     <select name="instructor_id" id="instructor_id" class="form-select @error('instructor_id') is-invalid @enderror" @disabled($negotiationLocked)>
@@ -299,7 +312,41 @@
                                         @endforeach
                                     </select>
                                     @error('instructor_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                                    <div class="form-text">Przypisanie nie oznacza potwierdzenia dostępności.</div>
+                                    <div class="form-text">Przypisanie nie oznacza potwierdzenia dostępności. Najpierw zapisz instruktora, a dopiero potem wyślij zapytanie do jego panelu.</div>
+                                    @php
+                                        $trainerShareOpen = $case->show_in_trainer_panel
+                                            || $errors->has('trainer_panel_message')
+                                            || $errors->has('show_in_trainer_panel');
+                                    @endphp
+                                    <div class="border rounded p-3 mt-3 bg-light">
+                                        <div class="form-check">
+                                            <input type="checkbox" class="form-check-input" id="show_in_trainer_panel" @checked($trainerShareOpen)>
+                                            <label class="form-check-label" for="show_in_trainer_panel">Pokaż w panelu trenera</label>
+                                        </div>
+                                        @error('show_in_trainer_panel')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
+                                        @if($case->show_in_trainer_panel)
+                                            <div class="mt-2">
+                                                <button type="submit" form="trainer-panel-hide" class="btn btn-outline-danger btn-sm">Wyłącz w panelu trenera</button>
+                                                <div class="form-text">Odznaczenie checkboxa i „Zapisz ustalenia” też wyłącza zapytanie. Termin zostaje na sprawie.</div>
+                                            </div>
+                                        @endif
+                                        <div id="trainer-share-fields" class="mt-3 {{ $trainerShareOpen ? '' : 'd-none' }}">
+                                            <label for="trainer_panel_message" class="form-label">Wiadomość do trenera</label>
+                                            <textarea form="trainer-panel-send" name="trainer_panel_message" id="trainer_panel_message" rows="4" maxlength="2000" class="form-control @error('trainer_panel_message') is-invalid @enderror">{{ old('trainer_panel_message', $case->trainer_panel_message) }}</textarea>
+                                            @error('trainer_panel_message')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
+                                            <div class="form-text">Trener zobaczy ją w panelu jako wiadomość od administratora. Zapytanie pojawi się u niego dopiero po wysłaniu. Dzwonek, e-mail i SMS (jeśli jest włączony) idą przy pierwszym wysłaniu.</div>
+                                            <button type="submit" form="trainer-panel-send" class="btn btn-primary btn-sm mt-2">Wyślij</button>
+                                        </div>
+                                    </div>
+                                    <script>
+                                        document.getElementById('show_in_trainer_panel')?.addEventListener('change', function () {
+                                            document.getElementById('trainer-share-fields')?.classList.toggle('d-none', !this.checked);
+                                            const value = document.getElementById('show_in_trainer_panel_value');
+                                            if (value) {
+                                                value.value = this.checked ? '1' : '0';
+                                            }
+                                        });
+                                    </script>
                                     @if($negotiationLocked)
                                         <input type="hidden" name="instructor_id" value="{{ $case->instructor_id }}">
                                     @endif
@@ -368,6 +415,9 @@
                                             class="form-control @error('start_date') is-invalid @enderror"
                                             @disabled($negotiationLocked)>
                                         @error('start_date')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                        @if($case->trainer_schedule_is_test && $case->start_date)
+                                            <div class="fw-semibold mt-1" style="color: #dc3545;">DATA TESTOWA</div>
+                                        @endif
                                         @if($negotiationLocked)
                                             <input type="hidden" name="start_date" value="{{ $case->datetimeLocalValue($case->start_date, (bool) $case->schedule_time_known) }}">
                                         @endif
@@ -388,6 +438,19 @@
                                     </div>
                                 </div>
                                 <div class="form-text mb-3">Można zapisać sam początek. Koniec wymaga początku. Wpisanie terminu nie tworzy szkolenia.</div>
+                                @if(filled($case->trainer_note))
+                                    <div class="mb-3">
+                                        <div class="form-label">Notatka trenera</div>
+                                        <div class="border rounded p-2 bg-light" style="white-space: pre-wrap;">{{ $case->trainer_note }}</div>
+                                    </div>
+                                @endif
+                                @if($case->trainer_declined_at)
+                                    <div class="alert alert-warning">
+                                        <div class="fw-semibold">Trener rezygnuje z prowadzenia</div>
+                                        <div class="small text-muted mb-1">{{ $case->trainer_declined_at->timezone('Europe/Warsaw')->format('d.m.Y H:i') }}</div>
+                                        <div style="white-space: pre-wrap;">{{ $case->trainer_decline_reason }}</div>
+                                    </div>
+                                @endif
                             </form>
 
                             @unless($case->isLinkedToCourse())
@@ -522,6 +585,13 @@
 
                     <div class="card">
                         <div class="card-header fw-semibold">Historia</div>
+                        <style>
+                            .trainer-history-test {
+                                background: #fff4e5 !important;
+                                border-color: #f59e0b !important;
+                                box-shadow: inset 4px 0 0 #ea580c;
+                            }
+                        </style>
                         <ul class="list-group border-0 p-1 mb-0" style="display: flex; flex-direction: column; gap: 2px;">
                             @foreach($case->events->sortByDesc('happened_at') as $event)
                                 <li class="list-group-item rounded border {{ $event->historyItemClass() }}">
@@ -532,6 +602,9 @@
                                                aria-hidden="true"></i>
                                             <div class="min-w-0">
                                             <strong>{{ $event->typeLabel() }}</strong>
+                                            @if($event->isTrainerTrial())
+                                                <span class="badge text-bg-warning ms-1">Test</span>
+                                            @endif
                                             @if($event->noteContextLabel())
                                                 <span class="text-secondary"> · {{ $event->noteContextLabel() }}</span>
                                             @endif

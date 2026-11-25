@@ -15,6 +15,13 @@ class Instructor extends Model
 
     protected $table = 'instructors';
 
+    protected $casts = [
+        'is_active' => 'boolean',
+        'portal_access_enabled' => 'boolean',
+        'sms_notifications_enabled' => 'boolean',
+        'pnedu_user_id' => 'integer',
+    ];
+
     protected $fillable = [
         'title',          // Tytuł naukowy, np. "dr", "mgr"
         'first_name',     // Imię instruktora
@@ -27,6 +34,9 @@ class Instructor extends Model
         'photo',          // Ścieżka do zdjęcia
         'signature',      // Ścieżka do podpisu instruktora
         'is_active',      // Czy instruktor jest aktywny
+        'portal_access_enabled',
+        'sms_notifications_enabled',
+        'pnedu_user_id',
         'default_settlement_type',
         'notes',          // Notatki na temat trenera
         'ai_voice_profile', // Profil komunikacji dla AI (DEC-035), edytuje tylko super_admin

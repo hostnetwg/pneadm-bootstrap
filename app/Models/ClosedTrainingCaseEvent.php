@@ -25,6 +25,8 @@ class ClosedTrainingCaseEvent extends Model
 
     public const NOTE_CHANNEL_OTHER = 'other';
 
+    public const NOTE_CHANNEL_TEST = 'test';
+
     public const NOTE_PARTY_INSTRUCTOR = 'instructor';
 
     public const NOTE_PARTY_CLIENT = 'client';
@@ -59,6 +61,10 @@ class ClosedTrainingCaseEvent extends Model
     {
         if ($this->event_type === self::TYPE_EMAIL_SENT) {
             return $this->emailHistoryLabel();
+        }
+
+        if ($this->isTrainerTrial()) {
+            return 'Test';
         }
 
         return match ($this->event_type) {
@@ -156,7 +162,7 @@ class ClosedTrainingCaseEvent extends Model
 
     public function noteChannelLabel(): ?string
     {
-        if ($this->note_channel === null || $this->note_channel === '') {
+        if ($this->isTrainerTrial() || $this->note_channel === null || $this->note_channel === '') {
             return null;
         }
 
@@ -200,8 +206,17 @@ class ClosedTrainingCaseEvent extends Model
         return $parts === [] ? null : implode(' · ', $parts);
     }
 
+    public function isTrainerTrial(): bool
+    {
+        return $this->note_channel === self::NOTE_CHANNEL_TEST;
+    }
+
     public function historyItemClass(): string
     {
+        if ($this->isTrainerTrial()) {
+            return 'trainer-history-test';
+        }
+
         return match ($this->event_type) {
             self::TYPE_UPDATED => 'bg-secondary-subtle',
             self::TYPE_EMAIL_SENT => 'bg-success-subtle',

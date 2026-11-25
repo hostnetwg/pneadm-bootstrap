@@ -17,6 +17,9 @@
                     {{ session('success') }}
                 </div>
             @endif
+            @if(session('error'))
+                <div class="alert alert-danger">{{ session('error') }}</div>
+            @endif
 
             <!-- Przycisk dodawania nowego instruktora -->
             <div class="d-flex justify-content-end mb-3">

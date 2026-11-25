@@ -1,15 +1,23 @@
 <?php
 
 namespace App\Http\Controllers;
+
 use App\Models\Instructor;
+use App\Services\TrainerPortalAccountService;
 use Illuminate\Http\Request;
+use Throwable;
 
 class InstructorsController extends Controller
 {
+    public function __construct(
+        private readonly TrainerPortalAccountService $trainerAccounts,
+    ) {}
+
     public function index()
     {
-        //$instructors = Instructor::all();  // Pobieranie wszystkich instruktorów
-        $instructors = Instructor::paginate(25); // 25 instruktorów na stronę  
+        // $instructors = Instructor::all();  // Pobieranie wszystkich instruktorów
+        $instructors = Instructor::paginate(25); // 25 instruktorów na stronę
+
         return view('courses.instructors.index', compact('instructors'));
     }
 
@@ -17,10 +25,10 @@ class InstructorsController extends Controller
     public function store(Request $request)
     {
         // Test: Wyświetl przesłane dane
-        //dd($request->all());
-    
+        // dd($request->all());
+
         $request->validate([
-            'title' => 'nullable|string|max:50', // Dodano walidację tytułu            
+            'title' => 'nullable|string|max:50', // Dodano walidację tytułu
             'first_name' => 'required|string|max:255',
             'last_name' => 'required|string|max:255',
             'gender' => 'nullable|in:male,female,other,prefer_not_to_say',
@@ -38,7 +46,7 @@ class InstructorsController extends Controller
             'youtube_url' => 'nullable|url|max:255',
             'x_com_url' => 'nullable|url|max:255',
         ]);
-    
+
         $photoPath = null;
         if ($request->hasFile('photo')) {
             $photoPath = $request->file('photo')->store('instructors', 'public');
@@ -51,13 +59,13 @@ class InstructorsController extends Controller
 
         // ✅ Sanityzacja HTML - usunięcie niebezpiecznych tagów
         $bioHtml = $request->input('bio_html');
-        if (!empty($bioHtml)) {
-            $bioHtml = strip_tags($bioHtml, 
+        if (! empty($bioHtml)) {
+            $bioHtml = strip_tags($bioHtml,
                 '<p><br><strong><b><em><i><u><ul><ol><li><h1><h2><h3><h4><h5><h6><a><img><div><span>');
         }
-        
+
         $instructor = Instructor::create([
-            'title' => $request->input('title'),            
+            'title' => $request->input('title'),
             'first_name' => $request->input('first_name'),
             'last_name' => $request->input('last_name'),
             'gender' => $request->input('gender'),
@@ -66,8 +74,10 @@ class InstructorsController extends Controller
             'bio' => $request->input('bio'),
             'bio_html' => $bioHtml,
             'photo' => $photoPath,
-            'signature' => $signaturePath,            
+            'signature' => $signaturePath,
             'is_active' => $request->has('is_active'),
+            'portal_access_enabled' => $request->boolean('portal_access_enabled'),
+            'sms_notifications_enabled' => $request->boolean('sms_notifications_enabled'),
             'notes' => $request->input('notes'),
             'website_url' => $request->input('website_url'),
             'linkedin_url' => $request->input('linkedin_url'),
@@ -80,7 +90,11 @@ class InstructorsController extends Controller
             $instructor->ai_voice_profile = $this->aiVoiceProfile($request);
             $instructor->save();
         }
-    
+
+        if ($response = $this->syncTrainerPortal($instructor, false)) {
+            return $response;
+        }
+
         return redirect()->route('courses.instructors.index')->with('success', 'Instruktor został dodany.');
     }
 
@@ -88,35 +102,36 @@ class InstructorsController extends Controller
     {
         return view('courses.instructors.create');
     }
-    
 
     public function edit($id)
     {
         $instructor = Instructor::findOrFail($id);
+
         return view('courses.instructors.edit', compact('instructor'));
     }
 
     public function show($id)
     {
         $instructor = Instructor::with(['surveys.course', 'surveys.questions'])->findOrFail($id);
+
         return view('courses.instructors.show', compact('instructor'));
     }
-    
+
     public function update(Request $request, $id)
     {
         $instructor = Instructor::findOrFail($id);
-    
+
         $request->validate([
-            'title' => 'nullable|string|max:50', // Dodano walidację tytułu            
+            'title' => 'nullable|string|max:50', // Dodano walidację tytułu
             'first_name' => 'required|string|max:255',
             'last_name' => 'required|string|max:255',
             'gender' => 'nullable|in:male,female,other,prefer_not_to_say',
-            'email' => 'required|email|unique:instructors,email,' . $id,
+            'email' => 'required|email|unique:instructors,email,'.$id,
             'phone' => 'nullable|string|max:20',
             'bio' => 'nullable|string|max:1000',
             'bio_html' => 'nullable|string|max:10000',
             'photo' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
-            'signature' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',            
+            'signature' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             'is_active' => 'nullable|string',
             'remove_photo' => 'nullable|string',
             'remove_signature' => 'nullable|string',
@@ -128,7 +143,7 @@ class InstructorsController extends Controller
             'youtube_url' => 'nullable|url|max:255',
             'x_com_url' => 'nullable|url|max:255',
         ]);
-    
+
         // ✅ Usunięcie zdjęcia, jeśli użytkownik zaznaczył "Usuń zdjęcie"
         if ($request->has('remove_photo')) {
             if ($instructor->photo && \Storage::disk('public')->exists($instructor->photo)) {
@@ -136,7 +151,7 @@ class InstructorsController extends Controller
             }
             $instructor->photo = null; // Usunięcie ścieżki pliku w bazie danych
         }
-        
+
         // ✅ Usunięcie podpisu, jeśli użytkownik zaznaczył "Usuń podpis"
         if ($request->has('remove_signature')) {
             if ($instructor->signature && \Storage::disk('public')->exists($instructor->signature)) {
@@ -144,13 +159,13 @@ class InstructorsController extends Controller
             }
             $instructor->signature = null; // Usunięcie ścieżki pliku w bazie danych
         }
-    
+
         if ($request->hasFile('photo')) {
             // Usunięcie poprzedniego zdjęcia, jeśli istnieje
             if ($instructor->photo && \Storage::disk('public')->exists($instructor->photo)) {
                 \Storage::disk('public')->delete($instructor->photo);
             }
-    
+
             // Zapis nowego zdjęcia
             $photoPath = $request->file('photo')->store('instructors', 'public');
             $instructor->photo = $photoPath;
@@ -161,18 +176,21 @@ class InstructorsController extends Controller
             if ($instructor->signature && \Storage::disk('public')->exists($instructor->signature)) {
                 \Storage::disk('public')->delete($instructor->signature);
             }
-    
+
             // Zapis nowego zdjęcia
             $signaturePath = $request->file('signature')->store('instructors', 'public');
             $instructor->signature = $signaturePath;
-        }        
-    
+        }
+
         // ✅ Sanityzacja HTML - usunięcie niebezpiecznych tagów
         $bioHtml = $request->input('bio_html');
-        if (!empty($bioHtml)) {
-            $bioHtml = strip_tags($bioHtml, 
+        if (! empty($bioHtml)) {
+            $bioHtml = strip_tags($bioHtml,
                 '<p><br><strong><b><em><i><u><ul><ol><li><h1><h2><h3><h4><h5><h6><a><img><div><span>');
         }
+
+        $wasPortalEnabled = (bool) $instructor->portal_access_enabled;
+        $previousPneduUserId = $instructor->pnedu_user_id !== null ? (int) $instructor->pnedu_user_id : null;
 
         $instructor->title = $request->input('title');
         $instructor->first_name = $request->input('first_name');
@@ -183,6 +201,8 @@ class InstructorsController extends Controller
         $instructor->bio = $request->input('bio');
         $instructor->bio_html = $bioHtml;
         $instructor->is_active = $request->has('is_active');
+        $instructor->portal_access_enabled = $request->boolean('portal_access_enabled');
+        $instructor->sms_notifications_enabled = $request->boolean('sms_notifications_enabled');
         $instructor->notes = $request->input('notes');
         $instructor->website_url = $request->input('website_url');
         $instructor->linkedin_url = $request->input('linkedin_url');
@@ -192,19 +212,24 @@ class InstructorsController extends Controller
         if ($this->canEditAiVoiceProfile($request)) {
             $instructor->ai_voice_profile = $this->aiVoiceProfile($request);
         }
-    
+
         $instructor->save();
-    
+
+        if ($response = $this->syncTrainerPortal($instructor, $wasPortalEnabled, $previousPneduUserId)) {
+            return $response;
+        }
+
         return redirect()->route('courses.instructors.index')->with('success', 'Instruktor został zaktualizowany.');
     }
+
     public function destroy($id)
     {
         $instructor = Instructor::findOrFail($id);
-    
+
         // Sprawdzenie, czy instruktor ma zdjęcie
         if ($instructor->photo) {
-            $photoPath = public_path('storage/' . $instructor->photo);
-    
+            $photoPath = public_path('storage/'.$instructor->photo);
+
             // Usunięcie pliku, jeśli istnieje
             if (file_exists($photoPath)) {
                 unlink($photoPath);
@@ -213,21 +238,19 @@ class InstructorsController extends Controller
 
         // Sprawdzenie, czy instruktor ma signature
         if ($instructor->signature) {
-            $signaturePath = public_path('storage/' . $instructor->signature);
-    
+            $signaturePath = public_path('storage/'.$instructor->signature);
+
             // Usunięcie pliku signature, jeśli istnieje
             if (file_exists($signaturePath)) {
                 unlink($signaturePath);
             }
-        }        
-    
+        }
+
         // Usunięcie rekordu z bazy danych
         $instructor->delete();
-    
+
         return redirect()->route('courses.instructors.index')->with('success', 'Instruktor został usunięty.');
     }
-            
-    
 
     /**
      * Profil komunikacji dla AI (DEC-035) zmienia tylko super_admin; zapis innych użytkowników go nie rusza.
@@ -242,5 +265,35 @@ class InstructorsController extends Controller
         $profile = trim((string) $request->input('ai_voice_profile', ''));
 
         return $profile !== '' ? $profile : null;
+    }
+
+    private function syncTrainerPortal(Instructor $instructor, bool $wasEnabled, ?int $previousPneduUserId = null): ?\Illuminate\Http\RedirectResponse
+    {
+        if (! $instructor->portal_access_enabled) {
+            return null;
+        }
+
+        try {
+            $link = $this->trainerAccounts->link($instructor);
+        } catch (Throwable $exception) {
+            $instructor->portal_access_enabled = false;
+            $instructor->save();
+            \Illuminate\Support\Facades\Log::warning('Trainer portal link failed', [
+                'instructor_id' => $instructor->id,
+                'exception' => $exception::class,
+            ]);
+
+            return redirect()
+                ->route('courses.instructors.index')
+                ->with('error', 'Nie udało się włączyć panelu trenera. Sprawdź e-mail i spróbuj ponownie.');
+        }
+
+        $instructor->refresh();
+        $relinked = $previousPneduUserId !== (int) $instructor->pnedu_user_id;
+        if ($link['created'] || ! $wasEnabled || $relinked) {
+            $this->trainerAccounts->sendAccessMail($instructor, $link['created']);
+        }
+
+        return null;
     }
 }

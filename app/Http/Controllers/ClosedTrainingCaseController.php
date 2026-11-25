@@ -13,6 +13,7 @@ use App\Services\ClosedTrainingCaseCoordinationEmailBuilder;
 use App\Services\ClosedTrainingCaseScheduledEmailBuilder;
 use App\Services\ClosedTrainingCaseService;
 use App\Services\ClosedTrainingCaseThankYouEmailBuilder;
+use App\Services\TrainerPortalService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -34,6 +35,7 @@ class ClosedTrainingCaseController extends Controller
         private readonly ClosedTrainingCaseScheduledEmailBuilder $scheduledEmailBuilder,
         private readonly ClosedTrainingCaseCoordinationEmailBuilder $coordinationEmailBuilder,
         private readonly ClosedTrainingCaseThankYouEmailBuilder $thankYouEmailBuilder,
+        private readonly TrainerPortalService $trainerPortal,
     ) {}
 
     public function index(Request $request): View
@@ -331,6 +333,9 @@ class ClosedTrainingCaseController extends Controller
             $timeKnown = false;
         }
 
+        $hideFromTrainer = $closedTrainingCase->show_in_trainer_panel
+            && ! $request->boolean('show_in_trainer_panel');
+
         $this->cases->updateNegotiation($closedTrainingCase, [
             'instructor_id' => isset($data['instructor_id']) ? (int) $data['instructor_id'] : null,
             'client_price' => $data['client_price'] ?? null,
@@ -343,9 +348,49 @@ class ClosedTrainingCaseController extends Controller
             'schedule_time_known' => $timeKnown,
         ], $request->user());
 
+        if ($hideFromTrainer) {
+            $this->trainerPortal->hideFromTrainer($closedTrainingCase, $request->user());
+        }
+
         return redirect()
             ->route('closed-training-cases.show', $closedTrainingCase)
-            ->with('success', 'Zapisano ustalenia negocjacyjne.');
+            ->with('success', $hideFromTrainer
+                ? 'Zapisano ustalenia. Zapytanie wyłączone w panelu trenera. Wpisany termin zostaje na sprawie.'
+                : 'Zapisano ustalenia negocjacyjne.');
+    }
+
+    public function shareWithTrainer(Request $request, ClosedTrainingCase $closedTrainingCase): RedirectResponse
+    {
+        $data = $request->validate([
+            'trainer_panel_message' => ['nullable', 'string', 'max:2000'],
+        ], [
+            'trainer_panel_message.max' => 'Wiadomość do trenera może mieć najwyżej 2000 znaków.',
+        ]);
+
+        $sharing = $this->trainerPortal->shareWithMessage(
+            $closedTrainingCase,
+            $request->user(),
+            $data['trainer_panel_message'] ?? null,
+        );
+
+        $redirect = redirect()
+            ->route('closed-training-cases.show', $closedTrainingCase)
+            ->with('success', 'Zapytanie jest w panelu trenera.');
+
+        if ($sharing['warning']) {
+            $redirect->with('warning', $sharing['warning']);
+        }
+
+        return $redirect;
+    }
+
+    public function hideFromTrainer(Request $request, ClosedTrainingCase $closedTrainingCase): RedirectResponse
+    {
+        $this->trainerPortal->hideFromTrainer($closedTrainingCase, $request->user());
+
+        return redirect()
+            ->route('closed-training-cases.show', $closedTrainingCase)
+            ->with('success', 'Zapytanie ukryte w panelu trenera. Wpisany termin zostaje na sprawie.');
     }
 
     public function update(Request $request, ClosedTrainingCase $closedTrainingCase): RedirectResponse

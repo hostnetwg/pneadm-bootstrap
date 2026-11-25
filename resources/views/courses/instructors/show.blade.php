@@ -59,6 +59,12 @@
                                 @else
                                     <span class="badge bg-secondary">Nieaktywny</span>
                                 @endif
+                                @if($instructor->portal_access_enabled)
+                                    <span class="badge bg-primary">Panel trenera</span>
+                                @endif
+                                @if($instructor->sms_notifications_enabled)
+                                    <span class="badge bg-info text-dark">SMS</span>
+                                @endif
                             </p>
                         </div>
                     </div>

@@ -1,7 +1,11 @@
 # Następne Kroki
 
-Data utworzenia/aktualizacji: 2026-11-17
+Data utworzenia/aktualizacji: 2026-11-25
 Status: plan roboczy, do potwierdzenia przez właściciela
+
+## Ostatnio (2026-11-25) — Panel trenera na pnedu.pl
+
+Administrator włącza panel na karcie instruktora i osobno SMS. Sprawa wchodzi do panelu dopiero po **Wyślij**. Trener widzi zapytanie, wiadomość administratora i wpisuje termin. Dzwonek i e-mail idą w obie strony. SMS idzie tylko do trenera, gdy jest włączony. Kanon: [TRAINER_PORTAL.md](./TRAINER_PORTAL.md). Deploy: [2026-11-trainer-portal-deploy.md](./deploy/2026-11-trainer-portal-deploy.md).
 
 ## Ostatnio (2026-11-17) — Jeden list o przeniesieniu kursów na pnedu.pl
 

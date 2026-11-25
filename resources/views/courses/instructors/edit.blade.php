@@ -154,6 +154,19 @@
                     <label class="form-check-label" for="is_active">Aktywny</label>
                 </div>
 
+                <div class="border rounded p-3 mb-3">
+                    <div class="form-check">
+                        <input type="checkbox" name="portal_access_enabled" class="form-check-input" id="portal_access_enabled" value="1" @checked(old('portal_access_enabled', $instructor->portal_access_enabled))>
+                        <label class="form-check-label" for="portal_access_enabled">Panel trenera na pnedu.pl</label>
+                    </div>
+                    <div class="form-text mb-2">Osobny widok przy tym samym koncie. Nowe konto dostaje mail z ustawieniem hasła. Wyłączenie chowa panel i zostawia konto uczestnika.</div>
+                    <div class="form-check">
+                        <input type="checkbox" name="sms_notifications_enabled" class="form-check-input" id="sms_notifications_enabled" value="1" @checked(old('sms_notifications_enabled', $instructor->sms_notifications_enabled))>
+                        <label class="form-check-label" for="sms_notifications_enabled">SMS o nowym zapytaniu</label>
+                    </div>
+                    <div class="form-text">Na numer z pola telefon. W SMS-ie jest tylko informacja o zapytaniu, bez danych szkoły.</div>
+                </div>
+
                 <div class="mb-3">
                     <label for="notes" class="form-label">Notatki</label>
                     <textarea name="notes" class="form-control" id="notes" rows="5" placeholder="Notatki na temat trenera (tylko do użytku wewnętrznego)">{{ $instructor->notes }}</textarea>

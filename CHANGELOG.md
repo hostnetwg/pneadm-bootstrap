@@ -2,6 +2,17 @@
 
 Krótka numeracja panelu. Szczegóły zawsze w `docs/`. Nowy numer wersji (np. 1.1) tylko po potwierdzeniu Waldemara. Hotfixy dopisujemy do bieżącej wersji.
 
+## 1.6 — 2026-11-25
+
+Panel trenera na pnedu.pl. Na [karcie instruktora](/instructors) włączasz dostęp i osobno SMS. Na [sprawie szkolenia zamkniętego](/closed-training-cases) sprawa wchodzi do panelu dopiero po „Pokaż w panelu trenera”. Trener widzi zapytanie i kontakt, wpisuje termin, a opiekun dostaje dzwonek i e-mail.
+
+- Kanon: [TRAINER_PORTAL.md](docs/TRAINER_PORTAL.md)
+- **Hotfix 2026-11-25:** notatka z panelu trenera jest na [sprawie szkolenia zamkniętego](/closed-training-cases) przy terminie. Gdy trener zmienia datę, ta notatka jest też w mailu do opiekuna.
+- **Hotfix 2026-11-25:** na [sprawie szkolenia zamkniętego](/closed-training-cases) zaznaczenie „Pokaż w panelu trenera” otwiera wiadomość do trenera. Sprawa pojawia się u niego dopiero po **Wyślij**. **Ukryj w panelu trenera** chowa zapytanie, a wpisany termin zostaje.
+- **Hotfix 2026-11-25:** mail o nowym zapytaniu do trenera kończy się imieniem i nazwiskiem administratora, który go wysłał, oraz stopką NODN „Platforma Nowoczesnej Edukacji”.
+- **Hotfix 2026-11-25:** testowy termin trenera zapisuje się w [ustaleniach sprawy](/closed-training-cases). Pod datą jest czerwony dopisek DATA TESTOWA, a wpis w historii jest oznaczony jako Test.
+- **Hotfix 2026-11-25:** na [sprawie szkolenia zamkniętego](/closed-training-cases) zapytanie w panelu trenera wyłącza przycisk **Wyłącz w panelu trenera** albo odznaczenie checkboxa i **Zapisz ustalenia**. Termin zostaje.
+
 ## 1.5 — 2026-11-01
 
 Zaświadczenia: automatyczne czyszczenie starych plików PDF. Narzędzia deweloperskie: odświeżanie komputera deva jedną komendą.
