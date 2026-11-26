@@ -141,13 +141,19 @@ class ClosedTrainingCaseTest extends TestCase
             ->assertSee('Szkolenie rady przykładowej')
             ->assertSee('Telefon: prośba o termin w listopadzie.')
             ->assertSee('Oddzwonić i potwierdzić potrzeby.')
-            ->assertSee('Sprawa wpisana ręcznie w panelu.');
+            ->assertSee('Sprawa wpisana ręcznie w panelu.')
+            ->assertSee('name="handling_note"', false)
+            ->assertSeeInOrder(['id="note_channel"', 'id="note_party"', 'id="handling_note"', 'id="next_action"'], false)
+            ->assertDontSee('Dodaj notatkę', false);
 
         $this->actingAs($user)
             ->put(route('closed-training-cases.update', $case), [
                 'status' => ClosedTrainingCase::STATUS_IN_PROGRESS,
                 'assignee_user_id' => $user->id,
                 'waiting_on' => ClosedTrainingCase::WAITING_ON_SCHOOL,
+                'note_channel' => ClosedTrainingCaseEvent::NOTE_CHANNEL_PHONE,
+                'note_party' => ClosedTrainingCaseEvent::NOTE_PARTY_CLIENT,
+                'handling_note' => 'Rozmowa z dyrektorem.',
                 'next_action' => 'Jeżeli nie będzie odpowiedzi, zadzwonić ponownie.',
                 'next_action_at' => '2026-10-21 09:00',
             ])
@@ -157,6 +163,10 @@ class ClosedTrainingCaseTest extends TestCase
         $this->assertSame(ClosedTrainingCase::STATUS_IN_PROGRESS, $case->status);
         $this->assertSame(ClosedTrainingCase::WAITING_ON_SCHOOL, $case->waiting_on);
         $this->assertSame($user->id, $case->assignee_user_id);
+        $handlingNote = $case->events()->where('body', 'Rozmowa z dyrektorem.')->first();
+        $this->assertNotNull($handlingNote);
+        $this->assertSame(ClosedTrainingCaseEvent::NOTE_CHANNEL_PHONE, $handlingNote->note_channel);
+        $this->assertSame(ClosedTrainingCaseEvent::NOTE_PARTY_CLIENT, $handlingNote->note_party);
 
         $this->actingAs($user)
             ->post(route('closed-training-cases.notes.store', $case), [
@@ -166,7 +176,7 @@ class ClosedTrainingCaseTest extends TestCase
             ])
             ->assertRedirect(route('closed-training-cases.show', $case));
 
-        $note = $case->events()->where('event_type', ClosedTrainingCaseEvent::TYPE_NOTE)->first();
+        $note = $case->events()->where('body', 'Ustalono, że szkoła oddzwoni po radzie.')->first();
         $this->assertNotNull($note);
         $this->assertSame(ClosedTrainingCaseEvent::NOTE_CHANNEL_PHONE, $note->note_channel);
         $this->assertSame(ClosedTrainingCaseEvent::NOTE_PARTY_CLIENT, $note->note_party);
@@ -294,7 +304,7 @@ class ClosedTrainingCaseTest extends TestCase
         $this->assertNull($case->offer_url);
         $this->assertSame('Szkolenie rady przykładowej', $case->topic);
 
-        $this->assertSame(7, $case->events()->count());
+        $this->assertSame(8, $case->events()->count());
         $this->assertTrue($case->events()->where('event_type', ClosedTrainingCaseEvent::TYPE_NOTE)->exists());
 
         $this->actingAs($user)
@@ -311,7 +321,7 @@ class ClosedTrainingCaseTest extends TestCase
             ->assertDontSee('>Opiekun<', false)
             ->assertSee('Telefon: prośba o termin w listopadzie.')
             ->assertSee('W toku')
-            ->assertSee('(7)', false)
+            ->assertSee('(8)', false)
             ->assertSee('title="Liczba działań w historii sprawy"', false);
     }
 

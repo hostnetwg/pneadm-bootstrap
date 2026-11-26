@@ -13,6 +13,7 @@ Panel trenera na pnedu.pl. Na [karcie instruktora](/instructors) włączasz dost
 - **Hotfix 2026-11-25:** testowy termin trenera zapisuje się w [ustaleniach sprawy](/closed-training-cases). Pod datą jest czerwony dopisek DATA TESTOWA, a wpis w historii jest oznaczony jako Test.
 - **Hotfix 2026-11-25:** na [sprawie szkolenia zamkniętego](/closed-training-cases) zapytanie w panelu trenera wyłącza przycisk **Wyłącz w panelu trenera** albo odznaczenie checkboxa i **Zapisz ustalenia**. Termin zostaje.
 - **Hotfix 2026-11-25:** na [liście spraw](/closed-training-cases) filtr **Trener** pokazuje sprawy wybranego trenera albo sprawy bez trenera.
+- **Hotfix 2026-11-26:** na [karcie sprawy](/closed-training-cases) notatka trenera jest od razu pod opiekunem. W **Obsłudze** forma kontaktu, „z kim” i notatka zapisują się razem ze statusem i tym, czyj jest ruch. Puste oznaczenie to wewnętrzna notatka. Osobny przycisk „Dodaj notatkę” znika.
 
 ## 1.5 — 2026-11-01
 

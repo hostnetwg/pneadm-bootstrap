@@ -54,6 +54,12 @@
                                 <p class="mb-0 {{ $case->nextActionIsOverdue() ? 'text-danger' : 'text-secondary' }}">Do {{ $case->formatLocal($case->next_action_at) }}</p>
                             @endif
                             <p class="mt-3 mb-0 text-secondary">Opiekun: {{ $case->assignee?->name ?: 'nieprzypisany' }}</p>
+                            @if(filled($case->trainer_note))
+                                <div class="alert alert-info mt-3 mb-0">
+                                    <div class="fw-semibold">Notatka trenera</div>
+                                    <div style="white-space: pre-wrap;">{{ $case->trainer_note }}</div>
+                                </div>
+                            @endif
                         </div>
                     </div>
 
@@ -437,13 +443,13 @@
                                         @endif
                                     </div>
                                 </div>
-                                <div class="form-text mb-3">Można zapisać sam początek. Koniec wymaga początku. Wpisanie terminu nie tworzy szkolenia.</div>
                                 @if(filled($case->trainer_note))
                                     <div class="mb-3">
-                                        <div class="form-label">Notatka trenera</div>
-                                        <div class="border rounded p-2 bg-light" style="white-space: pre-wrap;">{{ $case->trainer_note }}</div>
+                                        <div class="fw-semibold">Notatka trenera</div>
+                                        <div class="border rounded p-2 bg-white" style="white-space: pre-wrap;">{{ $case->trainer_note }}</div>
                                     </div>
                                 @endif
+                                <div class="form-text mb-3">Można zapisać sam początek. Koniec wymaga początku. Wpisanie terminu nie tworzy szkolenia.</div>
                                 @if($case->trainer_declined_at)
                                     <div class="alert alert-warning">
                                         <div class="fw-semibold">Trener rezygnuje z prowadzenia</div>
@@ -652,75 +658,6 @@
                 </div>
 
                 <div class="col-lg-5">
-                    <form method="POST"
-                          action="{{ route('closed-training-cases.notes.store', $case) }}"
-                          id="closed-training-note-form"
-                          class="card mb-4 shadow-sm position-sticky"
-                          style="top: 1rem; z-index: 1020; max-height: calc(100vh - 2rem); overflow-y: auto;"
-                          data-note-sticky="1">
-                        @csrf
-                        <div class="card-header fw-semibold d-flex align-items-center justify-content-between gap-2">
-                            <span>Notatka</span>
-                            <button type="button"
-                                    id="closed-training-note-pin"
-                                    class="btn btn-sm btn-outline-secondary"
-                                    title="Przypnij — zostaje na swoim miejscu"
-                                    aria-pressed="false"
-                                    aria-label="Przypnij notatkę">
-                                <i class="bi bi-pin-angle" aria-hidden="true"></i>
-                                <span data-note-pin-label>Przypnij</span>
-                            </button>
-                        </div>
-                        <div class="card-body">
-                            @php
-                                $instructorOptionLabel = $case->listInstructorName();
-                                $instructorOptionLabel = $instructorOptionLabel === '—'
-                                    ? 'Trener (brak na sprawie)'
-                                    : 'Trener: '.$instructorOptionLabel;
-                                $clientOptionLabel = filled($case->contact_name)
-                                    ? 'Zamawiający: '.$case->contact_name
-                                    : 'Zamawiający (brak osoby)';
-                                $noteChannelIsOther = old('note_channel') === \App\Models\ClosedTrainingCaseEvent::NOTE_CHANNEL_OTHER;
-                            @endphp
-                            <div class="row g-2 mb-2">
-                                <div class="col-6">
-                                    <label for="note_channel" class="form-label">Forma kontaktu</label>
-                                    <select name="note_channel" id="note_channel" class="form-select @error('note_channel') is-invalid @enderror">
-                                        <option value="">Bez oznaczenia</option>
-                                        @foreach(\App\Models\ClosedTrainingCaseEvent::noteChannelOptions() as $value => $label)
-                                            <option value="{{ $value }}" @selected(old('note_channel') === $value)>{{ $label }}</option>
-                                        @endforeach
-                                    </select>
-                                    @error('note_channel')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                                </div>
-                                <div class="col-6">
-                                    <label for="note_party" class="form-label">Z kim</label>
-                                    <select name="note_party" id="note_party" class="form-select @error('note_party') is-invalid @enderror">
-                                        <option value="">Bez oznaczenia</option>
-                                        <option value="instructor" @selected(old('note_party') === 'instructor')>{{ $instructorOptionLabel }}</option>
-                                        <option value="client" @selected(old('note_party') === 'client')>{{ $clientOptionLabel }}</option>
-                                    </select>
-                                    @error('note_party')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                                </div>
-                            </div>
-                            <div class="mb-2 {{ $noteChannelIsOther ? '' : 'd-none' }}" id="note-channel-other-wrap">
-                                <label for="note_channel_other" class="form-label">Doprecyzowanie formy</label>
-                                <input type="text"
-                                       name="note_channel_other"
-                                       id="note_channel_other"
-                                       value="{{ old('note_channel_other') }}"
-                                       maxlength="100"
-                                       class="form-control @error('note_channel_other') is-invalid @enderror"
-                                       placeholder="np. SMS, spotkanie">
-                                @error('note_channel_other')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                            </div>
-                            <div class="form-text mb-3">Opcjonalnie. Puste „Z kim” = notatka nie z rozmowy z trenerem ani zamawiającym.</div>
-                            <textarea name="body" rows="4" class="form-control @error('body') is-invalid @enderror" placeholder="Ustalenie z rozmowy, bez zmiany statusu.">{{ old('body') }}</textarea>
-                            @error('body')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                            <button type="submit" class="btn btn-outline-primary mt-3">Dodaj notatkę</button>
-                        </div>
-                    </form>
-
                     <form method="POST" action="{{ route('closed-training-cases.update', $case) }}" class="card mb-4">
                         @csrf
                         @method('PUT')
@@ -766,6 +703,54 @@
                                 </select>
                                 @error('waiting_on')<div class="invalid-feedback">{{ $message }}</div>@enderror
                                 <div class="form-text">Kto ma wykonać następny ruch: PNE, szkoła albo prowadzący.</div>
+                            </div>
+                            @php
+                                $instructorOptionLabel = $case->listInstructorName();
+                                $instructorOptionLabel = $instructorOptionLabel === '—'
+                                    ? 'Trener (brak na sprawie)'
+                                    : 'Trener: '.$instructorOptionLabel;
+                                $clientOptionLabel = filled($case->contact_name)
+                                    ? 'Zamawiający: '.$case->contact_name
+                                    : 'Zamawiający (brak osoby)';
+                                $noteChannelIsOther = old('note_channel') === \App\Models\ClosedTrainingCaseEvent::NOTE_CHANNEL_OTHER;
+                            @endphp
+                            <div class="row g-2 mb-2">
+                                <div class="col-6">
+                                    <label for="note_channel" class="form-label">Forma kontaktu</label>
+                                    <select name="note_channel" id="note_channel" class="form-select @error('note_channel') is-invalid @enderror">
+                                        <option value="">Bez oznaczenia</option>
+                                        @foreach(\App\Models\ClosedTrainingCaseEvent::noteChannelOptions() as $value => $label)
+                                            <option value="{{ $value }}" @selected(old('note_channel') === $value)>{{ $label }}</option>
+                                        @endforeach
+                                    </select>
+                                    @error('note_channel')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                </div>
+                                <div class="col-6">
+                                    <label for="note_party" class="form-label">Z kim</label>
+                                    <select name="note_party" id="note_party" class="form-select @error('note_party') is-invalid @enderror">
+                                        <option value="">Bez oznaczenia</option>
+                                        <option value="instructor" @selected(old('note_party') === 'instructor')>{{ $instructorOptionLabel }}</option>
+                                        <option value="client" @selected(old('note_party') === 'client')>{{ $clientOptionLabel }}</option>
+                                    </select>
+                                    @error('note_party')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                </div>
+                            </div>
+                            <div class="mb-2 {{ $noteChannelIsOther ? '' : 'd-none' }}" id="note-channel-other-wrap">
+                                <label for="note_channel_other" class="form-label">Doprecyzowanie formy</label>
+                                <input type="text"
+                                       name="note_channel_other"
+                                       id="note_channel_other"
+                                       value="{{ old('note_channel_other') }}"
+                                       maxlength="100"
+                                       class="form-control @error('note_channel_other') is-invalid @enderror"
+                                       placeholder="np. spotkanie">
+                                @error('note_channel_other')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                            </div>
+                            <div class="form-text mb-3">Puste pola to wewnętrzna notatka. Wypełniona forma albo osoba oznacza kontakt.</div>
+                            <div class="mb-3">
+                                <label for="handling_note" class="form-label">Notatka</label>
+                                <textarea name="handling_note" id="handling_note" rows="4" class="form-control @error('handling_note') is-invalid @enderror" placeholder="Wewnętrzna notatka albo ustalenie z kontaktu.">{{ old('handling_note') }}</textarea>
+                                @error('handling_note')<div class="invalid-feedback">{{ $message }}</div>@enderror
                             </div>
                             <div class="mb-3">
                                 <label for="next_action" class="form-label">Następne działanie</label>
@@ -1791,51 +1776,6 @@
                 syncNoteChannelOtherVisibility();
             }
 
-            const noteForm = document.getElementById('closed-training-note-form');
-            const notePinBtn = document.getElementById('closed-training-note-pin');
-            const notePinStorageKey = 'closed_training_case_note_pinned';
-            if (noteForm && notePinBtn) {
-                const notePinIcon = notePinBtn.querySelector('i.bi');
-                const notePinLabel = notePinBtn.querySelector('[data-note-pin-label]');
-                const stickyStyle = 'top: 1rem; z-index: 1020; max-height: calc(100vh - 2rem); overflow-y: auto;';
-                const pinnedStyle = 'max-height: none; overflow-y: visible;';
-
-                const applyNotePin = function (pinned) {
-                    noteForm.classList.toggle('position-sticky', !pinned);
-                    noteForm.style.cssText = pinned ? pinnedStyle : stickyStyle;
-                    noteForm.setAttribute('data-note-sticky', pinned ? '0' : '1');
-                    notePinBtn.setAttribute('aria-pressed', pinned ? 'true' : 'false');
-                    notePinBtn.setAttribute(
-                        'aria-label',
-                        pinned ? 'Odepnij notatkę' : 'Przypnij notatkę'
-                    );
-                    notePinBtn.title = pinned
-                        ? 'Odepnij — znów pływa przy przewijaniu'
-                        : 'Przypnij — zostaje na swoim miejscu';
-                    if (notePinIcon) {
-                        notePinIcon.className = pinned ? 'bi bi-pin-angle-fill' : 'bi bi-pin-angle';
-                    }
-                    if (notePinLabel) {
-                        notePinLabel.textContent = pinned ? 'Odepnij' : 'Przypnij';
-                    }
-                };
-
-                let notePinned = false;
-                try {
-                    notePinned = window.localStorage.getItem(notePinStorageKey) === '1';
-                } catch (e) {
-                    notePinned = false;
-                }
-                applyNotePin(notePinned);
-
-                notePinBtn.addEventListener('click', function () {
-                    notePinned = !notePinned;
-                    applyNotePin(notePinned);
-                    try {
-                        window.localStorage.setItem(notePinStorageKey, notePinned ? '1' : '0');
-                    } catch (e) {}
-                });
-            }
         })();
     </script>
 </x-app-layout>

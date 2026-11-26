@@ -430,8 +430,19 @@ class ClosedTrainingCaseController extends Controller
             ],
             'assignee_user_id' => ['nullable', 'integer', Rule::exists('users', 'id')],
             'waiting_on' => ['nullable', Rule::in(array_keys(ClosedTrainingCase::waitingOnOptions()))],
+            'note_channel' => ['nullable', 'string', Rule::in(array_keys(ClosedTrainingCaseEvent::noteChannelOptions()))],
+            'note_channel_other' => ['nullable', 'string', 'max:100', Rule::requiredIf(
+                fn () => $request->input('note_channel') === ClosedTrainingCaseEvent::NOTE_CHANNEL_OTHER
+            )],
+            'note_party' => ['nullable', 'string', Rule::in(array_keys(ClosedTrainingCaseEvent::notePartyOptions()))],
+            'handling_note' => ['nullable', 'string', 'max:3000', Rule::requiredIf(
+                fn () => filled($request->input('note_channel')) || filled($request->input('note_party'))
+            )],
             'next_action' => 'nullable|string|max:1000',
             'next_action_at' => 'nullable|date',
+        ], [
+            'handling_note.required' => 'Wpisz treść notatki, gdy oznaczasz formę kontaktu albo osobę.',
+            'note_channel_other.required' => 'Doprecyzuj formę kontaktu.',
         ]);
 
         $this->cases->updateHandling($closedTrainingCase, [
@@ -442,6 +453,16 @@ class ClosedTrainingCaseController extends Controller
             'next_action' => $this->blankToNull($data['next_action'] ?? null),
             'next_action_at' => $data['next_action_at'] ?? null,
         ], $request->user());
+
+        $handlingNote = trim((string) ($data['handling_note'] ?? ''));
+        if ($handlingNote !== '') {
+            $this->cases->addNote($closedTrainingCase, $request->user(), [
+                'body' => $handlingNote,
+                'note_channel' => $data['note_channel'] ?? null,
+                'note_channel_other' => $data['note_channel_other'] ?? null,
+                'note_party' => $data['note_party'] ?? null,
+            ]);
+        }
 
         return redirect()
             ->route('closed-training-cases.show', $closedTrainingCase)

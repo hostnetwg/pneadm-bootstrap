@@ -16,6 +16,21 @@ class TrainerPortalTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_trainer_note_is_visible_at_the_top_of_the_case(): void
+    {
+        [$user, , $case] = $this->fixtures();
+        $case->update(['trainer_note' => 'Ustaliłem termin po rozmowie.']);
+
+        $this->actingAs($user)
+            ->get(route('closed-training-cases.show', $case))
+            ->assertOk()
+            ->assertSeeInOrder([
+                'Notatka trenera',
+                'Ustaliłem termin po rozmowie.',
+                'Kontakt szkoły',
+            ], false);
+    }
+
     public function test_assignment_alone_does_not_open_the_trainer_panel(): void
     {
         [$user, $instructor, $case] = $this->fixtures();
