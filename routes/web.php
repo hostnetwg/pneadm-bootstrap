@@ -588,8 +588,11 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
         Route::delete('/{fileLink}', [\App\Http\Controllers\CourseFileLinkController::class, 'destroy'])->name('destroy');
     });
 
-    // Rozliczenia trenerów (faktury wypłat) — tylko Super Administrator
+    // Rozliczenia trenerów i notatka o instruktorze — tylko Super Administrator
     Route::middleware('super_admin')->group(function () {
+        Route::put('/courses/{course}/instructor-note', [\App\Http\Controllers\CourseInstructorNoteController::class, 'update'])
+            ->whereNumber('course')
+            ->name('courses.instructor-note.update');
         Route::get('/instructors/{instructor}/instructor-invoices', [\App\Http\Controllers\CourseInstructorSettlementController::class, 'instructorInvoices'])
             ->name('instructors.instructor-invoices.index');
         Route::post('/instructor-invoices/{instructorInvoice}/mark-paid', [\App\Http\Controllers\CourseInstructorSettlementController::class, 'markPaid'])

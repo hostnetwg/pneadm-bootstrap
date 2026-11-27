@@ -155,6 +155,7 @@ class CoursesController extends Controller
         ];
 
         if (auth()->user()?->isSuperAdmin()) {
+            $eagerLoads[] = 'instructorNote:id,course_id,body';
             $eagerLoads['instructorSettlementItem.instructorInvoice'] = function ($query) {
                 $query->select(
                     'id',

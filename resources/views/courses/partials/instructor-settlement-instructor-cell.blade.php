@@ -62,4 +62,7 @@
             </div>
         @endif
     @endif
+    @if($canManageInstructorSettlement)
+        @include('courses.partials.instructor-note-trigger', ['course' => $course])
+    @endif
 </div>

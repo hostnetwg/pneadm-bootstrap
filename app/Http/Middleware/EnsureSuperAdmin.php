@@ -16,11 +16,11 @@ class EnsureSuperAdmin
             if ($request->expectsJson()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Brak uprawnień. Tylko Super Administrator może zarządzać rozliczeniami trenerów.',
+                    'message' => 'Brak uprawnień. Tylko Super Administrator może zarządzać rozliczeniami i notatką o instruktorze.',
                 ], 403);
             }
 
-            abort(403, 'Brak uprawnień. Tylko Super Administrator może zarządzać rozliczeniami trenerów.');
+            abort(403, 'Brak uprawnień. Tylko Super Administrator może zarządzać rozliczeniami i notatką o instruktorze.');
         }
 
         return $next($request);

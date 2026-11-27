@@ -1,7 +1,11 @@
 # Następne Kroki
 
-Data utworzenia/aktualizacji: 2026-11-25
+Data utworzenia/aktualizacji: 2026-11-27
 Status: plan roboczy, do potwierdzenia przez właściciela
+
+## Ostatnio (2026-11-27) — Notatka o instruktorze na liście szkoleń
+
+Na `/courses`, w kolumnie instruktora pod rozliczeniem, jest link **Notatka**. Widzą go tylko Super Administratorzy, tak jak rozliczenie. Zapis otwiera okno Bootstrap. Po lewej, na wysokości Anuluj i Zapisz, jest **Generuj**: wstawia `SZKOLENIE: tytuł (data) ` ze spacją na końcu, a przy szkoleniu zamkniętym `SZKOLENIE RP: tytuł (data) `. Obok Anuluj jest **USUŃ**, które po potwierdzeniu kasuje notatkę. Po zapisaniu treści link zmienia się w karteczkę, a najechanie pokazuje treść. Puste pole usuwa notatkę. Rekord jest w `course_instructor_notes` i należy do szkolenia (`courses`), nie do instruktora. Pole „Notatki techniczne” na edycji szkolenia zostaje osobno. Migracja: `2026_11_27_100000_create_course_instructor_notes_table`. Kanon: [COURSE_INSTRUCTOR_NOTES.md](./COURSE_INSTRUCTOR_NOTES.md). Deploy: [2026-11-instructor-note-deploy.md](./deploy/2026-11-instructor-note-deploy.md).
 
 ## Ostatnio (2026-11-25) — Panel trenera na pnedu.pl
 

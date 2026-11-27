@@ -7,6 +7,7 @@ Krótka numeracja panelu. Szczegóły zawsze w `docs/`. Nowy numer wersji (np. 1
 Panel trenera na pnedu.pl. Na [karcie instruktora](/instructors) włączasz dostęp i osobno SMS. Na [sprawie szkolenia zamkniętego](/closed-training-cases) sprawa wchodzi do panelu dopiero po „Pokaż w panelu trenera”. Trener widzi zapytanie i kontakt, wpisuje termin, a opiekun dostaje dzwonek i e-mail.
 
 - Kanon: [TRAINER_PORTAL.md](docs/TRAINER_PORTAL.md)
+- **Hotfix 2026-11-27:** na [liście szkoleń](/courses), w kolumnie instruktora pod rozliczeniem, Super Administrator ma **Notatkę**. Po zapisie widać karteczkę, a najechanie pokazuje treść. **Generuj** wstawia nagłówek `SZKOLENIE: tytuł (data)` ze spacją na końcu, a przy szkoleniu zamkniętym `SZKOLENIE RP:`. **USUŃ** kasuje notatkę po potwierdzeniu. To nie są notatki techniczne z edycji szkolenia. Kanon: [COURSE_INSTRUCTOR_NOTES.md](docs/COURSE_INSTRUCTOR_NOTES.md)
 - **Hotfix 2026-11-25:** notatka z panelu trenera jest na [sprawie szkolenia zamkniętego](/closed-training-cases) przy terminie. Gdy trener zmienia datę, ta notatka jest też w mailu do opiekuna.
 - **Hotfix 2026-11-25:** na [sprawie szkolenia zamkniętego](/closed-training-cases) zaznaczenie „Pokaż w panelu trenera” otwiera wiadomość do trenera. Sprawa pojawia się u niego dopiero po **Wyślij**. **Ukryj w panelu trenera** chowa zapytanie, a wpisany termin zostaje.
 - **Hotfix 2026-11-25:** mail o nowym zapytaniu do trenera kończy się imieniem i nazwiskiem administratora, który go wysłał, oraz stopką NODN „Platforma Nowoczesnej Edukacji”.

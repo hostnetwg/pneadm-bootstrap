@@ -388,6 +388,15 @@ class Course extends Model
     }
 
     /**
+     * Notatka operacyjna o prowadzącym to szkolenie.
+     * Osobna od pola courses.notatki (notatki techniczne na karcie szkolenia).
+     */
+    public function instructorNote()
+    {
+        return $this->hasOne(CourseInstructorNote::class, 'course_id');
+    }
+
+    /**
      * Publiczny URL formularza rejestracji zaświadczenia na pnedu.pl (lub null).
      */
     public function certificateRegistrationPublicUrl(): ?string
@@ -496,6 +505,18 @@ class Course extends Model
         $plain = trim(preg_replace('/\s+/u', ' ', $plain) ?? $plain);
 
         return $plain !== '' ? $plain : $fallback;
+    }
+
+    /**
+     * Nagłówek notatki o instruktorze: SZKOLENIE: tytuł (data),
+     * a dla szkolenia zamkniętego SZKOLENIE RP: tytuł (data).
+     */
+    public function instructorNoteHeader(): string
+    {
+        $label = $this->category === 'closed' ? 'SZKOLENIE RP' : 'SZKOLENIE';
+        $date = $this->start_date ? $this->start_date->format('d.m.Y') : 'brak daty';
+
+        return $label.': '.$this->plainTitle().' ('.$date.') ';
     }
 
     /**

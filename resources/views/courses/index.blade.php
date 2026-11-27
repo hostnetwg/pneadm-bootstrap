@@ -1944,6 +1944,7 @@
         });
     </script>
     @if(auth()->user()?->isSuperAdmin())
+        @include('courses.partials.instructor-note-modal')
         @include('courses.partials.instructor-settlement-modal')
     @endif
     @endpush
